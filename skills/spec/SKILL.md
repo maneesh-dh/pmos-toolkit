@@ -82,16 +82,24 @@ Act as each role IN SEQUENCE. For each role, identify gaps, risks, and missing d
 
 **Tier 3:** Use all applicable roles.
 
-### Roles & Focus Areas
+### Roles, Ordering & Focus Areas
 
-| Role | Focus | Skip if... |
-|------|-------|------------|
-| **Principal Architect** | System boundaries, service interactions, data flow, scalability | No new services or data flows |
-| **Principal Designer** | UI components, state management, user interactions, responsive behavior | No frontend changes |
-| **Database Administrator** | Schema design, migrations, indexes, query patterns, data integrity | No DB changes |
-| **Product Director** | User personas, user flows, edge cases, empty states, first-time experience | Already thorough in requirements |
-| **Senior Analyst** | Functional & non-functional requirements, acceptance criteria, success metrics | Tier 1 |
-| **DevOps Engineer** | Deployment, configuration, feature flags, monitoring, rollout strategy | Tier 1-2 |
+Run roles in this order. Each role's decisions inform the next — architecture constrains schema, schema constrains APIs, APIs constrain frontend, user flows validate the full stack, deployment wraps everything.
+
+| Order | Role | Focus | Skip if... |
+|-------|------|-------|------------|
+| 1 | **Principal Architect** | System boundaries, service interactions, data flow, deployment model | No new services or data flows |
+| 2 | **Database Administrator** | Schema design, migrations, indexes, query patterns, data integrity | No DB changes |
+| 3 | **Principal Designer** | UI components, state management, design tokens, user interactions, responsive behavior | No frontend changes |
+| 4 | **Product Director** | User personas, user flows, edge cases, empty states, first-time experience | Already thorough in requirements |
+| 5 | **DevOps Engineer** | Deployment, configuration, feature flags, monitoring, rollout strategy | Tier 1-2 |
+| 6 | **Senior Analyst** | Functional & non-functional requirements coverage, acceptance criteria, success metrics — final gap sweep | Tier 1 |
+
+**Why this order:** Architect establishes the system shape (containers, protocols, service boundaries). DBA designs the schema within those boundaries. Designer builds the frontend knowing what data and APIs exist. Product Director validates that the technical decisions serve user flows. DevOps wraps deployment around the full picture. Analyst does a final coverage check.
+
+**When to adjust:** If the project is primarily a frontend/UX change with minimal backend work, move Designer to position 2 (before DBA) — the UX may drive what data needs to be stored. State your reordering rationale when you announce the first role.
+
+For Tier 2 (2-3 roles), pick from this list in order — don't jump to role 5 while skipping role 2.
 
 ### Role Protocol (MANDATORY for Tier 2-3)
 

@@ -50,3 +50,36 @@ echo
 
 echo "=== orphaned jumpcloud helpers ==="
 ps -Ao pid,ppid,state,etime,command | awk '/JumpCloudGo-Chrome/ && $2==1 {print}' || true
+echo
+
+echo "=== managed chrome profiles with jumpcloud extension ==="
+python3 - <<'PY' || true
+import json, os
+ext_id='jdoahkhfkeipblhbhppmcbdgapeoaopa'
+base=os.path.expanduser('~/Library/Application Support/Google/Chrome')
+state_path=os.path.join(base, 'Local State')
+try:
+    with open(state_path) as f:
+        state=json.load(f)
+except Exception:
+    raise SystemExit(0)
+
+found=False
+for name in os.listdir(base):
+    pref=os.path.join(base, name, 'Preferences')
+    if not os.path.isfile(pref):
+        continue
+    try:
+        with open(pref) as f:
+            data=json.load(f)
+    except Exception:
+        continue
+    if ext_id in json.dumps(data.get('extensions', {}).get('settings', {})):
+        info=state.get('profile', {}).get('info_cache', {}).get(name, {})
+        print(f'[{name}]')
+        for key in ['name', 'user_name', 'hosted_domain', 'is_managed']:
+            print(f'{key}={info.get(key)}')
+        found=True
+if not found:
+    print('none')
+PY

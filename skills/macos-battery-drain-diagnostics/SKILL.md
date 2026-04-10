@@ -93,17 +93,60 @@ end tell
 APPLESCRIPT
 ```
 
-Check managed-profile extension ownership:
+Check managed-profile extension ownership dynamically:
 
 ```bash
-rg -l 'jdoahkhfkeipblhbhppmcbdgapeoaopa' "$HOME/Library/Application Support/Google/Chrome"/*/Preferences "$HOME/Library/Application Support/Google/Chrome"/*/'Secure Preferences' 2>/dev/null
+ext_id='jdoahkhfkeipblhbhppmcbdgapeoaopa'
+rg -l "$ext_id" "$HOME/Library/Application Support/Google/Chrome"/*/Preferences "$HOME/Library/Application Support/Google/Chrome"/*/'Secure Preferences' 2>/dev/null
 python3 - <<'PY'
 import json, os
-path=os.path.expanduser('~/Library/Application Support/Google/Chrome/Local State')
+ext_id='jdoahkhfkeipblhbhppmcbdgapeoaopa'
+base=os.path.expanduser('~/Library/Application Support/Google/Chrome')
+matches=[]
+for name in os.listdir(base):
+    pref=os.path.join(base, name, 'Preferences')
+    if not os.path.isfile(pref):
+        continue
+    try:
+        with open(pref) as f:
+            data=json.load(f)
+    except Exception:
+        continue
+    if ext_id in json.dumps(data.get('extensions', {}).get('settings', {})):
+        matches.append(name)
+
+path=os.path.join(base, 'Local State')
 with open(path) as f:
     data=json.load(f)
-for profile, info in data.get('profile', {}).get('info_cache', {}).items():
-    if profile == 'Profile 8':
+for profile in matches:
+    info=data.get('profile', {}).get('info_cache', {}).get(profile, {})
+    print(f'[{profile}]')
+    for k in ['name','user_name','hosted_domain','is_managed']:
+        print(f'{k}={info.get(k)}')
+PY
+```
+
+If you just want a reusable one-liner:
+
+```bash
+python3 - <<'PY'
+import json, os
+ext_id='jdoahkhfkeipblhbhppmcbdgapeoaopa'
+base=os.path.expanduser('~/Library/Application Support/Google/Chrome')
+with open(os.path.join(base, 'Local State')) as f:
+    state=json.load(f)
+for name in os.listdir(base):
+    pref=os.path.join(base, name, 'Preferences')
+    if not os.path.isfile(pref):
+        continue
+    try:
+        with open(pref) as f:
+            data=json.load(f)
+    except Exception:
+        continue
+    if ext_id in json.dumps(data.get('extensions', {}).get('settings', {})):
+        info=state.get('profile', {}).get('info_cache', {}).get(name, {})
+        print(f'[{name}]')
         for k in ['name','user_name','hosted_domain','is_managed']:
             print(f'{k}={info.get(k)}')
 PY

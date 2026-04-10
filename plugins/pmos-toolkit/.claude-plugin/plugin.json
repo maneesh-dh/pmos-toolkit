@@ -5,7 +5,8 @@
   "author": {
     "name": "Maneesh Dhabria"
   },
-  "repository": "https://github.com/maneeshdhabria/agent-skills",
+  "homepage": "https://github.com/maneesh-dhabria/pmos-toolkit",
+  "repository": "https://github.com/maneesh-dhabria/pmos-toolkit",
   "license": "MIT",
   "keywords": [
     "requirements",

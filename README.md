@@ -1,6 +1,6 @@
 # PMOS Toolkit
 
-A plugin for Claude Code and Codex CLI that provides a structured software delivery pipeline — from requirements through to verification.
+A plugin marketplace for Claude Code and Codex CLI that provides a structured software delivery pipeline — from requirements through to verification.
 
 **Plugin name:** `pmos-toolkit`
 **Namespace:** Skills are invoked as `/pmos-toolkit:<skill-name>`
@@ -8,13 +8,19 @@ A plugin for Claude Code and Codex CLI that provides a structured software deliv
 ## Repository Structure
 
 ```
-agent-skills/
-├── .claude-plugin/    Plugin manifest (Claude Code)
-├── .codex-plugin/     Plugin manifest (Codex CLI)
-├── skills/            Plugin skills (delivered via plugin system)
-├── plugins/           Bundled third-party skills (e.g., impeccable design ecosystem)
-├── agents/            Shared agent definitions
-└── link-skills.sh     Symlink script for bundled third-party skills
+pmos-toolkit/
+├── .claude-plugin/
+│   └── marketplace.json       Marketplace manifest (this repo IS the marketplace)
+├── .codex/
+│   └── INSTALL.md             Codex installation instructions
+├── plugins/
+│   └── pmos-toolkit/
+│       ├── .claude-plugin/
+│       │   └── plugin.json    Plugin manifest
+│       ├── .codex-plugin/
+│       │   └── plugin.json    Codex plugin manifest
+│       ├── skills/            Plugin skills
+│       └── agents/            Shared agent definitions
 ```
 
 ## Skills
@@ -39,131 +45,56 @@ agent-skills/
                    optional enhancers
 ```
 
-## Installation
+## Install
 
 ### Claude Code
 
-**From GitHub:**
+```bash
+/plugin marketplace add maneesh-dhabria/pmos-toolkit
+/plugin install pmos-toolkit
+```
+
+### Codex
+
+Tell Codex:
+
+```
+Fetch and follow instructions from https://raw.githubusercontent.com/maneesh-dhabria/pmos-toolkit/refs/heads/main/.codex/INSTALL.md
+```
+
+Or manually:
 
 ```bash
-# Add the marketplace (one-time)
-/plugin marketplace add maneeshdhabria/agent-skills
-
-# Enable the plugin
-/plugin enable pmos-toolkit
+git clone https://github.com/maneesh-dhabria/pmos-toolkit.git ~/.codex/pmos-toolkit
+mkdir -p ~/.agents/skills
+ln -s ~/.codex/pmos-toolkit/plugins/pmos-toolkit/skills ~/.agents/skills/pmos-toolkit
 ```
 
-**Local development:**
-
-```bash
-# Clone the repo
-git clone https://github.com/maneeshdhabria/agent-skills.git
-
-# Load directly (per-session)
-claude --plugin-dir /path/to/agent-skills
-
-# Or set up a persistent local marketplace (see Local Development below)
-```
-
-### Codex CLI
-
-Create or update `~/.agents/plugins/marketplace.json`:
-
-```json
-{
-  "name": "local-plugins",
-  "interface": { "displayName": "Local Plugins" },
-  "plugins": [
-    {
-      "name": "pmos-toolkit",
-      "source": { "source": "local", "path": "/path/to/agent-skills" },
-      "policy": { "installation": "AVAILABLE" },
-      "category": "Productivity"
-    }
-  ]
-}
-```
-
-Then enable in `~/.codex/config.toml`:
-
-```toml
-[plugins."pmos-toolkit@local-plugins"]
-enabled = true
-```
+Then restart Codex.
 
 ### Verify
 
-Open a new session. Try `/pmos-toolkit:verify` or `/pmos-toolkit:spec` to confirm the plugin is loaded.
+Open a new session and run `/pmos-toolkit:spec` or `/pmos-toolkit:plan` to confirm the plugin is loaded.
 
 ## Local Development
 
-For persistent local development without `--plugin-dir` on every session:
-
-1. Clone this repo
-2. Create a local marketplace directory:
+For developing skills locally:
 
 ```bash
-mkdir -p ~/.claude/plugins/marketplaces/local-plugins/.claude-plugin
-```
+# Clone the repo
+git clone https://github.com/maneesh-dhabria/pmos-toolkit.git
 
-3. Create `~/.claude/plugins/marketplaces/local-plugins/.claude-plugin/marketplace.json`:
-
-```json
-{
-  "name": "local-plugins",
-  "owner": { "name": "Your Name" },
-  "plugins": [
-    {
-      "name": "pmos-toolkit",
-      "source": { "source": "local", "path": "/absolute/path/to/agent-skills" },
-      "version": "1.0.0",
-      "category": "productivity"
-    }
-  ]
-}
-```
-
-4. Register the marketplace in `~/.claude/plugins/known_marketplaces.json`:
-
-```json
-{
-  "local-plugins": {
-    "source": { "source": "local", "path": "/path/to/local-plugins" },
-    "installLocation": "/path/to/local-plugins"
-  }
-}
-```
-
-5. Enable in your `settings.json`:
-
-```json
-{
-  "enabledPlugins": {
-    "pmos-toolkit@local-plugins": true
-  }
-}
+# Load directly (per-session)
+claude --plugin-dir /path/to/pmos-toolkit
 ```
 
 Changes to skill files take effect after restarting your session or running `/reload-plugins`.
-
-## Bundled Third-Party Skills
-
-The `plugins/` directory contains 23 design and frontend skills from the impeccable ecosystem (adapt, animate, arrange, audit, bolder, clarify, colorize, critique, delight, distill, extract, harden, impeccable, normalize, onboard, optimize, overdrive, polish, quieter, shape, typeset, etc.).
-
-These are **not** part of the pmos-toolkit plugin. They're bundled for convenience and symlinked into config directories via `link-skills.sh`. If you already have the `frontend-design` plugin installed, you don't need these — the official plugin provides the same skills.
-
-To set up the bundled skills:
-
-```bash
-# Edit CONFIG_DIRS in link-skills.sh to match your config directories, then:
-./link-skills.sh
-```
 
 ## Adding New Skills
 
 Use `/pmos-toolkit:create-skill` inside a session, or manually:
 
-1. Create `skills/<skill-name>/SKILL.md` with the required frontmatter:
+1. Create `plugins/pmos-toolkit/skills/<skill-name>/SKILL.md` with the required frontmatter:
 
 ```yaml
 ---
@@ -176,7 +107,14 @@ argument-hint: "<what to pass>"
 
 2. Restart your session or run `/reload-plugins`.
 
+## Updating
+
+```bash
+# Claude Code updates automatically via the marketplace.
+# For Codex:
+cd ~/.codex/pmos-toolkit && git pull
+```
+
 ## Requirements
 
 - Claude Code or Codex CLI
-- Bash (for `link-skills.sh`, only needed for bundled third-party skills)

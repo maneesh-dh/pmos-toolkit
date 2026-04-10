@@ -1,32 +1,37 @@
-# Agent Skills
+# PMOS Toolkit
 
-A collection of reusable skills for Claude Code, Codex CLI, and other AI coding agents. Skills are slash-command workflows (`/verify`, `/spec`, `/plan`, etc.) that guide agents through structured processes.
+A plugin for Claude Code and Codex CLI that provides a structured software delivery pipeline — from requirements through to verification.
+
+**Plugin name:** `pmos-toolkit`
+**Namespace:** Skills are invoked as `/pmos-toolkit:<skill-name>`
 
 ## Repository Structure
 
 ```
 agent-skills/
-├── skills/          User-created skills (pipeline, utilities, custom workflows)
-├── plugins/         Plugin-contributed skills (e.g., impeccable design ecosystem)
-├── agents/          Shared agent definitions
-└── link-skills.sh   Symlink setup script
+├── .claude-plugin/    Plugin manifest (Claude Code)
+├── .codex-plugin/     Plugin manifest (Codex CLI)
+├── skills/            Plugin skills (delivered via plugin system)
+├── plugins/           Bundled third-party skills (e.g., impeccable design ecosystem)
+├── agents/            Shared agent definitions
+└── link-skills.sh     Symlink script for bundled third-party skills
 ```
 
-### Skills (User-Created)
+## Skills
 
 | Skill | Description |
 |-------|-------------|
-| `/requirements` | Brainstorm and shape a requirements document — first pipeline stage |
-| `/creativity` | Structured creativity techniques for non-obvious improvements (optional enhancer) |
-| `/msf` | Motivation, Satisfaction, Friction analysis with PSYCH scoring (optional enhancer) |
-| `/spec` | Technical specification from requirements — second pipeline stage |
-| `/plan` | Execution plan from a spec — third pipeline stage |
-| `/execute` | Implement a plan end-to-end with TDD and verification |
-| `/verify` | Post-implementation verification gate — lint, test, review, QA |
-| `/changelog` | Generate user-facing changelog entries after merging to main |
-| `/session-log` | Capture learnings, decisions, and patterns from a session |
-| `/create-skill` | Create a new skill with cross-platform conventions |
-| `/macos-battery-drain-diagnostics` | Diagnose battery drain, orphaned processes, and cleanup opportunities |
+| `/pmos-toolkit:requirements` | Brainstorm and shape a requirements document — first pipeline stage |
+| `/pmos-toolkit:creativity` | Structured creativity techniques for non-obvious improvements (optional enhancer) |
+| `/pmos-toolkit:msf` | Motivation, Satisfaction, Friction analysis with PSYCH scoring (optional enhancer) |
+| `/pmos-toolkit:spec` | Technical specification from requirements — second pipeline stage |
+| `/pmos-toolkit:plan` | Execution plan from a spec — third pipeline stage |
+| `/pmos-toolkit:execute` | Implement a plan end-to-end with TDD and verification |
+| `/pmos-toolkit:verify` | Post-implementation verification gate — lint, test, review, QA |
+| `/pmos-toolkit:changelog` | Generate user-facing changelog entries after merging to main |
+| `/pmos-toolkit:session-log` | Capture learnings, decisions, and patterns from a session |
+| `/pmos-toolkit:create-skill` | Create a new skill with cross-platform conventions |
+| `/pmos-toolkit:macos-battery-drain-diagnostics` | Diagnose battery drain, orphaned processes, and cleanup opportunities |
 
 **Pipeline flow:**
 ```
@@ -34,78 +39,129 @@ agent-skills/
                    optional enhancers
 ```
 
-### Plugins (Impeccable Design Ecosystem)
+## Installation
 
-23 design and frontend skills for building production-grade interfaces:
+### Claude Code
 
-| Skill | Description |
-|-------|-------------|
-| `/impeccable` | Create distinctive, production-grade frontend interfaces |
-| `/critique` | Evaluate design from a UX perspective with quantitative scoring |
-| `/shape` | Plan UX and UI before writing code |
-| `/audit` | Accessibility, performance, theming, and responsive design checks |
-| `/adapt` | Responsive design across screen sizes and devices |
-| `/animate` | Purposeful animations and micro-interactions |
-| `/arrange` | Improve layout, spacing, and visual rhythm |
-| `/bolder` | Amplify safe designs to be more visually impactful |
-| `/clarify` | Improve UX copy, error messages, and microcopy |
-| `/colorize` | Add strategic color to monochromatic designs |
-| `/delight` | Add moments of joy and personality |
-| `/distill` | Strip designs to their essence |
-| `/extract` | Extract reusable components and design tokens |
-| `/harden` | Error handling, i18n, and edge case resilience |
-| `/normalize` | Realign UI to design system standards |
-| `/onboard` | Design onboarding flows and first-run experiences |
-| `/optimize` | Diagnose and fix UI performance issues |
-| `/overdrive` | Technically ambitious implementations — shaders, physics, 60fps |
-| `/polish` | Final quality pass on alignment, spacing, and consistency |
-| `/quieter` | Tone down overstimulating designs |
-| `/typeset` | Fix typography hierarchy, sizing, and readability |
-
-## Setup
-
-### 1. Clone the repository
+**From GitHub:**
 
 ```bash
-git clone https://github.com/maneeshdhabria/agent-skills.git ~/Desktop/Projects/agent-skills
+# Add the marketplace (one-time)
+/plugin marketplace add maneeshdhabria/agent-skills
+
+# Enable the plugin
+/plugin enable pmos-toolkit
 ```
 
-### 2. Run the link script
-
-The link script creates individual symlinks from your agent config directories into the skills discovery path. By default it targets:
-
-- `~/.claude-personal/skills/`
-- `~/.claude-workmax/skills/`
-- `~/.codex-work/skills/`
-
-Edit the `CONFIG_DIRS` array in `link-skills.sh` to match your setup, then run:
+**Local development:**
 
 ```bash
+# Clone the repo
+git clone https://github.com/maneeshdhabria/agent-skills.git
+
+# Load directly (per-session)
+claude --plugin-dir /path/to/agent-skills
+
+# Or set up a persistent local marketplace (see Local Development below)
+```
+
+### Codex CLI
+
+Create or update `~/.agents/plugins/marketplace.json`:
+
+```json
+{
+  "name": "local-plugins",
+  "interface": { "displayName": "Local Plugins" },
+  "plugins": [
+    {
+      "name": "pmos-toolkit",
+      "source": { "source": "local", "path": "/path/to/agent-skills" },
+      "policy": { "installation": "AVAILABLE" },
+      "category": "Productivity"
+    }
+  ]
+}
+```
+
+Then enable in `~/.codex/config.toml`:
+
+```toml
+[plugins."pmos-toolkit@local-plugins"]
+enabled = true
+```
+
+### Verify
+
+Open a new session. Try `/pmos-toolkit:verify` or `/pmos-toolkit:spec` to confirm the plugin is loaded.
+
+## Local Development
+
+For persistent local development without `--plugin-dir` on every session:
+
+1. Clone this repo
+2. Create a local marketplace directory:
+
+```bash
+mkdir -p ~/.claude/plugins/marketplaces/local-plugins/.claude-plugin
+```
+
+3. Create `~/.claude/plugins/marketplaces/local-plugins/.claude-plugin/marketplace.json`:
+
+```json
+{
+  "name": "local-plugins",
+  "owner": { "name": "Your Name" },
+  "plugins": [
+    {
+      "name": "pmos-toolkit",
+      "source": { "source": "local", "path": "/absolute/path/to/agent-skills" },
+      "version": "1.0.0",
+      "category": "productivity"
+    }
+  ]
+}
+```
+
+4. Register the marketplace in `~/.claude/plugins/known_marketplaces.json`:
+
+```json
+{
+  "local-plugins": {
+    "source": { "source": "local", "path": "/path/to/local-plugins" },
+    "installLocation": "/path/to/local-plugins"
+  }
+}
+```
+
+5. Enable in your `settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "pmos-toolkit@local-plugins": true
+  }
+}
+```
+
+Changes to skill files take effect after restarting your session or running `/reload-plugins`.
+
+## Bundled Third-Party Skills
+
+The `plugins/` directory contains 23 design and frontend skills from the impeccable ecosystem (adapt, animate, arrange, audit, bolder, clarify, colorize, critique, delight, distill, extract, harden, impeccable, normalize, onboard, optimize, overdrive, polish, quieter, shape, typeset, etc.).
+
+These are **not** part of the pmos-toolkit plugin. They're bundled for convenience and symlinked into config directories via `link-skills.sh`. If you already have the `frontend-design` plugin installed, you don't need these — the official plugin provides the same skills.
+
+To set up the bundled skills:
+
+```bash
+# Edit CONFIG_DIRS in link-skills.sh to match your config directories, then:
 ./link-skills.sh
 ```
 
-This symlinks every skill (from both `skills/` and `plugins/`) into each config directory so the CLI discovers them as `/skill-name`.
+## Adding New Skills
 
-### 3. Verify
-
-Open a new Claude Code or Codex session. Your skills should appear in the skill list. Try `/verify` or `/spec` to confirm.
-
-### Custom Config Directories
-
-If your agent config lives somewhere other than the defaults, update `CONFIG_DIRS` in `link-skills.sh`:
-
-```bash
-CONFIG_DIRS=(
-  "$HOME/.my-claude-config"
-  "$HOME/.my-codex-config"
-)
-```
-
-Then re-run the script.
-
-## Adding Your Own Skills
-
-Use the `/create-skill` command inside a session, or manually:
+Use `/pmos-toolkit:create-skill` inside a session, or manually:
 
 1. Create `skills/<skill-name>/SKILL.md` with the required frontmatter:
 
@@ -118,17 +174,9 @@ argument-hint: "<what to pass>"
 ---
 ```
 
-2. Run `./link-skills.sh` to update symlinks.
-
-User-created skills go in `skills/`. Plugin-contributed skills go in `plugins/`. This separation keeps the repo browsable without affecting discovery — the CLI sees all skills identically.
-
-## How Discovery Works
-
-The CLI scans the `skills/` directory in your config folder for subdirectories containing `SKILL.md`. Each skill is identified by its directory name. The `link-skills.sh` script merges both `skills/` and `plugins/` into a flat set of symlinks so the CLI finds everything in one place.
-
-No manifest, registry, or configuration file is needed — it's purely filesystem-based.
+2. Restart your session or run `/reload-plugins`.
 
 ## Requirements
 
-- Claude Code, Codex CLI, or another agent that supports skill discovery via `~/.*/skills/` directories
-- Bash (for `link-skills.sh`)
+- Claude Code or Codex CLI
+- Bash (for `link-skills.sh`, only needed for bundled third-party skills)

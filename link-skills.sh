@@ -1,6 +1,11 @@
 #!/bin/bash
-# link-skills.sh — Symlinks all skills (user + plugin) into each config directory's skills/ folder.
-# Run this after adding or removing skills.
+# link-skills.sh — Symlinks plugin ecosystem skills into config directories.
+#
+# User-created skills (skills/) are delivered via the pmos-toolkit plugin.
+# This script only handles plugin ecosystem skills (plugins/) that aren't
+# part of the plugin manifest, plus .system skills.
+#
+# Run this after adding or removing plugin ecosystem skills.
 
 REPO="$(cd "$(dirname "$0")" && pwd)"
 CONFIG_DIRS=(
@@ -16,7 +21,6 @@ for dir in "${CONFIG_DIRS[@]}"; do
   fi
 
   # Remove old symlink (if skills/ is a single symlink to the repo)
-  # or remove old individual symlinks
   if [ -L "$dir/skills" ]; then
     rm "$dir/skills"
     mkdir -p "$dir/skills"
@@ -30,14 +34,7 @@ for dir in "${CONFIG_DIRS[@]}"; do
     echo "Created $dir/skills/"
   fi
 
-  # Link user skills
-  for skill in "$REPO"/skills/*/; do
-    [ -d "$skill" ] || continue
-    name=$(basename "$skill")
-    ln -s "$skill" "$dir/skills/$name"
-  done
-
-  # Link plugin skills
+  # Link plugin ecosystem skills (e.g., impeccable design skills)
   for skill in "$REPO"/plugins/*/; do
     [ -d "$skill" ] || continue
     name=$(basename "$skill")
@@ -53,4 +50,7 @@ for dir in "${CONFIG_DIRS[@]}"; do
   echo "Linked $count skills into $dir/skills/"
 done
 
+echo ""
+echo "Note: User skills (skills/) are delivered via the pmos-toolkit plugin."
+echo "Ensure the plugin is enabled in your settings."
 echo "Done."

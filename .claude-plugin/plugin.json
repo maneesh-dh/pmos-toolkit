@@ -1,0 +1,20 @@
+{
+  "name": "pmos-toolkit",
+  "version": "1.0.0",
+  "description": "Product management and software delivery pipeline — requirements, spec, plan, execute, verify, and supporting utilities.",
+  "author": {
+    "name": "Maneesh Dhabria"
+  },
+  "repository": "https://github.com/maneeshdhabria/agent-skills",
+  "license": "MIT",
+  "keywords": [
+    "requirements",
+    "specification",
+    "planning",
+    "execution",
+    "verification",
+    "pipeline",
+    "product-management"
+  ],
+  "skills": "./skills/"
+}

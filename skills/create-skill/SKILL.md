@@ -36,11 +36,7 @@ The `<skill-name>` directory should be lowercase, hyphenated (e.g., `create-skil
 ls ~/Desktop/Projects/agent-skills/skills/ ~/Desktop/Projects/agent-skills/plugins/
 ```
 
-After creating a new skill, run the link script to update symlinks in all config directories:
-
-```bash
-~/Desktop/Projects/agent-skills/link-skills.sh
-```
+Skills in `skills/` are delivered via the `pmos-toolkit` plugin (namespace: `pmos-toolkit:<skill-name>`). No symlink step needed — the plugin system discovers them automatically. Just restart your session or run `/reload-plugins`.
 
 ---
 
@@ -116,7 +112,7 @@ argument-hint: "<what to pass>"
 Before writing the final SKILL.md, verify:
 
 - [ ] Saved to `~/Desktop/Projects/agent-skills/skills/<name>/SKILL.md` (NOT `plugins/`)
-- [ ] Ran `~/Desktop/Projects/agent-skills/link-skills.sh` to update symlinks
+- [ ] Restarted session or ran `/reload-plugins` to pick up the new skill
 - [ ] Platform Adaptation section present
 - [ ] Description includes natural trigger phrases
 - [ ] No hard dependency on `superpowers:` skills (inline fallback exists)

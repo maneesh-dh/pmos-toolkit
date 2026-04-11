@@ -1,6 +1,6 @@
 ---
 name: verify
-description: Post-implementation verification gate — lint, test, deploy, spec compliance, multi-agent code review, manual QA, and regression test hardening. Run after implementation is done (whether via /execute, manual coding, or partial work). Works with git commits, no PR required. Use when the user says "check my work", "is this done", "verify the implementation", "did I miss anything", or "review and test everything".
+description: Post-implementation verification gate — ALWAYS run after /execute completes. Lint, test, deploy, spec compliance, multi-agent code review, manual QA, and regression test hardening. Also run after manual coding or partial work. Works with git commits, no PR required. Use when the user says "check my work", "is this done", "verify the implementation", "did I miss anything", or "review and test everything".
 user-invocable: true
 argument-hint: "<path-to-spec-doc> (optional — will search docs/specs/ if omitted)"
 ---

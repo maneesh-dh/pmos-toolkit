@@ -36,10 +36,12 @@ These instructions use Claude Code tool names. In other environments:
    - **Fallback:** `git checkout -b feature/<name>` if worktrees aren't practical.
    - **Setup:** Auto-detect and install dependencies (`npm install`, `pip install -r requirements.txt`, `cargo build`, etc.). Run the test suite to establish a clean baseline before starting work.
 4. **Check for environment conflicts.** If using Docker with parallel stacks, ensure ports and project names don't collide.
-5. **Verify verification tooling.** Before starting Task 1, confirm that every verification tool the plan requires is responsive:
-   - If the plan has backend API tasks: confirm the dev server starts and responds to a basic request.
-   - If the plan has frontend tasks: confirm browser automation (Playwright MCP) is responsive. If it fails, establish the fallback now (build check, type check, curl against dev server) — do NOT proceed assuming it will work later.
-   - If any tool is unavailable, log it and document the alternative before starting.
+5. **Verify verification tooling (hard gate).** Before starting Task 1, produce evidence that your verification tools work:
+   - If the plan has backend API tasks: start the dev server, run a request, paste the output.
+   - If the plan has frontend tasks: open a page via Playwright MCP, paste the screenshot. If Playwright fails, establish the fallback now and paste its output instead (build check, type check, curl).
+   - If any tool is unavailable, document the failure and the alternative.
+
+   Do NOT proceed to Task 1 without this evidence. This is a gate, not a checklist item.
 6. **Create task list.** Extract every task from the plan and create a tracked task for each, using your available task tracking tool. Include:
    - Task name and number from the plan
    - Key files to be modified
@@ -58,9 +60,13 @@ Work through the plan's tasks in order. For each task:
 2. **Read the task** — understand goal, files, spec refs, and steps.
 3. **Follow TDD** — write failing test, verify it fails, implement, verify it passes.
 4. **Run the verify-fix loop** (see below).
-5. **Commit** — small, focused commit per task. Not one giant commit at the end.
-6. **Mark task as completed** in your task tracker.
-7. **Move to next task** — only after verification passes and task is marked complete.
+5. **Produce runtime evidence before committing:**
+   - **API tasks:** curl every new/modified endpoint against the running dev server. Paste the output.
+   - **UI tasks:** open the affected page in Playwright MCP (or fallback). Paste screenshot or programmatic output.
+   - If you cannot produce runtime evidence for an API or UI task, the task is not done. Do not commit.
+6. **Commit** — small, focused commit per task. Not one giant commit at the end.
+7. **Mark task as completed** in your task tracker.
+8. **Move to next task** — only after verification passes, evidence is produced, and task is marked complete.
 
 ### Verify-Fix Loop (per task)
 
@@ -109,7 +115,6 @@ Execute tasks in order. After each task, self-review against the spec before pro
 ### Execution Rules
 
 - **Test in smaller chunks.** Verify after each task. Do NOT batch all testing to the end.
-- **Runtime verification for API tasks.** For tasks that modify API endpoints or middleware, inline verification MUST include a runtime check (`curl` or equivalent against a running dev server) — not just passing tests. Tests verify code correctness; runtime checks verify DI wiring, middleware, serialization, and actual DB state.
 - **Update documentation** as part of relevant tasks (CLAUDE.md, changelogs, etc.).
 - **Log plan deviations.** When the actual codebase differs from what the plan assumes (e.g., model fields don't exist, method signatures differ, enum values are different), log it inline: `DEVIATION: Plan assumes X, actual codebase has Y`. Adapt the implementation to reality but do NOT silently adjust — the deviation log helps catch plan quality issues for future sessions.
 
@@ -177,6 +182,8 @@ Do NOT tear down the worktree stack — the user may want to inspect it. Remind 
 ```bash
 docker compose -f docker-compose.worktree.yml -p <project> down
 ```
+
+3. **Invoke `/pmos-toolkit:verify`** to run the full post-implementation verification gate. This is the next pipeline stage (`/execute → /verify`). Do NOT consider execution complete until /verify has run.
 
 ---
 

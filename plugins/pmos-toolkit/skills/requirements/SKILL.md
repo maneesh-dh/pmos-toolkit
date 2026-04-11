@@ -30,7 +30,13 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
-## Phase 0: Intake & Tier Detection
+## Phase 0: Load Workstream Context
+
+Before any other work, follow the context loading instructions in `context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform brainstorming — product understanding, user segments, metrics, and constraints make requirements more grounded.
+
+---
+
+## Phase 1: Intake & Tier Detection
 
 ### Determine Input Mode
 
@@ -47,7 +53,7 @@ The user's input can take several forms. Handle each differently:
 
 1. **Read the user's input.** If the argument is unclear about which product/service/surface the requirements concern, use AskUserQuestion to clarify upfront — do not guess.
 2. **Scope check.** If the input describes multiple independent subsystems (e.g., "build X with chat, billing, analytics, and admin"), flag this immediately. Don't spend questions refining details of a project that needs decomposition first. Help the user break it into independent sub-requirements, each getting its own requirements doc.
-3. **Check for existing requirements.** Look in `docs/requirements/` for an existing file covering this feature.
+3. **Check for existing requirements.** Look in `{docs_path}/requirements/` for an existing file covering this feature.
    - If found: read it, summarize what's there, ask the user if this is an update or fresh start.
    - If not found: proceed.
 4. **Detect the tier** based on the nature of the work:
@@ -76,7 +82,7 @@ Mark each task as in-progress when you start it and completed when done.
 
 ---
 
-## Phase 1: Research (Parallel Subagents)
+## Phase 2: Research (Parallel Subagents)
 
 **Skip for Tier 1.** For Tier 2, do 1a only. For Tier 3, do both.
 
@@ -103,7 +109,7 @@ Summarize findings before asking questions. Ground the conversation in what alre
 
 ---
 
-## Phase 2: Collaborative Brainstorming
+## Phase 3: Collaborative Brainstorming
 
 Act as a **product director** and **senior analyst**. Use AskUserQuestion to ask questions — batch related questions into a single call (up to 4), but follow the natural conversation flow. Do not dump an unfocused checklist.
 
@@ -145,9 +151,9 @@ Surface decisions that need to be made NOW (before spec). For each:
 
 ---
 
-## Phase 3: Write the Document
+## Phase 4: Write the Document
 
-Save to `docs/requirements/YYYY-MM-DD-<feature-name>.md`.
+Save to `{docs_path}/requirements/YYYY-MM-DD-<feature-name>.md`. Create the directory if it doesn't exist.
 
 Use the template matching the detected tier. Delete sections marked "skip" for that tier.
 
@@ -325,7 +331,7 @@ Use the template matching the detected tier. Delete sections marked "skip" for t
 
 ---
 
-## Phase 4: Review Loops
+## Phase 5: Review Loops
 
 After writing the initial document, run iterative review loops.
 
@@ -375,7 +381,7 @@ Each loop runs BOTH checks:
 
 ---
 
-## Phase 5: Final Review
+## Phase 6: Final Review
 
 Run one final improvement pass:
 
@@ -388,13 +394,23 @@ Run one final improvement pass:
 
 After final fixes, commit:
 ```
-git add docs/requirements/<file>
+git add {docs_path}/requirements/<file>
 git commit -m "docs: add requirements for <feature>"
 ```
 
 Tell the user: "Requirements captured and committed. When ready, run `/spec` to create the detailed technical specification."
 
 **The terminal state is handoff to /spec.** Do NOT start writing a spec or implementation plan from this skill.
+
+---
+
+## Workstream Enrichment (after final review)
+
+If a workstream was loaded in Phase 0, follow the enrichment instructions in `context/context-loading.md` Step 4. For this skill, the signals to look for are:
+
+- User segments mentioned in the requirements → workstream `## User Segments`
+- Problem statements that refine the product's purpose → workstream `## Value Proposition` or `## Description`
+- Success metrics → workstream `## Key Metrics`
 
 ---
 

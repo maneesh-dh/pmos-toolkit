@@ -2,7 +2,7 @@
 name: verify
 description: Post-implementation verification gate — ALWAYS run after /execute completes. Lint, test, deploy, spec compliance, multi-agent code review, manual QA, and regression test hardening. Also run after manual coding or partial work. Works with git commits, no PR required. Use when the user says "check my work", "is this done", "verify the implementation", "did I miss anything", or "review and test everything".
 user-invocable: true
-argument-hint: "<path-to-spec-doc> (optional — will search docs/specs/ if omitted)"
+argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted)"
 ---
 
 # Implementation Verification Gate
@@ -46,11 +46,17 @@ Mark each as in-progress when starting and completed when done. Skip tasks that 
 
 ---
 
-## Phase 0: Gather Context
+## Phase 0: Load Workstream Context
+
+Before any other work, follow the context loading instructions in `context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to verify that implementation aligns with product goals, not just spec compliance.
+
+---
+
+## Phase 1: Gather Context
 
 1. **Locate upstream documents.** Find the spec, requirements, and plan:
    - Check user argument first
-   - Then search `docs/specs/`, `docs/requirements/`, `docs/plans/` for the most recent matching files
+   - Then search `{docs_path}/specs/`, `{docs_path}/requirements/`, `{docs_path}/plans/` for the most recent matching files
    - If nothing found, ask the user
 2. **Read all three documents** (whichever exist). You need these for the compliance check.
 3. **Identify what changed.** Run `git diff main...HEAD --stat` (or appropriate base) to see which files were modified. This scopes the verification.
@@ -58,7 +64,7 @@ Mark each as in-progress when starting and completed when done. Skip tasks that 
 
 ---
 
-## Phase 1: Static Verification (fast, run first)
+## Phase 2: Static Verification (fast, run first)
 
 Run in this order. Each step must pass before proceeding to the next. If a step fails, fix the issue, then re-run.
 
@@ -99,7 +105,7 @@ cd apps/<frontend-app> && npm run lint && npm test
 
 ---
 
-## Phase 2: Multi-Agent Code Quality Review
+## Phase 3: Multi-Agent Code Quality Review
 
 Dispatch parallel subagents to review the diff from multiple angles. This catches code quality issues that static analysis and tests miss. Works against `git diff` — no PR required.
 
@@ -147,7 +153,7 @@ For each issue scoring 75+:
 
 ---
 
-## Phase 3: Deploy & Integration Verification
+## Phase 4: Deploy & Integration Verification
 
 ### 3a. Database Migrations (if applicable)
 
@@ -201,13 +207,13 @@ Run actual scenarios in the development environment. Interact with the system as
 
 ---
 
-## Phase 4: Spec Compliance Check
+## Phase 5: Spec Compliance Check
 
 This is the most important phase. Re-read each upstream document and verify every requirement is implemented.
 
 ### 4a. Requirements Compliance
 
-Read `docs/requirements/<file>`. For every goal, user journey, and acceptance criterion:
+Read `{docs_path}/requirements/<file>`. For every goal, user journey, and acceptance criterion:
 
 | # | Requirement | Status | Evidence |
 |---|-------------|--------|----------|
@@ -216,7 +222,7 @@ Read `docs/requirements/<file>`. For every goal, user journey, and acceptance cr
 
 ### 4b. Spec Compliance
 
-Read `docs/specs/<file>`. For every FR-ID and edge case:
+Read `{docs_path}/specs/<file>`. For every FR-ID and edge case:
 
 | ID | Requirement | Status | Evidence |
 |----|-------------|--------|----------|
@@ -226,7 +232,7 @@ Read `docs/specs/<file>`. For every FR-ID and edge case:
 
 ### 4c. Plan Compliance
 
-Read `docs/plans/<file>`. For every task:
+Read `{docs_path}/plans/<file>`. For every task:
 
 | Task | Status | Notes |
 |------|--------|-------|
@@ -245,7 +251,7 @@ List every gap found:
 
 ---
 
-## Phase 5: Harden the Test Suite
+## Phase 6: Harden the Test Suite
 
 For every issue discovered during verification:
 
@@ -262,7 +268,7 @@ Also check for coverage gaps:
 
 ---
 
-## Phase 6: Final Compliance Pass
+## Phase 7: Final Compliance Pass
 
 One last check before committing:
 
@@ -274,7 +280,7 @@ One last check before committing:
 
 ---
 
-## Phase 7: Commit & Report
+## Phase 8: Commit & Report
 
 1. **Commit all changes** (fixes, new tests, documentation updates):
    ```bash

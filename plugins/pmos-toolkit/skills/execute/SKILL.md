@@ -23,9 +23,15 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
-## Phase 0: Setup
+## Phase 0: Load Workstream Context
 
-1. **Locate the plan.** If the user passed an argument, use it. Otherwise check `docs/plans/` for the most recent file. If nothing found, ask.
+Before any other work, follow the context loading instructions in `context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context passively — it informs implementation decisions and deviation assessments.
+
+---
+
+## Phase 1: Setup
+
+1. **Locate the plan.** If the user passed an argument, use it. Otherwise check `{docs_path}/plans/` for the most recent file. If nothing found, ask.
 2. **Read the plan and its upstream spec end-to-end.** Understand the "Done when" criteria and final verification task.
 3. **Isolate the work:**
    - **Worktree (preferred):** Check for existing `.worktrees/` or `worktrees/` directory. If neither exists, create `.worktrees/`. Verify the directory is gitignored (`git check-ignore -q .worktrees`); if not, add it to `.gitignore` and commit. Then:
@@ -52,7 +58,7 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
-## Phase 1: Execute Tasks
+## Phase 2: Execute Tasks
 
 Work through the plan's tasks in order. For each task:
 
@@ -120,7 +126,7 @@ Execute tasks in order. After each task, self-review against the spec before pro
 
 ---
 
-## Phase 2: Deploy & Verify
+## Phase 3: Deploy & Verify
 
 After all tasks are complete, run the plan's final verification task. If the plan doesn't have one, construct it from this checklist:
 
@@ -158,7 +164,7 @@ When verification reveals issues:
 
 ---
 
-## Phase 3: Spec Compliance Review
+## Phase 4: Spec Compliance Review
 
 After verification passes, do a final compliance check:
 
@@ -168,7 +174,7 @@ After verification passes, do a final compliance check:
 
 ---
 
-## Phase 4: Commit & Report
+## Phase 5: Commit & Report
 
 1. **Commit all changes** with a clear commit message referencing the plan.
 2. **Report to the user:**
@@ -212,6 +218,14 @@ Every verification claim must have fresh evidence. Run the command, read the out
 - The plan itself appears to have a bug (e.g., task references a file that doesn't exist)
 
 **Ask rather than guess.** A wrong guess costs more than a pause for clarification.
+
+---
+
+## Workstream Enrichment (after commit & report)
+
+If a workstream was loaded in Phase 0, follow the enrichment instructions in `context/context-loading.md` Step 4. For this skill, the signals to look for are:
+
+- Key implementation decisions → workstream `## Key Decisions`
 
 ---
 

@@ -5,11 +5,15 @@ description: Use when merging to main or after a merge to main - generates user-
 
 # Changelog
 
-Generate user-facing changelog entries in `docs/changelog.md`, prepended (newest first).
+Generate user-facing changelog entries, prepended (newest first).
+
+## Determine docs_path
+
+Check for `.pmos/settings.yaml` in the current repo. If found, read `docs_path` (default: `.pmos`). If not found, use `docs/`. Use `{docs_path}/changelog.md` as the output path.
 
 ## Process
 
-1. **Determine scope** — Run `git log` to find commits since the last changelog entry date (read the top entry in `docs/changelog.md` for the last date). If no changelog exists, use all commits on main.
+1. **Determine scope** — Run `git log` to find commits since the last changelog entry date (read the top entry in `{docs_path}/changelog.md` for the last date). If no changelog exists, use all commits on main.
 
 2. **Analyze changes** — Read the commit messages and diffs to understand what was added, changed, or fixed. Focus on *what the system can now do*, not implementation details.
 
@@ -27,7 +31,7 @@ No "Added/Changed/Fixed" prefixes required — use them only when they add clari
 
 4. **Show draft to user** — Present the entry and ask for confirmation or edits before writing.
 
-5. **Write** — Prepend the entry to `docs/changelog.md`. If the file doesn't exist, create it with a single H1 header `# Changelog` followed by the entry.
+5. **Write** — Prepend the entry to `{docs_path}/changelog.md`. If the file doesn't exist, create it with a single H1 header `# Changelog` followed by the entry.
 
 ## Rules
 

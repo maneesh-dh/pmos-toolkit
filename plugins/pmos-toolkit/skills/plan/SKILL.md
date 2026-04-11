@@ -27,11 +27,17 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
-## Phase 0: Intake
+## Phase 0: Load Workstream Context
 
-1. **Locate the spec.** If the user passed an argument, use it. Otherwise check `docs/specs/` for a recent file. If nothing found, ask.
+Before any other work, follow the context loading instructions in `context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform task design — tech stack, constraints, and deployment patterns shape implementation planning.
+
+---
+
+## Phase 1: Intake
+
+1. **Locate the spec.** If the user passed an argument, use it. Otherwise check `{docs_path}/specs/` for a recent file. If nothing found, ask.
 2. **Read the spec end-to-end.** Summarize it back in 3-5 bullets and confirm understanding with the user via AskUserQuestion.
-3. **Check for an existing plan.** Look in `docs/plans/` for a file covering this feature.
+3. **Check for an existing plan.** Look in `{docs_path}/plans/` for a file covering this feature.
    - If found: read it, ask if this is an update or fresh start.
    - If not found: proceed.
 
@@ -41,7 +47,7 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
-## Phase 1: Deep Code Study
+## Phase 2: Deep Code Study
 
 Study the existing code that will be impacted. This is NOT a skim — you must read the actual files.
 
@@ -60,9 +66,9 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 
 ---
 
-## Phase 2: Write the Plan
+## Phase 3: Write the Plan
 
-Save to `docs/plans/YYYY-MM-DD-<feature-name>-implementation-plan.md`.
+Save to `{docs_path}/plans/YYYY-MM-DD-<feature-name>-implementation-plan.md`. Create the directory if it doesn't exist.
 
 ### Plan Document Structure
 
@@ -285,7 +291,7 @@ Each entry MUST have "Options Considered" and "Rationale."
 
 ---
 
-## Phase 3: Review Loops
+## Phase 4: Review Loops
 
 After writing the initial plan, run iterative review loops. Minimum 2 loops.
 
@@ -331,7 +337,7 @@ Each loop runs BOTH checks:
 
 ---
 
-## Phase 4: Final Review
+## Phase 5: Final Review
 
 Run one final improvement pass:
 
@@ -345,7 +351,7 @@ Run one final improvement pass:
 
 After final fixes, commit:
 ```
-git add docs/plans/<file>
+git add {docs_path}/plans/<file>
 git commit -m "docs: add implementation plan for <feature>"
 ```
 
@@ -358,6 +364,15 @@ Report to user:
 Then offer to execute:
 
 > **"Plan complete and saved. Run `/pmos-toolkit:execute` to implement it, or review the plan first?"**
+
+---
+
+## Workstream Enrichment (after final review)
+
+If a workstream was loaded in Phase 0, follow the enrichment instructions in `context/context-loading.md` Step 4. For this skill, the signals to look for are:
+
+- Technical dependencies discovered → workstream `## Tech Stack`
+- Infrastructure details → workstream technical context sections
 
 ---
 

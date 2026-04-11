@@ -5,7 +5,11 @@ description: Use when the user invokes /session-log, or before ending a signific
 
 # Session Log
 
-Capture session learnings as concise bullet points in `docs/session-log.md`, prepended (newest first).
+Capture session learnings as concise bullet points, prepended (newest first).
+
+## Load Workstream Context
+
+Before any other work, follow the context loading instructions in `context/context-loading.md` (relative to the skills directory). This determines `{docs_path}`. Use `{docs_path}/session-log.md` as the output path.
 
 ## Process
 
@@ -27,7 +31,9 @@ Only include bullets that apply. No empty sections, no headers within the entry.
 
 3. **Show draft to user** — Present the entry and ask for confirmation or edits before writing.
 
-4. **Write** — Prepend the entry to `docs/session-log.md`. If the file doesn't exist, create it with a single H1 header `# Session Log` followed by the entry.
+4. **Write** — Prepend the entry to `{docs_path}/session-log.md`. If the file doesn't exist, create it with a single H1 header `# Session Log` followed by the entry.
+
+5. **Workstream Enrichment** — If a workstream was loaded, follow the enrichment instructions in `context/context-loading.md` Step 4. Session log signals: decisions with reasoning → workstream `## Key Decisions`; gotchas → workstream `## Constraints & Scars`.
 
 ## Rules
 

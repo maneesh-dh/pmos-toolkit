@@ -1,6 +1,6 @@
 # Session Log
 
-Capture session learnings as concise bullet points in `docs/session-log.md`, prepended (newest first).
+Capture session learnings as concise bullet points, prepended (newest first). Determine `{docs_path}` by reading `.pmos/settings.yaml` if it exists (default: `.pmos`); otherwise use `docs/`.
 
 ## Process
 
@@ -27,7 +27,7 @@ Only include bullets that apply. No empty sections, no headers within the entry.
 
 3. **Show draft to user** — Present the entry and ask for confirmation or edits before writing.
 
-4. **Write** — Prepend the entry to `docs/session-log.md`. If the file doesn't exist, create it with a single H1 header `# Session Log` followed by the entry.
+4. **Write** — Prepend the entry to `{docs_path}/session-log.md`. If the file doesn't exist, create it with a single H1 header `# Session Log` followed by the entry.
 
 ## Rules
 

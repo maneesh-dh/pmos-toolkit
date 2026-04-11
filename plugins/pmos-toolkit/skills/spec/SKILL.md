@@ -27,11 +27,17 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
-## Phase 0: Intake & Tier Detection
+## Phase 0: Load Workstream Context
 
-1. **Locate the requirements.** If the user passed an argument, use it. Otherwise check `docs/requirements/` for a recent file. If nothing found, ask.
+Before any other work, follow the context loading instructions in `context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform technical decisions — product constraints, tech stack, and stakeholder concerns shape architecture choices.
+
+---
+
+## Phase 1: Intake & Tier Detection
+
+1. **Locate the requirements.** If the user passed an argument, use it. Otherwise check `{docs_path}/requirements/` for a recent file. If nothing found, ask.
 2. **Read the requirements end-to-end.** Confirm understanding with the user — summarize the problem, goals, non-goals, and key decisions already made.
-3. **Check for existing spec.** Look in `docs/specs/` for an existing file.
+3. **Check for existing spec.** Look in `{docs_path}/specs/` for an existing file.
    - If found: read it, ask the user if this is an update or fresh start.
    - If not found: proceed.
 4. **Detect the tier** from the requirements doc (carry forward the same tier if tagged, otherwise assess):
@@ -48,7 +54,7 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
-## Phase 1: Research (Parallel Subagents)
+## Phase 2: Research (Parallel Subagents)
 
 **Tier 1:** Read the specific files/functions involved in the bug. No broader research needed.
 
@@ -69,7 +75,7 @@ Track all sources in a Research Sources table.
 
 ---
 
-## Phase 2: Multi-Role Interview
+## Phase 3: Multi-Role Interview
 
 Act as each role IN SEQUENCE. For each role, identify gaps, risks, and missing details. Use AskUserQuestion to ask questions — batch related questions from the same role into a single call (up to 4), but do not mix questions across roles.
 
@@ -127,7 +133,7 @@ For each role:
 
 ---
 
-## Phase 3: Think Hard About Verification
+## Phase 4: Think Hard About Verification
 
 Before writing the spec, think creatively about how to verify the implementation. This is a CORE part of the spec, not an afterthought.
 
@@ -143,9 +149,9 @@ For each major feature area, define HOW it will be verified.
 
 ---
 
-## Phase 4: Write the Spec
+## Phase 5: Write the Spec
 
-Save to `docs/specs/YYYY-MM-DD-<feature-name>-spec.md`.
+Save to `{docs_path}/specs/YYYY-MM-DD-<feature-name>-spec.md`. Create the directory if it doesn't exist.
 
 ### Tier 1 Template: Bug Fix / Minor Enhancement
 
@@ -429,7 +435,7 @@ CREATE TABLE ... (
 
 ---
 
-## Phase 5: Review Loops
+## Phase 6: Review Loops
 
 **Tier 1:** Run 1 review loop, then final review.
 
@@ -482,7 +488,7 @@ The structural checklist catches omissions. The design critique catches shallow 
 
 ---
 
-## Phase 6: Final Review
+## Phase 7: Final Review
 
 Run one final improvement pass:
 
@@ -496,11 +502,21 @@ Run one final improvement pass:
 
 After final fixes, commit:
 ```
-git add docs/specs/<file>
+git add {docs_path}/specs/<file>
 git commit -m "docs: add spec for <feature>"
 ```
 
 Ask the user: "I believe the spec is ready. Do you have any remaining concerns, or shall we move to `/plan`?" — the user's confirmation is required before declaring completion.
+
+---
+
+## Workstream Enrichment (after final review)
+
+If a workstream was loaded in Phase 0, follow the enrichment instructions in `context/context-loading.md` Step 4. For this skill, the signals to look for are:
+
+- Tech stack decisions → workstream `## Tech Stack`
+- Architectural constraints → workstream `## Constraints & Scars`
+- Key design decisions → workstream `## Key Decisions`
 
 ---
 

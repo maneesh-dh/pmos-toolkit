@@ -37,7 +37,7 @@ pmos-toolkit/
 | `/pmos-toolkit:changelog` | Generate user-facing changelog entries after merging to main |
 | `/pmos-toolkit:session-log` | Capture learnings, decisions, and patterns from a session |
 | `/pmos-toolkit:create-skill` | Create a new skill with cross-platform conventions |
-| `/pmos-toolkit:macos-battery-drain-diagnostics` | Diagnose battery drain, orphaned processes, and cleanup opportunities |
+| `/pmos-toolkit:mac-health` | Diagnose battery drain, orphaned processes, and cleanup opportunities |
 
 **Pipeline flow:**
 ```

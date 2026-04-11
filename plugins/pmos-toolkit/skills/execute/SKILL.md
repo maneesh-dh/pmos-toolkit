@@ -19,6 +19,7 @@ These instructions use Claude Code tool names. In other environments:
 - **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
+- **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, track progress via commit messages and report status verbally.
 
 ---
 
@@ -35,6 +36,13 @@ These instructions use Claude Code tool names. In other environments:
    - **Fallback:** `git checkout -b feature/<name>` if worktrees aren't practical.
    - **Setup:** Auto-detect and install dependencies (`npm install`, `pip install -r requirements.txt`, `cargo build`, etc.). Run the test suite to establish a clean baseline before starting work.
 4. **Check for environment conflicts.** If using Docker with parallel stacks, ensure ports and project names don't collide.
+5. **Create task list.** Extract every task from the plan and create a tracked task for each, using your available task tracking tool. Include:
+   - Task name and number from the plan
+   - Key files to be modified
+   - Dependencies on other tasks (if any)
+   - The task's verification criteria as its "done" signal
+
+   This gives the user (and you) a live progress view throughout execution.
 
 ---
 
@@ -42,11 +50,13 @@ These instructions use Claude Code tool names. In other environments:
 
 Work through the plan's tasks in order. For each task:
 
-1. **Read the task** — understand goal, files, spec refs, and steps.
-2. **Follow TDD** — write failing test, verify it fails, implement, verify it passes.
-3. **Run the verify-fix loop** (see below).
-4. **Commit** — small, focused commit per task. Not one giant commit at the end.
-5. **Move to next task** — only after verification passes.
+1. **Mark task as in-progress** in your task tracker.
+2. **Read the task** — understand goal, files, spec refs, and steps.
+3. **Follow TDD** — write failing test, verify it fails, implement, verify it passes.
+4. **Run the verify-fix loop** (see below).
+5. **Commit** — small, focused commit per task. Not one giant commit at the end.
+6. **Mark task as completed** in your task tracker.
+7. **Move to next task** — only after verification passes and task is marked complete.
 
 ### Verify-Fix Loop (per task)
 

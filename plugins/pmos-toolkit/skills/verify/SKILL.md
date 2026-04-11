@@ -19,6 +19,20 @@ These instructions use Claude Code tool names. In other environments:
 - **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
+- **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, announce phase transitions verbally.
+
+**Create verification tasks** at the start using your available task tracking tool:
+
+1. Gather Context
+2. Static Verification (lint, types, tests)
+3. Code Quality Review
+4. Deploy & Integration Verification
+5. Spec Compliance Check
+6. Harden Test Suite
+7. Final Compliance Pass
+8. Commit & Report
+
+Mark each as in-progress when starting and completed when done. Skip tasks that don't apply (e.g., skip deploy if no deployment is involved).
 
 ---
 

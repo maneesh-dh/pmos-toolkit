@@ -26,6 +26,7 @@ These instructions use Claude Code tool names. In other environments:
 - **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
+- **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, announce phase transitions verbally.
 
 ---
 
@@ -62,6 +63,16 @@ The user's input can take several forms. Handle each differently:
 The user can override the tier. If unsure, ask.
 
 **Gate:** Do not proceed until you understand (a) what product/service area the requirements target and (b) the tier.
+
+**Create phase tasks** using your available task tracking tool, scaled to tier:
+
+| Tier | Tasks to create |
+|------|----------------|
+| **Tier 1** | Intake, Write Document, Final Review |
+| **Tier 2** | Intake, Research, Brainstorm, Write Document, Review Loop 1, Review Loop 2, Final Review |
+| **Tier 3** | Intake, Research (Code), Research (Industry), Brainstorm, Write Document, Review Loop 1, Review Loop 2, Final Review |
+
+Mark each task as in-progress when you start it and completed when done.
 
 ---
 

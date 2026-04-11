@@ -44,9 +44,35 @@ Work through the plan's tasks in order. For each task:
 
 1. **Read the task** — understand goal, files, spec refs, and steps.
 2. **Follow TDD** — write failing test, verify it fails, implement, verify it passes.
-3. **Run inline verification** — execute the exact commands listed in the task's verification section.
+3. **Run the verify-fix loop** (see below).
 4. **Commit** — small, focused commit per task. Not one giant commit at the end.
-5. **Move to next task** — do not proceed if verification fails.
+5. **Move to next task** — only after verification passes.
+
+### Verify-Fix Loop (per task)
+
+Do not move to the next task until the current task's verification passes. This is a bounded loop, not a hope:
+
+```
+attempt = 0
+while verification fails AND attempt < 3:
+    1. Read the failure output carefully
+    2. Diagnose root cause (not symptoms)
+    3. Fix
+    4. Re-run the FULL verification (not just the part that failed)
+    attempt += 1
+
+if still failing after 3 attempts:
+    STOP — escalate to user with:
+    - What the task requires
+    - What verification command fails
+    - What you tried and why it didn't work
+    - Your best guess at the underlying issue
+```
+
+**Rules:**
+- Each retry must change something — never re-run the same code hoping for a different result.
+- Re-run the full task verification, not just the failing subset. A fix in one place can break another.
+- The bound (3 attempts) prevents thrashing. If you can't fix it in 3 tries, a human needs to look.
 
 ### Subagent Execution (when Agent tool is available)
 

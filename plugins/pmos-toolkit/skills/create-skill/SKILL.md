@@ -59,6 +59,12 @@ Additionally, when writing skill instructions:
 - Do NOT assume MCP tools are available — treat them as optional enhancements
 - Do NOT assume subagent dispatch — write instructions that work sequentially too
 
+**Self-contained skills should inline these patterns where applicable:**
+- **Setup** — environment preparation, dependency detection, workspace isolation
+- **Self-review & refinement loops** — review own output against requirements, iterate until quality bar is met (minimum 2 loops)
+- **Escalation policy** — when to stop and ask for help vs. proceeding with stated assumptions
+- **Evidence standards** — what constitutes proof that a step succeeded (command output, not "should work")
+
 ---
 
 ## Convention 3: Description Quality

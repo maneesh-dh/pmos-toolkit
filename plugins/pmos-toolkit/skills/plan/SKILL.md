@@ -354,15 +354,9 @@ Report to user:
 - Key decisions (top 3 from decision log)
 - Open risks flagged
 
-Then offer execution choice:
+Then offer to execute:
 
-> **"Plan complete and saved. Two execution options:**
->
-> **1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task, review between tasks, fast iteration.
->
-> **2. Inline Execution** — Execute tasks in this session with checkpoints for review.
->
-> **Which approach?"**
+> **"Plan complete and saved. Run `/pmos-toolkit:execute` to implement it, or review the plan first?"**
 
 ---
 

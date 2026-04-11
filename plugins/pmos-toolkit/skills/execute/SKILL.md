@@ -26,9 +26,14 @@ These instructions use Claude Code tool names. In other environments:
 
 1. **Locate the plan.** If the user passed an argument, use it. Otherwise check `docs/plans/` for the most recent file. If nothing found, ask.
 2. **Read the plan and its upstream spec end-to-end.** Understand the "Done when" criteria and final verification task.
-3. **Isolate the work (if possible):**
-   - If git worktrees are supported: create an isolated worktree (`git worktree add`).
-   - Otherwise: create a feature branch (`git checkout -b feature/<name>`).
+3. **Isolate the work:**
+   - **Worktree (preferred):** Check for existing `.worktrees/` or `worktrees/` directory. If neither exists, create `.worktrees/`. Verify the directory is gitignored (`git check-ignore -q .worktrees`); if not, add it to `.gitignore` and commit. Then:
+     ```bash
+     git worktree add .worktrees/<branch-name> -b <branch-name>
+     cd .worktrees/<branch-name>
+     ```
+   - **Fallback:** `git checkout -b feature/<name>` if worktrees aren't practical.
+   - **Setup:** Auto-detect and install dependencies (`npm install`, `pip install -r requirements.txt`, `cargo build`, etc.). Run the test suite to establish a clean baseline before starting work.
 4. **Check for environment conflicts.** If using Docker with parallel stacks, ensure ports and project names don't collide.
 
 ---
@@ -43,13 +48,28 @@ Work through the plan's tasks in order. For each task:
 4. **Commit** — small, focused commit per task. Not one giant commit at the end.
 5. **Move to next task** — do not proceed if verification fails.
 
-If subagents are available (Agent tool), dispatch independent tasks in parallel. Otherwise, execute sequentially.
+### Subagent Execution (when Agent tool is available)
+
+Dispatch a fresh subagent per task. Fresh context prevents confusion from accumulated state. After each task, run a **two-stage review**:
+
+1. **Spec compliance review** — dispatch a reviewer subagent with the task's spec requirements and the implementer's diff. Question: does the code match the spec? Flag missing requirements or scope creep.
+2. **Code quality review** — dispatch a second reviewer with the diff and project conventions (CLAUDE.md). Question: is the code well-built? Flag bugs, inconsistencies, convention violations.
+
+If either reviewer finds issues, the implementer fixes them and the reviewer re-reviews. Do not proceed to the next task with open issues.
+
+**Handling implementer status:**
+- **Done** — proceed to review.
+- **Needs context** — provide the missing information and re-dispatch.
+- **Blocked** — assess: provide more context, use a more capable model, break the task smaller, or escalate to the user. Never retry without changing something.
+
+### Sequential Execution (no subagents)
+
+Execute tasks in order. After each task, self-review against the spec before proceeding.
 
 ### Execution Rules
 
 - **Test in smaller chunks.** Verify after each task. Do NOT batch all testing to the end.
 - **Update documentation** as part of relevant tasks (CLAUDE.md, changelogs, etc.).
-- **Ask for clarification** if any ambiguity arises during execution.
 
 ---
 
@@ -115,6 +135,34 @@ Do NOT tear down the worktree stack — the user may want to inspect it. Remind 
 ```bash
 docker compose -f docker-compose.worktree.yml -p <project> down
 ```
+
+---
+
+## Evidence Before Claims
+
+Every verification claim must have fresh evidence. Run the command, read the output, THEN make the claim.
+
+| Claim | Required | Not Sufficient |
+|-------|----------|----------------|
+| "Tests pass" | Test output: "X passed, 0 failed" | Previous run, "should pass" |
+| "Lint clean" | Linter output: 0 errors | "I didn't change style" |
+| "Build succeeds" | Build output: exit 0 | "Linter passed" |
+| "Bug fixed" | Test original symptom: passes | "Code changed, assumed fixed" |
+
+**Never use:** "should pass", "looks correct", "probably fine". If you haven't run the command in this step, you cannot claim the result.
+
+---
+
+## When to Stop
+
+**Stop executing and escalate immediately when:**
+- A dependency is missing or unavailable
+- A test fails repeatedly after attempted fixes
+- An instruction in the plan is unclear or contradictory
+- Verification fails in a way you can't diagnose
+- The plan itself appears to have a bug (e.g., task references a file that doesn't exist)
+
+**Ask rather than guess.** A wrong guess costs more than a pause for clarification.
 
 ---
 

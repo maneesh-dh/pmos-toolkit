@@ -29,7 +29,7 @@ These instructions use Claude Code tool names. In other environments:
 
 ## Phase 0: Load Workstream Context
 
-Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform technical decisions — product constraints, tech stack, and stakeholder concerns shape architecture choices.
+Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform technical decisions — product constraints, tech stack, and stakeholder concerns shape architecture choices. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /spec` and factor them into your approach for this session.
 
 ---
 
@@ -517,6 +517,12 @@ If a workstream was loaded in Phase 0, follow the enrichment instructions in `pr
 - Tech stack decisions → workstream `## Tech Stack`
 - Architectural constraints → workstream `## Constraints & Scars`
 - Key design decisions → workstream `## Key Decisions`
+
+---
+
+## Capture Learnings (after workstream enrichment)
+
+Follow the learning capture instructions in `learnings/learnings-capture.md` (relative to the skills directory).
 
 ---
 

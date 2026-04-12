@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# Pre-push hook: enforce plugin version bumps when plugin content changes.
+#
+# For each ref being pushed, find plugins under `plugins/<name>/` that have
+# modified files in the range remote..local. For each such plugin, require:
+#   1. .claude-plugin/plugin.json `version` differs between remote tip and local tip.
+#   2. .codex-plugin/plugin.json `version` matches .claude-plugin/plugin.json at local tip.
+#
+# Without this, Claude Code / Codex serve a stale version-keyed cache and
+# never see the new skill content.
+
+set -euo pipefail
+
+ZERO="0000000000000000000000000000000000000000"
+fail=0
+
+get_version() {
+  # get_version <ref> <path>
+  local ref="$1" path="$2"
+  git show "$ref:$path" 2>/dev/null | sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1
+}
+
+while read -r local_ref local_oid remote_ref remote_oid; do
+  # Deleting a remote branch — nothing to check.
+  [ "$local_oid" = "$ZERO" ] && continue
+
+  # New branch on remote: diff against merge-base with origin/HEAD if available,
+  # else against the empty tree.
+  if [ "$remote_oid" = "$ZERO" ]; then
+    base=$(git merge-base "$local_oid" origin/HEAD 2>/dev/null || echo "")
+    [ -z "$base" ] && base=$(git hash-object -t tree /dev/null)
+  else
+    base="$remote_oid"
+  fi
+
+  changed=$(git diff --name-only "$base" "$local_oid" 2>/dev/null | grep -E '^plugins/[^/]+/(skills|agents|\.claude-plugin|\.codex-plugin)/' || true)
+  [ -z "$changed" ] && continue
+
+  plugins=$(echo "$changed" | awk -F/ '{print $2}' | sort -u)
+
+  for plugin in $plugins; do
+    claude_json="plugins/$plugin/.claude-plugin/plugin.json"
+    codex_json="plugins/$plugin/.codex-plugin/plugin.json"
+
+    # Only enforce for plugins that actually have a content change (skills/ or agents/).
+    plugin_changed=$(echo "$changed" | grep -E "^plugins/$plugin/(skills|agents)/" || true)
+    [ -z "$plugin_changed" ] && continue
+
+    local_v=$(get_version "$local_oid" "$claude_json")
+    remote_v=$(get_version "$base" "$claude_json")
+
+    if [ -z "$local_v" ]; then
+      echo "ERROR: $claude_json missing or no version field at local tip." >&2
+      fail=1
+      continue
+    fi
+
+    if [ "$local_v" = "$remote_v" ]; then
+      echo "ERROR: $plugin content changed but $claude_json version unchanged ($local_v)." >&2
+      echo "       Bump the version (patch for clarifications, minor for new behavior, major for breaking)." >&2
+      fail=1
+    fi
+
+    codex_v=$(get_version "$local_oid" "$codex_json")
+    if [ -z "$codex_v" ]; then
+      echo "ERROR: $codex_json missing or no version field at local tip." >&2
+      fail=1
+    elif [ "$codex_v" != "$local_v" ]; then
+      echo "ERROR: $plugin version drift — .claude-plugin=$local_v .codex-plugin=$codex_v." >&2
+      echo "       Both manifests must carry the same version." >&2
+      fail=1
+    fi
+  done
+done
+
+exit $fail

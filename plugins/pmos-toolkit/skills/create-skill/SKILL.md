@@ -112,6 +112,28 @@ argument-hint: "<what to pass>"
 
 ---
 
+## Convention 6: Learning Integration
+
+Every pipeline skill MUST include two learning integration points:
+
+**At startup** (in Phase 0 or as a standalone section after Platform Adaptation):
+
+```markdown
+Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /skill-name` and factor them into your approach for this session.
+```
+
+**At end** (after the skill's core work and workstream enrichment, before Anti-Patterns):
+
+```markdown
+## Capture Learnings (after workstream enrichment)
+
+Follow the learning capture instructions in `learnings/learnings-capture.md` (relative to the skills directory).
+```
+
+This ensures new skills participate in the global feedback loop from day one.
+
+---
+
 ## Checklist Before Saving
 
 Before writing the final SKILL.md, verify:
@@ -126,3 +148,5 @@ Before writing the final SKILL.md, verify:
 - [ ] Pipeline diagram included if the skill fits the pipeline
 - [ ] Under 500 lines (extract to `reference/` files if needed)
 - [ ] Anti-patterns section present
+- [ ] Learning read at startup (Phase 0 or standalone Load Learnings section)
+- [ ] Capture Learnings section at end (references `learnings/learnings-capture.md`)

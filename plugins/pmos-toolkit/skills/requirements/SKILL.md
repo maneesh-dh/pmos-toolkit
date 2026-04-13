@@ -412,19 +412,21 @@ Tell the user: "Requirements captured and committed. When ready, run `/spec` to 
 
 ---
 
-## Workstream Enrichment (after final review)
+## Phase 7: Workstream Enrichment
 
-If a workstream was loaded in Phase 0, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
 
 - User segments mentioned in the requirements → workstream `## User Segments`
 - Problem statements that refine the product's purpose → workstream `## Value Proposition` or `## Description`
 - Success metrics → workstream `## Key Metrics`
 
+This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
+
 ---
 
-## Capture Learnings (after workstream enrichment)
+## Phase 8: Capture Learnings
 
-Follow the learning capture instructions in `learnings/learnings-capture.md` (relative to the skills directory).
+**This skill is not complete until learnings are captured.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Record anything that will help a future invocation of this skill go better — surprising behaviors, repeated corrections, non-obvious decisions.
 
 ---
 

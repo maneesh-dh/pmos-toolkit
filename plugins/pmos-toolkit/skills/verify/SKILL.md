@@ -298,9 +298,20 @@ One last check before committing:
 
 ---
 
-## Capture Learnings (after commit & report)
+## Phase 9: Workstream Enrichment
 
-Follow the learning capture instructions in `learnings/learnings-capture.md` (relative to the skills directory).
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+
+- Implementation gaps discovered vs spec → workstream `## Key Decisions`
+- New constraints or scars uncovered during verification → workstream `## Constraints & Scars`
+
+This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
+
+---
+
+## Phase 10: Capture Learnings
+
+**This skill is not complete until learnings are captured.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Record anything that will help a future invocation of this skill go better — surprising behaviors, repeated corrections, non-obvious decisions.
 
 ---
 

@@ -221,17 +221,19 @@ Every verification claim must have fresh evidence. Run the command, read the out
 
 ---
 
-## Workstream Enrichment (after commit & report)
+## Phase 6: Workstream Enrichment
 
-If a workstream was loaded in Phase 0, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
 
 - Key implementation decisions → workstream `## Key Decisions`
 
+This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
+
 ---
 
-## Capture Learnings (after workstream enrichment)
+## Phase 7: Capture Learnings
 
-Follow the learning capture instructions in `learnings/learnings-capture.md` (relative to the skills directory).
+**This skill is not complete until learnings are captured.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Record anything that will help a future invocation of this skill go better — surprising behaviors, repeated corrections, non-obvious decisions.
 
 ---
 

@@ -184,9 +184,9 @@ Table-heavy, minimal prose. Keep the report under 300 lines.
 
 ---
 
-## Capture Learnings (after consistency pass)
+## Phase 7: Capture Learnings
 
-Follow the learning capture instructions in `learnings/learnings-capture.md` (relative to the skills directory).
+**This skill is not complete until learnings are captured.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Record anything that will help a future invocation of this skill go better — surprising behaviors, repeated corrections, non-obvious decisions.
 
 ---
 

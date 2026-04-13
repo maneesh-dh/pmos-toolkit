@@ -122,15 +122,27 @@ Every pipeline skill MUST include two learning integration points:
 Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /skill-name` and factor them into your approach for this session.
 ```
 
-**At end** (after the skill's core work and workstream enrichment, before Anti-Patterns):
+**At end** — Workstream Enrichment and Capture Learnings MUST be numbered phases (not trailing unnumbered sections), otherwise they get skipped. Place them as the last two phases, before Anti-Patterns:
 
 ```markdown
-## Capture Learnings (after workstream enrichment)
+## Phase N: Workstream Enrichment
 
-Follow the learning capture instructions in `learnings/learnings-capture.md` (relative to the skills directory).
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+
+- [skill-specific signal] → workstream `## [Section]`
+
+This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
+
+---
+
+## Phase N+1: Capture Learnings
+
+**This skill is not complete until learnings are captured.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Record anything that will help a future invocation of this skill go better — surprising behaviors, repeated corrections, non-obvious decisions.
 ```
 
-This ensures new skills participate in the global feedback loop from day one.
+If the skill doesn't load workstream context in Phase 0, omit the Workstream Enrichment phase and only include Capture Learnings.
+
+This ensures new skills participate in the global feedback loop from day one and that the feedback loop actually runs.
 
 ---
 
@@ -165,5 +177,6 @@ Before writing the final SKILL.md, verify:
 - [ ] Under 500 lines (extract to `reference/` files if needed)
 - [ ] Anti-patterns section present
 - [ ] Learning read at startup (Phase 0 or standalone Load Learnings section)
-- [ ] Capture Learnings section at end (references `learnings/learnings-capture.md`)
+- [ ] Capture Learnings is a **numbered phase** (not a trailing unnumbered section) with terminal-gate language ("this skill is not complete until learnings are captured")
+- [ ] Workstream Enrichment is a **numbered phase** (if the skill loads workstream context in Phase 0) with skip-gate language
 - [ ] Progress tracking instruction included if skill has ≥3 phases/gates

@@ -280,11 +280,77 @@ If a companion spec was provided in Scope Declaration (Phase 1), read it now and
 
 ## Phase 6: Targeted Pseudocode
 
-Stub — to be filled in T5.
+Write pseudocode for 2-3 flows that are algorithmically complex enough to warrant the depth. **Do NOT pseudocode every flow** — that's an anti-pattern; it duplicates `/plan` and locks in implementation choices prematurely.
+
+### Selection criteria
+
+A flow gets pseudocode if ANY of these triggers apply:
+1. **Non-trivial state machine** — 3+ states with branching transitions
+2. **Algorithmic complexity** — sorting, matching, scoring, pricing, scheduling
+3. **Multi-step write with rollback needs** — distributed transaction, saga, compensating actions
+4. **Reconciliation / retry / idempotency logic** — periodic sync, redelivery handling
+5. **Concurrency-sensitive** — locks, optimistic versioning, CAS operations, leader election
+
+**Hard cap: Max 2-3 flows.** If more than 3 qualify, pick the 3 with the highest combination of complexity and blast radius.
+
+### Format per flow
+
+```
+Flow: <name>
+Entry: <trigger — API endpoint, scheduled job, event subscription>
+
+FUNCTION <name>(<params>):
+  # English description of step
+  <variable> = <db call or logic>
+  IF <condition>:
+    <branch>
+  ELSE:
+    <branch>
+  RETURN <shape>
+```
+
+Each pseudocode block is followed by FOUR required sections:
+
+- **DB calls:** every query and mutation this flow performs (with table and predicate)
+- **State transitions:** every state change named (FROM → TO with the trigger)
+- **Error branches:** every point this can fail and what happens (rollback, retry, alert, propagate)
+- **Concurrency notes:** what's protected by what (advisory lock, transaction isolation level, unique constraint, CAS column)
+
+### Why these four sections
+
+The pseudocode itself catches algorithmic bugs. The four follow-up sections catch the bugs pseudocode misses — concurrency races, missing rollback paths, untracked state changes, missing DB queries the flow assumes exist. Writing them is part of the discipline; skipping them defeats the point.
+
+---
 
 ## Phase 7: Gap Resolution
 
-Stub — to be filled in T5.
+For every gap in the Gap Register (from Phases 3-6), the agent generates a context-and-patch proposal, then the user picks a disposition.
+
+### Per-gap workflow
+
+For each gap:
+1. **Context:** restate the gap in one sentence, name which scenario or artifact exposed it, severity (blocker / significant / minor / forward-compat).
+2. **Proposed patch:** specific spec change with EXACT section reference and the EXACT new content. For DB schema gaps, write the SQL. For API gaps, write the request/response field. For sequence diagram gaps, write the new arrow. For wire-up gaps, name the missing endpoint or UI consumer.
+3. **User picks disposition:**
+   - **Apply patch** — agent uses the `Edit` tool on the spec file to apply the change. Logs the change in simulation doc §10 (Spec Patches Applied).
+   - **Modify patch** — user refines the proposal; agent applies the modified version.
+   - **Accept as risk** — gap stays unaddressed; logged in simulation doc §8 (Accepted Risks) with the user's stated rationale.
+   - **Defer as open question** — gap stays unaddressed but flagged as needing external input; logged in simulation doc §9 (Open Questions) with owner and needed-by date if known.
+
+### Tier-based interaction
+
+- **Tier 2:** present gaps one at a time. Each is small enough that inline review fits the rhythm.
+- **Tier 3:** batch gaps by category (Data, Interfaces, Behavior, Interface, Wire-up, Operational). Present all gaps in a category, get dispositions, then move to the next category. Avoids exhausting the user with one-by-one across potentially dozens of findings.
+
+### Spec edits
+
+ALWAYS use the `Edit` tool on the spec file. Never use `Write` to rewrite the whole spec. Each edit is one surgical change, logged.
+
+### Disposition rationale
+
+Every "Accept as risk" or "Defer as open question" MUST capture rationale. "I don't want to fix this right now" is not rationale — what's the business or technical reason? The simulation doc's value for future readers depends on traceable decisions.
+
+**Exit gate:** Every gap in the Gap Register must have a disposition before Phase 8 writes the simulation doc. If any remain undecided, return to the user.
 
 ## Phase 8: Write Simulation Doc
 

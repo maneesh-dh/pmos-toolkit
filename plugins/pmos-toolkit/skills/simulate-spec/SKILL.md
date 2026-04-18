@@ -2,7 +2,7 @@
 name: simulate-spec
 description: Pressure-test a spec against realistic and adversarial scenarios before implementation — scenario trace, artifact fitness critique, interface cross-reference, targeted pseudocode. Optional validator between /spec and /plan in the requirements -> spec -> plan pipeline. Use when the user says "simulate the design", "validate this spec", "will this design actually work", "check for gaps in the design", or has a spec ready for end-to-end scrutiny before implementation.
 user-invocable: true
-argument-hint: "<path-to-spec-doc>"
+argument-hint: "<path-to-spec-doc> [--force]"
 ---
 
 # Spec Simulation Generator
@@ -59,11 +59,15 @@ Look in `{docs_path}/simulations/` for an existing file covering this feature.
 
 | Tier | Behavior |
 |------|----------|
-| **Tier 1** (bug fix) | Skill refuses to run. Announce: "This is a Tier 1 spec — simulation is overkill. Skipping." Then exit. |
+| **Tier 1** (bug fix) | Skill refuses to run by default. Announce: "This is a Tier 1 spec — simulation is overkill. Skipping. Re-invoke with `--force` to run anyway." Then exit. **If `--force` was passed in invocation arguments, proceed using Tier 2 behavior.** |
 | **Tier 2** (enhancement) | All phases run. Inline gap resolution (one gap at a time in Phase 7). 1 review loop. |
 | **Tier 3** (feature / new system) | All phases run. Batched gap resolution (by category in Phase 7). 1 review loop. Deeper adversarial coverage in Phase 2. |
 
 The tier is declared in the spec header (e.g., `**Tier:** 2`). If absent, infer from scope (single bug → Tier 1; behavior enhancement → Tier 2; new capability or major redesign → Tier 3) and announce the inferred tier for confirmation.
+
+**Argument parsing:** The skill accepts a positional spec path and an optional `--force` flag. Example invocations:
+- `/pmos-toolkit:simulate-spec docs/specs/2026-04-18-foo-spec.md` — auto-detect tier; refuse if Tier 1
+- `/pmos-toolkit:simulate-spec docs/specs/2026-04-18-foo-spec.md --force` — proceed regardless of tier (Tier 1 specs run with Tier 2 behavior)
 
 ### 1.5 Scope Declaration
 

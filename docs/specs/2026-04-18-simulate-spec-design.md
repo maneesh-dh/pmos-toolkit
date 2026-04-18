@@ -407,7 +407,7 @@ Since this is a skill (prompt-based), verification is primarily manual:
 
 ## 22. Open Questions
 
-| # | Question | Owner | Needed By |
-|---|----------|-------|-----------|
-| 1 | Should the skill's `--force` override for Tier 1 (edge case E8) be supported in v1, or defer? | User | Before `/plan` |
-| 2 | For update mode (E7), should re-tracing be restricted to changed sections only (diff-aware) or full re-trace? | User | Before `/plan` |
+| # | Question | Owner | Needed By | Resolution |
+|---|----------|-------|-----------|------------|
+| 1 | Should the skill's `--force` override for Tier 1 (edge case E8) be supported in v1, or defer? | User | Before `/plan` | **Resolved (2026-04-18):** `--force` supported in v1. Argument hint and Phase 1.4 updated. |
+| 2 | For update mode (E7), should re-tracing be restricted to changed sections only (diff-aware) or full re-trace? | User | Before `/plan` | Open — defer to v2 if/when needed |

@@ -354,11 +354,118 @@ Every "Accept as risk" or "Defer as open question" MUST capture rationale. "I do
 
 ## Phase 8: Write Simulation Doc
 
-Stub — to be filled in T6.
+Save to `{docs_path}/simulations/YYYY-MM-DD-<feature>-simulation.md`. Create the `simulations/` directory if it doesn't exist.
 
-## Phase 9: Review Loop
+Populate the doc from accumulated state:
+- §1 (Scope) ← from Phase 1
+- §2 (Scenario Inventory) ← from Phase 2
+- §3 (Coverage Matrix) ← from Phase 3
+- §4 (Fitness Findings) ← from Phase 4 (per-bucket)
+- §5 (Cross-Reference) ← from Phase 5
+- §6 (Pseudocode) ← from Phase 6
+- §7 (Gap Register) ← accumulated across Phases 3-6, with dispositions filled in Phase 7
+- §8 (Accepted Risks) ← from Phase 7 dispositions
+- §9 (Open Questions) ← from Phase 7 dispositions
+- §10 (Spec Patches Applied) ← from Phase 7 Edit calls
+- §11 (Review Log) ← filled in Phase 9
 
-Stub — to be filled in T6.
+### Simulation doc template
+
+```markdown
+# <Feature Name> — Design Simulation
+
+**Date:** YYYY-MM-DD
+**Spec:** `<path-to-spec>`
+**Tier:** 2 | 3
+
+---
+
+## 1. Scope
+- **In scope:** [layers covered]
+- **Out of scope:** [layers deferred — with pointers if known]
+- **Companion specs:** [paths]
+- **Downstream consumers anticipated:** [list]
+
+## 2. Scenario Inventory
+
+| # | Scenario | Source | Category |
+|---|----------|--------|----------|
+
+## 3. Scenario Coverage Matrix
+
+| Scenario | Step | Spec Artifact | Status |
+|----------|------|---------------|--------|
+
+## 4. Artifact Fitness Findings
+
+### 4.1 Data & Storage
+### 4.2 Service Interfaces
+### 4.3 Behavior (State / Workflows)
+### 4.4 Interface (UI / CLI / Library — whichever applies)
+### 4.5 Operational (NFRs, Rollout)
+### 4.6 Other Artifacts (if present)
+
+## 5. Interface ↔ Core Cross-Reference
+
+| # | Interaction | Trigger | Endpoint/Function | Req Shape Match | Res Has What Consumer Needs | Error Mapping Defined | Notes |
+
+## 6. Targeted Pseudocode
+
+### 6.1 [Flow Name]
+[Pseudocode block + DB calls + state transitions + error branches + concurrency notes]
+
+## 7. Gap Register
+
+| # | Gap | Exposed By | Severity | Disposition | Notes |
+|---|-----|-----------|----------|-------------|-------|
+
+## 8. Accepted Risks
+Gaps the user explicitly chose not to fix, with rationale.
+
+## 9. Open Questions
+
+| # | Question | Owner | Needed By |
+
+## 10. Spec Patches Applied
+
+| # | Section | Change Summary | Gap # |
+
+## 11. Review Log
+
+| Loop | Findings | Changes Made |
+```
+
+After writing, commit:
+```
+git add {docs_path}/simulations/<file>
+git commit -m "docs: simulation for <feature>"
+```
+
+---
+
+## Phase 9: Review Loop (single pass)
+
+Run a SINGLE review pass over the simulation doc. The skill is already adversarial by design — a second pass is "critique the critique" and adds little. Gap Resolution (Phase 7) was already a collaborative review.
+
+### Review checks
+
+1. **Scenario completeness** — re-read the spec; did Phase 2 miss any user journey, edge case, or failure mode that should have been enumerated?
+2. **Bucket completeness** — did Phase 4 cover every artifact bucket that's in scope? Any artifact type from the spec that didn't get critiqued?
+3. **Cross-reference completeness** — did Phase 5 do BOTH the forward table AND the reverse scan? Any orphan endpoints or orphan interface actions missed?
+4. **Gap Register integrity** — does every gap have a disposition? Does every "Apply patch" disposition appear in §10 (Spec Patches Applied)? Does every "Accept as risk" have rationale in §8?
+5. **High-severity gap coverage** — every blocker gap has either an applied patch or an explicit accepted-risk decision? (No blockers should be deferred without strong reason.)
+
+### If issues found
+
+Append findings to the Gap Register. Return to Phase 7 for resolution. Then re-write the simulation doc (or Edit it surgically). Log the loop in §11 (Review Log).
+
+### Exit criteria
+
+- All 5 review checks pass
+- Last loop found only cosmetic issues (or no issues)
+- **User has confirmed they have no further concerns** — do not self-declare exit
+
+If user requests another loop, run it. The single-loop default is the floor, not the ceiling.
 
 ## Phase 10: Workstream Enrichment
 

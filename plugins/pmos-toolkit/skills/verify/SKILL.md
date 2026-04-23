@@ -257,33 +257,50 @@ Run actual scenarios in the development environment. Interact with the system as
 
 This is the most important phase. Re-read each upstream document and verify every requirement is implemented.
 
+**Three-state outcome model (applies to 4a, 4b, 4c):**
+
+Every row in every compliance table resolves to exactly one of three outcomes. Bare "Pass", "Fail", "Complete", or "Partial" are not valid — they collapse into the three below, and every row's `Evidence` column must cite a concrete artifact.
+
+| Outcome | Meaning | Required in Evidence column |
+|---------|---------|----------------------------|
+| **Verified** | Requirement/task met; evidence produced during Phase 2–4. | Test file + function, screenshot path, `curl` output excerpt, DB query result, or commit SHA. The evidence type must match what was declared in the Phase 4 entry gate allowlist if the row has a runtime surface. |
+| **NA (alt-evidence)** | No runtime surface for this row, OR the row was intentionally out of scope and covered indirectly. | Named alternative: e.g., "covered by `test_pricing.py::test_discount_applied`", or the specific reason tied to the requirement text (e.g., "FR narrative change only — no code path"). Bare "NA" or "N/A" is not valid. |
+| **Unverified — action required** | Verification was attempted and blocked. The row is NOT resolved. | The specific blocker and the user action needed to unblock (e.g., "Playwright MCP unavailable in this environment — user must install; re-run 3d after"). Unverified rows must also appear in the Phase 8 final report as open items. |
+
+Every row also cross-references the todo it closed (or left open) from the Phase 4 entry gate, if applicable. If no Phase 4 todo was created (pure internal logic), the Evidence column names the unit test that covered it.
+
 ### 4a. Requirements Compliance
 
 Read `{docs_path}/requirements/<file>`. For every goal, user journey, and acceptance criterion:
 
-| # | Requirement | Status | Evidence |
-|---|-------------|--------|----------|
-| Goal 1 | [From requirements] | Pass/Fail/Partial | [Test name, screenshot, or curl output] |
-| Journey 1, Step 3 | [Specific step] | Pass/Fail | [How verified] |
+| # | Requirement | Outcome | Evidence |
+|---|-------------|---------|----------|
+| Goal 1 | [From requirements] | Verified / NA / Unverified | [Per the three-state model: test file, screenshot path, curl excerpt, DB query, alt-evidence citation, or blocker + user action] |
+| Journey 1, Step 3 | [Specific step] | Verified / NA / Unverified | [e.g., `screenshots/j1-s3.png` from Phase 4 3d, or `Unverified — dev server wouldn't start; user must run docker compose up`] |
 
 ### 4b. Spec Compliance
 
 Read `{docs_path}/specs/<file>`. For every FR-ID and edge case:
 
-| ID | Requirement | Status | Evidence |
-|----|-------------|--------|----------|
-| FR-01 | [From spec] | Pass/Fail | [Test name or interactive verification artifact] |
+| ID | Requirement | Outcome | Evidence |
+|----|-------------|---------|----------|
+| FR-01 | [From spec] | Verified / NA / Unverified | [Per the three-state model — e.g., `test_orders.py::test_checkout_flow`, or `screenshots/fr-01-checkout.png`, or `Unverified — Stripe webhook endpoint requires live deploy`] |
 | FR-02 | ... | ... | ... |
-| E1 | [Edge case] | Pass/Fail | [How verified] |
+| E1 | [Edge case] | Verified / NA / Unverified | [Evidence for the edge case specifically, not the happy path] |
 
 ### 4c. Plan Compliance
 
 Read `{docs_path}/plans/<file>`. For every task:
 
-| Task | Status | Notes |
-|------|--------|-------|
-| T1: [Name] | Complete/Partial/Missing | [Any issues] |
+| Task | Outcome | Evidence |
+|------|---------|----------|
+| T1: [Name] | Verified-complete / NA-skipped-with-reason / Unverified | [Commit SHA(s) implementing the task + at least one test or Phase 4 verification artifact; OR the decision record for an intentional skip (e.g., "merged into T3 during execution"); OR the blocker + user action] |
 | T2: ... | ... | ... |
+
+**For plan-task outcomes:**
+- `Verified-complete` requires BOTH a commit reference AND a verification artifact (test, screenshot, curl excerpt). A commit alone is not evidence of correctness — only of existence.
+- `NA-skipped-with-reason` requires naming the decision AND where it was recorded (plan update, session log, commit message). "NA" without a reason is not valid.
+- `Unverified` means the task was claimed done but the verification couldn't be produced. This is a gap — surface it in the 4d Gap Report.
 
 ### 4d. Gap Report
 

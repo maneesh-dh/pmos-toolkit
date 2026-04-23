@@ -397,12 +397,13 @@ Every claim must have evidence. No exceptions:
 
 ## Anti-Patterns (DO NOT)
 
-- Do NOT skip manual verification — automated tests miss UX issues, rendering bugs, and timing problems
+For Phase 4 skip rationalizations specifically, see the **Phase 4 Red Flags** table — those six thoughts are the most common skips and are named individually there. This section covers general-purpose anti-patterns that apply across phases.
+
 - Do NOT mark failing tests as skip to make the suite pass
 - Do NOT claim "tests pass" without showing the output
-- Do NOT skip the spec compliance check — this is the most valuable phase
-- Do NOT leave discovered issues as "known gaps" — fix them and add regression tests
+- Do NOT skip the Phase 5 spec compliance check — this is the most valuable phase
+- Do NOT leave discovered issues as "known gaps" — every item resolves to one of the three Phase 5 states (Verified, NA-with-alt-evidence, or Unverified-action-required with a named blocker). There is no fourth state.
 - Do NOT commit debug logging, TODOs, or temporary workarounds
-- Do NOT verify only the happy path — test at least one error/edge case
+- Do NOT verify only the happy path — every affected flow gets at least one error/edge case per the Phase 4 entry gate's 3e evidence row
 - Do NOT assume the previous verification run is still valid — re-run after every fix
-- Do NOT skip the hardening phase — converting bugs to tests is what prevents regressions
+- Do NOT skip the Phase 6 hardening phase — converting bugs to tests is what prevents regressions

@@ -470,4 +470,101 @@ Apply Phase 12. Output: `Refined #{id}.` (Or `Refined #{id}. Renamed to {new-fil
 
 ---
 
-(Phases 9, 10, 11 are added in subsequent tasks.)
+## Phase 9: Done / Drop Shortcuts
+
+Triggered by `/mytasks done <id> [note]` (status → completed) or `/mytasks drop <id> [reason]` (status → dropped).
+
+### Step 1: Locate the item
+
+Use Phase 6 normalize-and-locate. If not found, error and exit.
+
+### Step 2: Update frontmatter
+
+- `status`: `completed` (for `done`) or `dropped` (for `drop`).
+- `completed`: today's ISO date.
+- `updated`: today's ISO date.
+
+### Step 3: Append note to body (if `[note]` / `[reason]` provided)
+
+Append to `## Notes` (creating the section at the END of the body if absent):
+
+- For `done`: `- {today}: {note}`
+- For `drop`: `- {today}: dropped — {reason}`
+
+If no note/reason was provided, skip this step (no body change).
+
+### Step 4: Regenerate INDEX, report
+
+Apply Phase 12 (the item is now excluded from INDEX since status is completed/dropped).
+
+Output:
+- For `done`: `Completed #{id}: "{title}".`
+- For `drop`: `Dropped #{id}: "{title}".`
+
+---
+
+## Phase 10: Check-in
+
+Triggered by `/mytasks checkin <id> [note]`. Append a check-in entry, advance `next_checkin`, prompt status transition if `waiting`.
+
+### Step 1: Locate the item
+
+Use Phase 6 normalize-and-locate. If not found, error and exit.
+
+### Step 2: Append to `## Check-ins` body section
+
+If `## Check-ins` section exists, append a new line at the end of the section:
+`- {today}: {note}` (or `- {today}:` with empty trailing note if no note arg).
+
+If `## Check-ins` does not exist, create it at the end of the body:
+```markdown
+
+## Check-ins
+- {today}: {note}
+```
+
+### Step 3: Advance `next_checkin`
+
+If `checkin:` cadence is set:
+| Cadence | New `next_checkin` |
+|---|---|
+| `daily` | today + 1 day |
+| `weekly` | today + 7 days |
+| `biweekly` | today + 14 days |
+| `monthly` | today + 1 calendar month, clamped to the last day of the target month if necessary (e.g., Jan 31 → Feb 28; Aug 31 → Sep 30) |
+| `none` | leave `next_checkin:` blank |
+
+If `checkin:` is not set or empty, leave `next_checkin:` unchanged (the user hasn't enabled a cadence).
+
+### Step 4: Status transition prompt
+
+If `status:` was `waiting` BEFORE this checkin, prompt the user:
+
+```
+Move to in-progress? [Y/n]
+```
+
+(Use `_shared/interactive-prompts.md` primary path with a yes/no choice if `AskUserQuestion` is available; otherwise plain text prompt.)
+
+- `Y` (or `<enter>` for default) → set `status: in-progress`.
+- `n` → leave status as `waiting`.
+
+For other statuses (`pending`, `in-progress`, `completed`, `dropped`), do NOT prompt; status stays.
+
+### Step 5: Update `updated`, regenerate INDEX, report
+
+Set `updated:` to today. Apply Phase 12.
+
+Output (without status transition):
+```
+Checked in on #{id}. Next checkin: {next_checkin or "not scheduled"}.
+```
+
+Output (with status transition from waiting → in-progress):
+```
+Checked in on #{id}. Status: waiting → in-progress. Next checkin: {next_checkin or "not scheduled"}.
+```
+
+---
+
+(Phase 11 is added in the next task.)

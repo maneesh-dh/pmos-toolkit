@@ -295,3 +295,64 @@ Expected interactive flow per `_shared/interactive-prompts.md`, same field order
 8. Write back, set `updated:` to today.
 9. Apply Phase 12.
 10. Output: `Refined #0001.`
+
+### Scenario: `/mytasks done 1 wrapped this up` (with-checkins fixture, today = 2026-04-25)
+
+Expected:
+- Locate 0001.
+- Set `status: completed`, `completed: 2026-04-25`, `updated: 2026-04-25`.
+- Append note to `## Notes` (creating section if absent): `- 2026-04-25: wrapped this up`.
+- Apply Phase 12 (item leaves INDEX since completed).
+- Output: `Completed #0001: "Weekly 1on1 prep".`
+
+### Scenario: `/mytasks done 1` (no note)
+
+Expected: same as above but no note appended.
+
+### Scenario: `/mytasks drop 2 vendor never responded` (with-checkins fixture, today = 2026-04-25)
+
+Expected:
+- Locate 0002.
+- Set `status: dropped`, `completed: 2026-04-25`, `updated: 2026-04-25`.
+- Append to `## Notes`: `- 2026-04-25: dropped — vendor never responded`.
+- Apply Phase 12.
+- Output: `Dropped #0002: "SSL cert renewal blocked on vendor".`
+
+## Fixture: with-checkins (continued — checkin mechanics)
+
+### Scenario: `/mytasks checkin 1 quick sync, all green` (today = 2026-04-25)
+
+Expected:
+- Locate 0001 (status: in-progress, checkin: weekly, next_checkin: 2026-04-25).
+- Append to `## Check-ins`: `- 2026-04-25: quick sync, all green`. (Section already exists.)
+- Advance `next_checkin: 2026-05-02` (today + 7 days).
+- Status was `in-progress`, NOT `waiting` → no transition prompt.
+- Set `updated: 2026-04-25`.
+- Apply Phase 12.
+- Output: `Checked in on #0001. Next checkin: 2026-05-02.`
+
+### Scenario: `/mytasks checkin 2 still no response from vendor` (today = 2026-04-25, status: waiting)
+
+Expected:
+- Locate 0002.
+- Append to `## Check-ins`: `- 2026-04-25: still no response from vendor`. (Section absent → create.)
+- Advance `next_checkin: 2026-05-02`.
+- Status was `waiting` → prompt: `Move to in-progress? [Y/n]`. User says `Y`.
+- Set `status: in-progress`, `updated: 2026-04-25`.
+- Apply Phase 12.
+- Output: `Checked in on #0002. Status: waiting → in-progress. Next checkin: 2026-05-02.`
+
+### Scenario: `/mytasks checkin 1` (no note, weekly cadence)
+
+Expected:
+- Append `- 2026-04-25:` (no note text after the colon).
+- Advance next_checkin.
+- Output as above.
+
+### Scenario: cadence math edge cases
+
+For `monthly` cadence: today = 2026-01-31. Advance to 2026-02-28 (clamp to last day of February since Feb 31 doesn't exist).
+For `monthly` cadence: today = 2026-02-15. Advance to 2026-03-15.
+For `daily`: today = 2026-04-25 → next 2026-04-26.
+For `biweekly`: today = 2026-04-25 → next 2026-05-09.
+For `none`: leave next_checkin blank.

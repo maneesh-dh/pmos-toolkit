@@ -33,6 +33,7 @@ These instructions use Claude Code tool names. In other environments:
 - `schema.md` — item file shape, enum values, `INDEX.md` format
 - `inference-heuristics.md` — keyword → type table for quick-capture
 - `pipeline-bridge.md` — how `--backlog <id>` integrates with pipeline skills
+- `_shared/interactive-prompts.md` — interactive prompting protocol used by Phase 5
 
 ---
 
@@ -212,7 +213,7 @@ Output the file contents verbatim, fenced as markdown.
 
 ## Phase 5: Refine
 
-Triggered by `/backlog refine <id>`. Interactive — use `AskUserQuestion` where available; otherwise, present the prompts as a list and collect a single response, parsing each section.
+Triggered by `/backlog refine <id>`. Interactive — follow `_shared/interactive-prompts.md` for the prompting protocol (primary path: `AskUserQuestion`; fallback: one question at a time with numbered responses).
 
 ### Step 1: Load the item
 

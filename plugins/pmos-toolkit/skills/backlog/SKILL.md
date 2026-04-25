@@ -57,4 +57,69 @@ If the first token is not a recognized verb AND the argument is non-empty, treat
 
 ---
 
-[Subsequent phases will be added in later tasks]
+## Phase 2: Quick-Capture (`add` or bare text)
+
+Triggered by `/backlog add <text>` OR `/backlog <any free text>` (no recognized verb).
+
+**This phase MUST complete in a single tool-call sequence with NO clarifying questions.** Wrong inference is acceptable; capture friction is not.
+
+### Step 1: Resolve `backlog/` location
+
+- If `<repo>/backlog/items/` exists, use it.
+- Else, create `<repo>/backlog/items/` with `mkdir -p`.
+
+(`<repo>` = git repo root, found via `git rev-parse --show-toplevel`. If not in a git repo, use the current working directory.)
+
+### Step 2: Allocate id
+
+Scan `backlog/items/` and `backlog/archive/**/` for filenames matching `^([0-9]{4})-`. Take the max numeric prefix; allocate `id = max + 1`. If neither directory exists or is empty, `id = 1`. Format as 4-digit zero-padded.
+
+### Step 3: Infer type
+
+Apply `inference-heuristics.md` to `<text>` (case-insensitive, first-match-by-order). If no keyword matches, set `type: idea` and remember to emit the fallback notice in Step 6.
+
+### Step 4: Build slug
+
+- Lowercase the title.
+- Replace any run of non-alphanumeric chars with a single hyphen.
+- Trim leading/trailing hyphens.
+- Truncate to 60 characters at a hyphen boundary if possible, otherwise hard-truncate.
+
+### Step 5: Write the item file
+
+Path: `backlog/items/{id}-{slug}.md`
+
+Content (frontmatter only, no body):
+
+```yaml
+---
+id: {id}
+title: {original text, unchanged}
+type: {inferred type}
+status: inbox
+priority: should
+labels: []
+created: {today YYYY-MM-DD}
+updated: {today YYYY-MM-DD}
+source:
+spec_doc:
+plan_doc:
+pr:
+parent:
+dependencies: []
+---
+```
+
+### Step 6: Regenerate `INDEX.md`
+
+Apply Phase 10 (rebuild-index) inline. If regeneration fails, the item file is still written — emit a warning suggesting `/backlog rebuild-index`, but DO NOT roll back the item write.
+
+### Step 7: Report
+
+Output exactly one line:
+
+`Captured #{id} ({type}, should): "{title}"`
+
+If `type` was the fallback (`idea` from rule 4 of `inference-heuristics.md`), append:
+
+` — type inferred as 'idea' (no strong signal); use /backlog set {id} type=... to correct.`

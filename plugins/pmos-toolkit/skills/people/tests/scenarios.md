@@ -123,3 +123,94 @@ Expected:
 Expected:
 - Derive handle: try `sarah` — not taken (no fixture record uses bare `sarah`), use it.
 - Output: `Added sarah (Sarah).`
+
+## Fixture: with-people (continued)
+
+### Scenario: `/people show sarah-chen`
+
+Expected:
+- Locate `~/.pmos/people/sarah-chen.md`.
+- Render the file content verbatim, fenced as markdown.
+
+### Scenario: `/people show Sarah Chen`
+
+Expected:
+- Apply Phase 2 fuzzy match → tier 3 exact name match → 1 result `sarah-chen`.
+- Render that record verbatim.
+
+### Scenario: `/people show sarah` (ambiguous)
+
+Expected:
+- Apply Phase 2 → tier 2 alias match → 1 result `sarah-chen`.
+- Render that record verbatim.
+
+### Scenario: `/people show sara` (ambiguous, substring tier)
+
+Expected:
+- Apply Phase 2 → tier 4 → 2 results.
+- Output: `Multiple matches: sarah-chen, sarah-patel. Run /people show <handle> with the exact handle.`
+
+### Scenario: `/people show xyz`
+
+Expected:
+- Apply Phase 2 → 0 matches.
+- Output: `No matches for 'xyz'. Run /people for the full list.`
+
+### Scenario: `/people show 999nonexistent`
+
+Expected: same as `xyz` — `No matches for '999nonexistent'.`
+
+### Scenario: `/people list --workstream platform-q3`
+
+Expected:
+- Read all records.
+- Filter to records whose `workstreams:` contains `platform-q3`.
+- With-people fixture: sarah-chen and mark-davis match.
+- Render flat sorted (by name) table with INDEX.md columns.
+
+### Scenario: `/people list --relationship peer`
+
+Expected:
+- Filter to `working_relationship: peer`.
+- With-people fixture: sarah-chen, mark-davis match (sarah-patel is `team-member`).
+- Render flat sorted table.
+
+### Scenario: `/people list --workstream platform-q3 --relationship peer` (combined)
+
+Expected: AND semantics. Same two records (both filters pass for sarah-chen and mark-davis).
+
+### Scenario: `/people set sarah-chen team=infra`
+
+Expected:
+- Validate `team` is an allowed editable field. (`team` is free-string, no enum check.)
+- Load sarah-chen.md, update `team: infra`, set `updated:` to today.
+- Apply Phase 8 (regenerate INDEX).
+- Output: `Updated sarah-chen: team = infra.`
+
+### Scenario: `/people set sarah-chen working_relationship=invalid_value`
+
+Expected:
+- Validate against enum. `invalid_value` not in allowed list.
+- Output: `Unknown working_relationship 'invalid_value'. Allowed: boss, direct-report, peer, team-member, stakeholder, external, other.`
+- No write.
+
+### Scenario: `/people set sarah-chen handle=new-handle`
+
+Expected:
+- `handle` is skill-managed; not editable directly.
+- Output: `Field 'handle' cannot be set directly. The skill manages it.`
+- No write.
+
+### Scenario: `/people refine sarah-chen`
+
+Expected interactive flow per `_shared/interactive-prompts.md` — same field order as Phase 3, but pre-filled with current values:
+1. Prompt designation (current: `VP Engineering`). User: `<enter>` to keep.
+2. Prompt role (current: `Eng Manager`). User: types `Director of Engineering`.
+3. Prompt working_relationship (current: `peer`). User: `<enter>`.
+4. Prompt team (current: `platform`). User: `<enter>`.
+5. Prompt email (current: `sarah@acme.com`). User: `<enter>`.
+6. Prompt workstreams (current: `platform-q3`). User: `<enter>`.
+7. Prompt aliases (current: `sarah, schen, sc`). User: appends, types `sarah, schen, sc, schen2`.
+8. Write back, set `updated:` to today.
+9. Apply Phase 8.
+10. Output: `Refined sarah-chen.`

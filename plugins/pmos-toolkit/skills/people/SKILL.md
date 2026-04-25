@@ -214,4 +214,106 @@ This entry point has no user-facing slash command — `/mytasks` invokes it dire
 
 ---
 
-(Phases 4, 5, 6, 7 are added in subsequent tasks.)
+## Phase 4: Show Record
+
+Triggered by `/people show <handle-or-name>`.
+
+### Step 1: Resolve
+
+If `<handle-or-name>` looks like a kebab-case handle (lowercase + hyphens only) AND `~/.pmos/people/{input}.md` exists, use it directly.
+
+Otherwise, apply Phase 2 (find) to the input. Then:
+- **0 matches:** `No matches for '{input}'. Run /people for the full list.`
+- **1 match:** proceed with that handle.
+- **N matches:** `Multiple matches: {comma-separated handles}. Run /people show <handle> with the exact handle.`
+
+### Step 2: Render
+
+Output the file contents verbatim, fenced as markdown.
+
+---
+
+## Phase 5: Filtered List
+
+Triggered by `/people list [flags]`.
+
+### Recognized flags (all optional, all combinable; AND semantics)
+
+| Flag | Effect |
+|---|---|
+| `--workstream <slug>` | Records whose `workstreams:` contains `<slug>` |
+| `--relationship <enum>` | Records whose `working_relationship:` equals the enum value |
+
+### Step 1: Read records
+
+Glob `~/.pmos/people/*.md` (excluding `INDEX.md`). Parse frontmatter for each. Skip malformed files with a one-line warning.
+
+### Step 2: Validate flag values
+
+For `--relationship`: must be in the enum. Reject with `Unknown relationship '{value}'. Allowed: boss, direct-report, peer, team-member, stakeholder, external, other.`
+
+For `--workstream`: any string accepted (workstreams are free-text).
+
+### Step 3: Filter and sort
+
+Apply filters with AND semantics. Sort survivors by `name` ascending.
+
+### Step 4: Render
+
+Render the same table as INDEX.md (columns: handle, name, designation, role, working_relationship, team, email).
+
+If 0 matches: `No people match.`
+
+---
+
+## Phase 6: Set Field
+
+Triggered by `/people set <handle> <field>=<value>`.
+
+### Step 1: Locate the record
+
+`~/.pmos/people/{handle}.md` must exist. If not: `No record with handle '{handle}'. Run /people find {handle} for suggestions.`
+
+### Step 2: Parse and validate field name
+
+Allowed editable fields: `name`, `designation`, `role`, `working_relationship`, `team`, `email`, `workstreams`, `aliases`.
+
+Disallowed (skill-managed): `handle`, `created`, `updated`. Reject: `Field '{field}' cannot be set directly. The skill manages it.`
+
+Unknown fields: `Field '{field}' is not recognized. Allowed: {comma-separated list}.`
+
+### Step 3: Validate value
+
+| Field | Validation |
+|---|---|
+| `working_relationship` | Must be in enum |
+| `workstreams`, `aliases` | Comma-separated; written as YAML list. Empty value clears the list. |
+| `name`, `designation`, `role`, `team`, `email` | Free string. Empty value clears the field. |
+
+On enum violation: `Unknown {field} '{value}'. Allowed: {comma-separated list}.` No write.
+
+### Step 4: Edit and report
+
+Load record, update only the named field, set `updated:` to today, write back. Apply Phase 8 (regenerate INDEX). Output: `Updated {handle}: {field} = {value}.`
+
+---
+
+## Phase 7: Refine
+
+Triggered by `/people refine <handle>`. Interactive — pre-filled walk through all editable fields.
+
+### Step 1: Locate the record
+
+`~/.pmos/people/{handle}.md` must exist. If not: `No record with handle '{handle}'. Run /people find {handle} for suggestions.`
+
+### Step 2: Walk through fields per `_shared/interactive-prompts.md`
+
+Same field order as Phase 3 (designation → role → working_relationship → team → email → workstreams → aliases). Each prompt shows the current value as default; `<enter>` keeps it; explicit new value replaces; `clear` (for list fields) empties.
+
+### Step 3: Write back
+
+Replace each field with the new value (only if changed). Set `updated:` to today. Body is untouched.
+
+### Step 4: Regenerate INDEX, report
+
+Apply Phase 8. Output: `Refined {handle}.`

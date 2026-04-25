@@ -342,6 +342,36 @@ Delegate to Phase 6 (set) with the inferred `field=value`. Output: `Linked #{id}
 
 ---
 
+## Phase 9: Archive
+
+Triggered by `/backlog archive [--quarter Q]`.
+
+### Step 1: Determine target quarter
+
+If `--quarter <Q>` is provided (format `YYYY-QN`), use it for the destination directory.
+Otherwise, derive per-item: for each eligible item, target = `{year-of-updated}-Q{quarter-of-updated}` based on the item's `updated:` date.
+
+### Step 2: Collect eligible items
+
+For each file in `backlog/items/*.md`:
+- Parse frontmatter.
+- Eligible if `status` in `done, wontfix` AND age (today - `updated:`) > 30 days.
+
+### Step 3: Move
+
+For each eligible item:
+- Create `backlog/archive/{quarter}/` if absent.
+- `git mv backlog/items/{file} backlog/archive/{quarter}/{file}` (preserves history).
+- If git mv fails (e.g., not in a git repo), fall back to a regular file move.
+
+### Step 4: Regenerate and report
+
+Apply Phase 10 (rebuild-index — archive items are excluded from INDEX). Output:
+
+`Archived {N} items: {list of "#{id} -> {quarter}"} (or "0 items: nothing eligible.").`
+
+---
+
 ## Phase 10: Rebuild Index
 
 Triggered by `/backlog rebuild-index`. Also invoked internally by Phases 2, 5, 6, 7, 8, 9 after any item write.

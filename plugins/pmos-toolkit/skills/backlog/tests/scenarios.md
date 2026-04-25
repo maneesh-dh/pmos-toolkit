@@ -107,3 +107,18 @@ Expected:
 ### Scenario: `/backlog promote 2` (status=spec'd)
 
 Expected: error `#0002 is already at status 'spec'd'. To replan, use /plan --backlog 0002 directly.`
+
+## Fixture: with-archive
+
+### Scenario: `/backlog archive` (today = 2026-04-25)
+
+Expected:
+1. Item #0001 (`status: done`, `updated: 2026-01-15`, age > 30d) -> moved to `backlog/archive/2026-Q1/0001-old-done-thing.md`.
+2. Item #0002 (`status: done`, `updated: 2026-04-20`, age 5d) -> stays.
+3. Item #0003 (`status: ready`) -> stays.
+4. INDEX.md regenerated.
+5. Output: `Archived 1 item: #0001 -> 2026-Q1.`
+
+### Scenario: `/backlog archive --quarter 2026-Q1`
+
+Expected: archive ALL eligible items into `2026-Q1` regardless of `updated:` quarter. Same rules otherwise (only `done`/`wontfix` and >30 days).

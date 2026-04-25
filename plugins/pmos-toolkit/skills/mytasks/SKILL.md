@@ -141,4 +141,102 @@ If invoked from another phase: silent on success, warn on failure.
 
 ---
 
-(Phases 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 are added in subsequent tasks.)
+## Phase 2: Quick Capture (`<bare text>`)
+
+Triggered by `/mytasks <text>` where `<text>` does not start with a recognized verb (`add`, `list`, `today`, `week`, `overdue`, `waiting`, `checkins`, `for`, `in`, `show`, `set`, `refine`, `done`, `drop`, `checkin`, `archive`, `rebuild-index`).
+
+**This phase MUST complete in a single tool-call sequence with NO clarifying questions.** Wrong inference is acceptable; capture friction is not.
+
+### Step 1: Resolve `~/.pmos/tasks/items/`
+
+If `~/.pmos/tasks/items/` exists, use it. Otherwise, create it with `mkdir -p ~/.pmos/tasks/items`.
+
+### Step 2: Allocate id
+
+Scan `~/.pmos/tasks/items/` and `~/.pmos/tasks/archive/**/` for filenames matching `^([0-9]{4})-`. Take the max numeric prefix; allocate `id = max + 1`. If neither directory exists or both are empty, `id = 1`. Format as 4-digit zero-padded.
+
+### Step 3: Apply inference rules
+
+Per `inference-heuristics.md`:
+1. **Type:** scan for keyword match; fallback `execution`.
+2. **Date (`due:`):** scan for natural-language date pattern; strip the matched substring from the title.
+3. **People:** scan for `@handle` tokens. For each, call `/people find <handle>`:
+   - **Single match:** add resolved handle to `people:` list; strip `@handle` token from title.
+   - **Multiple matches:** flag as unresolved (multi-match); leave token in title; collect for warning.
+   - **No match:** flag as unresolved (no-match); leave token in title; collect for warning.
+4. **Workstream:** check current working directory for `.pmos/settings.yaml`; if present and contains `workstream:` key, use it.
+
+The **type keyword is NOT stripped from the title** (it's natural language; the title remains intelligible to the user).
+
+### Step 4: Build slug from final title
+
+After date stripping (and resolved-`@handle` stripping):
+- Lowercase the title.
+- Replace any run of non-alphanumeric chars with a single hyphen.
+- Trim leading/trailing hyphens.
+- Truncate to 60 characters at a hyphen boundary if possible, otherwise hard-truncate.
+
+### Step 5: Write the item file
+
+Path: `~/.pmos/tasks/items/{id}-{slug}.md`
+
+Content (frontmatter only, no body):
+
+```yaml
+---
+id: {id}
+title: {final title text}
+type: {inferred type}
+importance: neutral
+status: pending
+workstream: {value or empty if not inferred}
+people: [{resolved handles, comma-separated; empty list `[]` if none}]
+labels: []
+links: []
+due: {value or empty if not inferred}
+start:
+checkin:
+next_checkin:
+created: {today YYYY-MM-DD}
+updated: {today YYYY-MM-DD}
+completed:
+---
+```
+
+Optional fields with no value are written as bare keys (e.g., `start:`), not omitted, so the file shape is consistent.
+
+### Step 6: Regenerate INDEX.md
+
+Apply Phase 12 inline. If regeneration fails, the item file is still written — emit a warning suggesting `/mytasks rebuild-index`, but DO NOT roll back.
+
+### Step 7: Report
+
+Build the report line:
+
+```
+Captured #{id} ({type}, {importance}): "{final title}"
+```
+
+Append clauses for non-default values, separated by ` — `:
+- `due {due}` if due was inferred.
+- `workstream {workstream}` if inferred (annotate `(from current repo)` if from `.pmos/settings.yaml`).
+- `people: {comma-separated handles}` if any resolved.
+
+Then, on subsequent indented lines, list any unresolved `@handle` tokens:
+- For no-match: `⚠ unresolved: @{token} — run /people add {token}, then /mytasks set {id} people=<handle>`
+- For multi-match: `⚠ unresolved: @{token} — multiple matches ({comma-separated handles}); run /mytasks set {id} people=<handle>`
+
+Example:
+```
+Captured #0042 (call, neutral): "Call sarah about Q3 OKRs" — due 2026-05-01
+```
+
+Or with unresolved person:
+```
+Captured #0043 (execution, neutral): "Sync with @sarah on roadmap"
+  ⚠ unresolved: @sarah — multiple matches (sarah-chen, sarah-patel); run /mytasks set 0043 people=<handle>
+```
+
+---
+
+(Phases 3, 4, 5, 6, 7, 8, 9, 10, 11 are added in subsequent tasks.)

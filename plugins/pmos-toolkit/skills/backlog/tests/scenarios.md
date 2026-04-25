@@ -122,3 +122,18 @@ Expected:
 ### Scenario: `/backlog archive --quarter 2026-Q1`
 
 Expected: archive ALL eligible items into `2026-Q1` regardless of `updated:` quarter. Same rules otherwise (only `done`/`wontfix` and >30 days).
+
+## Fixture: multi-repo-workstream
+
+### Scenario: `/backlog list --workstream` (run from repo-a, workstream=test-workstream)
+
+Expected:
+- Aggregator reads workstream.md, finds linked_repos=[repo-a, repo-b].
+- Reads items from each.
+- Both items have id `0001` -> shown as `repo-a#0001` and `repo-b#0001`.
+- Sorted: `repo-b#0001` (priority must) first, then `repo-a#0001` (priority should).
+- Columns include a `repo` column.
+
+### Scenario: `/backlog show repo-b#0001`
+
+Expected: render `tests/fixtures/multi-repo-workstream/repo-b/backlog/items/0001-thing-in-b.md`.

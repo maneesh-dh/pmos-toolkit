@@ -392,3 +392,33 @@ Overwrite `<repo>/backlog/INDEX.md` with the format defined in `schema.md` (### 
 
 If invoked directly: `Regenerated INDEX.md: {count} items.`
 If invoked from another phase: silent on success, warn on failure.
+
+---
+
+## Phase 11: Workstream Aggregator
+
+Used by Phases 3 (`list --workstream`) and 4 (`show repo#id`). Not user-invoked directly.
+
+### Step 1: Find the workstream slug
+
+Read `<repo>/.pmos/settings.yaml`. Extract `workstream:`. If absent, error: `Current repo has no workstream link. Run /product-context init or use /backlog list without --workstream.`
+
+### Step 2: Find linked repos
+
+Read `~/.pmos/workstreams/{slug}.md`. Parse frontmatter. Extract `linked_repos:` list. If absent or empty, error: `Workstream '{slug}' has no linked_repos. Add them via /product-context update.`
+
+### Step 3: For each linked repo
+
+For each path in `linked_repos`:
+- If the path does not exist on disk, emit a one-line warning: `Skipping {path} (not on disk).`
+- Otherwise, read items from `{path}/backlog/items/*.md`. Tag each item with its repo basename for disambiguation.
+
+### Step 4: Merge
+
+Return the merged list (or the located file, for `show repo#id`). Never write — the aggregator is read-only.
+
+### Step 5: ID disambiguation
+
+When listing, render each item's id as `{repo-basename}#{id}` (e.g., `repo-a#0001`). When the user invokes `/backlog show repo-a#0001`, parse the prefix to route to the right repo.
+
+The Phase 11 aggregator does NOT mutate `~/.pmos/workstreams/{slug}.md` or any `.pmos/settings.yaml`. Linked-repo management is `/product-context`'s responsibility.

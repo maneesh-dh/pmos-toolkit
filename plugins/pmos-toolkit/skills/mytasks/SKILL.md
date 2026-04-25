@@ -306,4 +306,71 @@ Then list any unresolved person tokens on indented lines (same format as Phase 2
 
 ---
 
-(Phases 4, 5, 6, 7, 8, 9, 10, 11 are added in subsequent tasks.)
+## Phase 4: Filtered List
+
+Triggered by `/mytasks list [flags]`.
+
+### Recognized flags (all optional, all combinable; AND semantics)
+
+| Flag | Effect | INDEX-served? |
+|---|---|---|
+| `--status <pending\|in-progress\|waiting\|completed\|dropped>` | Filter by status | yes |
+| `--type <execution\|follow-up\|reminder\|idea\|read\|call>` | Filter by type | yes |
+| `--importance <leverage\|neutral\|overhead>` | Filter by LNO bucket | yes (bucket header) |
+| `--workstream <slug>` | Filter by workstream | yes |
+| `--person <handle>` | Filter by handle in `people:` | NO — read item files |
+| `--label <name>` | Filter by label in `labels:` | NO — read item files |
+| `--due <today\|this-week\|overdue\|next-7\|next-30>` | Date-window filter on `due:` | yes |
+| `--checkin-due` | `next_checkin <= today` | yes |
+| `--include-done` | Include `completed`, `dropped` (excluded by default) | requires reading archive too if set |
+
+### Step 1: Choose source
+
+If all provided flags are INDEX-served (per the table above) AND `--include-done` is NOT set, use `~/.pmos/tasks/INDEX.md` as the source. Otherwise, glob `~/.pmos/tasks/items/*.md` and parse frontmatter for each. If `--include-done` is set, also glob `~/.pmos/tasks/archive/**/*.md`.
+
+### Step 2: Validate flag values against enums
+
+Reject unknown enum values with: `Unknown {flag-name} '{value}'. Allowed: {comma-separated list}.` No render.
+
+### Step 3: Apply filters and sort
+
+AND semantics across flags. Default sort: `due` ascending (no-due last) → `updated` descending. Importance is the **grouping** key for the default `/mytasks` no-arg view; `list` renders flat (no grouping) unless explicitly grouped (not a v1 feature).
+
+For `--due` window flags:
+- `today` → `due == today`
+- `this-week` → `today <= due <= today + 7`
+- `overdue` → `due < today` AND `status` NOT in (completed, dropped)
+- `next-7` → `today <= due <= today + 7`
+- `next-30` → `today <= due <= today + 30`
+
+### Step 4: Render
+
+Render a markdown table with columns `id | type | status | due | next_checkin | title | workstream`.
+
+For person- or label-filtered views, additionally include the relevant column (`people` or `labels`) since those flags read item files anyway.
+
+If 0 matches: `No items match.`
+
+---
+
+## Phase 5: Named Views
+
+Triggered by `/mytasks today`, `/mytasks week`, `/mytasks overdue`, `/mytasks waiting`, `/mytasks checkins`, `/mytasks for <handle>`, `/mytasks in <workstream>`.
+
+Each named view dispatches to Phase 4 with the equivalent flags:
+
+| Named view | Equivalent `list` invocation |
+|---|---|
+| `/mytasks today` | `list --due today` |
+| `/mytasks week` | `list --due this-week` |
+| `/mytasks overdue` | `list --due overdue` |
+| `/mytasks waiting` | `list --status waiting` |
+| `/mytasks checkins` | `list --checkin-due` |
+| `/mytasks for <handle>` | `list --person <handle>` |
+| `/mytasks in <workstream>` | `list --workstream <workstream>` |
+
+The output is identical to the equivalent `list` invocation. No special formatting.
+
+---
+
+(Phases 6, 7, 8, 9, 10, 11 are added in subsequent tasks.)

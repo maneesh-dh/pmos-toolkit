@@ -142,3 +142,97 @@ Expected:
 7. Prompt checkin. User: `<enter>` (none default).
 8. Write item with frontmatter only, no body, all optional fields empty.
 9. Output: `Added #{id} (execution, neutral): "Quick standalone task".` (No clauses since nothing optional was set.)
+
+## Fixture: with-tasks (continued — list & named views)
+
+### Scenario: `/mytasks list` (no flags)
+
+Expected:
+- Read INDEX.md.
+- Render flat sorted list (importance leverage > neutral > overhead → due asc → updated desc).
+- Output table columns: id, type, status, due, next_checkin, title, workstream.
+- Order: 0001, 0002, 0004, 0003.
+
+### Scenario: `/mytasks list --status pending`
+
+Expected:
+- Filter to `status: pending`. From with-tasks: 0002, 0004 (0001 is in-progress, 0003 is waiting).
+- Source: INDEX.md (status is an INDEX column).
+- Render flat sorted: 0002 first (has due), 0004 second.
+
+### Scenario: `/mytasks list --workstream platform-q3 --importance leverage`
+
+Expected:
+- AND filter: workstream platform-q3 AND importance leverage.
+- Match: 0001 only.
+- Source: INDEX.md (both filters map to INDEX columns; importance is the bucket).
+- Output: single-row table.
+
+### Scenario: `/mytasks list --label reading` (label not in INDEX)
+
+Expected:
+- Filter requires reading item files (labels not in INDEX).
+- Read all items, filter to those whose `labels:` contains `reading`. Match: 0004.
+- Output: single row.
+
+### Scenario: `/mytasks list --person sarah-chen` (people not in INDEX)
+
+Expected:
+- Filter requires reading item files (people not in INDEX).
+- Read all items, filter to those whose `people:` contains `sarah-chen`. Match: 0001, 0002.
+- Output: two-row table, sorted by importance bucket (0001 leverage first, then 0002 neutral).
+
+### Scenario: `/mytasks today` (assume today = 2026-05-01)
+
+Expected:
+- Equivalent to `/mytasks list --due today`.
+- INDEX.md filter: `due: 2026-05-01`. Match: 0002.
+- Output: single row.
+
+### Scenario: `/mytasks week` (assume today = 2026-04-25)
+
+Expected:
+- Equivalent to `/mytasks list --due this-week`.
+- "this-week" window: today through today + 7 days, i.e., 2026-04-25 to 2026-05-02.
+- INDEX.md filter: `due` in window. Match: 0002 (due 2026-05-01).
+- Output: single row.
+
+### Scenario: `/mytasks overdue` (assume today = 2026-06-01)
+
+Expected:
+- Equivalent to `/mytasks list --due overdue`.
+- Filter: `due < today` AND `status` NOT in (completed, dropped). All due dates are before 2026-06-01: 0001 (2026-05-12), 0002 (2026-05-01). 0003, 0004 have no due — excluded.
+- Output: 2 rows.
+
+### Scenario: `/mytasks waiting`
+
+Expected:
+- Equivalent to `/mytasks list --status waiting`.
+- Match: 0003.
+- Output: single row.
+
+### Scenario: `/mytasks checkins` (today = 2026-05-08)
+
+Expected:
+- Equivalent to `/mytasks list --checkin-due`.
+- Filter: `next_checkin <= today`. Match: 0002 (next_checkin 2026-05-08).
+- Output: single row.
+
+### Scenario: `/mytasks for sarah-chen`
+
+Expected:
+- Equivalent to `/mytasks list --person sarah-chen`.
+- Reads item files. Match: 0001, 0002.
+
+### Scenario: `/mytasks in platform-q3`
+
+Expected:
+- Equivalent to `/mytasks list --workstream platform-q3`.
+- INDEX.md filter. Match: 0001, 0002.
+
+### Scenario: `/mytasks list --status open` (invalid enum value)
+
+Expected:
+- Validate against status enum. `open` is not in the list.
+- Output: `Unknown status 'open'. Allowed: pending, in-progress, waiting, completed, dropped.`
+- No render.

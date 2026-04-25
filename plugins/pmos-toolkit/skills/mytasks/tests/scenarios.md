@@ -103,3 +103,42 @@ Expected:
 1. No type keyword → default `execution`. No date.
 2. Title: `Buy birthday gift`.
 3. Output: `Captured #0006 (execution, neutral): "Buy birthday gift".` (No due, no people, no workstream — minimal report.)
+
+### Scenario: `/mytasks add Prep board deck` (empty fixture)
+
+Expected interactive flow per `_shared/interactive-prompts.md`:
+1. Allocate id `0001`.
+2. Prompt `importance` (enum): `leverage`, `neutral` (default), `overhead`. User picks: `leverage`.
+3. Prompt `type` (enum): `execution` (default — no keyword inferred from "Prep board deck"), `follow-up`, `reminder`, `idea`, `read`, `call`. User: `<enter>` (keeps execution).
+4. Prompt `workstream` (free string, default = inferred from `.pmos/settings.yaml` if present, else empty). User: `board-q2`.
+5. Prompt `due` (date input). User: `Friday`. Skill parses → next Friday's ISO date.
+6. Prompt `people` (comma-separated, skippable). User: `Mark, Lisa`.
+7. For each name token, call `/people find`:
+   - `Mark` → tier 2 alias match if `mark` is in mark-davis's aliases; assume yes → resolves silently.
+   - `Lisa` → 0 matches → triggers unknown-person three-option prompt.
+8. **Unknown-person prompt** (multi-option per `_shared/interactive-prompts.md`):
+   ```
+   No match for 'Lisa' — what would you like to do?
+     (a) create new person 'Lisa'
+     (b) pick existing: (none with similar name)
+     (c) skip — leave 'Lisa' unresolved
+   ```
+   User picks `(a)`. Invoke `/people` reactive create with name `Lisa` → returns handle `lisa`. Append `lisa` to the task's `people:` list.
+9. Prompt `checkin` (enum): `daily`, `weekly`, `biweekly`, `monthly`, `none` (default). User picks `weekly`. Skill auto-sets `next_checkin: today + 7 days`.
+10. Build slug from title: `prep-board-deck`.
+11. Write `~/.pmos/tasks/items/0001-prep-board-deck.md` with collected fields.
+12. Apply Phase 12 (rebuild INDEX).
+13. Output: `Added #0001 (execution, leverage): "Prep board deck" — due {Friday-date}, workstream board-q2, people: mark-davis, lisa, checkin weekly (next 2026-05-02).`
+
+### Scenario: `/mytasks add Quick standalone task` (skip everything optional)
+
+Expected:
+1. Allocate id.
+2. Prompt importance. User: `<enter>` (neutral default).
+3. Prompt type. User: `<enter>` (execution default).
+4. Prompt workstream. User: `skip` or `<enter>` (empty).
+5. Prompt due. User: `skip`.
+6. Prompt people. User: `skip`.
+7. Prompt checkin. User: `<enter>` (none default).
+8. Write item with frontmatter only, no body, all optional fields empty.
+9. Output: `Added #{id} (execution, neutral): "Quick standalone task".` (No clauses since nothing optional was set.)

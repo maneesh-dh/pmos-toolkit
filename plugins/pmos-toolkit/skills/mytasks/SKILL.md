@@ -239,4 +239,71 @@ Captured #0043 (execution, neutral): "Sync with @sarah on roadmap"
 
 ---
 
-(Phases 3, 4, 5, 6, 7, 8, 9, 10, 11 are added in subsequent tasks.)
+## Phase 3: Rich Capture (`add`)
+
+Triggered by `/mytasks add <text>`. Interactive — collects rich attributes upfront via `_shared/interactive-prompts.md`.
+
+### Step 1: Allocate id and resolve `~/.pmos/tasks/items/`
+
+Same as Phase 2 Steps 1-2.
+
+### Step 2: Walk through prompts per `_shared/interactive-prompts.md`
+
+Ask in this order, ONE field at a time:
+
+1. **`importance`** — enum. Options: `leverage`, `neutral` (default), `overhead`.
+2. **`type`** — enum. Options: `execution` (default if no keyword inferred from `<text>`; otherwise the inferred value is the default), `follow-up`, `reminder`, `idea`, `read`, `call`.
+3. **`workstream`** — free string. Default: value from current repo's `.pmos/settings.yaml` `workstream:` key if present, else empty. Skippable.
+4. **`due`** — date input. Format hint: `YYYY-MM-DD or "Friday", "tomorrow", "in 3 days"`. Parse per `inference-heuristics.md` date rules. Skippable.
+5. **`people`** — comma-separated names or handles. For each token (after stripping any `@` prefix), call `/people find`:
+   - **Single match:** add the resolved handle silently.
+   - **Multiple matches:** present a multi-option prompt per `_shared/interactive-prompts.md`:
+     ```
+     '{token}' matches multiple people — which one?
+       (a) {handle-1} ({name})
+       (b) {handle-2} ({name})
+       ...
+       (c) skip — leave '{token}' unresolved
+     ```
+     User picks one; add that handle. If "skip", leave unresolved (collect for warning).
+   - **No match:** present a multi-option prompt:
+     ```
+     No match for '{token}' — what would you like to do?
+       (a) create new person '{token}'
+       (b) pick existing: {ranked-list-of-near-matches-or-"(none with similar name)"}
+       (c) skip — leave '{token}' unresolved
+     ```
+     User picks. If `(a)`, invoke `/people` reactive create (per `/people` Phase 3 reactive entry point) with the name token; receive the new handle and add it. If `(b)` and there are near-matches, prompt to select; add the chosen handle. If `(c)` or no near-matches in `(b)`, leave unresolved.
+6. **`checkin`** — enum. Options: `none` (default), `daily`, `weekly`, `biweekly`, `monthly`. If user picks any non-`none` cadence, also set `next_checkin: today + cadence` per Phase 10 cadence math.
+
+### Step 3: Build slug from `<text>`
+
+Same slug rules as Phase 2 Step 4.
+
+### Step 4: Write the item file
+
+Path: `~/.pmos/tasks/items/{id}-{slug}.md`. Frontmatter as in Phase 2 Step 5, but with all collected values from Step 2. Skipped fields are written as bare keys with no value.
+
+### Step 5: Regenerate INDEX
+
+Apply Phase 12. Same fail-soft semantics as Phase 2 Step 6.
+
+### Step 6: Report
+
+Build a report line:
+
+```
+Added #{id} ({type}, {importance}): "{title}"
+```
+
+Append clauses (` — ` separated) for any non-default values:
+- `due {due}`
+- `workstream {workstream}`
+- `people: {comma-separated handles}`
+- `checkin {cadence} (next {next_checkin})`
+
+Then list any unresolved person tokens on indented lines (same format as Phase 2 Step 7).
+
+---
+
+(Phases 4, 5, 6, 7, 8, 9, 10, 11 are added in subsequent tasks.)

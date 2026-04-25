@@ -278,6 +278,50 @@ Load item, update only the named field, set `updated:` to today, write back. If 
 
 ---
 
+## Phase 7: Promote
+
+Triggered by `/backlog promote <id>`. Hands off the item to the appropriate pipeline skill.
+
+### Step 1: Load and check status
+
+Locate the item. Map status to target skill:
+
+| Current status | Target | Notes |
+|---|---|---|
+| `inbox` | `/requirements` | Item likely lacks ACs |
+| `ready` | `/spec` | Item has ACs already |
+| `spec'd` | refuse | Use `/plan --backlog <id>` directly |
+| `planned` | refuse | Use `/execute --backlog <id>` directly |
+| `in-progress` | refuse | Already running |
+| `done`, `wontfix` | refuse | Use `/backlog set` to revive first |
+
+On refuse, output: `#{id} is already at status '{status}'. {next_step_message}.` No further action.
+
+### Step 2: Build the seed
+
+Construct a seed string from the item:
+
+```
+[Backlog #{id} | {type} | priority {priority}]
+Title: {title}
+
+{body if present, otherwise just the title}
+
+Source: backlog/items/{id}-{slug}.md
+```
+
+### Step 3: Invoke the target skill
+
+Invoke the target skill (`/requirements` or `/spec`) with the seed AND `--backlog {id}` so the pipeline-bridge consent gate opens. The user's session continues inside the target skill.
+
+### Step 4: On return, report
+
+Once the target skill exits, output: `Promoted #{id} -> {target}. (source linked)` if the target wrote a doc, or `Promoted #{id} -> {target}. (target did not write a doc — re-invoke when ready.)` otherwise.
+
+The actual frontmatter update on the item (e.g., `source:` or `spec_doc:`) is the target skill's responsibility per `pipeline-bridge.md`. Phase 7 does NOT mutate item frontmatter — it only invokes.
+
+---
+
 ## Phase 8: Link Doc or PR
 
 Triggered by `/backlog link <id> <doc-path-or-url>`.

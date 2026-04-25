@@ -94,3 +94,16 @@ Expected: infer field from filename pattern: `*-spec.md` -> `spec_doc`, `*-plan.
 ### Scenario: `/backlog link 2 https://github.com/foo/bar/pull/99`
 
 Expected: set `pr:` to the URL. Output: `Linked #0002: pr = https://github.com/foo/bar/pull/99.`
+
+### Scenario: `/backlog promote 3` (status=inbox, with-items fixture)
+
+Expected:
+1. Item #0003 has `status: inbox` and minimal body.
+2. Skill picks `/requirements` as the target (status `inbox` and `idea`/`tech-debt`/`feature` -> `/requirements`; status `ready` -> `/spec`).
+3. Invokes `/requirements --backlog 0003` with the item's title + body as the seed.
+4. The pipeline-bridge in `/requirements` recognizes `--backlog 0003` and, on doc-write, sets `source:` on item #0003.
+5. After `/requirements` returns, output: `Promoted #0003 -> /requirements. (source linked)`.
+
+### Scenario: `/backlog promote 2` (status=spec'd)
+
+Expected: error `#0002 is already at status 'spec'd'. To replan, use /plan --backlog 0002 directly.`

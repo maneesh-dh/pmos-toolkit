@@ -1,0 +1,78 @@
+# Pipeline Bridge
+
+Defines the `--backlog <id>` contract that the `/backlog` skill and the pipeline skills (`/requirements`, `/spec`, `/plan`, `/execute`, `/verify`) jointly implement.
+
+## Principle
+
+Pipeline skills mutate backlog item state ONLY when `--backlog <id>` is explicitly passed. Without it, the backlog is invisible to them. This is the consent gate that prevents surprise edits when a user runs a pipeline skill on something unrelated.
+
+## Lifecycle
+
+| Pipeline event | Item update | Trigger |
+|---|---|---|
+| `/requirements --backlog <id>` writes its doc | item `source:` set to the requirements doc path | The `/requirements` skill invokes Phase 6 (set) on `/backlog` after writing its output |
+| `/spec --backlog <id>` writes its doc | item `spec_doc:` set; status: `inbox`/`ready` -> `spec'd`; `planned`+ unchanged | `/spec` invokes Phase 6 (set) twice (one for spec_doc, one for status if applicable) |
+| `/plan --backlog <id>` writes its doc | item `plan_doc:` set; status -> `planned` | `/plan` invokes Phase 6 (set) |
+| `/execute --backlog <id>` starts | status -> `in-progress` | `/execute` invokes Phase 6 (set) at the start of execution |
+| `/verify --backlog <id>` reports pass | status -> `done`; `pr:` filled if available from git context | `/verify` invokes Phase 6 (set) |
+
+## Auto-prompt (offered seeds)
+
+When `/requirements` or `/spec` is invoked with an empty argument string AND `--backlog` is not provided AND a `<repo>/backlog/items/` directory exists:
+
+1. Read items via Phase 11 if a workstream is linked, else local items only.
+2. Filter to candidate statuses: `/requirements` -> `inbox` or `ready`; `/spec` -> `ready`.
+3. Sort by priority bucket (must>should>could>maybe), then `score` desc, then `updated` desc.
+4. Take the top 5.
+5. Offer them via `AskUserQuestion`:
+   ```
+   No seed provided. Pick a backlog item to start from?
+
+     1. #0042 [must, bug] SSL renewal cron is flaky
+     2. #0017 [should, feature] Add OAuth support
+     ...
+     6. (skip — proceed with no seed)
+   ```
+6. If user picks one, set the seed to that item's content AND set `--backlog <id>` for the rest of the invocation.
+
+This auto-prompt is a one-shot at the start of the skill; it does NOT recur.
+
+## Auto-capture (deferred items flow into backlog)
+
+`/plan` and `/verify` produce sections that surface deferred or out-of-scope work. Before those skills exit, they:
+
+1. Detect candidate items in their output (heuristic: bulleted items under headings like "Deferred", "Out of scope", "Follow-up", "Future work", "Known limitations").
+2. Construct a list of proposed backlog entries:
+   - `title`: the bullet text (truncated to 100 chars)
+   - `type`: inferred via `inference-heuristics.md`
+   - `status`: `inbox`
+   - `source`: the doc path being written
+3. Show the proposed list to the user (`AskUserQuestion`):
+   ```
+   I detected 3 deferred items in this {plan|verify} output. Capture to backlog?
+
+     1. Capture all
+     2. Pick which to capture
+     3. Skip
+   ```
+4. On confirm, invoke Phase 2 (`/backlog add ...`) for each, with the `source:` field pre-filled.
+
+## Implementation pattern for pipeline skills
+
+Each pipeline skill adds, near the top of its phase body, this Subroutine:
+
+```markdown
+### Subroutine: Backlog Bridge
+
+If `--backlog <id>` was passed:
+- After writing the primary output doc, invoke `/backlog set <id> {field}={value}` for the relevant field per the lifecycle table.
+- If the set fails (item not found, etc.), emit a single-line warning and continue.
+
+If `--backlog` was NOT passed AND argument is empty AND backlog/items/ exists:
+- Run the auto-prompt flow above.
+
+(For /plan and /verify) After the primary doc is written:
+- Run the auto-capture flow above.
+```
+
+The skill body cites this reference document instead of restating the contract; only the per-field mapping changes per skill.

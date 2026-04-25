@@ -2,7 +2,7 @@
 name: requirements
 description: Brainstorm, shape, and create a requirements document — problem definition, high-level solution direction, user journeys, research synthesis. First stage in the requirements -> spec -> plan pipeline. Auto-tiers by scope (bug fix / enhancement / feature). Use this skill when the user says things like "I have a feature idea", "let's brainstorm", "what should we build", "define what we need", "help me figure out the requirements", or shares initial thoughts about a problem to solve.
 user-invocable: true
-argument-hint: "<initial thoughts or observations to seed the requirements>"
+argument-hint: "<initial thoughts or observations to seed the requirements> [--backlog <id>]"
 ---
 
 # Requirements Document Generator
@@ -27,6 +27,19 @@ These instructions use Claude Code tool names. In other environments:
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
 - **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, announce phase transitions verbally.
+
+---
+
+## Backlog Bridge
+
+This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skills/backlog/pipeline-bridge.md` for the full contract.
+
+**At skill start:**
+- If `--backlog <id>` was passed: load the item via `cat <repo>/backlog/items/{id}-*.md` and use its content as the seed alongside any user-provided argument. Remember `<id>` for use at the end of the skill.
+- If no argument was provided AND `<repo>/backlog/items/` exists: run the auto-prompt flow per `pipeline-bridge.md`. If the user picks an item, set `<id>` and use its content as the seed.
+
+**At skill end (after writing the requirements doc):**
+- If `<id>` was set, invoke `/backlog set {id} source={doc_path}`. On failure, warn and continue.
 
 ---
 

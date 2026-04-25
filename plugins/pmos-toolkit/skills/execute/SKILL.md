@@ -2,7 +2,7 @@
 name: execute
 description: Execute an implementation plan end-to-end — task-by-task TDD implementation with deploy verification, frontend testing, and manual spot checks. Supports git worktree isolation. Use when the user says "implement the plan", "start building", "execute this", "code this up", or has a plan doc ready for implementation.
 user-invocable: true
-argument-hint: "<path-to-plan-doc>"
+argument-hint: "<path-to-plan-doc> [--backlog <id>]"
 ---
 
 # Plan Executor
@@ -20,6 +20,18 @@ These instructions use Claude Code tool names. In other environments:
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
 - **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, track progress via commit messages and report status verbally.
+
+---
+
+## Backlog Bridge
+
+This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skills/backlog/pipeline-bridge.md`.
+
+**At skill start:**
+- If `--backlog <id>` was passed: invoke `/backlog set {id} status=in-progress`. On failure, warn and continue.
+
+**At skill end:**
+- No automatic status change here; `/verify` is responsible for the `done` transition.
 
 ---
 

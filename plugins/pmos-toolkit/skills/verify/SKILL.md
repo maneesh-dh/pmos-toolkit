@@ -2,7 +2,7 @@
 name: verify
 description: Post-implementation verification gate — ALWAYS run after /execute completes. Lint, test, deploy, spec compliance, multi-agent code review, interactive QA, and regression test hardening. Also run after manual coding or partial work. Works with git commits, no PR required. Use when the user says "check my work", "is this done", "verify the implementation", "did I miss anything", or "review and test everything".
 user-invocable: true
-argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted)"
+argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted) [--backlog <id>]"
 ---
 
 # Implementation Verification Gate
@@ -20,6 +20,21 @@ These instructions use Claude Code tool names. In other environments:
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** State the specific blocker and the setup the user must complete before browser-based verification can run. Do NOT mark any UI-surface FR verified without either Playwright evidence or an explicitly declared alternative (a specific test file that covers the rendered output). Offloading verification to the user is not a valid completion state — it resolves to `Unverified — action required` on the Phase 5 compliance tables, and Phase 4 stays open.
 - **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, announce phase transitions verbally.
+
+---
+
+## Backlog Bridge
+
+This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skills/backlog/pipeline-bridge.md`.
+
+**At skill start:**
+- If `--backlog <id>` was passed: load the item file as supplementary context.
+
+**At skill end (only if the verify pass is reported successful):**
+- If `<id>` was set, invoke `/backlog set {id} status=done`. If the active branch has an associated PR (detect via `gh pr view --json url`), also invoke `/backlog set {id} pr={url}`. On failure, warn and continue.
+- Run the auto-capture flow per `pipeline-bridge.md`: scan the verify output for "Known issues" / "Follow-up" sections and propose new backlog items.
+
+---
 
 **Create verification tasks** at the start using your available task tracking tool:
 

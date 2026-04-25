@@ -2,7 +2,7 @@
 name: plan
 description: Create an execution plan from a spec — deep code study, TDD tasks with inline verification, decision logging, risk assessment, and a concrete final verification checklist. Third stage in the requirements -> spec -> plan pipeline. Always full format. Use when the user says "break this into tasks", "create the implementation steps", "how do we implement this", or has a spec ready for task breakdown.
 user-invocable: true
-argument-hint: "<path-to-spec-doc>"
+argument-hint: "<path-to-spec-doc> [--backlog <id>]"
 ---
 
 # Implementation Plan Generator
@@ -24,6 +24,19 @@ These instructions use Claude Code tool names. In other environments:
 - **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
+
+---
+
+## Backlog Bridge
+
+This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skills/backlog/pipeline-bridge.md`.
+
+**At skill start:**
+- If `--backlog <id>` was passed: load the item file as supplementary context.
+
+**At skill end (after writing the plan doc):**
+- If `<id>` was set, invoke `/backlog set {id} plan_doc={doc_path}`, then `/backlog set {id} status=planned`. On failure, warn and continue.
+- Run the auto-capture flow per `pipeline-bridge.md`: detect deferred-work bullets in the plan output, propose them as new backlog items via `AskUserQuestion`. On user confirmation, invoke `/backlog add` for each with `source:` pre-filled.
 
 ---
 

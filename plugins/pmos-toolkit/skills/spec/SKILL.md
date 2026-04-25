@@ -2,7 +2,7 @@
 name: spec
 description: Create a detailed technical specification from a requirements document — architecture, API contracts, DB schema, frontend design, testing strategy, verification plan. Second stage in the requirements -> spec -> plan pipeline. Auto-tiers by scope. Use when the user says "write the technical design", "design the system", "create the spec", "how should this work technically", or has a requirements doc ready for detailed design.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or requirements text>"
+argument-hint: "<path-to-requirements-doc or requirements text> [--backlog <id>]"
 ---
 
 # Technical Specification Generator
@@ -24,6 +24,19 @@ These instructions use Claude Code tool names. In other environments:
 - **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
+
+---
+
+## Backlog Bridge
+
+This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skills/backlog/pipeline-bridge.md`.
+
+**At skill start:**
+- If `--backlog <id>` was passed: load the item file as supplementary context.
+- If no argument provided AND `<repo>/backlog/items/` has items with status=ready: run the auto-prompt flow.
+
+**At skill end (after writing the spec doc):**
+- If `<id>` was set, invoke `/backlog set {id} spec_doc={doc_path}`, then `/backlog set {id} status=spec'd` (only if current status is `inbox` or `ready`). On failure, warn and continue.
 
 ---
 

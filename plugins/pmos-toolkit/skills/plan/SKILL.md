@@ -2,7 +2,7 @@
 name: plan
 description: Create an execution plan from a spec — deep code study, TDD tasks with inline verification, decision logging, risk assessment, and a concrete final verification checklist. Third stage in the requirements -> spec -> plan pipeline. Always full format. Use when the user says "break this into tasks", "create the implementation steps", "how do we implement this", or has a spec ready for task breakdown.
 user-invocable: true
-argument-hint: "<path-to-spec-doc> [--backlog <id>]"
+argument-hint: "<path-to-spec-doc> [--backlog <id>] [--feature <slug>]"
 ---
 
 # Implementation Plan Generator
@@ -44,13 +44,15 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 
 Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform task design — tech stack, constraints, and deployment patterns shape implementation planning. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /plan` and factor them into your approach for this session.
 
+**Resolve feature folder.** Follow `../_shared/feature-folder.md` with `skill_name=plan`, `feature_arg=<--feature value or empty>`, and `feature_hint=<topic from user input or spec arg>`. Use the returned folder path as `{feature_folder}`. The protocol creates the folder if needed.
+
 ---
 
 ## Phase 1: Intake
 
 1. **Locate the spec.** Follow `../.shared/resolve-input.md` with `phase=specs`, `label="spec"`.
 2. **Read the spec end-to-end.** Summarize it back in 3-5 bullets and confirm understanding with the user via AskUserQuestion.
-3. **Check for an existing plan.** Look in `{docs_path}/plans/` for a file covering this feature.
+3. **Check for an existing plan.** Look for `{feature_folder}/03_plan.md`.
    - If found: read it, ask if this is an update or fresh start.
    - If not found: proceed.
 
@@ -81,7 +83,7 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 
 ## Phase 3: Write the Plan
 
-Save to `{docs_path}/plans/YYYY-MM-DD-<feature-name>-implementation-plan.md`. Create the directory if it doesn't exist.
+Save to `{feature_folder}/03_plan.md`. Overwrite if it already exists.
 
 ### Plan Document Structure
 
@@ -384,7 +386,7 @@ Run one final improvement pass:
 
 After final fixes, commit:
 ```
-git add {docs_path}/plans/<file>
+git add {feature_folder}/03_plan.md
 git commit -m "docs: add implementation plan for <feature>"
 ```
 

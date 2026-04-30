@@ -2,7 +2,7 @@
 name: requirements
 description: Brainstorm, shape, and create a requirements document — problem definition, high-level solution direction, user journeys, research synthesis. First stage in the requirements -> spec -> plan pipeline. Auto-tiers by scope (bug fix / enhancement / feature). Use this skill when the user says things like "I have a feature idea", "let's brainstorm", "what should we build", "define what we need", "help me figure out the requirements", or shares initial thoughts about a problem to solve.
 user-invocable: true
-argument-hint: "<initial thoughts or observations to seed the requirements> [--backlog <id>]"
+argument-hint: "<initial thoughts or observations to seed the requirements> [--feature <slug>] [--backlog <id>]"
 ---
 
 # Requirements Document Generator
@@ -46,6 +46,8 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 ## Phase 0: Load Workstream Context
 
 Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform brainstorming — product understanding, user segments, metrics, and constraints make requirements more grounded. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /requirements` and factor them into your approach for this session.
+
+**Resolve feature folder.** Follow `../_shared/feature-folder.md` with `skill_name=requirements`, `feature_arg=<value of --feature flag if provided, else empty>`, and `feature_hint=<short user-supplied feature name from the conversation>`. Use the returned folder path as `{feature_folder}` for the rest of this run. The protocol creates the folder if needed.
 
 ---
 
@@ -174,7 +176,7 @@ Surface decisions that need to be made NOW (before spec). For each:
 
 ## Phase 4: Write the Document
 
-Save to `{docs_path}/requirements/YYYY-MM-DD-<feature-name>.md`. Create the directory if it doesn't exist.
+Save to `{feature_folder}/01_requirements.md`. Overwrite if it already exists (git provides version history).
 
 Use the template matching the detected tier. Delete sections marked "skip" for that tier.
 
@@ -435,7 +437,7 @@ Run one final improvement pass:
 
 After final fixes, commit:
 ```
-git add {docs_path}/requirements/<file>
+git add {feature_folder}/01_requirements.md
 git commit -m "docs: add requirements for <feature>"
 ```
 

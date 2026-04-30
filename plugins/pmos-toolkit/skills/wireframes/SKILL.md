@@ -1,8 +1,8 @@
 ---
 name: wireframes
-description: Generate static HTML wireframes (single-file, mid-fi, Tailwind) for a user-facing feature — covers all screens, components, states, and target devices. Optional bridge between /requirements and /spec in the requirements -> spec -> plan pipeline (run before /spec when the feature is user-facing). Auto-triggers /requirements if no req doc exists. Self-evaluates each wireframe against UX heuristics with a reviewer subagent and runs up to 2 self-refinement loops. Use when the user says "create wireframes", "mock up the UI", "wireframe this feature", "design the screens", "show me the UI states", or has a requirements doc ready and wants visuals before the spec.
+description: Generate static HTML wireframes (single-file, mid-fi, Tailwind) for a user-facing feature — covers all screens, components, states, and target devices. Optional bridge between /requirements and /spec in the requirements -> spec -> plan pipeline (run before /spec when the feature is user-facing). Auto-triggers /requirements if no req doc exists. Optionally extracts a "house style" from the host repo's frontend (Tailwind tokens, component library, layout patterns) so wireframes match the existing app, and accepts screenshots (`--screenshots`) of existing flows as IA anchors for "extend this flow" requests. Self-evaluates each wireframe against UX heuristics with a reviewer subagent and runs up to 2 self-refinement loops. Use when the user says "create wireframes", "mock up the UI", "wireframe this feature", "design the screens", "show me the UI states", "extend this existing flow", or has a requirements doc ready and wants visuals before the spec.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>]"
+argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--screenshots <path>]"
 ---
 
 # Wireframe Generator
@@ -54,7 +54,13 @@ Before any other work, follow the context loading instructions in `product-conte
    - Functional requirements that imply UI
    - Non-goals (so you do NOT wireframe out-of-scope flows)
    - Any explicit UX constraints (brand, accessibility tier, device support already declared)
-4. **Confirm understanding.** Summarize the journeys you'll wireframe and ask the user to confirm before continuing.
+3.5. **Ingest screenshots, if provided.** If the user passed `--screenshots <path>` (one or more times) OR attached images inline, follow `reference/screenshot-ingestion.md`:
+   - Copy each image to `{feature_folder}/wireframes/assets/source-screens/`
+   - Run vision-extraction per the prompt template in that file
+   - Append a section per screenshot to `{feature_folder}/wireframes/assets/source-screens.md`
+   - Defer the journey-anchoring `AskUserQuestion` step to the journey-confirmation gate below (so the user reviews journeys and screenshot mappings together)
+   - If no screenshots provided, skip this step entirely.
+4. **Confirm understanding.** Summarize the journeys you'll wireframe AND (if step 3.5 ran) propose anchor mappings between each screenshot and a journey step. Ask the user to confirm both via `AskUserQuestion` (batch ≤ 4 per call, screenshots first then journey list, sequential calls if needed). Update `source-screens.md` "Anchored to" lines per the user's answers. Platform fallback: present journeys + proposed mappings as a numbered list and ask for confirmation in free text.
 
 **Gate:** Do not proceed until the user confirms the journey list.
 
@@ -115,6 +121,32 @@ The `Patterns` column lists the `patterns/<category>/<file>` references for each
 
 ---
 
+## Phase 2.5: Host Style Extraction (optional)
+
+> Decimal phase number is intentional — Phase 3 onward keeps existing numbering so external references (other skills, prior conversations) still resolve. Skip this phase entirely if it doesn't apply; the rest of the skill is unaffected.
+
+This phase tries to make wireframes look like they belong in the user's existing product. **Skip silently** when there's no host frontend (backend-only repo, ad-hoc directory). When applicable, it produces an override CSS file that re-skins the wireframe vocabulary using tokens extracted from the repo.
+
+Follow `reference/style-extraction.md` for the full procedure. Summary:
+
+1. **Detect** whether to run. Triggers when `cwd` is in a git repo AND a frontend signal is present (React/Vue/Svelte/Next/Nuxt deps, `tailwind.config.*`, `:root { --* }` CSS, or a substantial `<style>` block in `index.html`). If none match, write `{feature_folder}/wireframes/assets/house-style.json` with `{"source": null}` and skip the rest of this phase.
+2. **Choose a candidate frontend.** Single candidate → use it. Multiple candidates → ask via `AskUserQuestion` (single-select, candidates + "None — use default style"). Platform fallback: pick the candidate with the most component files; announce.
+3. **Extract** tokens (colors, radius, fontFamily) and component-library hints from `tailwind.config.*`, top-level CSS files, `package.json`, and 2–3 representative component/page files. Read budget cap: ~20 files / ~30 KB.
+4. **Write artifacts:**
+   - `{feature_folder}/wireframes/assets/house-style.json` — structured summary (always, even if empty).
+   - `{feature_folder}/wireframes/assets/house-style.css` — variable overrides for `wireframe.css` (only when extraction yielded usable tokens).
+5. **Confirm with the user** via `AskUserQuestion`:
+   - **Question:** "Apply this extracted house style to wireframes?"
+   - **Options:** **Use as extracted** / **Edit before applying** / **Discard, use default style**
+   - "Discard" → delete `house-style.css`; keep the JSON with `"applied": false` for audit.
+6. **Screenshot fallback:** if no host frontend was detected but Phase 1 step 3.5 ingested screenshots, attempt token inference from the screenshot descriptions (best effort; leave empty if not confident).
+
+**Subagents:** if available, dispatch one subagent for the extractor with read-only access to the repo. Otherwise run inline.
+
+**Gate:** the user must confirm or discard the extracted style before Phase 3 begins. This is a fast confirmation, not a deep review.
+
+---
+
 ## Phase 3: Generate Wireframes (Parallel Subagents)
 
 For each `(component × device)` pair in the matrix, generate one HTML file at:
@@ -145,6 +177,8 @@ If the copy fails (path not resolvable), `Read` the skill's `assets/wireframe.cs
 - The full HTML template from `reference/html-template.md`
 - **Only the pattern files tagged on this component's inventory row** (typically 1–3 files from `patterns/`). Do NOT pass the whole patterns library — it's too large and dilutes attention. The patterns are authoritative: each pattern's "best practices", "common mistakes", and "skeleton" must be respected
 - Workstream tech-stack hints if loaded (brand color, type stack)
+- **If `assets/house-style.json` exists with `source != null` AND the user chose "Use as extracted":** include the JSON verbatim. Instruct the subagent to (a) link `./assets/house-style.css` after `./assets/wireframe.css` in every generated file, and (b) match component shapes to the `patterns` hints (e.g., button radius, card style, nav layout). The override CSS handles colors and tokens — the subagent only needs to honor the shape patterns.
+- **If this component has at least one anchored screenshot** (per `source-screens.md`): include only that screenshot's description block (not the whole file) plus the absolute path to the original image. Include the IA-preservation instruction from `reference/screenshot-ingestion.md` ("match layout/IA, may improve states/a11y/copy, must NOT silently reorganize IA"). Components without anchored screenshots receive no screenshot context.
 - Strict instruction: produce ONLY the HTML file(s), no commentary
 
 **If subagents are unavailable**: generate sequentially in the main agent.
@@ -153,6 +187,7 @@ If the copy fails (path not resolvable), `Read` the skill's `assets/wireframe.cs
 
 - One `.html` file per `(component × device)` pair
 - Links the shared `./assets/wireframe.css` (copied in step 3a) — do NOT inline the rules from that stylesheet
+- If `./assets/house-style.css` exists and was applied in Phase 2.5, link it **immediately after** `wireframe.css` so its `:root` overrides take effect
 - Tailwind via CDN: `<script src="https://cdn.tailwindcss.com"></script>` (used alongside the shared CSS for layout/spacing utilities)
 - State-switcher tabs at the top so reviewers flip between states without reload
 - Annotations layer (toggleable) explaining non-obvious interactions
@@ -480,3 +515,6 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT default the entry-context to High (60) or Low (25) silently — Medium (40) is the unbiased default unless the req doc declares otherwise
 - Do NOT add a separate /wireframes approval gate around /msf's edits in Phase 7 — /msf already has its own per-recommendation approval flow (its Phase 4 + Phase 5); double-prompting confuses the user
 - Do NOT auto-invoke /msf in Phase 7 without announcing the boundary — print "Entering /msf" and "Exiting /msf" so the user can follow the flow
+- Do NOT blend tokens from multiple host frontends in Phase 2.5 — pick one (user-selected) so wireframes have a coherent visual language
+- Do NOT use screenshots as the sole journey source — they augment the requirements doc, they don't replace it; trigger /requirements first if no req doc exists
+- Do NOT redesign IA away from an anchored screenshot without explicit user direction — generators may improve states, a11y, and copy, but moving primary actions or restructuring sections needs the user to ask for it

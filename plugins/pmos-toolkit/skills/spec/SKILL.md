@@ -2,7 +2,7 @@
 name: spec
 description: Create a detailed technical specification from a requirements document — architecture, API contracts, DB schema, frontend design, testing strategy, verification plan. Second stage in the requirements -> spec -> plan pipeline. Auto-tiers by scope. Use when the user says "write the technical design", "design the system", "create the spec", "how should this work technically", or has a requirements doc ready for detailed design.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or requirements text> [--backlog <id>]"
+argument-hint: "<path-to-requirements-doc or requirements text> [--feature <slug>] [--backlog <id>]"
 ---
 
 # Technical Specification Generator
@@ -44,13 +44,15 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 
 Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform technical decisions — product constraints, tech stack, and stakeholder concerns shape architecture choices. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /spec` and factor them into your approach for this session.
 
+**Resolve feature folder.** Follow `../_shared/feature-folder.md` with `skill_name=spec`, `feature_arg=<--feature value or empty>`, and `feature_hint=<topic from user input or the requirements arg>`. Use the returned folder path as `{feature_folder}`. The protocol creates the folder if needed (supporting users who enter the pipeline at /spec).
+
 ---
 
 ## Phase 1: Intake & Tier Detection
 
 1. **Locate the requirements.** Follow `../.shared/resolve-input.md` with `phase=requirements`, `label="requirements doc"`.
 2. **Read the requirements end-to-end.** Confirm understanding with the user — summarize the problem, goals, non-goals, and key decisions already made.
-3. **Check for existing spec.** Look in `{docs_path}/specs/` for an existing file.
+3. **Check for existing spec.** Look at `{feature_folder}/02_spec.md` for an existing file.
    - If found: read it, ask the user if this is an update or fresh start.
    - If not found: proceed.
 4. **Detect the tier** from the requirements doc (carry forward the same tier if tagged, otherwise assess):
@@ -173,7 +175,7 @@ For each major feature area, define HOW it will be verified.
 
 ## Phase 5: Write the Spec
 
-Save to `{docs_path}/specs/YYYY-MM-DD-<feature-name>-spec.md`. Create the directory if it doesn't exist.
+Save to `{feature_folder}/02_spec.md`. Overwrite if it already exists.
 
 ### Tier 1 Template: Bug Fix / Minor Enhancement
 
@@ -544,7 +546,7 @@ Run one final improvement pass:
 
 After final fixes, commit:
 ```
-git add {docs_path}/specs/<file>
+git add {feature_folder}/02_spec.md
 git commit -m "docs: add spec for <feature>"
 ```
 

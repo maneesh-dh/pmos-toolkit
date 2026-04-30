@@ -2,7 +2,7 @@
 name: wireframes
 description: Generate static HTML wireframes (single-file, mid-fi, Tailwind) for a user-facing feature — covers all screens, components, states, and target devices. Optional bridge between /requirements and /spec in the requirements -> spec -> plan pipeline (run before /spec when the feature is user-facing). Auto-triggers /requirements if no req doc exists. Self-evaluates each wireframe against UX heuristics with a reviewer subagent and runs up to 2 self-refinement loops. Use when the user says "create wireframes", "mock up the UI", "wireframe this feature", "design the screens", "show me the UI states", or has a requirements doc ready and wants visuals before the spec.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...]"
+argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>]"
 ---
 
 # Wireframe Generator
@@ -37,6 +37,8 @@ This skill has multiple phases. Create one task per phase using your agent's tas
 ## Phase 0: Load Workstream Context & Learnings
 
 Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available — design tokens, brand voice, and prior wireframe conventions live here. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /wireframes` and factor them into your approach for this session.
+
+**Resolve feature folder.** Follow `../_shared/feature-folder.md` with `skill_name=wireframes`, `feature_arg=<--feature value or empty>`, and `feature_hint=<topic from user input>`. Use the returned folder path as `{feature_folder}`. Wireframes are commonly produced before /spec, so this skill may create the folder.
 
 ---
 
@@ -118,19 +120,19 @@ The `Patterns` column lists the `patterns/<category>/<file>` references for each
 For each `(component × device)` pair in the matrix, generate one HTML file at:
 
 ```
-{docs_path}/wireframes/{YYYY-MM-DD}_{feature_slug}/{NN}_{component_slug}_{device}.html
+{feature_folder}/wireframes/{NN}_{screen-slug}.html
 ```
 
-Where `NN` is a zero-padded index matching the inventory order.
+Where `NN` is a 2-digit zero-padded sequence number reflecting intended viewing order. The skill controls numbering — start at `01` and increment per screen, following the inventory order. Use a `{screen-slug}` that combines the component slug and device (e.g., `01_dashboard_desktop-web.html`). Supporting assets (CSS, images, thumbnails) live in `{feature_folder}/wireframes/assets/`.
 
 ### 3a. Copy shared stylesheet (do this BEFORE any wireframe is generated)
 
-Copy `assets/wireframe.css` from this skill into the output folder so every wireframe can link `./wireframe.css` (relative). Resolve the skill path from `${CLAUDE_PLUGIN_ROOT}` when available; otherwise fall back to the cached plugin path:
+Copy `assets/wireframe.css` from this skill into the output folder so every wireframe can link `./assets/wireframe.css` (relative). Resolve the skill path from `${CLAUDE_PLUGIN_ROOT}` when available; otherwise fall back to the cached plugin path:
 
 ```bash
-mkdir -p "{docs_path}/wireframes/{YYYY-MM-DD}_{feature_slug}"
+mkdir -p "{feature_folder}/wireframes/assets"
 cp "${CLAUDE_PLUGIN_ROOT:-$HOME/.claude-personal/plugins/cache/pmos-toolkit/pmos-toolkit/*/}skills/wireframes/assets/wireframe.css" \
-   "{docs_path}/wireframes/{YYYY-MM-DD}_{feature_slug}/wireframe.css"
+   "{feature_folder}/wireframes/assets/wireframe.css"
 ```
 
 If the copy fails (path not resolvable), `Read` the skill's `assets/wireframe.css` and `Write` it to the destination. Do NOT inline the contents into individual wireframe files.
@@ -150,7 +152,7 @@ If the copy fails (path not resolvable), `Read` the skill's `assets/wireframe.cs
 ### File Requirements (every wireframe MUST satisfy)
 
 - One `.html` file per `(component × device)` pair
-- Links the shared `./wireframe.css` (copied in step 3a) — do NOT inline the rules from that stylesheet
+- Links the shared `./assets/wireframe.css` (copied in step 3a) — do NOT inline the rules from that stylesheet
 - Tailwind via CDN: `<script src="https://cdn.tailwindcss.com"></script>` (used alongside the shared CSS for layout/spacing utilities)
 - State-switcher tabs at the top so reviewers flip between states without reload
 - Annotations layer (toggleable) explaining non-obvious interactions
@@ -211,7 +213,7 @@ After all per-file refinement is done, present a cross-file rollup of any unreso
 
 ### 5a. Generate `index.html`
 
-Create `{docs_path}/wireframes/{YYYY-MM-DD}_{feature_slug}/index.html` with:
+Create `{feature_folder}/wireframes/index.html` with:
 
 - Header: feature name, generation date, link back to req doc
 - **Device tabs** at the top — one tab per device targeted; clicking filters the card grid
@@ -223,7 +225,7 @@ Create `{docs_path}/wireframes/{YYYY-MM-DD}_{feature_slug}/index.html` with:
 - Search box that filters cards by component name
 - Footer: total file count, file path of the folder
 
-Use the same Tailwind CDN approach AND link the shared `./wireframe.css` so the index inherits the same theme tokens, typography, and chrome styles as the wireframe files. The index must work offline as a `file://` URL.
+Use the same Tailwind CDN approach AND link the shared `./assets/wireframe.css` so the index inherits the same theme tokens, typography, and chrome styles as the wireframe files. The index must work offline as a `file://` URL.
 
 ### 5b. Serve
 
@@ -235,7 +237,7 @@ command -v node && command -v npx
 
 - **Node available**: start a static server in the background:
   ```bash
-  cd {wireframes_folder} && npx --yes http-server -p 0 -c-1 --silent
+  cd {feature_folder}/wireframes && npx --yes http-server -p 0 -c-1 --silent
   ```
   Capture the printed port and report `http://localhost:<port>/index.html` to the user.
 - **Node missing**: print the absolute `file://` path to `index.html` and tell the user to open it in Chrome. Note that some browsers restrict iframe loading from `file://` — the cards may need to be opened in new tabs instead.
@@ -316,7 +318,7 @@ For each journey:
 
 ### 6e. Output: dual-table `psych-findings.md`
 
-Save to `<wireframes-folder>/psych-findings.md`. Format details — header, per-journey block, dual tables (element + screen rollup), driver palette, severity assignment, sparkline, applied-changes log, unsurfaced-findings log — are specified in `reference/psych-output-format.md`. Follow that format exactly so artifacts are interchangeable with `/msf` Pass B output.
+Save to `{feature_folder}/wireframes/psych-findings.md`. Format details — header, per-journey block, dual tables (element + screen rollup), driver palette, severity assignment, sparkline, applied-changes log, unsurfaced-findings log — are specified in `reference/psych-output-format.md`. Follow that format exactly so artifacts are interchangeable with `/msf` Pass B output.
 
 ### 6f. Findings Presentation Protocol
 
@@ -369,7 +371,7 @@ Invoke `/msf` as a sub-procedure rather than handing off. Skills stay independen
 2. **Read** `../msf/SKILL.md` (relative to the skills directory).
 3. **Construct arguments**:
    - `<requirements-doc>`: the path resolved in /wireframes Phase 1
-   - `--wireframes <wireframes-folder>`: the folder created in Phase 3
+   - `--wireframes {feature_folder}/wireframes`: the folder created in Phase 3
    - `--skip-psych`: Phase 6 already produced `psych-findings.md`; /msf Pass B references it, doesn't re-score
    - `--default-scope=both`: pre-recommends "update both req doc and wireframes" in /msf Phase 5 (user can still override)
 4. **Execute /msf's phases inline** with these arguments:
@@ -381,7 +383,7 @@ Invoke `/msf` as a sub-procedure rather than handing off. Skills stay independen
    - /msf Phase 4 (Prioritize) → Must / Should / Nice-to-have grouping with per-recommendation user approval
    - /msf Phase 5 (Apply changes) → edits both req doc AND wireframes inline (user approves per recommendation; `--default-scope=both` is the default answer)
    - /msf Phase 6 (Consistency Pass) → cross-check applied changes against revised requirements
-   - /msf "Save Analysis" → writes `docs/msf/YYYY-MM-DD-<feature>-msf-analysis.md` (canonical) AND `<wireframes-folder>/msf-findings.md` (copy with header pointing to canonical)
+   - /msf "Save Analysis" → writes `docs/msf/YYYY-MM-DD-<feature>-msf-analysis.md` (canonical) AND `{feature_folder}/wireframes/msf-findings.md` (copy with header pointing to canonical)
    - /msf Phase 7 (Capture Learnings) → /msf logs its own learnings; /wireframes Phase 10 logs its separately
 5. **Announce completion**: "Exited /pmos-toolkit:msf. Resuming /wireframes Phase 8 (Spec Handoff)."
 
@@ -394,7 +396,7 @@ After /msf returns:
 1. **Spot-check edited wireframes** against `reference/eval-rubric.md` (same as Phase 6 post-edit check). Do NOT trigger Phase 4 review-loops.
 2. Confirm both artifacts exist:
    - `docs/msf/YYYY-MM-DD-<feature>-msf-analysis.md`
-   - `<wireframes-folder>/msf-findings.md` (copy)
+   - `{feature_folder}/wireframes/msf-findings.md` (copy)
 3. Confirm any wireframes /msf modified now reference the same `./wireframe.css` (they should — Edit doesn't touch the link).
 
 ### 7d. Exit criteria
@@ -428,7 +430,7 @@ MSF analysis: `{relative_path}/msf-findings.md` (if Phase 7 ran; canonical at `d
 Commit:
 
 ```bash
-git add {docs_path}/wireframes/{YYYY-MM-DD}_{feature_slug}/ {requirements_doc_path}
+git add {feature_folder}/wireframes/ {requirements_doc_path}
 # If Phase 7 ran, also stage the canonical /msf doc:
 git add docs/msf/*-msf-analysis.md 2>/dev/null || true
 git commit -m "docs: add wireframes for <feature>"

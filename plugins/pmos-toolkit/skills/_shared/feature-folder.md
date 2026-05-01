@@ -9,12 +9,12 @@ Callers pass:
 - `feature_arg` — value of `--feature <slug>` if the user provided it; otherwise empty
 - `feature_hint` — a short feature-name string the skill has from user input (used to derive a default slug for new folders); may be empty
 
-The folder lives at `{docs_path}/{YYYY-MM-DD}_{slug}/` where `{docs_path}` was resolved by `product-context/context-loading.md` and the date is the folder *creation* date.
+The folder lives at `{docs_path}/features/{YYYY-MM-DD}_{slug}/` where `{docs_path}` was resolved by `product-context/context-loading.md` (default: `docs/pmos`) and the date is the folder *creation* date. The `features/` segment is part of the convention — feature folders share that parent with the type-grouped artifact directories `requirements/`, `specs/`, `plans/` listed in `context-loading.md` Step 1.
 
 ## Step 1: Explicit `--feature` argument
 
 If `feature_arg` is non-empty:
-- Look for a folder matching `{docs_path}/*_{feature_arg}/` (any date prefix).
+- Look for a folder matching `{docs_path}/features/*_{feature_arg}/` (any date prefix).
 - **Exactly one match:** use it. Update `.pmos/current-feature` to that folder name. Echo: `Using feature folder: <path>`. Return.
 - **Zero matches:** error. Echo: `No feature folder matching '{feature_arg}'. Available: <list of slugs from existing feature folders>`. Stop. Do **not** auto-create — explicit `--feature` is a precise lookup.
 - **Multiple matches:** error. Echo: `Multiple feature folders match '{feature_arg}': <list>`. Stop.
@@ -43,10 +43,10 @@ If the user picks **Create new** or types a new slug under **Other...**:
 
 1. Show the derived (or typed) slug. Prompt: `Slug: <derived-slug> [Enter to accept, edit to override]`. Accept the user's edited value if any.
 2. Validate the final slug against **Slug Rules** below. On failure, show the rule that was violated and re-prompt.
-3. **Collision check:** if `{docs_path}/*_{slug}/` already matches an existing folder (any date), abort the create. Show the existing folder and prompt:
+3. **Collision check:** if `{docs_path}/features/*_{slug}/` already matches an existing folder (any date), abort the create. Show the existing folder and prompt:
    - `Use existing <folder-name>` — switch to that folder.
    - `Pick a different slug` — re-prompt for slug.
-4. Create the directory `{docs_path}/{today}_{slug}/` where `{today}` is the current date `YYYY-MM-DD`. **The date prefix is mandatory.** Get today's date from the environment (e.g., `$(date +%Y-%m-%d)`) — do NOT guess, do NOT omit, do NOT use today's date without the underscore separator. Example: `docs/features/2026-05-01_face-tagging/`. NOT `docs/features/face-tagging/`.
+4. Create the directory `{docs_path}/features/{today}_{slug}/` where `{today}` is the current date `YYYY-MM-DD`. **The date prefix is mandatory.** Get today's date from the environment (e.g., `$(date +%Y-%m-%d)`) — do NOT guess, do NOT omit, do NOT use today's date without the underscore separator. Example with the default `docs/pmos` layout: `docs/pmos/features/2026-05-01_face-tagging/`. With legacy `docs` layout: `docs/features/2026-05-01_face-tagging/`. NOT `docs/features/face-tagging/` (no date prefix).
 5. Write `.pmos/current-feature` containing the folder name (single line, no trailing newline issues — use plain echo).
 6. Echo: `Created feature folder: <path>`. Return.
 
@@ -88,11 +88,11 @@ If the user picks an existing folder:
 
 ## Migration Note (for repos with pre-date-prefix folders)
 
-Repos predating this convention may have folders like `{docs_path}/face-tagging/` without a date. To bring them into the convention:
+Repos predating this convention may have folders like `{docs_path}/features/face-tagging/` without a date. To bring them into the convention:
 
-1. Pick the original creation date (from `git log --diff-filter=A --follow {docs_path}/<slug>/ | tail -1`).
-2. `git mv {docs_path}/<slug> {docs_path}/<YYYY-MM-DD>_<slug>`.
+1. Pick the original creation date (from `git log --diff-filter=A --follow {docs_path}/features/<slug>/ | tail -1`).
+2. `git mv {docs_path}/features/<slug> {docs_path}/features/<YYYY-MM-DD>_<slug>`.
 3. Update any in-folder docs that reference the old path.
-4. If `.pmos/current-feature` pointed at the old name, update it.
+4. If `.pmos/current-feature` pointed at the old name, update it (it stores just the folder basename, e.g. `2026-05-01_face-tagging`).
 
 Skills must NOT do this migration automatically — it's a user-driven cleanup.

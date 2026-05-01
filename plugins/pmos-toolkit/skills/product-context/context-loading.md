@@ -8,9 +8,21 @@ Reference document for pipeline skills. Follow these steps at the START of every
 
 1. Check if `.pmos/settings.yaml` exists in the current repo
 2. **If found:** read `docs_path` from it. If `docs_path` is not specified, default to `.pmos`
-3. **If not found:** use `docs/` as the default (backward compatible — preserves existing behavior)
+3. **If not found:** apply the **legacy-layout check** below:
+   - If ANY of `docs/requirements/`, `docs/specs/`, `docs/plans/`, `docs/features/` already exists in the repo → use `docs/` (legacy layout — preserves backward compatibility for repos that started on older toolkit versions)
+   - Otherwise → use `docs/pmos/` (current default — keeps pmos artifacts namespaced under `docs/` so they don't collide with the repo's own docs)
 
-Use `{docs_path}` everywhere the skill references artifact directories (requirements/, specs/, plans/, session-log.md, changelog.md). Create subdirectories under `docs_path` as needed on first write.
+Use `{docs_path}` everywhere the skill references artifact directories (requirements/, specs/, plans/, features/, session-log.md, changelog.md). Create subdirectories under `docs_path` as needed on first write.
+
+**Why `docs/pmos/` and not `.pmos/`:** the latter is `.gitignore`d in many repos by convention (it's where the pointer file and settings live, treated as local state). Pipeline artifacts (specs, plans) are deliberately committed. `docs/pmos/` keeps them committed AND namespaced.
+
+**Migrating a legacy repo to the new layout:**
+```bash
+mkdir -p docs/pmos
+git mv docs/requirements docs/specs docs/plans docs/features docs/pmos/ 2>/dev/null
+git mv docs/session-log.md docs/changelog.md docs/pmos/ 2>/dev/null
+```
+Then either remove the legacy directories (so the legacy-layout check returns false next run) or set `docs_path: docs/pmos` explicitly in `.pmos/settings.yaml`. Skills do NOT migrate automatically.
 
 ---
 
@@ -45,15 +57,15 @@ When no `.pmos/settings.yaml` exists:
    ```
    Read each workstream file's frontmatter to get the name and type for display.
 
-   - **User picks an existing workstream:** Create `.pmos/settings.yaml` with `workstream: {slug}` and `docs_path: .pmos`, then load context per Step 2
+   - **User picks an existing workstream:** Create `.pmos/settings.yaml` with `workstream: {slug}` and `docs_path: docs/pmos` (use `.pmos` only if the user explicitly prefers private/uncommitted artifacts — most users want artifacts committed), then load context per Step 2
    - **User picks "Create a new workstream":** Run `/product-context init`, then continue with the pipeline skill
-   - **User picks "none" / skips:** Proceed without context, using `docs/` as docs_path
+   - **User picks "none" / skips:** Proceed without context. Apply the Step 1 legacy-layout check to pick `docs_path`: legacy `docs/` if the repo has pre-existing `docs/{requirements,specs,plans,features}/` folders, otherwise `docs/pmos/`
 
 3. **If no workstreams exist** — ask:
    > "No workstream context found. Want to set one up? (This helps pipeline skills produce more relevant output.)"
 
    - **Yes:** Run `/product-context init`, then continue
-   - **No:** Proceed without context, using `docs/` as docs_path
+   - **No:** Proceed without context. Apply the Step 1 legacy-layout check to pick `docs_path`: legacy `docs/` if the repo has pre-existing `docs/{requirements,specs,plans,features}/` folders, otherwise `docs/pmos/`
 
 This fallback is a one-time prompt per repo — once `.pmos/settings.yaml` is created, it never triggers again.
 

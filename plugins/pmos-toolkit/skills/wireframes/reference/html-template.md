@@ -96,8 +96,8 @@ Every generated wireframe file MUST follow this skeleton. The shared CSS at `./w
     <div class="wf-footer__inner">
       <span>{{COMPONENT_NAME}}</span>
       <span class="mock-pill">{{DEVICE}}</span>
-      <span>File {{NN}} of {{TOTAL}}</span>
-      <span>Generated {{YYYY-MM-DD}}</span>
+      <span>File {{NN}} of {{TOTAL}}</span>           <!-- e.g. "File 03 of 6" — leading zero on file index, NO leading zero on total -->
+      <span>Generated {{YYYY-MM-DD}}</span>          <!-- always include — non-optional -->
       <a class="wf-grow" style="text-align:right;color:var(--wf-accent)" href="./index.html">Back to index</a>
     </div>
   </footer>
@@ -166,6 +166,29 @@ Annotations are toggleable via the chrome button and don't appear when off.
 - Use real-shape names ("Acme Pilot Q3 Renewal", not "Project A")
 - Dates as actual dates near today, not placeholders
 
+## Strict format requirements
+
+Subagents drift on these unless the format is shown verbatim. Match these exactly.
+
+**Footer:**
+
+```html
+<span>File 03 of 6</span>          <!-- leading zero on file index; NO leading zero on total -->
+<span>Generated 2026-05-01</span>  <!-- always include — non-optional -->
+```
+
+**Accessibility — icon-only / short-label buttons:**
+
+Every `<button>` whose visible content is fewer than 5 characters OR contains only emoji/symbols MUST have an `aria-label` attribute describing its purpose.
+
+```html
+<button aria-label="Close" title="Close">×</button>
+<button aria-label="Add to favorites">⭐</button>
+<button aria-label="More actions">⋯</button>
+```
+
+This applies uniformly across files in a feature folder — high-variance coverage (one wireframe with 31 aria-labels, another with 1) is a defect the cross-file reviewer will catch.
+
 ## Anti-patterns
 
 - Do NOT duplicate `wireframe.css` rules in inline `<style>` — extend the stylesheet instead, or use Tailwind utilities for one-offs
@@ -173,3 +196,4 @@ Annotations are toggleable via the chrome button and don't appear when off.
 - Do NOT remove the annotations toggle — reviewers need a clean view too
 - Do NOT use `Lorem ipsum`
 - Do NOT use real photographs or finished iconography — `mock-img`, emoji, or labeled boxes only
+- Do NOT vary the footer format across files — "File 3 of 06" / "File 03 of 06" / "File 03 of 6" must NOT mix; only the last form is correct

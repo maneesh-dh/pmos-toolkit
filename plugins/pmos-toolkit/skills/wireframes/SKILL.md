@@ -34,6 +34,38 @@ This skill has multiple phases. Create one task per phase using your agent's tas
 
 ---
 
+## Rigor & Corner-Cut Protocol
+
+This skill is permissive — several phases have a "cheap option" (skip Phase 2.5, fewer Phase 4 loops, smaller PSYCH walkthrough). Permissiveness is fine; **silent downgrades are not**. The protocol below makes rigor visible.
+
+### Rigor tiers
+
+Pick the tier that matches the work. The tier governs Phase 4 (review loops) and the default density of Phase 2 / Phase 6 prompts.
+
+- **High-rigor (default).** One reviewer subagent per file in parallel; full 2-loop protocol; full Phase 2.5 extraction; full Phase 6 walkthrough.
+- **Medium-rigor (recommended for ≤ 6 files OR a focused enhancement).** ONE cross-file reviewer subagent (single message, multi-file critique); apply fixes; no second loop. Phase 2.5 still runs in full. Phase 6 still mandatory for Tier 2/3 but may collapse to a single subagent.
+- **Low-rigor (personal-tool, single-user, time-bound only).** Inline grep + read-aloud spot-check against the rubric headings PLUS one mandatory cross-file reviewer subagent (200-word brief: aria coverage on icon-only buttons, focus-visible styles, contrast against dark/light surfaces, high-variance findings across files). The cross-file pass is non-negotiable — it's cheap (~30s) and catches what grep misses.
+
+The user can override the chosen tier at any phase boundary. Default is high-rigor; recommend medium for ≤ 6 files; recommend low only when the user has signaled time-pressure or personal-tool context.
+
+### Announcement rule (non-negotiable)
+
+Whenever you choose the lighter option for a phase, **announce it before doing it** with this format:
+
+> "Choosing [lighter option] for [phase] because [rationale]. Trade-off: [what we lose]. Override?"
+
+The user gets one beat to redirect; if they don't, proceed. Phases that have cheap options and therefore require an announcement when downgraded:
+
+- **Phase 2 scope-triage** — items classified as "skip wireframe" or "comparison only"
+- **Phase 2.5** — when skipped despite a host frontend being present
+- **Phase 3.5 screenshot ingestion** — when skipped despite screenshots being attached
+- **Phase 4 review loops** — when running medium- or low-rigor instead of full
+- **Phase 6 PSYCH** — when fewer than the available journeys are walked, or single-subagent collapse is used
+
+Silently downgrading rigor is a small integrity leak that compounds across phases.
+
+---
+
 ## Phase 0: Load Workstream Context & Learnings
 
 Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available — design tokens, brand voice, and prior wireframe conventions live here. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /wireframes` and factor them into your approach for this session.
@@ -67,6 +99,20 @@ Before any other work, follow the context loading instructions in `product-conte
 ---
 
 ## Phase 2: Component & Device Breakdown
+
+### 2a-pre. Scope Triage (do this first)
+
+Read every item in the requirements doc. For each, classify into one of three treatments:
+
+| Class | Symptom | Treatment |
+|---|---|---|
+| **Net-new IA / flow** | new screen, new tab, new modal, reshaped chrome | Full wireframe with state matrix |
+| **Comparison / before-after** | restyle, remove stripes, change a single visual property | Single-screen "before / after" wireframe (1 file, 2 states) |
+| **Trivially specifiable** | data fix, label change, link wiring, refactor | Skip wireframe — note in handoff that /spec proceeds directly |
+
+Present the triage table via `AskUserQuestion` (one question per row OR a single multiSelect with labeled rows) so the user confirms classifications before any inventory work. Default recommendations should be visible. Per the Rigor & Corner-Cut Protocol, **announce every "skip wireframe" and "comparison only" classification with rationale** — these are scope-cuts, not silent omissions.
+
+After triage, only the items classed "Net-new IA / flow" or "Comparison / before-after" enter the inventory below. Skipped items get listed in the Phase 8 spec handoff under "Skipped from wireframing — proceed directly to /spec".
 
 ### 2a. Component Inventory
 
@@ -208,9 +254,21 @@ The full template lives in `reference/html-template.md` — do not deviate from 
 
 ## Phase 4: Self-Refinement (Reviewer Subagent + Loops)
 
-For each generated wireframe file, run up to 2 refinement loops. Stop early when the reviewer reports zero issues at severity ≥ medium.
+### 4a. Loop-rigor decision (do this before dispatching anything)
 
-### Loop Structure
+Pick the rigor tier per the **Rigor & Corner-Cut Protocol** at the top of this skill:
+
+- **High-rigor (default):** one reviewer subagent per file in parallel; up to 2 refinement loops per file.
+- **Medium-rigor:** ONE reviewer subagent across all files (single message, multi-file critique); apply fixes; no second loop. Recommend for ≤ 6 files or a focused enhancement.
+- **Low-rigor:** inline grep + spot-check PLUS one mandatory cross-file reviewer subagent (200-word brief: aria-label coverage on icon-only buttons, focus-visible styles, color contrast against dark/light surfaces, high-variance findings across files). The cross-file pass is **non-negotiable** even in low-rigor — grep alone misses contrast, focus-visible rendering, and "wireframe 01 didn't actually change relative to current state" type findings.
+
+**Announce the chosen tier with rationale before proceeding.** Format: "Choosing [tier] for Phase 4 because [reason]. Trade-off: [what we lose]. Override?"
+
+The remainder of this phase describes the high-rigor protocol. Medium- and low-rigor variants follow the same loop structure but with the subagent fan-out reduced as described above.
+
+### 4b. Loop Structure (high-rigor)
+
+For each generated wireframe file, run up to 2 refinement loops. Stop early when the reviewer reports zero issues at severity ≥ medium.
 
 **Step 1 — Dispatch reviewer subagent (parallel where possible):**
 - One reviewer subagent per wireframe file
@@ -251,7 +309,7 @@ After all per-file refinement is done, present a cross-file rollup of any unreso
 Create `{feature_folder}/wireframes/index.html` with:
 
 - Header: feature name, generation date, link back to req doc
-- **Device tabs** at the top — one tab per device targeted; clicking filters the card grid
+- **Device tabs** at the top — one tab per device targeted; clicking filters the card grid. **When only one device is targeted, omit the device-tabs row entirely** (a single-tab control is visual noise). Document the omission in the index footer ("All wireframes target desktop-web — device filter omitted") so the user knows it was intentional, not forgotten.
 - **Card grid** — one card per `(component × device)` pair showing:
   - Component name + device chip
   - State count badge ("4 states")
@@ -259,6 +317,8 @@ Create `{feature_folder}/wireframes/index.html` with:
   - Click → opens the wireframe in a new tab
 - Search box that filters cards by component name
 - Footer: total file count, file path of the folder
+
+**The index does NOT include:** state-switcher tabs or annotations toggles. Those live inside each wireframe file (per `reference/html-template.md`). The index is purely a navigation surface — a card grid + filter, nothing else. If a reviewer wants to flip states or toggle annotations, they open the wireframe in a new tab.
 
 Use the same Tailwind CDN approach AND link the shared `./assets/wireframe.css` so the index inherits the same theme tokens, typography, and chrome styles as the wireframe files. The index must work offline as a `file://` URL.
 
@@ -301,7 +361,13 @@ Read the tier tag from the requirements doc (carried forward from `/requirements
 
 Pull the user-journey list from the requirements doc. **Cap at 5 journeys per session** — more than 5 produces shallow output and review fatigue.
 
-If the req doc has > 5 journeys, use `AskUserQuestion` (multiSelect) to let the user pick the top 5; recommend the most stakeholder-visible ones (signup, first-value, primary daily flow, share/invite, recovery).
+**Always confirm the journey list with the user via `AskUserQuestion` (multiSelect, max 5 selections)** — even when the req doc has ≤ 5 explicit journeys, and even when you derived the list yourself. Many req docs contain *implicit* journeys (overflow-menu paths, recovery flows, error-state walks) that aren't numbered as such; the confirmation step is the only place those surface.
+
+- Recommended option: "the 3–5 journeys you derived, in priority order" (signup, first-value, primary daily flow, share/invite, recovery are the canonical stakeholder-visible set).
+- Always include "Other (specify)" so the user can name a journey you missed.
+- **Bias toward including any journey that walks through a wireframe with a verified bug or a known-broken state** — those are exactly the journeys most worth pressure-testing.
+
+Platform fallback: present the list as a numbered list and ask for confirmation in free text.
 
 For each selected journey:
 - Identify the wireframes that participate (by component slug from the inventory matrix)
@@ -518,3 +584,5 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT blend tokens from multiple host frontends in Phase 2.5 — pick one (user-selected) so wireframes have a coherent visual language
 - Do NOT use screenshots as the sole journey source — they augment the requirements doc, they don't replace it; trigger /requirements first if no req doc exists
 - Do NOT redesign IA away from an anchored screenshot without explicit user direction — generators may improve states, a11y, and copy, but moving primary actions or restructuring sections needs the user to ask for it
+- Do NOT silently downgrade rigor at any phase — the Rigor & Corner-Cut Protocol mandates announcement-with-rationale before choosing a lighter option (skipping subagents, fewer review loops, smaller PSYCH walkthrough). Silent downgrades compound across phases and erode user trust in the artifact
+- Do NOT skip Phase 2.5 (host style extraction) just because you "already know" the tokens — the protocol exists to catch tokens you'd miss from memory (color-mode-specific overrides, highlight colors, accent variants). The extraction subagent has fresh eyes; you don't. Cost is ~2 minutes; confidence gain is substantial

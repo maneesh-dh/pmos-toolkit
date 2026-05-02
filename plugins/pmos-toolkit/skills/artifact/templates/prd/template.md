@@ -53,7 +53,7 @@ Describe the specific customer segment, their job-to-be-done, the evidence for t
 Explain the strategic trigger: which OKR or bet this serves, the concrete window that's closing, and what it costs the business to wait.
 
 ## §4 Goals & Non-Goals
-<!-- tier: both -->
+<!-- tier: full -->
 <!-- purpose: bound the work with outcome-shaped goals and explicit non-goals with rationale -->
 <!-- guidance:
   - Goals are outcome-shaped (measurable movement, not deliverable) — 1–3 goals max, each measurable
@@ -70,6 +70,7 @@ Write 1–3 outcome-shaped goals (each measurable) and ≥2 non-goals with one-l
   - ≥1 input metric that leads the primary
   - ≥1 guardrail metric with a regression threshold
   - Owner + instrumentation status per metric
+  - In Lite mode, this section absorbs the Goals bound — render as a single combined "Goals + Metrics" section.
 -->
 <!-- tabular_schema:
   columns: [Metric, Layer (primary|input|guardrail|counter), Baseline, Target, Timebox, Mechanism, Owner, Instrumentation]

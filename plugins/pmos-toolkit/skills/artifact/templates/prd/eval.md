@@ -98,31 +98,31 @@ Per-section evaluation items for the PRD template. Two consumers:
 
 - id: goals-outcome-shaped
   kind: judgment
-  tier: [lite, full]
+  tier: [full]
   check: each goal is outcome-shaped (measurable movement), not a deliverable ("ship X")
   severity: high
 
 - id: goals-count
   kind: judgment
-  tier: [lite, full]
+  tier: [full]
   check: 1–3 goals total (not 0, not 4+)
   severity: medium
 
 - id: goals-each-measurable
   kind: judgment
-  tier: [lite, full]
+  tier: [full]
   check: each goal is individually measurable (has a number or observable signal)
   severity: high
 
 - id: non-goals-present
   kind: judgment
-  tier: [lite, full]
+  tier: [full]
   check: ≥2 non-goals listed
   severity: medium
 
 - id: non-goals-not-strawmen
   kind: judgment
-  tier: [lite, full]
+  tier: [full]
   check: non-goals are reasonable (not obvious out-of-scope items no one would expect), each with rationale
   severity: medium
 
@@ -288,6 +288,20 @@ Per-section evaluation items for the PRD template. Two consumers:
   check: no solution-prescriptive stories (e.g., "I want a dropdown for X" — that's a design decision, not a need)
   severity: medium
 
+- id: job-story-preferred
+  kind: judgment
+  tier: [full]
+  check: |
+    For situational or transactional features (where context shifts the user's goal), prefer job-story format over Connextra.
+  severity: low
+
+- id: stories-dont-duplicate-solution-overview
+  kind: judgment
+  tier: [full]
+  check: |
+    Stories describe user-observable behavior at story granularity; they do NOT restate the prose narrative from §6 Solution Overview.
+  severity: medium
+
 ---
 
 ## §9 Scope: MVP vs Later
@@ -339,11 +353,9 @@ Per-section evaluation items for the PRD template. Two consumers:
   severity: low
 
 - id: open-question-owners
-  kind: precondition
+  kind: judgment
   tier: [lite, full]
   check: each open question has an owner and a by-when date
-  gap_question: |
-    Who owns each open question and by when will it be resolved? List each question with an owner and date.
   severity: medium
 
 ---

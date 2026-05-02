@@ -181,3 +181,35 @@ After loop 2 (or loop 1 if no high remain):
 - Run a 3rd loop "just in case." Diminishing returns are real; surface to user instead.
 - Silently fix `low` findings without user input — log them, surface only on request or at handoff.
 - Invoke the reviewer with a different prompt than `reviewer-prompt.md`. The prompt enforces the JSON contract.
+
+## Phase 4 — Save & Confirm
+
+1. The artifact file at `{feature_folder}/{slug}.md` already exists from Phase 2.7 and was edited in Phase 3.
+2. Show the user a one-paragraph summary:
+   - Artifact type + tier
+   - Preset used
+   - Sections written
+   - Refinement-loop iterations (1 or 2) and counts: `N high resolved, M medium resolved, K low logged`
+   - Residuals deferred (count + names)
+3. Offer to `git add` + commit. Do NOT auto-commit. Suggested commit message:
+   ```
+   docs({type}): add {tier} {type} for {feature-slug}
+   ```
+
+## Phase 5 — Workstream Enrichment
+
+If a workstream was loaded in Phase 0:
+
+1. Scan the gathered context + the final draft for signals worth persisting to the workstream:
+   - New user segments named
+   - Metrics with baselines / targets
+   - Strategic decisions / OKR links
+   - Stakeholders / teams not previously listed
+2. Surface each candidate addition via `AskUserQuestion` (Apply / Modify / Skip), batched ≤4 per call.
+3. Apply approved additions to `~/.pmos/workstreams/{workstream}.md`.
+
+If no workstream is active, skip this phase.
+
+## Phase 6 — Capture Learnings
+
+Read `../learnings/learnings-capture.md` (relative to this skill dir) and follow it. This phase is a **terminal gate** — the skill is not complete until learnings have been processed.

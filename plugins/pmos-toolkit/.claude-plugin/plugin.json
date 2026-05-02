@@ -1,6 +1,6 @@
 {
   "name": "pmos-toolkit",
-  "version": "2.11.0",
+  "version": "2.12.0",
   "description": "Product management and software delivery pipeline — requirements, spec, plan, execute, verify, and supporting utilities.",
   "author": {
     "name": "Maneesh Dhabria"
@@ -17,7 +17,8 @@
     "pipeline",
     "product-management",
     "prototype",
-    "artifact"
+    "artifact",
+    "grill"
   ],
   "skills": "./skills/"
 }

@@ -243,12 +243,12 @@ Before defining tasks, map out which files will be created or modified and what 
 - [ ] **Seed data:** `python scripts/seed_sop_db.py --reset` (if data files changed)
 
 **Cleanup:**
-- [ ] Remove temporary files and debug logging
-- [ ] Stop worktree containers if running: `docker compose -f docker-compose.worktree.yml -p <project> down`
+- [ ] Remove temporary files and debug logging [only if applicable]
+- [ ] Stop worktree containers if running: `docker compose -f docker-compose.worktree.yml -p <project> down` [only if applicable]
 - [ ] Flip feature flags if applicable
-- [ ] Update documentation files (`CLAUDE.md`, changelogs, etc.)
+- [ ] Update documentation files (`CLAUDE.md`, changelogs, etc.) [only if applicable]
 
-[Only include items that apply to this feature. But every item must have the exact command and expected outcome.]
+[Every retained item must have an exact command and expected outcome.]
 
 ---
 
@@ -280,6 +280,8 @@ Before defining tasks, map out which files will be created or modified and what 
 **Incremental verification:** Every task has an "Inline verification" section. Do not batch all testing to the end.
 
 **Prescribe the interface, leave the implementation:** Specify function names, signatures, test assertions, file paths, and commands. Leave internal algorithm details and refactoring decisions to the implementor.
+
+**Task code block size:** if a single task's pasted code block exceeds ~80 lines, choose one of: (a) split the task into smaller tasks, (b) reference an external scratch file the implementor opens, or (c) prescribe the interface (function signatures, test assertions, expected behavior) and let the implementor write the body. Long pasted code blocks bias plan length and substitute for engineering judgment.
 
 ### Verification Must Prove Behavior
 
@@ -337,6 +339,7 @@ Each loop runs BOTH checks:
 9. **Verification quality:** Does every task's test assert on behavioral output with realistic data — not just status codes, exit codes, or "it compiles"? Apply the litmus test: could a subtly broken implementation still pass this verification?
 10. **Wireframe linkage:** If `{feature_folder}/wireframes/` exists, does every UI-touching task cite a `**Wireframe refs:**` line? Tasks without wireframe refs are gaps unless the task is non-UI.
 11. **Final-verification polish coverage:** Does TN include the hard-reload-every-route step, the force-an-error-path step, the UX polish checklist line, and (if wireframes exist) the wireframe diff line?
+12. **Refactor-before-modify:** Does any task modify a function whose existing structure isn't preserved by the modification? If yes, the prerequisite refactor must be its own numbered sub-step before the additive change.
 
 **B. Design-Level Self-Critique** (catches wrong/shallow task decomposition):
 1. **Reviewer perspective:** If you were sent this plan for review, what comments would you add? Read it as a critical reviewer, not the author — flag tasks with unclear scope, missing verification steps, implicit dependencies, and assumptions about what's "obvious."
@@ -372,6 +375,8 @@ For every loop that produces findings (structural or design-critique):
 **Platform fallback (no `AskUserQuestion`):** list findings as a numbered table with columns [Finding | Proposed Fix | Options: Fix/Modify/Skip/Defer]; ask the user to reply with the disposition numbers. Do NOT silently self-fix.
 
 **Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." This forces the user to re-state each finding in their reply. Always structure the ask.
+
+**Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
 ### Exit Criteria (ALL must be true)
 

@@ -228,7 +228,7 @@ Use the template matching the detected tier. Delete sections marked "skip" for t
 - [Observable user outcome 2]
 
 ### Non-Goals
-- NOT doing [X] because [reason]
+- NOT doing [X] — because [reason]
 
 ## Solution Direction
 [High-level approach. ASCII diagrams where useful.]
@@ -279,8 +279,8 @@ Use the template matching the detected tier. Delete sections marked "skip" for t
 - [Observable user outcome 2] — measured by [metric]
 
 ### Non-Goals (explicit scope cuts)
-- NOT doing [X] in this iteration because [reason]
-- NOT solving [adjacent problem] because [reason]
+- NOT doing [X] in this iteration — because [reason]
+- NOT solving [adjacent problem] — because [reason]
 
 ## User Experience Analysis
 
@@ -412,6 +412,8 @@ For every loop that produces findings (structural or product-critique):
 **Platform fallback (no `AskUserQuestion`):** list findings as a numbered table with columns [Finding | Proposed Fix | Options: Fix/Modify/Skip/Defer]; ask the user to reply with the disposition numbers. Do NOT silently self-fix.
 
 **Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." This forces the user to re-state each finding in their reply. Always structure the ask.
+
+**Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
 ### Exit Criteria (ALL must be true)
 

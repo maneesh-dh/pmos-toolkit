@@ -144,3 +144,40 @@ sources:
 ```
 
 Then proceed to Phase 3.
+
+## Phase 3 — Self-Refinement Loop (max 2 iterations)
+
+Mirrors `/wireframes` Phase 4 pattern.
+
+### Loop iteration
+
+1. **Dispatch reviewer subagent.**
+   - Subagent type: `general-purpose`.
+   - Inputs: `reviewer-prompt.md` (system instructions), the full `eval.md` for this template, and the current draft.
+   - Background: false (this is a foreground call; we need findings before proceeding).
+   - Subagent returns JSON of the shape defined in `reviewer-prompt.md`.
+
+2. **Parse findings.** Each finding has `section`, `criterion_id`, `severity`, `finding`, `suggested_fix`.
+
+3. **Auto-apply** all `high` and `medium` findings via `Edit` against the draft file. Apply the `suggested_fix` literally — the reviewer prompt requires fixes specific enough to apply directly.
+4. **Log** all `low` findings to a `_residuals` accumulator (in-memory).
+
+### Loop continuation
+
+- If any `high` findings remained AFTER applying loop-1 (i.e., the auto-fix didn't fully resolve them — should be rare; reviewer should regenerate the section), run loop 2.
+- Hard cap: **2 loops total.** No third loop, ever.
+
+### Residual presentation
+
+After loop 2 (or loop 1 if no high remain):
+
+- Surface any `high` still remaining + all `medium` from loop 2 + any `low` deemed worth raising via the **Findings Presentation Protocol**:
+  - Batch ≤4 findings per `AskUserQuestion` call.
+  - Per finding, options: **Apply as proposed** / **Modify** / **Skip** / **Defer**.
+  - Apply user-confirmed fixes via `Edit`. "Defer" appends the finding to a `## Deferred Improvements` section at the end of the artifact.
+
+### Anti-patterns (do NOT)
+
+- Run a 3rd loop "just in case." Diminishing returns are real; surface to user instead.
+- Silently fix `low` findings without user input — log them, surface only on request or at handoff.
+- Invoke the reviewer with a different prompt than `reviewer-prompt.md`. The prompt enforces the JSON contract.

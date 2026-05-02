@@ -275,3 +275,92 @@ Ask: "Run the eval loop on the updated artifact?" via `AskUserQuestion`. If yes,
 ### Phase U.6 — Save, then Phase 6 learnings capture (terminal gate)
 
 Same as Phase 4 + Phase 6 from the create flow.
+
+## Template Management
+
+### `/artifact template add` — research-grounded authoring
+
+`--quick` flag drops to scaffold-only mode (skip phases T.2 and T.3, jump to T.4 with empty proposed sections).
+
+#### T.1 — Intake
+
+Ask via `AskUserQuestion` (one batch ≤4):
+- Template **name** + **slug** (slug must not collide with built-in templates: `prd`, `experiment-design`, `eng-design`, `discovery`. Validate at capture time and reject collisions before continuing.)
+- **Purpose / when used** (1-2 sentences)
+- **Audience**
+- **Examples** — links or pasted reference docs (optional)
+- **Inspirations / frameworks** to ground in (optional)
+
+#### T.2 — Research subagent (skip if `--quick` or user opts out via AskUserQuestion)
+
+Dispatch a `general-purpose` subagent. Foreground call. Prompt:
+
+```
+Research best practices for the artifact class "<name>" (purpose: <purpose>; inspirations: <list>).
+
+Survey canonical sources via WebSearch and WebFetch. Cite each source.
+
+Return a proposal:
+- Sections (8-15) with one-line purpose each
+- Per-section eval items with kind (precondition|judgment), check, severity (high|medium|low), and gap_question for preconditions
+- Frontmatter files_to_read suggestions
+- A recommended default_preset (concise|tabular|narrative|executive)
+- Cited source links
+
+Do NOT write any files. Output a single markdown report ~600-900 words.
+```
+
+#### T.3 — Section-by-section alignment
+
+For each proposed section in the research report, ask via `AskUserQuestion` with options:
+- **Approve** (preview shows section purpose + eval items)
+- **Tweak** (free-text follow-up)
+- **Discuss** (free-text follow-up)
+- **Drop**
+
+Capture decisions per section. Track which eval items survived.
+
+#### T.4 — Frontmatter authoring
+
+Confirm via `AskUserQuestion` (one batch):
+- `tiers`: `[single]` / `[lite, full]`
+- `default_preset`: pick from 4 built-in (or "user-defined" if applicable)
+- `files_to_read`: confirm list
+
+#### T.5 — Generate the 2 files
+
+Write to `~/.pmos/artifacts/templates/<slug>/`:
+- `template.md` — frontmatter + section markdown with embedded guidance per the alignment decisions.
+- `eval.md` — per-criterion items per the alignment decisions.
+
+Validate on write:
+- Both files present.
+- Frontmatter parses; required fields present.
+- Every `## §N` in template.md has a matching `## §N` in eval.md.
+- If validation fails, surface the specific error and offer to retry or abort.
+
+#### T.6 — Optional dry-run
+
+Ask: "Run a dry-run by creating one artifact with this template?" via `AskUserQuestion`. If yes, prompt for a feature folder (or use the most recent), then execute Phase 2 with the new template. User can iterate on sections/evals based on what the dry-run produces.
+
+### `/artifact template list`
+
+Read both built-in (`templates/`) and user (`~/.pmos/artifacts/templates/`) directories. Render a table:
+
+```
+| Slug              | Name                      | Tiers       | Source     |
+|-------------------|---------------------------|-------------|------------|
+| prd               | PRD                       | lite, full  | built-in   |
+| experiment-design | Experiment Design Doc     | lite, full  | built-in   |
+| eng-design        | Engineering Design Doc    | lite, full  | built-in   |
+| discovery         | Discovery Doc             | single      | built-in   |
+| okr-doc           | OKR Document              | single      | user       |
+```
+
+Read-only.
+
+### `/artifact template remove <slug>`
+
+1. If `<slug>` is a built-in: refuse with message "Built-in templates cannot be removed."
+2. If `<slug>` is a user template: confirm via `AskUserQuestion` (Yes/No), then `rm -rf ~/.pmos/artifacts/templates/<slug>/`. Show the path that was removed.
+3. If `<slug>` doesn't exist: list available user templates.

@@ -2,7 +2,7 @@
 name: execute
 description: Execute an implementation plan end-to-end — task-by-task TDD implementation with deploy verification, frontend testing, and manual spot checks. Supports git worktree isolation. Use when the user says "implement the plan", "start building", "execute this", "code this up", or has a plan doc ready for implementation.
 user-invocable: true
-argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>]"
+argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>] [--resume | --restart | --from T<N>]"
 ---
 
 # Plan Executor

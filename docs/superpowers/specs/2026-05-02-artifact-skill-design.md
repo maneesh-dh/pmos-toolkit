@@ -25,10 +25,24 @@ The skill follows established `pmos-toolkit` conventions: Phase 0 workstream con
 
 **Non-Goals**
 
-- Replacing `/spec` (technical specification used in pipeline) with `/artifact eng-design`. The two coexist: `/spec` is the implementation-bound spec inside the requirements→spec→plan pipeline; `/artifact eng-design` is a standalone RFC/design doc artifact.
+- Replacing pipeline skills (`/requirements`, `/spec`, `/plan`). The pipeline stays self-contained; each pipeline skill owns its template, rigor, and tiers. `/artifact` is for **standalone documents** outside the pipeline (PRDs sent to stakeholders, RFCs for cross-team review, discovery docs done before requirements). It auto-CONSUMES pipeline outputs (reads `01_requirements.md`, `02_spec.md`, `03_plan.md` if present) but does not replace them. No `/plan`-equivalent template ships in v1 — a plan is internal execution scaffolding, not a stakeholder artifact.
 - Real-time collaboration / multi-author merge. Artifacts are markdown files; collaboration uses the host system (git, Notion, Google Docs export).
 - Auto-publishing to Notion/Confluence/Drive in v1. Out of scope; the user can export manually.
 - Version-controlling artifacts inside the skill. Git in the host repo handles that.
+
+### 2.1 Positioning vs Pipeline Skills
+
+| Need | Use |
+|---|---|
+| Internal team-alignment requirements doc | `/requirements` (pipeline) |
+| Internal implementation-bound spec | `/spec` (pipeline) |
+| Internal task-level execution plan | `/plan` (pipeline) |
+| PRD shaped for stakeholder/exec review | `/artifact create prd` |
+| RFC for cross-team review | `/artifact create eng-design` |
+| Pre-requirements discovery doc | `/artifact create discovery` |
+| Experiment design doc | `/artifact create experiment-design` |
+
+A user can run both pipelines on the same feature folder. `/artifact` reads pipeline outputs as upstream context; the reverse is not assumed.
 
 ## 3. Architecture
 
@@ -155,9 +169,19 @@ The skill loads the preset and instructs the generator to follow the rules per s
 
 **Tier Lite (7 sections):** TL;DR · Problem & Customer · Goals + Metrics · Solution Sketch · User Journey · Scope (MVP) · Risks
 
-**Tier Full (13 sections):** TL;DR · Problem & Customer · Why Now · Goals & Non-Goals · Success Metrics · Solution Overview · User Journey/Narrative · Scope: MVP vs Later · Risks & Open Questions · Rollout & Experiment Plan · Dependencies & Stakeholders · FAQ · Appendix
+**Tier Full (14 sections):** TL;DR · Problem & Customer · Why Now · Goals & Non-Goals · Success Metrics · Solution Overview · User Journey/Narrative · **User Stories & Acceptance Criteria** · Scope: MVP vs Later · Risks & Open Questions · Rollout & Experiment Plan · Dependencies & Stakeholders · FAQ · Appendix
 
 **Hypothesis** is folded into Success Metrics (per-primary-metric: direction + magnitude + window + mechanism).
+
+**§8 User Stories & Acceptance Criteria** (Full only) — research-grounded structure synthesizing Cohn (3 Cs, INVEST), Patton (story map, walking skeleton), Adzic (impact-laddering), Jeffries (placeholder-for-conversation), Klement (job stories), and modern PM critique (Aakash/Lenny: stories belong to the backlog, PRD holds the spine). Authoring rules:
+
+- **Group by user-journey activity** (Patton backbone), not by priority. A flat priority-grouped list (must/should/could) is the antipattern Patton calls "context-free mulch."
+- **3–7 stories per group**, **≤12 stories total**. More than 12 means you're writing a backlog, not a PRD.
+- **Per-story format:** Connextra (`As a [role], I want [capability], so that [benefit]`) OR job story (`When [situation], I want to [motivation], so I can [outcome]`). Prefer job-story for situational/transactional features.
+- **`so that` must ladder to a goal in §4** (Adzic) — no orphan benefits.
+- **Acceptance criteria inline** per story: Given/When/Then for behavioral, checklist for static rules. Pick one form per story, not both.
+- **Walking-skeleton subset marked** — the minimum top-row stories needed for end-to-end value.
+- **Each story ≤3 lines + AC.** Stories are placeholders for conversation, not specs (Jeffries).
 
 **Section-level eval** (selected highlights — full criteria in `eval.md`):
 
@@ -170,12 +194,13 @@ The skill loads the preset and instructs the generator to follow the rules per s
 | §5 Success Metrics | Primary: baseline+target+timebox • mechanism stated (falsifiable) • ≥1 input metric • ≥1 guardrail • owner+instrumentation status • numerator+denominator for ratios |
 | §6 Solution Overview | Customer narrative present • happy + 1 alt flow • wireframe/prototype linked or TBD • no schema/API creep • new vs reused called out |
 | §7 User Journey | Specific persona • numbered steps (entry→action→outcome) • mental state at key steps • happy + ≥1 alt path • ends at JTBD outcome |
-| §8 Scope (MVP vs Later) | MVP = minimal set to test hypothesis • each Later item has deferral rationale • cut line ties to metrics • explicit OUTs called out |
-| §9 Risks & Open Qs | Cagan 4 (V/U/F/V) all addressed or deferred • each risk: likelihood+impact+mitigation/test • Qs distinct from risks • Q owners + by-when |
-| §10 Rollout (Full) | Phased ramp • kill criteria explicit (regression % per guardrail) • rollback plan named • tied to experiment doc if A/B • comms/launch deps |
-| §11 Deps & Stakeholders (Full) | Dep team owners + by-when • stakeholders by role |
-| §12 FAQ (Full) | ≥3 anticipated Qs • ≥1 hostile-skeptic Q |
-| §13 Appendix (Full) | Pure links/data, no new prose • sources for above-cited evidence |
+| §8 User Stories & AC (Full) | Grouped by journey activity (NOT priority groups) • ≤12 stories total • role is a named segment from §2 (no "As a system/user") • `so that` traces to a goal in §4 • AC per story: G/W/T or checklist (one form, not both) • AC describes observable outcome (not impl steps) • walking-skeleton subset marked • job-story preferred over Connextra for situational features • stories don't duplicate Solution Overview • no solution-prescriptive stories ("I want a dropdown") |
+| §9 Scope (MVP vs Later) | MVP = minimal set to test hypothesis • each Later item has deferral rationale • cut line ties to metrics • explicit OUTs called out |
+| §10 Risks & Open Qs | Cagan 4 (V/U/F/V) all addressed or deferred • each risk: likelihood+impact+mitigation/test • Qs distinct from risks • Q owners + by-when |
+| §11 Rollout (Full) | Phased ramp • kill criteria explicit (regression % per guardrail) • rollback plan named • tied to experiment doc if A/B • comms/launch deps |
+| §12 Deps & Stakeholders (Full) | Dep team owners + by-when • stakeholders by role |
+| §13 FAQ (Full) | ≥3 anticipated Qs • ≥1 hostile-skeptic Q |
+| §14 Appendix (Full) | Pure links/data, no new prose • sources for above-cited evidence |
 
 ### 4.2 Experiment Design Doc
 

@@ -180,6 +180,25 @@ files_to_read:
 
 This eliminates the duplication that existed when context.md and eval.md held separately authored copies of the same "evidence required" rule.
 
+**Tabular schemas (per tabular-friendly section).** Sections that list objects (Metrics, Variants, User Stories, Alternatives, Risks, Scope, Dependencies, Decision Criteria, Assumption Tests) carry a `tabular_schema` annotation in their template.md guidance comment. The Tabular preset honors the schema; other presets ignore it. The reviewer subagent, when the tabular preset is in use, judges schema-adherence as a `kind: judgment` eval item.
+
+```markdown
+## §5 Success Metrics
+<!-- tier: lite, full -->
+<!-- purpose: how we'll know it worked -->
+<!-- guidance:
+  - Primary metric: baseline + target + timebox + mechanism
+  - ≥1 input metric, ≥1 guardrail
+  - Owner + instrumentation status per metric
+-->
+<!-- tabular_schema:
+  columns: [Metric, Layer (primary|input|guardrail|counter), Baseline, Target, Timebox, Mechanism, Owner, Instrumentation]
+  row_per: metric
+-->
+```
+
+Schemas keep table columns deterministic across runs and let the reviewer flag column drift. Authoring cost: ~6–10 schemas per template (only for tabular-friendly sections).
+
 ### 3.4 Preset Anatomy
 
 Each preset is a single markdown file with rendering rules per section type:

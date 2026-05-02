@@ -167,29 +167,102 @@ The `Patterns` column lists the `patterns/<category>/<file>` references for each
 
 ---
 
-## Phase 2.5: Host Style Extraction (optional)
+## Phase 2.5: Resolve DESIGN.md
 
-> Decimal phase number is intentional — Phase 3 onward keeps existing numbering so external references (other skills, prior conversations) still resolve. Skip this phase entirely if it doesn't apply; the rest of the skill is unaffected.
+> Decimal phase number is intentional — Phase 3 onward keeps existing numbering so external references (other skills, prior conversations) still resolve.
 
-This phase tries to make wireframes look like they belong in the user's existing product. **Skip silently** when there's no host frontend (backend-only repo, ad-hoc directory). When applicable, it produces an override CSS file that re-skins the wireframe vocabulary using tokens extracted from the repo.
+DESIGN.md is the durable, repo-resident brand contract for the target app. This phase **finds** it, or **creates** it on first run, then merges it (resolving `x-extends`) into an in-memory object that the rest of the skill consumes. The legacy in-folder `house-style.json` / `house-style.css` artifacts are gone — DESIGN.md replaces them.
 
-Follow `reference/style-extraction.md` for the full procedure. Summary:
+Detailed procedure lives in three reference docs:
+- `reference/design-md-spec.md` — schema (base + `x-*` extensions).
+- `reference/design-md-resolver.md` — the resolution walk + `x-extends` cascade + staleness check + workstream persistence.
+- `reference/design-md-extractor.md` — auto-extraction from a host frontend; interactive elicitation for greenfield.
 
-1. **Detect** whether to run. Triggers when `cwd` is in a git repo AND a frontend signal is present (React/Vue/Svelte/Next/Nuxt deps, `tailwind.config.*`, `:root { --* }` CSS, or a substantial `<style>` block in `index.html`). If none match, write `{feature_folder}/wireframes/assets/house-style.json` with `{"source": null}` and skip the rest of this phase.
-2. **Choose a candidate frontend.** Single candidate → use it. Multiple candidates → ask via `AskUserQuestion` (single-select, candidates + "None — use default style"). Platform fallback: pick the candidate with the most component files; announce.
-3. **Extract** tokens (colors, radius, fontFamily) and component-library hints from `tailwind.config.*`, top-level CSS files, `package.json`, and 2–3 representative component/page files. Read budget cap: ~20 files / ~30 KB.
-4. **Write artifacts:**
-   - `{feature_folder}/wireframes/assets/house-style.json` — structured summary (always, even if empty).
-   - `{feature_folder}/wireframes/assets/house-style.css` — variable overrides for `wireframe.css` (only when extraction yielded usable tokens).
-5. **Confirm with the user** via `AskUserQuestion`:
-   - **Question:** "Apply this extracted house style to wireframes?"
-   - **Options:** **Use as extracted** / **Edit before applying** / **Discard, use default style**
-   - "Discard" → delete `house-style.css`; keep the JSON with `"applied": false` for audit.
-6. **Screenshot fallback:** if no host frontend was detected but Phase 1 step 3.5 ingested screenshots, attempt token inference from the screenshot descriptions (best effort; leave empty if not confident).
+### 2.5a — Resolve target app
 
-**Subagents:** if available, dispatch one subagent for the extractor with read-only access to the repo. Otherwise run inline.
+Follow `reference/design-md-resolver.md` Step 1 (workstream-first, then frontend detection, then AskUserQuestion if ambiguous). The chosen `app_dir` persists to the workstream `## Wireframes & Design System` section as `target_app.path`.
 
-**Gate:** the user must confirm or discard the extracted style before Phase 3 begins. This is a fast confirmation, not a deep review.
+### 2.5b — Find or create DESIGN.md
+
+Follow `reference/design-md-resolver.md` Step 2 (walk: `<app>/DESIGN.md` → `packages/ui/DESIGN.md` → `<repo-root>/DESIGN.md`).
+
+- **Found** → load it. Resolve `x-extends` per resolver Step 3. Run staleness check per resolver Step 4.
+  - **Fresh** → proceed to 2.5c.
+  - **Stale** → AskUserQuestion: **Re-extract** / **Use as-is** / **Abort**. Re-extract runs `reference/design-md-extractor.md` Branch A and rewrites the file (preserving any hand-edited `## Anti-patterns` and `x-content.voice` — diff and confirm before overwrite).
+- **Not found** → run `reference/design-md-extractor.md`:
+  - **Frontend present** → Branch A (auto-extract).
+  - **Greenfield** → Branch B (interactive elicitation, 4 questions).
+  - **Monorepo with shared `packages/ui/`** → AskUserQuestion: write to **shared base** (`packages/ui/DESIGN.md`) or **app-specific** (`<app_dir>/DESIGN.md`, with `x-extends` to the shared base if one exists). Recommend shared.
+
+### 2.5c — Confirm with user
+
+After load/create, AskUserQuestion:
+- **Question:** "Use this DESIGN.md for wireframes?"
+- **Options:** **Use as-is** / **Edit before continuing** / **Discard for this run**
+- "Edit" → print absolute path; wait for user signal; re-read.
+- "Discard" → set `x-source.applied: false` in the file; proceed with `wireframe.css` defaults only (no overlay).
+
+### 2.5d — Generate `design-overlay.css`
+
+Once confirmed, follow `reference/design-md-to-css.md` to produce `{feature_folder}/wireframes/assets/design-overlay.css` from the merged DESIGN.md. This file is regenerated every run.
+
+### 2.5e — Workstream persistence
+
+Update the workstream `## Wireframes & Design System` section per resolver Step 5: `target_app`, `design_md_path`, `components_md_path`, `last_extraction_sha` (only set on extract/re-extract).
+
+### 2.5f — Migration from legacy `## Design System / UI Patterns`
+
+If this is the first DESIGN.md created for this workstream AND the workstream has a non-empty `## Design System / UI Patterns` section (legacy from older `/wireframes` runs):
+1. Show the user the existing patterns and the proposed DESIGN.md additions (into `## Anti-patterns` / `## Do's and Don'ts`).
+2. AskUserQuestion: **Migrate (recommended)** / **Skip migration**.
+3. On migrate: append patterns to DESIGN.md, replace the workstream section's body with `→ See DESIGN.md at <path>`.
+
+**Subagents:** if available, dispatch one read-only subagent for extraction. Otherwise inline.
+
+**Gate:** the user must confirm DESIGN.md before Phase 2.6 begins.
+
+---
+
+## Phase 2.6: Resolve Composition Context
+
+DESIGN.md captures visual identity. Phase 2.6 captures **structural composition**: existing components, layout templates, and the decision log. Without this, Phase 3 would generate wireframes that *look* like the app but don't *fit* it.
+
+Output of this phase is three in-memory blobs passed to Phase 3:
+- `components_inventory` — from COMPONENTS.md.
+- `layout_anchor` — chosen named layout from `x-information-architecture.layouts`.
+- `decision_context` — concatenated workstream scars + DESIGN.md anti-patterns.
+
+### 2.6a — Load or create COMPONENTS.md
+
+COMPONENTS.md lives in the same dir as DESIGN.md. Procedure per `reference/components-md-spec.md` ("Extractor procedure"):
+
+- **Found and fresh** (commit SHA matches DESIGN.md's `x-source.sha` ± any `/verify` updates) → load.
+- **Found but stale** → offer re-extract via AskUserQuestion: **Re-extract** / **Use as-is**.
+- **Missing AND host frontend exists** → run the extractor; write to `<dirname design_md_path>/COMPONENTS.md`; AskUserQuestion accept/edit/skip gate (same shape as 2.5c).
+- **Missing AND greenfield** → write a stub COMPONENTS.md (header + `_No components yet._`). Don't block.
+
+### 2.6b — Pick a layout anchor
+
+If DESIGN.md `x-information-architecture.layouts` has entries:
+- AskUserQuestion (single-select): "Which existing layout does this feature follow?"
+- Options: each named layout + "None — start fresh"
+- Cap at 4; if more, recommend the 3 most common (by call-site count if available, else alphabetical).
+
+The chosen layout name + skeleton (from `x-information-architecture.layouts.<name>.skeleton`) is the `layout_anchor` passed to Phase 3.
+
+If no layouts are declared, skip — generators infer from DESIGN.md `## Layout` prose.
+
+### 2.6c — Assemble decision context
+
+Build a single text block by concatenating, in this order:
+1. Workstream `## Constraints & Scars` (if loaded in Phase 0).
+2. DESIGN.md `## Anti-patterns` (if present).
+3. DESIGN.md `## Do's and Don'ts`.
+4. Workstream `## Design System / UI Patterns` (only if migration in 2.5f was skipped).
+
+This is read-only — Phase 2.6 never writes to the workstream's `## Constraints & Scars` (that needs human judgment).
+
+**Gate:** none — Phase 2.6 is data assembly. Proceed to Phase 3.
 
 ---
 
@@ -222,8 +295,11 @@ If the copy fails (path not resolvable), `Read` the skill's `assets/wireframe.cs
 - Relevant excerpts from the req doc (journeys this component participates in)
 - The full HTML template from `reference/html-template.md`
 - **Only the pattern files tagged on this component's inventory row** (typically 1–3 files from `patterns/`). Do NOT pass the whole patterns library — it's too large and dilutes attention. The patterns are authoritative: each pattern's "best practices", "common mistakes", and "skeleton" must be respected
-- Workstream tech-stack hints if loaded (brand color, type stack)
-- **If `assets/house-style.json` exists with `source != null` AND the user chose "Use as extracted":** include the JSON verbatim. Instruct the subagent to (a) link `./assets/house-style.css` after `./assets/wireframe.css` in every generated file, and (b) match component shapes to the `patterns` hints (e.g., button radius, card style, nav layout). The override CSS handles colors and tokens — the subagent only needs to honor the shape patterns.
+- Workstream tech-stack hints if loaded (brand color, type stack — note: most of this now lives in DESIGN.md)
+- **The merged DESIGN.md (after `x-extends`) verbatim** as YAML, plus the instruction: "Link `./assets/design-overlay.css` immediately after `./assets/wireframe.css` in every generated file. The overlay handles tokens; honor `## Components` prose for shape patterns and `x-interaction` for behavior."
+- **The Phase 2.6 `components_inventory` (COMPONENTS.md content)** with the instruction: "When wireframing a button/input/card/modal/etc., prefer the variant names listed in COMPONENTS.md over inventing new ones. If no matching component exists in the inventory, mock the new component AND flag it in the file footer under 'New components proposed: <list>' so the reviewer can confirm."
+- **The Phase 2.6 `layout_anchor`** (named layout + skeleton) with the instruction: "Use this layout shell as the chrome for screen-level wireframes. Modals and overlays are exempt." If `layout_anchor` is "None — start fresh", omit this block.
+- **The Phase 2.6 `decision_context`** (workstream scars + DESIGN.md anti-patterns) with the instruction: "Honor every anti-pattern listed. If a wireframe needs to violate one, flag it in the file footer with rationale."
 - **If this component has at least one anchored screenshot** (per `source-screens.md`): include only that screenshot's description block (not the whole file) plus the absolute path to the original image. Include the IA-preservation instruction from `reference/screenshot-ingestion.md` ("match layout/IA, may improve states/a11y/copy, must NOT silently reorganize IA"). Components without anchored screenshots receive no screenshot context.
 - Strict instruction: produce ONLY the HTML file(s), no commentary
 
@@ -233,7 +309,7 @@ If the copy fails (path not resolvable), `Read` the skill's `assets/wireframe.cs
 
 - One `.html` file per `(component × device)` pair
 - Links the shared `./assets/wireframe.css` (copied in step 3a) — do NOT inline the rules from that stylesheet
-- If `./assets/house-style.css` exists and was applied in Phase 2.5, link it **immediately after** `wireframe.css` so its `:root` overrides take effect
+- Links `./assets/design-overlay.css` **immediately after** `wireframe.css` so DESIGN.md's `:root` overrides take effect (skip the link only if the user chose "Discard for this run" in Phase 2.5c)
 - Tailwind via CDN: `<script src="https://cdn.tailwindcss.com"></script>` (used alongside the shared CSS for layout/spacing utilities)
 - State-switcher tabs at the top so reviewers flip between states without reload
 - Annotations layer (toggleable) explaining non-obvious interactions
@@ -543,11 +619,24 @@ Tell the user: "Wireframes are ready. Open `{served_url_or_file_path}` to review
 
 ## Phase 9: Workstream Enrichment
 
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, this phase writes only the **navigation pointers** for the Wireframes & Design System contract — visual content lives canonically in `DESIGN.md` and `COMPONENTS.md`, not the workstream.
 
-- Recurring component patterns (top nav, modals) → workstream `## Design System / UI Patterns`
-- Brand/typography decisions made during generation → workstream `## Tech Stack`
-- Device support decisions → workstream `## Constraints & Scars`
+Update (or create) the workstream's `## Wireframes & Design System` section with these four fields exactly:
+
+```yaml
+target_app:
+  path: <app_dir>
+  confirmed_at: <YYYY-MM-DD>
+design_md_path: <relative path>
+components_md_path: <relative path>
+last_extraction_sha: <SHA at extraction; only set/update on extract>
+```
+
+**Do NOT write** brand color, typography, or recurring component patterns into `## Tech Stack` / `## Design System / UI Patterns` — those facts are canonical in DESIGN.md/COMPONENTS.md. Duplicating them creates drift.
+
+**Device support decisions** still go to workstream `## Constraints & Scars` if they're new and reusable across features (e.g. "no iOS app — never wireframe ios-app"). One-off device choices stay local to the feature folder.
+
+`## Constraints & Scars` is otherwise read-only from this skill — Phase 2.6 reads it; nothing here writes to it automatically. (Migration of an existing `## Design System / UI Patterns` section is handled in Phase 2.5f, not here.)
 
 This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
 
@@ -585,4 +674,8 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT use screenshots as the sole journey source — they augment the requirements doc, they don't replace it; trigger /requirements first if no req doc exists
 - Do NOT redesign IA away from an anchored screenshot without explicit user direction — generators may improve states, a11y, and copy, but moving primary actions or restructuring sections needs the user to ask for it
 - Do NOT silently downgrade rigor at any phase — the Rigor & Corner-Cut Protocol mandates announcement-with-rationale before choosing a lighter option (skipping subagents, fewer review loops, smaller PSYCH walkthrough). Silent downgrades compound across phases and erode user trust in the artifact
-- Do NOT skip Phase 2.5 (host style extraction) just because you "already know" the tokens — the protocol exists to catch tokens you'd miss from memory (color-mode-specific overrides, highlight colors, accent variants). The extraction subagent has fresh eyes; you don't. Cost is ~2 minutes; confidence gain is substantial
+- Do NOT skip Phase 2.5 (Resolve DESIGN.md) — even if you "know" the tokens. DESIGN.md is the durable artifact other tools (Stitch, Cursor, /verify) consume; not having it is technical debt. Cost is ~1 minute when the file exists; ~5 minutes on first creation
+- Do NOT write brand colors, typography, or component patterns into the workstream — those live in DESIGN.md / COMPONENTS.md. The workstream stores only the four navigation fields (`target_app`, `design_md_path`, `components_md_path`, `last_extraction_sha`)
+- Do NOT bypass COMPONENTS.md by inventing button/input/card/modal variants — Phase 3 generators must prefer existing variants and flag novel ones explicitly in the file footer
+- Do NOT modify the workstream `## Constraints & Scars` from this skill — Phase 2.6 reads it; only humans (or `/verify` with explicit confirmation) write to it
+- Do NOT keep the legacy `house-style.json` / `house-style.css` artifacts alive in new feature folders — Phase 2.5 produces `design-overlay.css` from DESIGN.md instead. Old folders' artifacts are left in place but not consulted

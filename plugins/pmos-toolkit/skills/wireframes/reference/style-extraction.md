@@ -1,4 +1,16 @@
-# Host Style Extraction (Phase 2.5)
+# Host Style Extraction (Phase 2.5) — SUPERSEDED
+
+> **Superseded as of pmos-toolkit v2.7.0.** Phase 2.5 of `/wireframes` no longer follows this document. The new procedure is split across:
+>
+> - `design-md-spec.md` — DESIGN.md schema (base + `x-*` extensions).
+> - `design-md-resolver.md` — file resolution + `x-extends` cascade + staleness check.
+> - `design-md-extractor.md` — auto-extraction (Branch A) and interactive elicitation for greenfield (Branch B). Replaces the extraction logic below.
+> - `design-md-to-css.md` — generates `design-overlay.css` (replaces the legacy `house-style.css`).
+> - `components-md-spec.md` — the COMPONENTS.md sidecar.
+>
+> This file is retained as a historical reference for plans that link to it (e.g. `2026-04-30-wireframes-style-and-screenshot-input-plan.md`). New work should follow the docs listed above.
+>
+> ---
 
 Extracts a "house style" from the host repo's frontend so generated wireframes look like they belong in the same product. Optional. Skips silently when the repo has no frontend.
 

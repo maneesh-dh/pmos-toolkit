@@ -2,7 +2,7 @@
 name: verify
 description: Post-implementation verification gate — ALWAYS run after /execute completes. Lint, test, deploy, spec compliance, multi-agent code review, interactive QA, and regression test hardening. Also run after manual coding or partial work. Works with git commits, no PR required. Use when the user says "check my work", "is this done", "verify the implementation", "did I miss anything", or "review and test everything".
 user-invocable: true
-argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted) [--feature <slug>] [--backlog <id>]"
+argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted) [--feature <slug>] [--backlog <id>] [--skip-design-drift]"
 ---
 
 # Implementation Verification Gate
@@ -45,6 +45,7 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 5. Spec Compliance Check
 6. Harden Test Suite
 7. Final Compliance Pass
+7.5. Design-System Drift Check (advisory)
 8. Commit & Report
 
 Mark each as in-progress when starting and completed when done. Skip tasks that don't apply (e.g., skip deploy if no deployment is involved).
@@ -430,6 +431,24 @@ One last check before committing:
 3. **Check for debug logging** or temporary code that should be removed.
 4. **Check for hardcoded values** that should be configuration.
 5. **Verify documentation is updated** (CLAUDE.md, changelogs, API docs).
+
+---
+
+## Phase 7.5: Design-System Drift Check (advisory)
+
+Keeps `DESIGN.md` and `COMPONENTS.md` in sync with the codebase so the design-system files stay self-sufficient over time. Advisory — never blocks `/verify`.
+
+Follow `reference/design-drift-check.md` end-to-end. Summary:
+
+1. **Skip-fast guards** — no frontend changes, no DESIGN.md, `x-source.applied: false`, or `--skip-design-drift` flag → skip silently.
+2. **Locate** DESIGN.md / COMPONENTS.md via `wireframes/reference/design-md-resolver.md`. Compute drift against the workstream's `last_extraction_sha` (fall back to `x-source.sha`).
+3. **Detect** token drift (Tailwind/CSS), component drift (new components, new variants), and layout drift (new route chrome shapes).
+4. **High-volume escape hatch:** drift count > 20 → offer one-shot re-extraction via `/wireframes` extractors instead of per-item prompts.
+5. **Surface via `AskUserQuestion`** (max 4 per call, cap 16 total): per item — **Apply** / **Modify** / **Skip (don't track)** / **Defer**.
+6. **Apply** approved changes via `Edit`; bump `x-source.sha`, `extracted_at`, and workstream `last_extraction_sha`. Stage with `/verify`'s Phase 8 commit.
+7. **Report** in the Phase 8 summary (additions / modifications / deferred / ignored counts).
+
+This phase does NOT generate wireframes, regenerate `design-overlay.css`, auto-create missing files (that's `/wireframes`), or modify the workstream `## Constraints & Scars`.
 
 ---
 

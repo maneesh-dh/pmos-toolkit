@@ -45,9 +45,11 @@ Before any other work, follow the context loading instructions in `product-conte
 
 ## Phase 0.4: Feature Disambiguation
 
-If no `<path-to-plan-doc>` and no `--feature` were provided, follow `../_shared/execute-resume.md` Phase 0.4 to scan the repo for in-flight features (folders under `{docs_path}/` with non-`done` task logs in their `execute/` subdir). If multiple candidates exist, present them via `AskUserQuestion` and let the user pick. If exactly one, use it. If none, error out — there is nothing to resume and no plan to execute.
+**If `--restart` was passed:** before doing anything else, count the existing `done` task logs under `{feature_folder}/execute/` (or all candidate feature folders if no plan path was given). Issue `AskUserQuestion`: "Restart will discard prior progress logs (X tasks marked done across N feature(s)). Confirm restart from scratch?" with options **Confirm restart** / **Cancel**. On Cancel, abort the /execute invocation immediately. On Confirm, skip the rest of Phase 0.4 and Phase 0.5 entirely and proceed to Phase 1 as a fresh start.
 
-Skip this phase entirely if `--restart` was passed (user explicitly wants a fresh start) or if the plan path was given (no ambiguity).
+Otherwise: if no `<path-to-plan-doc>` and no `--feature` were provided, follow `../_shared/execute-resume.md` Phase 0.4 to scan the repo for in-flight features (folders under `{docs_path}/` with non-`done` task logs in their `execute/` subdir). If multiple candidates exist, present them via `AskUserQuestion` and let the user pick. If exactly one, use it. If none, error out — there is nothing to resume and no plan to execute.
+
+Skip this phase entirely if the plan path was given (no ambiguity).
 
 ---
 
@@ -63,7 +65,7 @@ Follow `../_shared/execute-resume.md` Phase 0.5 to:
 6. Render the **Resume Report** to chat (markdown table from `../_shared/execute-resume.md` "Resume Report Rendering"), then confirm via `AskUserQuestion` (Resume / Restart task / Jump to specific / Restart from T1 / Cancel).
 7. Set `resume_mode = (mode, resume_task_index)` for Phase 1.
 
-**Skip this phase entirely** if `--restart` was passed, or if no logs exist under `{feature_folder}/execute/` (fresh execution). If `--from T<N>` was passed, skip the resolver and set `resume_mode = ("manual", N)` directly. If `--resume` was passed, force this phase even if the resolver would otherwise skip.
+**Skip this phase entirely** if `--restart` was passed, or if no logs exist under `{feature_folder}/execute/` (fresh execution). If `--from T<N>` was passed, skip the resolver and set `resume_mode = ("manual", N)` directly. Tasks in phases entirely before T<N> are treated as implicitly sealed by the manual override — no retroactive phase verify is run. If `--resume` was passed, force this phase even if the resolver would otherwise skip.
 
 ---
 
@@ -126,7 +128,7 @@ Work through the plan's tasks in order. For each task:
    ---
    task_number: 5
    task_name: "Add SOP migration"
-   task_goal_hash: <sha256 of plan T<N> Goal: line, normalized — see _shared/execute-resume.md "Hash Normalization Rule">
+   task_goal_hash: <sha256 of plan T<N> Goal: line, normalized — see ../_shared/execute-resume.md "Hash Normalization Rule">
    plan_path: "{feature_folder}/03_plan.md"
    branch: "feature/sop-editor"
    worktree_path: ".worktrees/sop-editor"
@@ -149,7 +151,7 @@ Skip this phase entirely if the plan has no `## Phase N` headings (flat plan). O
 
 1. Determine whether the just-completed task is the last in its `## Phase N` group.
 2. If yes: invoke /verify with `--scope phase --feature <slug> --phase <N>` (see `verify/SKILL.md` for the invocation contract). Evidence is written to `{feature_folder}/verify/<YYYY-MM-DD>-phase-<N>/`.
-3. Write `{feature_folder}/execute/phase-N.md` with the phase log frontmatter (schema in `_shared/phase-boundary-handler.md`).
+3. Write `{feature_folder}/execute/phase-N.md` with the phase log frontmatter (schema in `../_shared/phase-boundary-handler.md`).
 4. **If verify failed:** do NOT compact, do NOT continue. Escalate to the user with the failure summary. The phase-N.md log is left with `verify_status: failed` so the next session's resolver can pick up at the failed task.
 5. **If verify passed:** emit the `HALT_FOR_COMPACT` message ("Phase N verified green. Run `/compact` to clear context, then re-invoke `/execute --resume` to continue with phase N+1.") and end the /execute turn. The resolver in the next session sees the sealed phase log and picks up at the next phase's first task.
 

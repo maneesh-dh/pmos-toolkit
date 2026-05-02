@@ -132,10 +132,12 @@ function resolve_resume(plan_path, feature_folder):
 | State | Meaning |
 |-------|---------|
 | `not-started` | No log file exists for this task number. |
+| `not-started-with-commits` | No log exists for this task, but `git log` shows commits referencing T<N>. Likely a session that committed but crashed before writing the in-flight log. Default action: prompt to inspect commits or revert. |
 | `done` | Log exists, `status: done`, and `task_goal_hash` matches the current plan goal line. |
 | `done-sealed` | Task belongs to a phase whose `phase-N.md` has `verify_status: passed` and whose `plan_phase_hash` still matches. Trusted without per-task drift check. |
 | `done-but-drifted` | Log exists, `status: done`, but `task_goal_hash` does not match the current plan goal line. The plan was edited after the task completed. |
 | `in-flight` | Log exists, `status: in-flight`. Session crashed or was interrupted before the task could be marked done. |
+| `in-flight-with-commits` | Log exists with `status: in-flight` AND commits exist on the branch referencing T<N>. Default action: prompt to continue from commits or revert and redo. |
 | `failed` | Log exists, `status: failed`. Three-attempt retry budget was exhausted. |
 
 The `-with-commits` suffix is appended to `not-started` or `in-flight` when `git log <branch>` contains a `T<N>` reference for that task number, e.g. `in-flight-with-commits`, `not-started-with-commits`. This signals that real work landed on the branch even though the log was not finalized.

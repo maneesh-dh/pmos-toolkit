@@ -75,7 +75,13 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 3. **Read adjacent code.** Check imports, callers, and consumers of the code you'll modify.
 4. **Check project conventions.** Read `CLAUDE.md`, `.claude/rules/`, and recent commits for patterns to follow.
 5. **Trace data flow pipelines.** If the feature involves a write→read pipeline (search indexing, sync, export, import, queue, cache, aggregation), verify the full chain exists: write entry point → storage target → read entry point. Grep for each link. If any link is missing, add a task to implement it. (Skip for purely CRUD or purely UI features.)
-6. **Summarize findings** in a "Code Study Notes" section for the plan.
+6. **Read wireframes (if present).** Check `{feature_folder}/wireframes/` for HTML wireframes. If present, open each affected screen and note what the wireframe specifies. Treat wireframes as **reference, not specification**:
+
+   - **Authoritative for:** IA, screen inventory, component presence, copy and labels, state coverage (loading/empty/error/success), navigation entry/exit, journey shape. Tasks must implement these.
+   - **NOT authoritative for:** visual style, color, typography, spacing, iconography, component library. Tasks should adapt the wireframe to the host app's existing design system and conventions — never copy visual treatment verbatim when it conflicts with the host app.
+
+   Every UI task in Phase 3 must cite the wireframe(s) it implements via a `**Wireframe refs:**` field — same discipline as `**Spec refs:**`. This preserves the wireframe→implementation→verification chain for /verify Phase 4 sub-step 3f. If the host app has established patterns (Tailwind tokens, component library, layout conventions) that differ from the wireframe's visual treatment, the task should explicitly say "follow host-app convention X" rather than "match wireframe."
+7. **Summarize findings** in a "Code Study Notes" section for the plan.
 
 **Gate:** You must have read every impacted file before writing a single line of the plan.
 
@@ -170,6 +176,7 @@ Before defining tasks, map out which files will be created or modified and what 
 
 **Goal:** [One sentence]
 **Spec refs:** [Which spec sections/FR-IDs this implements]
+**Wireframe refs:** [If wireframes exist and this task touches UI: which screens (e.g., `wireframes/01_dashboard_desktop-web.html`). Omit the field for non-UI tasks.]
 
 **Files:**
 - Create: `path/to/file.py`
@@ -228,6 +235,10 @@ Before defining tasks, map out which files will be created or modified and what 
   3. Verify new UI elements render correctly
   4. Walk through the primary user flow
   5. Take a screenshot for verification
+  6. **Hard-reload every parameterized route** the change touches (open the URL in a fresh tab, not via in-app navigation) and confirm the requested resource renders — not the index/first item. Catches router-resolver bugs that in-app nav hides.
+  7. **Force at least one error path** (bad input, broken backend) and confirm the UI surfaces the failure with a recoverable CTA — not silent.
+- [ ] **UX polish checklist** (any UI-touching change): `document.title` set per route, no internal IDs/enum keys leaked into copy, casing/date-format consistency, meaningful image `alt`, no dead disabled affordances, zero uncaught console errors during the journey, navigation labels match destination titles. Full checklist enforced in `/verify` Phase 4 sub-step 3f.
+- [ ] **Wireframe diff** (if `{feature_folder}/wireframes/` exists): for each affected screen, open the wireframe and the live implementation side-by-side. Diff **only on the authoritative dimensions** (IA, copy, states, journeys) — NOT visual style, color, typography, spacing, or component library, which are expected to follow the host app. Classify every delta as `intentional — style adaptation`, `intentional — decision` (with rationale), or `regression` (fix before completion). Empty diff with no dimensions named is not acceptable.
 - [ ] **Manual spot check:** [Feature-specific verification — be specific]
 - [ ] **Seed data:** `python scripts/seed_sop_db.py --reset` (if data files changed)
 
@@ -324,6 +335,8 @@ Each loop runs BOTH checks:
 7. **Type consistency:** Do types, method signatures, and property names used in later tasks match what was defined in earlier tasks? A function called `clearLayers()` in Task 3 but `clearFullLayers()` in Task 7 is a plan bug.
 8. Final verification task is concrete and complete?
 9. **Verification quality:** Does every task's test assert on behavioral output with realistic data — not just status codes, exit codes, or "it compiles"? Apply the litmus test: could a subtly broken implementation still pass this verification?
+10. **Wireframe linkage:** If `{feature_folder}/wireframes/` exists, does every UI-touching task cite a `**Wireframe refs:**` line? Tasks without wireframe refs are gaps unless the task is non-UI.
+11. **Final-verification polish coverage:** Does TN include the hard-reload-every-route step, the force-an-error-path step, the UX polish checklist line, and (if wireframes exist) the wireframe diff line?
 
 **B. Design-Level Self-Critique** (catches wrong/shallow task decomposition):
 1. **Reviewer perspective:** If you were sent this plan for review, what comments would you add? Read it as a critical reviewer, not the author — flag tasks with unclear scope, missing verification steps, implicit dependencies, and assumptions about what's "obvious."
@@ -433,3 +446,6 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT combine unrelated changes into a single task — each task should be independently committable
 - Do NOT forget the "Done when" one-liner — it defines what success looks like for the whole plan
 - Do NOT skip the Cleanup subsection in final verification — temp files, containers, and debug logging accumulate
+- Do NOT omit `**Wireframe refs:**` on UI tasks when wireframes exist — the link is what carries polish/consistency expectations into /verify Phase 4 sub-step 3f
+- Do NOT instruct tasks to copy the wireframe's visual style verbatim. Wireframes are reference for IA / copy / states / journeys; visual style follows the host app's design system. Tasks should say "follow host-app pattern X" rather than "match wireframe pixel-for-pixel."
+- Do NOT let TN's frontend smoke test stop at "renders correctly" — it must include hard-reload, an error-path probe, the UX polish checklist, and (if wireframes exist) a wireframe diff. Polish belongs in the plan, not as a verify afterthought.

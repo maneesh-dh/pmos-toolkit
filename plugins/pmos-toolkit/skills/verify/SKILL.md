@@ -76,6 +76,13 @@ Before any other work, follow the context loading instructions in `product-conte
    - Requirements: `phase=requirements`, `label="requirements doc"`
    - Plan: `phase=plan`, `label="plan"`
 2. **Read all three documents** (whichever exist). You need these for the compliance check.
+2a. **Locate wireframes (if present).** Check `{feature_folder}/wireframes/` for HTML wireframes produced by `/wireframes`. If the folder exists, list every screen file and treat wireframes as a fourth source document — but understand what they are and aren't:
+
+   **Wireframes are authoritative for:** information architecture, screen inventory, component presence, copy and labels, state coverage (loading / empty / error / success), navigation entry/exit points, user-journey shape.
+
+   **Wireframes are NOT authoritative for:** visual style, color palette, typography choice, exact spacing, component library, iconography, or pixel-level layout. Those follow the host application's existing design system and conventions — even when the wireframe shows something different. The /wireframes skill itself extracts a `house-style.json` precisely because wireframes are intended to be adapted to the host app's style, not copied verbatim.
+
+   When there's a conflict between a wireframe's visual treatment and the host app's established patterns, **the host app wins** unless the spec explicitly calls out a visual-style change as a goal. This shapes how Phase 4 sub-step 3f and Phase 5 sub-step 4d classify deltas.
 3. **Identify what changed.** Run `git diff main...HEAD --stat` (or appropriate base) to see which files were modified. This scopes the verification.
 4. **Check if lint/type/tests were already run.** Ask the user or check recent terminal history. Skip steps already completed — but re-run if you're not confident they were clean.
 
@@ -196,6 +203,7 @@ Before running any Phase 4 sub-step, enumerate every upstream requirement that h
 | 3c. API Smoke Tests | `curl` response body compared row-by-row to the spec's API contract |
 | 3d. Frontend Verification | Playwright MCP screenshot, `browser_evaluate` DOM assertion, or a specific test file covering the rendered output |
 | 3e. Interactive Spot Checks | Playwright MCP interaction trace covering a user journey end-to-end, including at least one error/edge path |
+| 3f. UX Polish & Wireframe Consistency | Per-page checklist results (see 3f) AND, if wireframes exist, a wireframe-vs-implementation diff note per affected screen classifying each delta as `intentional` or `regression` |
 
 **Every enumerated todo resolves to exactly one of three outcomes:**
 
@@ -217,6 +225,10 @@ If any of these thoughts surface during Phase 4, stop and re-read the entry gate
 | "Setup would take too long" | Setup is Phase 4 work. If you have time to write the final report, you have time to start the server. |
 | "The happy path worked; good enough" | The spec's edge cases are explicit. Test at least one error/edge path per affected flow — the entry gate names this in 3e's evidence row. |
 | "I'll note it as a gap" | A gap you could have verified but didn't is not a gap — it's a skip. Either produce evidence (close as Verified), cite alternative evidence (close as NA), or name the blocker (leave open as Unverified-action-required). There is no fourth state. |
+| "Polish is cosmetic — out of scope for verification" | Polish *is* the user-facing product. Sub-step 3f is mandatory for any change with a UI surface. If the user has to push you to check polish, the skill failed. |
+| "Wireframes were just sketches — implementation is allowed to drift" | Style drift is *expected* — wireframes are not authoritative for visual style (see 2a). But unexamined drift on the authoritative dimensions (IA, copy, states, journeys) is a skip. Classify every delta on those dimensions as `intentional — style adaptation`, `intentional — decision`, or `regression`. A wireframe-diff with zero deltas listed is suspicious. |
+| "I should make the implementation look exactly like the wireframe" | No. Visual style follows the host app's design system, not the wireframe. The wireframe's color/typography/spacing/iconography is reference-only. Forcing pixel-fidelity over the host app's conventions is a different failure mode — flag it as a `regression` against the host app's design system, not the wireframe. |
+| "Hard-reload / deep-link works in-app, that's enough" | Parameterized routes must be hard-reloaded (open URL fresh in a new tab via Playwright) for every affected route. In-app navigation hides router-resolver bugs. |
 
 ### 3a. Database Migrations (if applicable)
 
@@ -267,6 +279,43 @@ Run actual scenarios in the development environment. Interact with the system as
 - Verify that unrelated flows still work (no regressions)
 
 **Do NOT rely only on automated tests.** Interactive verification (Playwright MCP driving real user journeys) catches issues that tests miss: rendering glitches, confusing UX, wrong copy, timing issues. "Interactive" means you operate the browser via MCP — not that a human operates it for you.
+
+### 3f. UX Polish & Wireframe Consistency (mandatory for any UI-touching change)
+
+This sub-step exists because automated tests, API smoke tests, and happy-path Playwright walks all pass while the product still ships with `<title>Vite App</title>`, `alt="image"`, leaked internal IDs in user-facing copy, and broken hard-reload. Polish is the product — it is not optional, and it is not a follow-up.
+
+**Skip only if** the change has zero UI surface (pure backend, infra, or library-internal). Document the skip with one sentence. Otherwise this sub-step runs.
+
+**Part 1 — Wireframe diff (only if `{feature_folder}/wireframes/` exists from Phase 1).** Wireframes are a *reference*, not a spec — see Phase 1 sub-step 2a for what they are and aren't authoritative for. For each affected screen:
+
+1. Open the wireframe HTML and the live implementation side-by-side via Playwright MCP.
+2. Compare **only on the dimensions wireframes are authoritative for** (per 2a): IA, screen inventory, component presence, copy and labels, state coverage (loading/empty/error/success), affordances (CTAs, disabled states), navigation entry/exit. Do NOT diff visual style, color, typography, spacing, iconography, or component library — those are expected to follow the host app and will differ from the wireframe by design.
+3. Record every delta on the authoritative dimensions in the wireframe-diff table (Phase 5 sub-step 4d). Classify each as one of:
+   - **`intentional — style adaptation`**: wireframe showed something the host app's design system handles differently. No fix needed; this is the expected adaptation. Cite the host-app convention.
+   - **`intentional — decision`**: a deliberate departure recorded during /execute or earlier (cite the decision record).
+   - **`regression`**: a missed requirement on an authoritative dimension (e.g., an empty state in the wireframe is missing from the implementation, copy is wrong, a journey step was dropped). Must be fixed in this verify pass, then re-verified.
+4. "Wireframe and implementation match" with no deltas listed is not acceptable evidence — name at least the authoritative dimensions checked.
+
+**The bar:** does the implementation cover what the wireframe specified at the IA/copy/states/journeys level, *adapted to the host app's design system*? Not: does it look pixel-identical to the wireframe.
+
+**Part 2 — UX polish checklist (always runs).** Walk the changed UI surface in Playwright and check every item below. Each becomes a row in the Phase 5 sub-step 4d table.
+
+| # | Check | How |
+|---|-------|-----|
+| P1 | `document.title` is set per route (not the framework default like "Vite App", "React App", "Next.js") | `browser_evaluate` `document.title` on each affected route |
+| P2 | No internal IDs / enum keys leaked into user-facing copy (e.g., `practitioner_bullets` shown to user instead of "Practitioner"; `table_of_contents` instead of "Table of Contents") | Visual scan + grep the rendered DOM for snake_case strings |
+| P3 | Casing/format consistency across labels, filter options, button text, dates, and headings (no SHOUTY CAPS where sentence case is used elsewhere; one date format) | Cross-check filter dropdowns, button text, and date renderings on each affected page |
+| P4 | Loading, empty, and error states render — and the error state surfaces actual failures, not silent UI | Force at least one error per affected flow (bad input, broken backend, force a 4xx/5xx) and observe the UI |
+| P5 | Image `alt` attributes are meaningful — never the literal string `"image"`, `"img"`, or empty for non-decorative images | `browser_evaluate` `[...document.images].map(i=>i.alt)` |
+| P6 | No dead disabled affordances — every disabled CTA either has a tooltip explaining why or is replaced by an action (e.g., disabled "No Summary" pill should offer "Summarize" instead) | Visual scan; click each disabled control |
+| P7 | Hard-reload works for every parameterized route the change touches | For each route, open the URL in a fresh Playwright tab (not in-app navigation) and confirm the page renders the requested resource, not the index/first item |
+| P8 | Deep-link / shareable URL parity — copy the URL, open in a new context, confirm same content | Same as P7 but with explicit URL-copy step |
+| P9 | Browser console has zero uncaught errors and zero unhandled promise rejections during the journey | `browser_console_messages` after walking each affected flow |
+| P10 | Navigation labels match destination titles (no "Notes" sidebar pointing to an "Annotations" page) | Cross-check sidebar/menu label vs `<h1>` on the destination |
+| P11 | Failure paths are visibly recoverable — if a backend operation fails, the user sees a retry CTA, not silence | Force at least one failure (network kill, bad input) and observe the UI |
+| P12 | No raw external/internal anchors leak into rendered content (e.g., EPUB `#filepos2205`, file-system paths, dev-only URLs) | `browser_evaluate` `[...document.querySelectorAll('a')].map(a=>a.href)` and inspect for non-app schemes/paths |
+
+**Evidence required (per the entry gate's 3f row):** the polished-checklist table with one outcome per row (`pass` / `fail` / `NA — reason`) AND, if wireframes existed, a wireframe-diff entry per affected screen. Failures become Phase 5 4d gaps and Phase 6 regression tests.
 
 ---
 
@@ -319,7 +368,31 @@ Read `{feature_folder}/03_plan.md` (resolved in Phase 1). For every task:
 - `NA-skipped-with-reason` requires naming the decision AND where it was recorded (plan update, session log, commit message). "NA" without a reason is not valid.
 - `Unverified` means the task was claimed done but the verification couldn't be produced. This is a gap — surface it in the 4d Gap Report.
 
-### 4d. Gap Report
+### 4d. Wireframe & UX Polish Compliance
+
+This table consolidates the output of Phase 4 sub-step 3f. Skip only if the change had zero UI surface (note the skip and proceed to 4e).
+
+**Part 1 — Wireframe deltas (only if `{feature_folder}/wireframes/` was loaded in Phase 1):**
+
+| Screen | Delta (authoritative dimensions only) | Classification | Evidence / Rationale |
+|--------|--------------------------------------|---------------|---------------------|
+| `01_dashboard.html` vs `/dashboard` | [What differs on IA / copy / states / journeys — NOT visual style] | `intentional — style adaptation` / `intentional — decision` / `regression` | [Screenshot pair, decision record reference, host-app convention reference, or fix commit] |
+
+Reminder: only diff on the dimensions wireframes are authoritative for (Phase 1 sub-step 2a). Visual-style differences (color, typography, spacing, iconography, component library) are expected and not listed as deltas — the implementation is meant to adapt the wireframe to the host app's design system.
+
+If a screen had zero deltas on the authoritative dimensions, write one row stating that explicitly and naming the dimensions checked (IA, copy, states, journeys) — empty tables are not acceptable evidence.
+
+**Part 2 — UX polish checklist results:**
+
+| # | Check | Outcome | Evidence |
+|---|-------|---------|----------|
+| P1 | `document.title` set per route | Verified / Failed / NA | [`browser_evaluate` output, or fix commit if it failed and was repaired this pass] |
+| P2 | No internal IDs / enum keys in user copy | ... | ... |
+| ...P3–P12 | (one row per checklist item from 3f) | ... | ... |
+
+Every `Failed` row in either part becomes a Phase 5 4e Gap Report entry AND a Phase 6 regression test.
+
+### 4e. Gap Report
 
 List every gap found:
 
@@ -426,3 +499,6 @@ For Phase 4 skip rationalizations specifically, see the **Phase 4 Red Flags** ta
 - Do NOT verify only the happy path — every affected flow gets at least one error/edge case per the Phase 4 entry gate's 3e evidence row
 - Do NOT assume the previous verification run is still valid — re-run after every fix
 - Do NOT skip the Phase 6 hardening phase — converting bugs to tests is what prevents regressions
+- Do NOT skip Phase 4 sub-step 3f for any change with a UI surface — polish + wireframe consistency is mandatory, not "if there's time." If the user has to ask "did you check polish?", the skill failed.
+- Do NOT mark wireframe drift as acceptable without classifying it. Every delta on an authoritative dimension is `intentional — style adaptation`, `intentional — decision`, or `regression`. "Close enough" is not a state.
+- Do NOT diff visual style (color, typography, spacing, iconography, component library) against the wireframe. Those follow the host app's design system, not the wireframe. Pushing pixel-fidelity to the wireframe over host-app conventions is itself a failure mode.

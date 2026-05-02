@@ -392,6 +392,8 @@ After all per-file refinement is done, present a cross-file rollup of any unreso
 
 **Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." Always structure the ask.
 
+**Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
+
 ---
 
 ## Phase 5: Index & Serve
@@ -524,6 +526,8 @@ Surface findings via `AskUserQuestion`. Group by target:
 **Platform fallback (no `AskUserQuestion`):** present a numbered table grouped by target with disposition column. Do NOT silently self-fix.
 
 **Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." Always structure the ask.
+
+**Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
 ### 6g. Apply dispositions
 

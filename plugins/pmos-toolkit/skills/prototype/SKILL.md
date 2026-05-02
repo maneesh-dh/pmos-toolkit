@@ -427,6 +427,8 @@ Log every applied change in `{feature_folder}/prototype/prototype-findings.md`.
 
 **Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." Always structure the ask.
 
+**Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
+
 ---
 
 ## Phase 9: Generate Landing Index + Serve

@@ -151,7 +151,7 @@ The Resume Report is rendered to chat only — no file is written (Open Question
 ### Markdown table template
 
 ```markdown
-# Execute Resume Report
+**Execute Resume Report**
 Plan: {plan_path}
 Branch: {branch}  (worktree: {worktree_path} — {worktree_status})
 

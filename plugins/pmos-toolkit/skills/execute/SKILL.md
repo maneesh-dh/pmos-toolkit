@@ -112,8 +112,34 @@ Work through the plan's tasks in order. For each task:
    - **API tasks:** curl every new/modified endpoint against the running dev server. Paste the output.
    - **UI tasks:** open the affected page in Playwright MCP (or fallback). Paste screenshot or programmatic output.
    - If you cannot produce runtime evidence for an API or UI task, the task is not done. Do not commit.
-6. **Commit** — small, focused commit per task. Not one giant commit at the end.
-7. **Write per-task log** to `{feature_folder}/execute/task-{NN}.md` where `NN` matches the task number from the plan (zero-padded 2 digits, e.g. `task-01.md`, `task-12.md`). Capture: task name/number, files touched, key decisions, deviations, runtime evidence, and verification outcome. Overwrite if a re-run hits the same task.
+6. **Commit** — small, focused commit per task. Not one giant commit at the end. **Commit subject MUST contain the task number in the form `T<N>`** (e.g., `feat(T5): add SOP migration` or `T5: add SOP migration`). The Phase 0.5 resolver greps `\bT[0-9]+\b` from `git log` to detect mid-task interruption — without `T<N>` in the subject, in-flight detection degrades.
+7. **Maintain the per-task log** at `{feature_folder}/execute/task-{NN}.md` (zero-padded 2 digits). The log has a structured frontmatter and a free-form body. Lifecycle:
+
+   - **At task start** (before TDD work begins): write the file with `status: in-flight`, populated frontmatter (see schema below), and an empty body. This is the "in-flight marker" that resume detects if the session crashes.
+   - **As files are touched:** append paths to `files_touched` in the frontmatter (used by phase-scoped /verify in Phase 2.5).
+   - **At task completion** (verify-fix loop passed AND runtime evidence produced): update `status: done`, set `completed_at`, and write the body (key decisions, deviations, runtime evidence, verification outcome).
+   - **At task failure** (3-attempt budget exhausted): update `status: failed`, set `completed_at`, write the body with the failure mode.
+
+   **Frontmatter schema:**
+
+   ```yaml
+   ---
+   task_number: 5
+   task_name: "Add SOP migration"
+   task_goal_hash: <sha256 of plan T<N> Goal: line, normalized — see _shared/execute-resume.md "Hash Normalization Rule">
+   plan_path: "{feature_folder}/03_plan.md"
+   branch: "feature/sop-editor"
+   worktree_path: ".worktrees/sop-editor"
+   status: in-flight | done | failed
+   started_at: 2026-05-02T14:32:11Z
+   completed_at: 2026-05-02T14:48:30Z   # only when status != in-flight
+   files_touched:
+     - src/sop/migrations/0042_add_remediation.py
+     - tests/sop/test_migration_0042.py
+   ---
+   ```
+
+   Overwrite the file's body on a re-run; preserve `started_at` from the first attempt.
 8. **Mark task as completed** in your task tracker.
 9. **Move to next task** — only after verification passes, evidence is produced, and task is marked complete.
 

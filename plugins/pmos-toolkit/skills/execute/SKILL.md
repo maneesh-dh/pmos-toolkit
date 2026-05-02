@@ -327,3 +327,5 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT leave discovered issues as "known gaps" — fix them and add tests
 - Do NOT make one giant commit at the end — commit after each task
 - Do NOT stop at the first passing test run — re-read the spec for completeness
+- Do NOT silently re-do tasks marked `done` in `task-NN.md` without checking the `task_goal_hash` against the current plan — drift detection exists for a reason; surface `done-but-drifted` to the user instead of either skipping or quietly redoing
+- Do NOT skip the Phase 2.5 Phase Boundary Check when the plan has `## Phase N` headings — full /verify at boundaries is the design's purpose; suppressing it defeats the cross-session compact handshake

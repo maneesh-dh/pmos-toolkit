@@ -2,7 +2,45 @@
 
 Used by Phase 7 (Interactive Friction Pass). PSYCH/MSF stay in `/wireframes` — this is a lighter pass that measures *operational cost* of completing each user journey through the running prototype.
 
-The friction subagent walks each journey end-to-end through the per-device HTML files (reading the route table from `runtime.js` and the screen components from the device file) and counts measurable interactions. It does NOT score motivation or satisfaction — that's `/msf`'s job.
+The friction subagent walks each journey end-to-end and counts measurable interactions. It does NOT score motivation or satisfaction — that's `/msf`'s job.
+
+## Walk mode (live vs analytical)
+
+There are two walk modes. **Live walk is the default whenever Playwright MCP is available** — analytical-only is a documented degraded fallback, not an equivalent. The two modes catch different failure classes.
+
+### Live walk (DEFAULT — Playwright MCP available)
+
+The subagent uses Playwright MCP to actually open the prototype in a headless browser, click through each journey step, and observe what happens:
+
+1. Start the static server (or use the URL captured in Phase 5d / 9b).
+2. For each journey step, perform the actual click / keystroke and wait for the next screen to render.
+3. Record real metrics: actual clicks issued, actual keystrokes typed, actual screens reached, actual modal interruptions encountered, actual `mockApi` latency observed (from `Date.now()` deltas around `await` boundaries).
+4. **Capture a per-step screenshot** when feasible — attached to `interactive-friction.md` so flagged steps are reviewable.
+5. Watch console for errors during the walk. A console error during journey traversal is a high-severity flag (the analytical pass cannot detect this).
+
+The live walk is the only way to detect:
+- Journey steps that look fine in code but fail in the browser (Phase 5d issues that slipped through).
+- Actual latency vs. nominal latency.
+- Race conditions where the next screen mounts before data is ready.
+- Modals that intercept clicks invisibly.
+
+### Analytical-only walk (degraded fallback — Playwright MCP unavailable)
+
+The subagent reads the route table from `runtime.js` and the screen components from the device file, then *analytically* counts what a user would have to do. This is the v2.7.0 mode.
+
+Limitations of analytical mode (state these honestly in the friction output):
+- **Cannot detect "page didn't render"** — analytical mode counts clicks against code that may be broken.
+- **Cannot measure actual latency** — uses the nominal 200–800ms range only.
+- **Cannot detect runtime errors mid-journey.**
+- **Cannot capture screenshots.**
+
+When running in analytical mode, the `interactive-friction.md` file MUST include a top-of-file banner:
+
+```markdown
+> ⚠ **Walk mode: analytical-only.** Playwright MCP was unavailable, so this pass measured friction by reading code rather than executing the prototype. Open each journey in a real browser before sharing with stakeholders — analytical counts assume the page renders.
+```
+
+Do not silently produce analytical-mode output that looks like live-walk output. The two modes are not interchangeable.
 
 ## What to count
 

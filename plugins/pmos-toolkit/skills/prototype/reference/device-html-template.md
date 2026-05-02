@@ -34,6 +34,13 @@ Each `index.<device>.html` follows this structure. Generated once per device by 
 
   <!-- screen components -->
   <script type="text/babel" data-presets="react">
+  (function () {
+    // MANDATORY IIFE wrap. Babel-standalone transpiles every <script type="text/babel">
+    // block into the SAME shared global scope (it does NOT create per-script closures
+    // like ES modules). Top-level `const`/`let` here therefore collide with identically
+    // named bindings declared in components.js, runtime.js, or other Babel blocks
+    // ("Identifier 'Button' has already been declared" on first reload). Wrapping each
+    // Babel block in an IIFE is the only durable fix.
     const { Button, Input, Modal, Toast, Card, Table, EmptyState, Spinner, Badge, Avatar } = window.__protoComponents;
     const { useRoute, navigate, mockApi, store, useStore } = window.__proto;
 
@@ -52,10 +59,13 @@ Each `index.<device>.html` follows this structure. Generated once per device by 
     // … one screen component per wireframe screen
 
     window.__screens = { DashboardScreen, /* … */ };
+  })();
   </script>
 
   <!-- app shell: device frame + router outlet + global modals -->
   <script type="text/babel" data-presets="react">
+  (function () {
+    // MANDATORY IIFE wrap (see screen-components block above for rationale).
     const { useRoute } = window.__proto;
     const screens = window.__screens;
 
@@ -95,6 +105,7 @@ Each `index.<device>.html` follows this structure. Generated once per device by 
     }
 
     ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  })();
   </script>
 </body>
 </html>
@@ -114,6 +125,7 @@ CSS for these lives in `prototype.css` keyed off `body.device-<name>`. Subagent 
 
 ## Strict rules for the generator subagent
 
+0. **MANDATORY: Wrap every `<script type="text/babel">` block in an IIFE.** Babel-standalone compiles every Babel block into the SAME shared global scope, so top-level `const`/`let` collide across blocks ("Identifier 'X' has already been declared" — fatal on first load). The wrap is `<script type="text/babel" data-presets="react">\n(function () {\n  …block body…\n})();\n</script>`. This applies to: components.js (if inlined), screen-components blocks, app-shell block, and any feature-specific Babel block. The only blocks that may skip the IIFE are pure `<script type="application/json">` data blocks (not Babel) and the loaded `runtime.js` / `design-tokens.js` / `components.js` files when they themselves are written as IIFEs.
 1. **Load order is fixed.** CSS: `prototype.css` → `design-overlay.css` → `styles.css`. JS: `design-tokens.js` (sets `window.__designTokens`) → `runtime.js` → `components.js`. Don't move `runtime.js` after Babel scripts. Don't load `design-tokens.js` after `runtime.js` / `components.js` — atoms reading `window.__designTokens` will get `undefined`.
 2. **Inline data is mandatory.** Every entity in `<meta name="mock-entities">` must have a corresponding `<script type="application/json" id="mock-<entity>">` block with the JSON inlined verbatim from `assets/<entity>.json`.
 3. **One screen component per wireframe screen.** Naming: `<PascalCaseSlug>Screen` (e.g., `UserDetailScreen` for `user-detail` slug).

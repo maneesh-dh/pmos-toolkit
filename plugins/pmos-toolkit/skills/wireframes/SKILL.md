@@ -2,7 +2,7 @@
 name: wireframes
 description: Generate static HTML wireframes (single-file, mid-fi, Tailwind) for a user-facing feature — covers all screens, components, states, and target devices. Optional bridge between /requirements and /spec in the requirements -> spec -> plan pipeline (run before /spec when the feature is user-facing). Auto-triggers /requirements if no req doc exists. Optionally extracts a "house style" from the host repo's frontend (Tailwind tokens, component library, layout patterns) so wireframes match the existing app, and accepts screenshots (`--screenshots`) of existing flows as IA anchors for "extend this flow" requests. Self-evaluates each wireframe against UX heuristics with a reviewer subagent and runs up to 2 self-refinement loops. Use when the user says "create wireframes", "mock up the UI", "wireframe this feature", "design the screens", "show me the UI states", "extend this existing flow", or has a requirements doc ready and wants visuals before the spec.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--screenshots <path>]"
+argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--screenshots <path>] [--bootstrap-design-only]"
 ---
 
 # Wireframe Generator
@@ -19,6 +19,20 @@ Use this when the feature has meaningful UI surface and the team benefits from s
 **Design vocabulary** is shared across every wireframe in a feature folder via `assets/wireframe.css` (theme tokens, state-switcher, annotations layer, device frames, and `mock-*` primitives — vocabulary borrowed from `superpowers:brainstorming/visual-companion`; CSS-variable theme discipline borrowed from `claude-plugins-official:frontend-design`). The CSS is copied into each output folder at the start of generation so wireframes remain portable and consistent.
 
 **Announce at start:** "Using the wireframes skill to generate HTML wireframes for this feature."
+
+## `--bootstrap-design-only` mode
+
+Invoked as `/wireframes --bootstrap-design-only` (typically by `/prototype` Phase 1.5 when DESIGN.md is missing but wireframes already exist). In this mode the skill produces ONLY DESIGN.md and COMPONENTS.md — no wireframe HTML, no review loops, no PSYCH/MSF, no Phase 7 polish, no Phase 9–10 enrichment. The user's existing wireframes are not touched.
+
+**Phases that run in this mode:** Phase 0 (workstream context), Phase 2.5 (DESIGN.md, including 2.5c review gate — DO NOT skip the gate), Phase 2.6a (COMPONENTS.md load/create — including 2.6a accept/edit/skip gate). All other phases are skipped.
+
+**COMPONENTS.md scope in bootstrap mode (mandatory):** enumerate ONLY components that exist in the host frontend (`<app_dir>/src/components/` or equivalent). Do NOT propose feature-specific or speculative new components — those belong to `/prototype`'s output (Phase 4c flags new variants in the components.js footer; `/verify` promotes them later). A bootstrap-mode COMPONENTS.md that names components not present in the host frontend is a contract violation.
+
+**Announce at start in this mode:** "Bootstrap-design-only: skipping wireframe regen. Producing DESIGN.md + COMPONENTS.md from the host frontend."
+
+**Exit:** announce path to the two files and return; do NOT trigger downstream phases or commit anything beyond the two files.
+
+For all other invocations, proceed through every phase below as usual.
 
 ## Platform Adaptation
 

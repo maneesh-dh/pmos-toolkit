@@ -2,7 +2,7 @@
 name: prototype
 description: Generate a high-fidelity, single-HTML-per-device interactive prototype (React via CDN + JSX, simulated API calls, domain-real LLM-generated mock data) that stitches all wireframe screens into walkable user journeys. Optional bridge between /wireframes and /spec in the requirements -> spec -> plan pipeline. Tier 1 skip; Tier 2 optional; Tier 3 mandatory. Inherits from wireframes (visual reference, IA, copy) and produces forms, CRUD, navigation, loading/error states without any backend or build step. Self-evaluates with a reviewer subagent (≤2 loops per device file) and runs an interactive friction pass measuring clicks/keystrokes/decisions per journey. Use when the user says "create a prototype", "make this clickable", "high-fi mockup", "stakeholder demo", "interactive prototype", "prototype this feature", or has wireframes ready and wants stakeholders to experience the flow before /spec.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>]"
+argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--update-handoff]"
 ---
 
 # Prototype Generator
@@ -26,11 +26,11 @@ These instructions use Claude Code tool names. In other environments:
 - **No `AskUserQuestion`:** State your assumption (default devices = wireframes' device list; default scope = all wireframe screens; mock data = use as generated; layout anchor = first declared in DESIGN.md or none if none exist), document it in the output's `index.html`, and proceed. For Phase 1.5 staleness prompts, default to "Use as-is" and note the staleness in the index footer.
 - **No subagents:** Generate sequentially in the main agent; run review and friction passes inline.
 - **No background processes:** Skip the local server and print the absolute `file://` path to `index.html`.
-- **No Playwright MCP:** Note browser-based verification as a manual step for the user.
+- **No Playwright MCP:** Phase 5d runtime smoke runs in degraded analytical-only mode, AND the prototype's landing `index.html` MUST display a "not runtime-smoked — verify in a real browser before sharing" banner. Phase 7 friction pass also runs in analytical-only mode.
 
 ## Track Progress
 
-This skill has 14 phases (Phase 1.5 was added in v2.8.0 for DESIGN.md resolution). Create one task per phase using your agent's task-tracking tool (e.g., `TodoWrite` in Claude Code, equivalent in other agents). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+This skill has 14 phases (Phase 1.5 was added in v2.8.0 for DESIGN.md resolution; Phase 5d runtime smoke added in v2.9.0). Create one task per phase using your agent's task-tracking tool (e.g., `TodoWrite` in Claude Code, equivalent in other agents). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
 
 ---
 
@@ -69,7 +69,34 @@ Before any other work, follow the context loading instructions in `product-conte
 
 Detailed procedure: `reference/design-artifact-resolver.md`. Summary:
 
-1. **Resolve DESIGN.md** via `wireframes/reference/design-md-resolver.md` (target app → file walk → `x-extends` cascade → staleness check). **If no DESIGN.md is found, abort with:** "DESIGN.md not found. Run `/wireframes` first to bootstrap the design-system file, then re-run `/prototype`." Do NOT auto-bootstrap; that's `/wireframes`' responsibility.
+1. **Resolve DESIGN.md** via `wireframes/reference/design-md-resolver.md` (target app → file walk → `x-extends` cascade → staleness check).
+
+   **If no DESIGN.md is found:** check whether wireframes already exist for this feature at `{feature_folder}/wireframes/` (look for `index.html` + at least one `NN_*.html`).
+
+   - **Wireframes EXIST:** offer a targeted bootstrap via `AskUserQuestion`:
+     > **Question:** "DESIGN.md is missing but wireframes already exist. How do you want to bootstrap the design system?"
+     > **Options:**
+     > - **Bootstrap DESIGN.md + COMPONENTS.md only via /wireframes targeted handoff (Recommended)** — runs only Phase 2.5 + 2.6 of /wireframes; no wireframe regen; takes ~2 min.
+     > - **Re-run full /wireframes** — regenerates all wireframes too; takes ~30 min; use when wireframes are also stale.
+     > - **Abort** — cancel /prototype; you'll bootstrap manually.
+
+     If user picks the targeted handoff, hand off to `/pmos-toolkit:wireframes` with this codified prompt VERBATIM:
+
+     ```
+     --bootstrap-design-only
+     Feature folder: {feature_folder}
+     Existing wireframes: {feature_folder}/wireframes/
+     Goal: produce {target_app}/DESIGN.md and {target_app}/COMPONENTS.md ONLY.
+     Skip Phases 1, 2, 3-8, 9-10. Run Phase 2.5 (DESIGN.md extraction)
+     and Phase 2.6 (COMPONENTS.md inventory) only. Honor the Phase 2.5c
+     review gate. COMPONENTS.md MUST enumerate only components present
+     in the host frontend; do NOT propose feature-specific components
+     (those are /prototype's output).
+     ```
+
+     Resume `/prototype` Phase 1.5 from step 2 once `/wireframes` returns.
+
+   - **Wireframes do NOT exist:** abort with "DESIGN.md not found and no wireframes either. Run `/wireframes` first to produce wireframes + DESIGN.md, then re-run `/prototype`." Do NOT auto-bootstrap; that's `/wireframes`' responsibility.
 2. **Resolve `design-overlay.css`:**
    - If `{feature_folder}/wireframes/assets/design-overlay.css` exists AND is at least as fresh as DESIGN.md → copy to `{feature_folder}/prototype/assets/design-overlay.css`.
    - Otherwise → regenerate from DESIGN.md via `wireframes/reference/design-md-to-css.md` directly into the prototype folder.
@@ -131,12 +158,23 @@ Platform fallback: print defaults, announce assumptions, proceed.
 Use `reference/mock-data-prompt.md` as the prompt template.
 
 1. **Extract visible-field summary** from wireframes. Grep across `wireframes/*.html` for `<th>`, `<label>`, `<dt>` text and any `data-field` attributes. Build `{screen, fieldsShown: [...], approxRowCount: N}`.
-2. **Dispatch ONE subagent** (or run inline if subagents unavailable) with:
+2. **Dispatch ONE subagent** with:
    - The mock-data prompt template (verbatim)
    - Full requirements doc text
    - Visible-field summary
    - Workstream domain hint if Phase 0 loaded one
    - Output folder: `{feature_folder}/prototype/assets/`
+
+   **Subagent dispatch is the prescribed path.** Inline generation is permitted ONLY when (a) the platform doesn't support subagents at all, OR (b) the parent agent already has full domain context AND the total mock-data volume is < 100 records across all entities. If you generate inline for any other reason, log it in `{feature_folder}/prototype/.deviations.md` as:
+
+   ```markdown
+   ## Phase 3 — inline generation
+   - Reason: <one-sentence justification>
+   - Records produced: <count>
+   - Date: <YYYY-MM-DD>
+   ```
+
+   `.deviations.md` is read by the Phase 9a landing index and surfaced in the footer so stakeholders can see what was off-spec. Silent deviation is a contract violation.
 3. **Validate output** before user review:
    - Each `<entity>.json` is valid non-empty JSON
    - No Lorem ipsum (`grep -i 'lorem\|ipsum'`)
@@ -167,11 +205,11 @@ If the copy fails, `Read` the skill's `assets/prototype.css` and `Write` it to t
 
 ### 4b. Generate runtime.js (subagent)
 
-Dispatch a subagent (or run inline) with `reference/runtime-template.md` as the spec. Output: `{feature_folder}/prototype/assets/runtime.js`. Must implement: hash router, mock-API client (200–800ms latency), in-memory store with pub/sub, mock-data loader (fetch + inline-script fallback), error injection via query param, `useRoute` and `useStore` hooks.
+Dispatch a subagent with `reference/runtime-template.md` as the spec. Inline generation follows the same exception criteria as Phase 3 — log to `.deviations.md` when bypassing the subagent. Output: `{feature_folder}/prototype/assets/runtime.js`. Must implement: hash router, mock-API client (200–800ms latency), in-memory store with pub/sub, mock-data loader (fetch + inline-script fallback), error injection via query param, `useRoute` and `useStore` hooks.
 
 ### 4c. Generate components.js (subagent)
 
-Dispatch a subagent (or run inline) with `reference/components-template.md` as the spec. Output: `{feature_folder}/prototype/assets/components.js`. Must export the atoms listed in the template (Button, Input, Modal, Toast, Card, Table, EmptyState, Spinner, Badge, Avatar) on `window.__protoComponents`.
+Dispatch a subagent with `reference/components-template.md` as the spec. Inline generation follows the same exception criteria as Phase 3 — log to `.deviations.md` when bypassing the subagent. Output: `{feature_folder}/prototype/assets/components.js`. Must export the atoms listed in the template (Button, Input, Modal, Toast, Card, Table, EmptyState, Spinner, Badge, Avatar) on `window.__protoComponents`.
 
 In addition to the existing inputs, the subagent receives **four blocks from Phase 1.5**:
 
@@ -266,6 +304,45 @@ grep -E 'Lorem ipsum|User [0-9]+|Item [0-9]+|TODO|FIXME|console\.error|console\.
 
 If any check fails, send a follow-up to the device's generator subagent with the specific failure.
 
+### 5d. Runtime smoke (MANDATORY — catches Babel scope collisions and missing wiring)
+
+The Phase 5c grep checks confirm structure but cannot tell whether the file actually *runs*. Babel-standalone compiles every `<script type="text/babel">` block into the same shared global scope, so an unwrapped top-level `const Button = …` in components.js silently breaks the page on first load with `Identifier 'Button' has already been declared`. Static checks miss this. A real browser load is the only reliable detector.
+
+**Default path — Playwright MCP (when available):**
+
+For each `index.<device>.html`:
+
+1. Start the static server (Phase 9b serve command, used here too) and capture the served URL.
+2. Use Playwright MCP to load `http://localhost:<port>/index.<device>.html`.
+3. Wait up to 5s for `#root` to have at least one child element.
+4. Read browser console messages.
+5. **Pass criteria (all must hold):**
+   - `#root` has ≥1 child within 5s (page actually rendered, not stuck on the empty React root).
+   - Zero `console.error` messages.
+   - Zero uncaught exceptions in the page error log.
+   - No SyntaxError, ReferenceError, or `has already been declared` substrings anywhere in console output.
+6. **On failure:** capture the full console output verbatim, send a follow-up to the device's generator subagent with the failure messages, and re-run the smoke. Hard cap: 2 smoke retries per device file. If still failing, abort with the captured console output and surface to the user as a Phase 8 finding tagged `severity: blocker`.
+
+**Degraded fallback — analytical-only (when Playwright MCP is unavailable):**
+
+Run these greps, but ALSO emit a banner in the prototype's landing `index.html` footer reading "⚠ Prototype was not runtime-smoked — verify in a real browser before sharing." This is a degraded mode; do not claim "interactive prototype" without this banner when the live smoke is skipped.
+
+```bash
+# A. Every Babel block must be IIFE-wrapped (matches the rule in device-html-template.md §0)
+grep -nE '<script type="text/babel"' "{feature_folder}/prototype/index.<device>.html" \
+  | while read -r line; do
+      # crude: every Babel block must be followed within 3 lines by `(function () {` or be an external src= reference
+      :
+    done
+# Document this as best-effort — the live smoke is what actually catches the bug.
+
+# B. components.js / runtime.js must contain an outer IIFE
+grep -q '^(function () {' "{feature_folder}/prototype/assets/components.js" || echo "FAIL: components.js missing outer IIFE wrap"
+grep -q '(() => {' "{feature_folder}/prototype/assets/runtime.js" || grep -q '^(function () {' "{feature_folder}/prototype/assets/runtime.js" || echo "FAIL: runtime.js missing outer IIFE wrap"
+```
+
+Analytical mode is a known-degraded fallback. It catches the IIFE-wrap omission only if the generator forgot the wrap entirely; it does NOT catch "wrap is there but a duplicate identifier was emitted in two different blocks." Live smoke is non-negotiable when Playwright MCP is available.
+
 ---
 
 ## Phase 6: Refinement Loop (Reviewer Subagent + ≤2 Loops Per File)
@@ -280,7 +357,7 @@ For each per-device HTML file, run up to 2 refinement loops. Stop early when zer
   - DESIGN.md `## Anti-patterns` and `## Do's and Don'ts` (verbatim) — score the file against each.
   - The `x-interaction` block — score against the **mandatory contract checklist** below.
   - COMPONENTS.md content — flag use of variants not in the inventory.
-- Score the file against all six rubric groups (I, J, M, A, V, R) PLUS the contract checks. Return JSON findings array; tag each finding with `source: "rubric:<id>" | "design-md:antipattern:<n>" | "x-interaction:<key>" | "components-md:<name>"`.
+- Score the file against all seven rubric groups (I, J, M, A, V, F, R) PLUS the contract checks. Group **F (Field-Earns-Its-Place)** is mandatory — for every visible data field on every screen, the reviewer must either (a) name the user decision the field anchors, or (b) flag the field as decoration with a remove/relocate suggestion. Return JSON findings array; tag each finding with `source: "rubric:<id>" | "design-md:antipattern:<n>" | "x-interaction:<key>" | "components-md:<name>"`.
 
 **`x-interaction` contract checklist** (severity ≥ medium when violated):
 - Modal positioning class matches `interaction.modals.style`?
@@ -310,13 +387,18 @@ For each per-device HTML file, run up to 2 refinement loops. Stop early when zer
 
 Use `reference/friction-thresholds.md`. Pull journey list from req doc (cap 5). If req doc has >5 journeys, ask via `AskUserQuestion` (multiSelect) — recommend the most stakeholder-visible ones (signup, first-value, primary daily flow, share/invite, recovery).
 
-For each journey:
-1. Trace screens through the prototype (subagent reads device HTML, walks the route table from `runtime.js`)
-2. Count clicks, keystrokes, decisions, screen transitions, modal interruptions per step
-3. Apply thresholds; flag exceedances with severity
-4. **Copy check:** confirm button labels and confirmation copy honor `merged_design_md.x-content.voice` and `x-content.buttonVerbs`. Mismatched verbs ("Submit" where DESIGN.md says "Save") are findings at severity medium.
+**Walk mode resolution (do this first):**
+- **Playwright MCP available** → live walk (DEFAULT). Each journey is actually clicked through in a headless browser; metrics are observed, not estimated.
+- **Playwright MCP unavailable** → analytical-only walk (DEGRADED FALLBACK). The friction output MUST carry the analytical-mode banner described in `reference/friction-thresholds.md`. Do not present analytical output as equivalent to live-walk output.
 
-**Subagents:** one per journey, parallel where available.
+For each journey:
+1. Resolve the screen path (live walk: actually traverse; analytical: read the route table from `runtime.js`).
+2. Count clicks, keystrokes, decisions, screen transitions, modal interruptions per step (live walk: observed; analytical: estimated).
+3. Apply thresholds; flag exceedances with severity.
+4. **Live-walk only:** flag any console error encountered mid-journey as severity high (it would otherwise leak to stakeholders).
+5. **Copy check:** confirm button labels and confirmation copy honor `merged_design_md.x-content.voice` and `x-content.buttonVerbs`. Mismatched verbs ("Submit" where DESIGN.md says "Save") are findings at severity medium.
+
+**Subagents:** one per journey, parallel where available. In live-walk mode, each subagent gets its own Playwright MCP session.
 
 **Output:** `{feature_folder}/prototype/interactive-friction.md` per the format in `reference/friction-thresholds.md`.
 
@@ -356,7 +438,7 @@ Create `{feature_folder}/prototype/index.html`:
 - Device tabs/cards: one per device file with device name, screen count, mock-data summary, "Open prototype" button (links to `index.<device>.html`)
 - Friction-pass summary: counts of high/medium/low flags per journey
 - Findings summary: counts by disposition from Phase 8
-- Footer: file count, prototype folder path
+- Footer: file count, prototype folder path, AND a "Deviations" section that renders the contents of `{feature_folder}/prototype/.deviations.md` if the file exists (Phase 3/4b/4c inline-mode entries, Phase 5d analytical-only smoke banner, Phase 7 analytical-only friction banner). Silently omitting `.deviations.md` from the index is a contract violation.
 - Loads `assets/prototype.css` only (no React — pure static landing page; must work offline as `file://`)
 
 ### 9b. Serve
@@ -367,11 +449,24 @@ Detect Node:
 command -v node && command -v npx
 ```
 
-- **Node available:** start a static server in the background:
+- **Node available:** start a static server in a subshell so cwd is bound to the prototype folder for the server's entire lifetime (a separate `cd …` then `npx http-server` from a follow-up Bash call serves `~`, not the prototype, and returns confusing 200s for nonexistent paths):
+
   ```bash
-  cd {feature_folder}/prototype && npx --yes http-server -p 0 -c-1 --silent
+  PORT=8765
+  ( cd "{feature_folder}/prototype" && nohup npx --yes http-server -p "$PORT" -c-1 > /tmp/proto-server.log 2>&1 & )
+  sleep 1
+
+  # MANDATORY smoke before announcing the URL — confirms the server is bound to the right cwd
+  curl -sI "http://localhost:$PORT/index.html" | head -1
+  # Expected: HTTP/1.1 200 OK   (anything else → wrong cwd or port collision)
+
+  # Optional second smoke: confirm a device file resolves
+  curl -sI "http://localhost:$PORT/index.{first_device}.html" | head -1
+  # Expected: HTTP/1.1 200 OK
   ```
-  Capture printed port and report `http://localhost:<port>/index.html`.
+
+  If the smoke returns anything other than `200 OK`, kill the server (`pkill -f "http-server -p $PORT"`), pick a different port, and retry. Only announce the URL after the smoke passes.
+
 - **Node missing:** print absolute `file://` path. Note: the inline-data fallback in Phase 5 makes `file://` work even when fetch is blocked.
 
 Always print BOTH a served URL (if any) AND the file path so the user has a fallback.
@@ -380,18 +475,22 @@ Always print BOTH a served URL (if any) AND the file path so the user has a fall
 
 ## Phase 10: Spec Handoff
 
-Append to requirements doc:
+> **`--update-handoff` mode:** if invoked as `/prototype --update-handoff`, skip Phases 1–9 entirely. Read the existing prototype folder, regenerate ONLY this section of the requirements doc to reflect the current on-disk state (current screen list, current device files, current finding counts), then exit. Use this after manual edits to the prototype to re-sync the req-doc reference without rebuilding anything. The mode requires that the req doc already has a `## Prototype` section to overwrite.
+
+Append (or replace under `--update-handoff`) to requirements doc:
 
 ```markdown
 ## Prototype
 
-Generated: {YYYY-MM-DD}
+Generated: {YYYY-MM-DD}  (last sync: {YYYY-MM-DD-HH-MM} via /prototype{ --update-handoff if applicable})
 Folder: `{relative_path_to_prototype}`
 Index: `{relative_path}/index.html`
 Devices: {device-list}
 Mock data: {N} entities, ~{record_count} records total
 Findings: `{relative_path}/prototype-findings.md`
 Friction pass: `{relative_path}/interactive-friction.md`
+
+> ℹ This section is a snapshot of the prototype as of the **last sync** timestamp above. After manual edits to the prototype (adding screens, dropping components, renaming fields), this snapshot drifts. Re-run `/prototype --update-handoff` to re-sync without regenerating the prototype itself.
 
 | # | Screen | Devices | File |
 |---|--------|---------|------|
@@ -453,7 +552,7 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT add a separate AskUserQuestion gate around per-finding fixes if Phase 8 already handled them
 - Do NOT use `@import url(...)` for fonts or any external resources — breaks `file://` portability
 - Do NOT use `console.log` / `console.error` / `console.warn` in generated screen code — debug logs are findings, not features
-- Do NOT bootstrap DESIGN.md from `/prototype` — Phase 1.5 aborts cleanly when missing and tells the user to run `/wireframes` first. Bootstrap responsibility lives in `/wireframes` exclusively
+- Do NOT bootstrap DESIGN.md from `/prototype` directly — when DESIGN.md is missing, Phase 1.5 either offers the targeted-bootstrap handoff to `/wireframes --bootstrap-design-only` (when wireframes exist) or aborts cleanly (when they don't). Bootstrap responsibility lives in `/wireframes` exclusively, but `/prototype` is allowed to invoke it via the codified handoff prompt
 - Do NOT regenerate `design-overlay.css` if a fresh one exists in the wireframes folder — copy it instead. Within a feature, wireframes and prototype must use the same overlay (avoids visual drift between the two artifacts)
 - Do NOT treat `x-interaction` as advisory — Phase 4c subagent and Phase 6 reviewer enforce it as a contract. Modal style, dismiss paths, destructive confirmation, focus trap, shortcuts must match literally
 - Do NOT write design-system content (colors, typography, modal style, interaction patterns) into the workstream — those live in DESIGN.md / COMPONENTS.md (canonical). Phase 11 only writes `target_app.path` if missing

@@ -74,6 +74,18 @@ The reviewer subagent uses this rubric to score a single per-device prototype HT
 | V3 | Components.js atoms used consistently | Buttons all use `Button` atom; inputs all use `Input` atom; no one-off inline styling that diverges. |
 | V4 | No wireframe annotations | Zero `.annotation`, `.state-tab`, `.wireframe-frame` artifacts; this is the prototype, not the wireframe. |
 
+### F — Field-Earns-Its-Place
+
+Every visible data field on a screen must anchor a decision the user actually makes on that screen. Fields that exist only because they're in the schema are decoration and degrade scannability.
+
+| ID | Heuristic | What to check |
+|----|-----------|---------------|
+| F1 | Decision-anchored fields | For every column/badge/metric/progress-indicator on each screen: name the user decision it informs ("user picks which item to open", "user judges freshness before resuming", "user confirms safe to delete"). If you cannot name the decision in one sentence, the field is decoration. Severity: medium. Suggested fix: remove or relocate to a detail/expanded view. |
+| F2 | Pre-computed metrics that have no cost-of-display rationale | Flag indicators that imply expensive precomputation (coverage bars, freshness scores, completeness rings) when the underlying data is generate-on-demand or trivially recomputable in the user's mental model. These mislead about system cost. Severity: medium. Suggested fix: replace with on-demand action ("Generate now" button) or remove. |
+| F3 | Schema-driven decoration | Fields displayed solely because they exist in the entity (created_at, last_modified, internal IDs, audit metadata) without a user-facing decision tied to them. Severity: low–medium. Suggested fix: hide on list/card surfaces; expose only in admin/debug views. |
+
+This category was added in v2.9.0 after a retro flagged a library-card audio-coverage bar that misrepresented the system (audio was generate-on-the-fly, not pre-computed) and added no decision value. The reviewer should ask for each visible field: *what does the user do with this number?* If the answer is "nothing", flag it.
+
 ### R — Runtime
 
 | ID | Heuristic | What to check |

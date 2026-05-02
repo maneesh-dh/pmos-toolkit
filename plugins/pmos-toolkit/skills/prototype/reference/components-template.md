@@ -187,10 +187,29 @@ const TableSkeleton = ({ rows, columns }) => (
 );
 ```
 
-## Footer (the last lines of components.js)
+## File structure (MANDATORY IIFE wrap)
+
+`components.js` is loaded as `<script type="text/babel" src="./assets/components.js">`. Babel-standalone compiles every Babel block into the SAME shared global scope as inline `<script type="text/babel">` blocks in the device HTML — so top-level `const Button = …` here collides with `const { Button } = window.__protoComponents` in screen blocks ("Identifier 'Button' has already been declared" — fatal on first load).
+
+The entire file body MUST be wrapped in an IIFE:
+
+```jsx
+(function () {
+  const Button = ({ … }) => ( … );
+  const Input = ({ … }) => ( … );
+  // … all atoms …
+
+  window.__protoComponents = { Button, Input, Modal, Toast, Card, Table, EmptyState, Spinner, Badge, Avatar };
+})();
+```
+
+Only the `window.__protoComponents` assignment escapes the closure — everything else stays scoped. Same rule applies to `runtime.js` (publishes `window.__proto`) and any `components-extra.js`.
+
+## Footer (the last lines of components.js, inside the IIFE)
 
 ```javascript
-window.__protoComponents = { Button, Input, Modal, Toast, Card, Table, EmptyState, Spinner, Badge, Avatar };
+  window.__protoComponents = { Button, Input, Modal, Toast, Card, Table, EmptyState, Spinner, Badge, Avatar };
+})();
 ```
 
 ## Subagent rules

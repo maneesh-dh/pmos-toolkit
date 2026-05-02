@@ -39,6 +39,7 @@ pmos-toolkit/
 | `/pmos-toolkit:session-log` | Capture learnings, decisions, and patterns from a session |
 | `/pmos-toolkit:create-skill` | Create a new skill with cross-platform conventions |
 | `/pmos-toolkit:mac-health` | Diagnose battery drain, orphaned processes, and cleanup opportunities |
+| `/pmos-toolkit:artifact` | Generate, refine, and update PRDs, Experiment Design Docs, Engineering Design Docs, and Discovery Docs with section-level eval criteria + writing-style presets. Custom templates at `~/.pmos/artifacts/`. |
 
 **Pipeline flow:**
 ```

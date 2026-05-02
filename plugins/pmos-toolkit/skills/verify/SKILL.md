@@ -2,7 +2,7 @@
 name: verify
 description: Post-implementation verification gate — ALWAYS run after /execute completes. Lint, test, deploy, spec compliance, multi-agent code review, interactive QA, and regression test hardening. Also run after manual coding or partial work. Works with git commits, no PR required. Use when the user says "check my work", "is this done", "verify the implementation", "did I miss anything", or "review and test everything".
 user-invocable: true
-argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted) [--feature <slug>] [--backlog <id>] [--skip-design-drift]"
+argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted) [--feature <slug>] [--backlog <id>] [--skip-design-drift] [--scope phase --phase <N>]"
 ---
 
 # Implementation Verification Gate
@@ -71,6 +71,20 @@ Before any other work, follow the context loading instructions in `product-conte
 ---
 
 ## Phase 1: Gather Context
+
+### Invocation Mode: Phase-Scoped (called from /execute)
+
+When invoked with `--scope phase --feature <slug> --phase <N>`, /verify runs the full checklist (Phases 2–7) but with two changes:
+
+1. **Changed-files set is restricted to files touched by tasks in the named phase only.** Read `{feature_folder}/execute/task-NN.md` for each `T<N>` listed in the plan's `## Phase <N>` group; union their `files_touched` frontmatter lists.
+2. **Evidence path is `{feature_folder}/verify/<YYYY-MM-DD>-phase-<N>/`** (not the default `{feature_folder}/verify/<YYYY-MM-DD>/`). Multiple phase-verify runs on the same day are namespaced by phase number, so they do not collide.
+
+On completion, return a structured pass/fail result to the calling skill (/execute Phase 2.5):
+- `ok: true|false`
+- `evidence_dir: <path>`
+- `failures: [...]` (when `ok == false`)
+
+All other Phase 1+ behavior is unchanged. Standalone /verify invocations (without `--scope phase`) work exactly as before.
 
 1. **Locate upstream documents.** Resolve each of the three inputs by following `../.shared/resolve-input.md`:
    - Spec: `phase=spec`, `label="spec"` (user argument, if passed, applies to the spec)

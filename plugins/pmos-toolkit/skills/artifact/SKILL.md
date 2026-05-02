@@ -225,3 +225,53 @@ Re-run the eval-loop judge on an existing artifact. **Internal QA only — does 
 5. Run Phase 4 save & confirm — point at the chosen output path.
 6. Skip Phase 5 (no new workstream signals from a re-run).
 7. Run Phase 6 learnings capture (terminal gate).
+
+## Update Flow (`/artifact update <path>`)
+
+Apply stakeholder feedback to an existing artifact. **Distinct from refine — this is a stakeholder loop, not internal QA.**
+
+### Phase U.1 — Accept feedback input
+
+Ask the user via `AskUserQuestion`:
+- **Paste comments** — user pastes block of feedback inline.
+- **File path** — user provides path to a feedback file (Notion export, email dump, .md notes).
+- **Dictate** — user describes feedback conversationally; agent transcribes.
+
+### Phase U.2 — Parse into structured items
+
+Extract each feedback item into the shape:
+
+```json
+{
+  "section": "§2 Problem & Customer",
+  "type": "edit | expand | trim | question | accept | reject",
+  "content": "verbatim feedback or summary"
+}
+```
+
+For ambiguous items (no clear section, or unclear intent), batch clarifying questions via `AskUserQuestion` (≤4 per call).
+
+For un-mappable items (don't fit any section), append them to a `## General Feedback` section in the artifact and continue.
+
+### Phase U.3 — Apply via Findings Presentation Protocol
+
+Per parsed item, batch ≤4 per `AskUserQuestion`. Options: **Apply as proposed** / **Modify** / **Skip** / **Defer**. Apply approvals via `Edit`. "Defer" appends to `## Deferred Improvements`.
+
+### Phase U.4 — Append Comment Resolution Log
+
+At the bottom of the artifact, append (or extend) a `## Comment Resolution Log` section with one row per resolved item:
+
+```markdown
+| Date | Reviewer | Section | Feedback | Resolution |
+|---|---|---|---|---|
+| 2026-05-02 | (paste) | §2 | Add competitor benchmark | Applied |
+| 2026-05-02 | sarah@ | §5 | Tighten guardrails | Modified |
+```
+
+### Phase U.5 — Optional re-run of refinement loop
+
+Ask: "Run the eval loop on the updated artifact?" via `AskUserQuestion`. If yes, run Phase 3.
+
+### Phase U.6 — Save, then Phase 6 learnings capture (terminal gate)
+
+Same as Phase 4 + Phase 6 from the create flow.

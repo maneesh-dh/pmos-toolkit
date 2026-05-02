@@ -46,7 +46,7 @@ function handle_phase_boundary(completed_task, plan, feature_folder):
         return ESCALATE(verify_result.failures)
 
     # 3b. Success path: hard-stop and instruct user to /compact + re-invoke --resume
-    # (per O1 default; advisory-continue is the alternative pending O1 resolution)
+    # (hard-stop default per O1 resolution; see Compact Behavior section)
     return HALT_FOR_COMPACT(
         message = f"Phase {phase.number} verified green. "
                   f"Run `/compact` to clear context, then re-invoke "
@@ -115,7 +115,7 @@ Phase 2.5 invokes /verify in a phase-scoped mode. The call mechanism is the impl
 | `evidence_dir` | string | Confirmed path where evidence was written (echoes the input path, or overrides if /verify chose a different location). |
 | `failures` | list[string] | Human-readable failure summaries. Empty list when `ok` is `true`. |
 
-**Scope semantics:** /verify phase-scoped mode runs the **full /verify checklist** but treats "changed files" as the union of `files_touched` from every per-task log in the phase (see §5.1 frontmatter). Evidence is written to `evidence_dir` instead of the default verify evidence location. The existing standalone /verify behavior is unchanged when invoked directly.
+**Scope semantics:** /verify phase-scoped mode runs the **full /verify checklist** but treats "changed files" as the union of `files_touched` from every per-task log in the phase (see spec §5.1 frontmatter). Evidence is written to `evidence_dir` instead of the default verify evidence location. The existing standalone /verify behavior is unchanged when invoked directly.
 
 ---
 

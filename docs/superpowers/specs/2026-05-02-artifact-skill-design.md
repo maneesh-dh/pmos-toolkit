@@ -71,21 +71,17 @@ plugins/pmos-toolkit/skills/artifact/
 ├── SKILL.md
 ├── templates/
 │   ├── prd/
-│   │   ├── template.md       # tier-aware sections + per-section guidance
-│   │   ├── eval.md           # section-level eval criteria for the judge
-│   │   └── context.md        # what context to gather; what to ask if missing
+│   │   ├── template.md       # sections + frontmatter (files_to_read, tier, default_preset)
+│   │   └── eval.md           # per-criterion: kind (precondition|judgment), check, gap_question, severity
 │   ├── experiment-design/
 │   │   ├── template.md
-│   │   ├── eval.md
-│   │   └── context.md
+│   │   └── eval.md
 │   ├── eng-design/
 │   │   ├── template.md
-│   │   ├── eval.md
-│   │   └── context.md
+│   │   └── eval.md
 │   └── discovery/
 │       ├── template.md
-│       ├── eval.md
-│       └── context.md
+│       └── eval.md
 ├── presets/
 │   ├── concise.md
 │   ├── tabular.md
@@ -101,8 +97,7 @@ plugins/pmos-toolkit/skills/artifact/
 ├── templates/
 │   └── <user-slug>/          # must NOT collide with built-in slug
 │       ├── template.md
-│       ├── eval.md
-│       └── context.md
+│       └── eval.md
 └── presets/
     └── <user-slug>.md        # must NOT collide with built-in slug
 ```
@@ -113,14 +108,31 @@ plugins/pmos-toolkit/skills/artifact/
 
 ### 3.3 Template File Anatomy
 
-Each template directory contains exactly three files:
+Each template directory contains exactly **two** files. (Earlier drafts had a third `context.md`; it was redundant — every "needs evidence" rule was already an eval criterion. Eval items now carry metadata that drives both context-gathering and judging from a single source.)
 
-**`template.md`** — Section markdown with embedded section-level guidance and tier markers. Format:
+**`template.md`** — Frontmatter + section markdown with embedded section-level guidance and tier markers.
 
 ```markdown
-# {Artifact Type}
+---
+name: PRD
+slug: prd
+description: Product Requirements Document
+tiers: [lite, full]
+default_preset: narrative
+files_to_read:
+  - label: requirements doc
+    pattern: "{feature_folder}/01_requirements*.md"
+  - label: spec doc
+    pattern: "{feature_folder}/02_spec*.md"
+  - label: wireframes
+    pattern: "{feature_folder}/wireframes/*"
+  - label: workstream
+    source: product-context
+  - label: attached files
+    source: user-args
+---
 
-<!-- tier: lite, full -->
+# {Artifact Type}
 
 ## §1. TL;DR
 <!-- tier: both -->
@@ -134,9 +146,39 @@ Each template directory contains exactly three files:
 {generation prompt for this section}
 ```
 
-**`eval.md`** — Per-section eval criteria the reviewer subagent uses. Returns JSON findings: `[{section, severity: high|medium|low, finding, suggested_fix}]`.
+**`eval.md`** — Per-section criteria with metadata for both phases.
 
-**`context.md`** — What files to auto-read (requirements doc, workstream, attached files), what gap-questions to ask if context is missing, and what evidence each section depends on.
+```markdown
+## §2 Problem & Customer
+
+- id: evidence-cited
+  kind: precondition          # gathered before generation; gap-Q if missing
+  tier: [lite, full]
+  check: ≥1 evidence (quote, ticket, data point, or research session ref)
+  gap_question: |
+    No customer evidence found in attached files. Paste a quote / ticket
+    reference / data point, or describe the source.
+  severity: high
+
+- id: workaround-described
+  kind: judgment              # judge-only check on the generated draft
+  tier: [lite, full]
+  check: current customer workaround / coping behavior described
+  severity: medium
+
+- id: no-solution-language
+  kind: judgment
+  tier: [lite, full]
+  check: no "we will build X" smuggled into the problem statement
+  severity: medium
+```
+
+**Two consumers, one file:**
+
+- **Phase 5 Gap Interview** filters `kind=precondition`, checks each `check` against `files_to_read` content (semantic match), and queues `gap_question` for unsatisfied items. Batched ≤4 per `AskUserQuestion` call.
+- **Phase 8 Refinement Loop** runs the reviewer subagent against ALL items (both kinds), since precondition-style criteria still apply to the generated draft (e.g., draft must show the gathered evidence in §2).
+
+This eliminates the duplication that existed when context.md and eval.md held separately authored copies of the same "evidence required" rule.
 
 ### 3.4 Preset Anatomy
 
@@ -303,26 +345,28 @@ The skill follows the pmos-toolkit phase pattern with explicit gates.
 | `template add\|list\|remove` | → template-management flow |
 | `preset add\|list\|remove` | → preset-management flow |
 
-### Phase 2 — Create Flow
+### Phase 2 — Create Flow (unified across all artifact types)
 
-1. **Resolve template:** lookup by slug (built-in always wins; user templates use unique slugs). If not found, list available + offer fuzzy match.
-2. **Tier detection (if applicable):** read `template.md` tier metadata. Auto-suggest based on signals (requirements doc richness, user input length, scope hints) and prompt user with a recommendation. `--tier` flag bypasses prompt.
+The same 12-phase flow applies to PRD, Experiment Design, Eng Design, Discovery, and any user-defined template.
+
+1. **Resolve template:** lookup by slug (built-in always wins; user templates use unique slugs). If not found, list available + offer fuzzy match. Validate: `template.md` and `eval.md` present; frontmatter parses; eval section IDs match template section IDs.
+2. **Tier detection:** read `template.md` frontmatter `tiers` list. If `[lite, full]`, auto-suggest based on signals (requirements doc richness, user input length, scope hints) and prompt user with a recommendation. `--tier` flag bypasses prompt. Single-tier templates (e.g., Discovery) skip this step.
 3. **Resolve feature folder** via `_shared/feature-folder.md` (mandatory `{YYYY-MM-DD}_{slug}` prefix).
-4. **Auto-consume upstream artifacts:** read requirements doc, spec doc, wireframes/prototype outputs in the feature folder. Read user-attached files. Read workstream context.
-5. **Gap interview:** load template's `context.md`. For any required-context item not satisfied by Phase 2.4, ask the user one or two batched questions via `AskUserQuestion`. No needless questions.
-6. **Preset selection:** if `--preset` flag present, use it. Else suggest a sensible default for the artifact type (e.g., Tabular for experiment-design, Narrative for PRD) and ask.
-7. **Generate draft:** use `template.md` + selected preset rules + gathered context. Write to `{feature_folder}/{type}.md` (or `{type}-{tier}.md` if user wants tier preserved in filename — single file by default).
+4. **Auto-consume upstream artifacts:** read every `files_to_read` entry from `template.md` frontmatter. Built-in patterns include: requirements doc, spec doc, wireframes/prototype outputs in the feature folder; user-attached files; workstream context.
+5. **Gap interview:** load `eval.md`, filter items where `kind: precondition`. For each, do a semantic check against the auto-read content (does anything in those files satisfy the `check`?). For unsatisfied items, queue the item's `gap_question`. Batch ≤4 questions per `AskUserQuestion` call. Skip questions whose evidence was already supplied.
+6. **Preset selection:** if `--preset` flag present, use it. Else use `template.md` frontmatter `default_preset` (e.g., Tabular for experiment-design, Narrative for PRD), confirming with user before proceeding.
+7. **Generate draft:** use `template.md` sections + selected preset rules + gathered context (auto-read content + gap-question answers). Write to `{feature_folder}/{type}.md` (single file by default; `--tier` is recorded in the artifact's frontmatter, not the filename).
 
 ### Phase 3 — Self-Refinement Loop (max 2 iterations)
 
 Mirrors `/wireframes` Phase 4 pattern.
 
-1. **Dispatch reviewer subagent.** Prompt is `reviewer-prompt.md` + the artifact's `eval.md` + the draft. Subagent returns JSON: `[{section, severity: high|medium|low, finding, suggested_fix}]`.
+1. **Dispatch reviewer subagent.** Prompt is `reviewer-prompt.md` + the artifact's `eval.md` (ALL items — both `precondition` and `judgment` kinds, since precondition rules still apply to the rendered draft) + the draft. Subagent returns JSON: `[{section, criterion_id, severity: high|medium|low, finding, suggested_fix}]`.
 2. **Auto-apply** all `high` and `medium` findings via `Edit`. Log `low` findings.
 3. **Loop continuation:** if any `high` remain after applying, run loop 2. Hard cap: 2 loops.
 4. **Residual surface:** any `high` remaining after loop 2, plus `medium`/`low` findings worth raising, get surfaced via Findings Presentation Protocol — batched ≤4 per `AskUserQuestion`, options Apply / Modify / Skip / Defer.
 
-The reviewer subagent reads only the section-relevant eval items per finding, never invents criteria not in `eval.md`.
+The reviewer subagent reads only the section-relevant eval items per finding and never invents criteria not in `eval.md`.
 
 ### Phase 4 — Save & Confirm
 
@@ -353,13 +397,23 @@ Read `learnings/learnings-capture.md` and reflect on capture-worthy patterns fro
 5. Optionally re-run Phase 3 eval loop after applying (ask).
 6. Save.
 
-### Template/Preset Management Flows
+### Template Management Flow (`/artifact template add`)
 
-- **`template add`** — Interactive guided. Prompts: name (must not collide with built-in), description, sections (one at a time), per-section purpose + eval criteria, context-needs. Generates `template.md` + `eval.md` + `context.md` at `~/.pmos/artifacts/templates/<slug>/`.
-- **`template list`** — Show built-in + user templates with source labels. Read-only.
+Multi-phase research-grounded authoring; mirrors the brainstorm that produced the 4 built-in templates so user templates ship at comparable quality. A `--quick` flag drops to scaffold-only mode for power users who already have a clear template in mind.
+
+1. **Intake.** User describes: name + slug (must not collide with built-in), purpose / when used, audience, examples (links / pasted reference docs), inspirations / frameworks they want grounded in. Validate slug uniqueness against built-in templates.
+2. **Research subagent** (skip if `--quick` or user opts out). Dispatched with the artifact-class name + cited inspirations. Subagent web-searches canonical sources (e.g., "OKR doc," "incident postmortem," "design review checklist"), returns: proposed sections with one-line purpose each, proposed eval items per section (with `kind`, `check`, `gap_question`, `severity`), proposed `files_to_read`, and cited source links.
+3. **Section-by-section alignment.** For each proposed section, present an `AskUserQuestion` with options Approve / Tweak / Discuss / Drop, showing the section's purpose and eval criteria as a preview. Capture decisions.
+4. **Frontmatter authoring.** Confirm `files_to_read`, `tiers` (single vs lite/full), `default_preset` with the user.
+5. **Generate the 2-file template** at `~/.pmos/artifacts/templates/<slug>/`: `template.md` (frontmatter + section markdown with embedded guidance) and `eval.md` (per-criterion items with metadata). Validate on write — frontmatter parses, eval section IDs match template section IDs.
+6. **Optional dry-run.** Offer to generate one artifact with the new template (using the user's last feature folder or a synthetic input) so they can stress-test it. User can iterate on sections/evals based on what the dry-run produces.
+
+### Other Management Flows
+
+- **`template list`** — Show built-in + user templates with source labels (`[built-in]` / `[user]`). Read-only.
 - **`template remove`** — Delete user template. Built-in templates cannot be removed; warn if attempted.
-- **`preset add`** — Interactive guided. Prompts: name, description, rendering rules per section type, voice/tone. Writes `~/.pmos/artifacts/presets/<slug>.md`.
-- **`preset list` / `preset remove`** — symmetric.
+- **`preset add`** — Interactive guided. Prompts: name, description, rendering rules per section type, voice/tone. Writes `~/.pmos/artifacts/presets/<slug>.md`. Slug must not collide with built-in.
+- **`preset list` / `preset remove`** — symmetric to template list/remove.
 
 ## 7. Self-Refinement Loop — Detail
 
@@ -418,7 +472,7 @@ Loop terminates when: zero `high` remain OR loop 2 completes. Diminishing return
 This spec hands off to `/plan`. The plan should cover, in order:
 
 1. Skill scaffold (`plugins/pmos-toolkit/skills/artifact/SKILL.md`) with Phase 0–6 structure
-2. Built-in template files: `prd/`, `experiment-design/`, `eng-design/`, `discovery/` (template.md + eval.md + context.md each)
+2. Built-in template files: `prd/`, `experiment-design/`, `eng-design/`, `discovery/` (template.md + eval.md each — eval-item metadata drives both gap-interview and judge phases)
 3. Built-in presets: `concise.md`, `tabular.md`, `narrative.md`, `executive.md`
 4. `reviewer-prompt.md` for the eval loop subagent
 5. Subcommand routing logic in SKILL.md

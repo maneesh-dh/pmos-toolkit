@@ -69,6 +69,10 @@ Follow `../_shared/execute-resume.md` Phase 0.5 to:
 
 ## Phase 1: Setup
 
+**Branch on `resume_mode` from Phase 0.5:**
+- **Fresh start** (`resume_mode` unset, or mode == `"restart"`): run all steps below.
+- **Resume** (mode in `{"resume", "manual"}`): skip steps 3, 4, and the baseline test run inside step 3. Worktree must be present (Phase 0.5 verified or recreated it). Cd into the worktree from the previous session's logs (`worktree_path` field). Skip directly to step 5 (verify verification tooling) — it must re-run, since dev servers / Playwright / type-checkers may not be running in this fresh shell.
+
 1. **Locate the plan.** Follow `../.shared/resolve-input.md` with `phase=plan`, `label="plan"`.
 2. **Read the plan and its upstream spec end-to-end.** Understand the "Done when" criteria and final verification task.
 3. **Isolate the work:**

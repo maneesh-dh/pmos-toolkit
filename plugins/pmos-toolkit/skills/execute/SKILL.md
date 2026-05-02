@@ -43,6 +43,30 @@ Before any other work, follow the context loading instructions in `product-conte
 
 ---
 
+## Phase 0.4: Feature Disambiguation
+
+If no `<path-to-plan-doc>` and no `--feature` were provided, follow `../_shared/execute-resume.md` Phase 0.4 to scan the repo for in-flight features (folders under `{docs_path}/` with non-`done` task logs in their `execute/` subdir). If multiple candidates exist, present them via `AskUserQuestion` and let the user pick. If exactly one, use it. If none, error out — there is nothing to resume and no plan to execute.
+
+Skip this phase entirely if `--restart` was passed (user explicitly wants a fresh start) or if the plan path was given (no ambiguity).
+
+---
+
+## Phase 0.5: Resume Resolution
+
+Follow `../_shared/execute-resume.md` Phase 0.5 to:
+
+1. Parse the plan, extract `[T1...TN]` with their `Goal:` lines and any `## Phase N` groupings.
+2. Scan `{feature_folder}/execute/task-*.md` and `phase-*.md`, parse frontmatter.
+3. Classify each task: `not-started` | `done` | `done-sealed` | `done-but-drifted` | `in-flight` | `failed`, plus `-with-commits` annotation from the git-log cross-check.
+4. Pick the resume point: lowest-N task whose state is not `done` and not `done-sealed`.
+5. Check worktree liveness — present, recreate-from-branch, or fresh-start.
+6. Render the **Resume Report** to chat (markdown table from `../_shared/execute-resume.md` "Resume Report Rendering"), then confirm via `AskUserQuestion` (Resume / Restart task / Jump to specific / Restart from T1 / Cancel).
+7. Set `resume_mode = (mode, resume_task_index)` for Phase 1.
+
+**Skip this phase entirely** if `--restart` was passed, or if no logs exist under `{feature_folder}/execute/` (fresh execution). If `--from T<N>` was passed, skip the resolver and set `resume_mode = ("manual", N)` directly. If `--resume` was passed, force this phase even if the resolver would otherwise skip.
+
+---
+
 ## Phase 1: Setup
 
 1. **Locate the plan.** Follow `../.shared/resolve-input.md` with `phase=plan`, `label="plan"`.

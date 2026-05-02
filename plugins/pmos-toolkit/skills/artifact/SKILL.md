@@ -364,3 +364,53 @@ Read-only.
 1. If `<slug>` is a built-in: refuse with message "Built-in templates cannot be removed."
 2. If `<slug>` is a user template: confirm via `AskUserQuestion` (Yes/No), then `rm -rf ~/.pmos/artifacts/templates/<slug>/`. Show the path that was removed.
 3. If `<slug>` doesn't exist: list available user templates.
+
+## Preset Management
+
+### `/artifact preset add`
+
+#### P.1 — Intake (one AskUserQuestion batch)
+
+- **Slug** (validate against built-in: `concise`, `tabular`, `narrative`, `executive` — reject collisions)
+- **Description** (1-line)
+- **Inspiration** (existing preset to fork? other doc style?)
+
+#### P.2 — Rendering rules per section type
+
+Walk through 4 section types, asking the user for the rule per type via `AskUserQuestion` (4 questions batched in 2 calls of 2):
+
+1. **Lists of objects** (metrics, variants, scope items, stories) — table / nested bullets / prose?
+2. **Narrative sections** (Problem, User Journey, FAQ) — prose / bulleted / mixed?
+3. **Procedural lists** (rollout phases, journey steps) — numbered / unnumbered / table?
+4. **Diagrams** — text/ASCII / Mermaid / both / none?
+
+#### P.3 — Voice and tone
+
+Ask: 3-5 voice rules (active vs passive, sentence length cap, hedging, etc.). Free-text or AskUserQuestion preset list.
+
+#### P.4 — Generate file
+
+Write to `~/.pmos/artifacts/presets/<slug>.md`:
+
+```markdown
+---
+name: <slug>
+description: <line>
+---
+
+# Rendering rules
+
+<rules from P.2>
+
+# Voice
+
+<rules from P.3>
+```
+
+### `/artifact preset list`
+
+Render built-in + user presets in a table with `Slug | Description | Source`.
+
+### `/artifact preset remove <slug>`
+
+Symmetric to `template remove`. Reject if built-in.

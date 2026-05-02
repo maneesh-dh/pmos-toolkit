@@ -320,6 +320,8 @@ Each pseudocode block is followed by FOUR required sections:
 - **Error branches:** every point this can fail and what happens (rollback, retry, alert, propagate)
 - **Concurrency notes:** what's protected by what (advisory lock, transaction isolation level, unique constraint, CAS column)
 
+If a section doesn't apply to this flow (e.g., file-IO-only flows have no DB calls; stateless transforms have no state transitions), declare it as `**<Section>:** N/A — <one-line reason>` and move on. Do not pad with empty bullets.
+
 ### Why these four sections
 
 The pseudocode itself catches algorithmic bugs. The four follow-up sections catch the bugs pseudocode misses — concurrency races, missing rollback paths, untracked state changes, missing DB queries the flow assumes exist. Writing them is part of the discipline; skipping them defeats the point.
@@ -346,9 +348,11 @@ For each gap:
 **Always present gaps via `AskUserQuestion`, never as a prose dump.** One question per gap, options = the four dispositions above (Apply patch / Modify patch / Accept as risk / Defer as open question). The `question` field should restate the gap + the proposed patch in one sentence so the user can decide without scrolling back.
 
 - **Tier 2:** issue one `AskUserQuestion` call per gap (or small batches of ≤4 related gaps). Each gap is small enough that inline review fits the rhythm.
-- **Tier 3:** batch gaps by category (Data, Interfaces, Behavior, Wire-up, Operational). Present up to 4 gaps per `AskUserQuestion` call, issue multiple calls sequentially within a category, get dispositions, then move to the next category. Avoids exhausting the user with one-by-one across potentially dozens of findings.
+- **Tier 3:** batch gaps by category (Data, Interfaces, Behavior, Wire-up, Operational). Present up to 4 gaps per `AskUserQuestion` call, issue multiple calls sequentially within a category, get dispositions, then move to the next category. Avoids exhausting the user with one-by-one across potentially dozens of findings. **Category coherence over batch fullness:** if leftover findings don't share a category, issue them as separate 1-2 question calls rather than padding a final batch to 4 with unrelated items. See `../_shared/structured-ask-edge-cases.md` §3.
 
 **Platform fallback (no `AskUserQuestion`):** present a numbered gap table with a disposition column; ask the user to reply with the selections. Do NOT silently apply patches.
+
+**Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
 ### Spec edits
 

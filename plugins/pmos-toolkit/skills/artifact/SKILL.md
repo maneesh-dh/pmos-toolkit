@@ -213,3 +213,15 @@ If no workstream is active, skip this phase.
 ## Phase 6 — Capture Learnings
 
 Read `../learnings/learnings-capture.md` (relative to this skill dir) and follow it. This phase is a **terminal gate** — the skill is not complete until learnings have been processed.
+
+## Refine Flow (`/artifact refine <path>`)
+
+Re-run the eval-loop judge on an existing artifact. **Internal QA only — does NOT accept new external feedback.**
+
+1. Read the artifact at `<path>`. Parse its frontmatter to determine `type`. If frontmatter is missing or `type` cannot be inferred, ask the user via `AskUserQuestion`.
+2. Resolve the template (same 2.1 logic) and load `eval.md`.
+3. Ask the user: "Overwrite `<path>` or write to `<path>.refined.md`?" via `AskUserQuestion`. Default = `.refined.md` (safer).
+4. Run Phase 3 refinement loop against the artifact (or its `.refined.md` copy).
+5. Run Phase 4 save & confirm — point at the chosen output path.
+6. Skip Phase 5 (no new workstream signals from a re-run).
+7. Run Phase 6 learnings capture (terminal gate).

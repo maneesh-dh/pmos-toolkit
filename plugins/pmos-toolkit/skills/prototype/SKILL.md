@@ -23,14 +23,14 @@ Use this when stakeholders need to experience the flow end-to-end before committ
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** State your assumption (default devices = wireframes' device list; default scope = all wireframe screens; mock data = use as generated), document it in the output's `index.html`, and proceed.
+- **No `AskUserQuestion`:** State your assumption (default devices = wireframes' device list; default scope = all wireframe screens; mock data = use as generated; layout anchor = first declared in DESIGN.md or none if none exist), document it in the output's `index.html`, and proceed. For Phase 1.5 staleness prompts, default to "Use as-is" and note the staleness in the index footer.
 - **No subagents:** Generate sequentially in the main agent; run review and friction passes inline.
 - **No background processes:** Skip the local server and print the absolute `file://` path to `index.html`.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
 
 ## Track Progress
 
-This skill has 13 phases. Create one task per phase using your agent's task-tracking tool (e.g., `TodoWrite` in Claude Code, equivalent in other agents). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+This skill has 14 phases (Phase 1.5 was added in v2.8.0 for DESIGN.md resolution). Create one task per phase using your agent's task-tracking tool (e.g., `TodoWrite` in Claude Code, equivalent in other agents). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
 
 ---
 
@@ -54,10 +54,37 @@ Before any other work, follow the context loading instructions in `product-conte
 5. **Read inputs end-to-end:**
    - Req doc: extract user journeys, business rules, entity model, tier tag
    - Wireframes: read `index.html` for the inventory matrix; read each `NN_*.html` for layout, copy, visible fields, state list
-   - `wireframes/assets/house-style.json` if present (drives Phase 4d high-fi styles)
+   - `wireframes/assets/design-overlay.css` if present (reused as the prototype's CSS overlay in Phase 1.5; otherwise regenerated from DESIGN.md)
 6. **Confirm understanding.** Summarize the journeys to be made interactive and the device list. Ask via `AskUserQuestion` (≤4 batched). Platform fallback: numbered list + free-text confirmation.
 
 **Gate:** Do not proceed until the user confirms.
+
+---
+
+## Phase 1.5: Resolve DESIGN.md & Composition Context
+
+> Decimal phase number is intentional — Phase 2 onward keeps existing numbering so external references (other skills, prior conversations) still resolve.
+
+`/prototype` consumes the same canonical design artifacts as `/wireframes` and `/verify`: DESIGN.md (visual identity + `x-interaction` + `x-content`), COMPONENTS.md (component-library inventory), `design-overlay.css` (CSS variable overlay), and a new `design-tokens.js` (JS-shaped tokens for JSX imports).
+
+Detailed procedure: `reference/design-artifact-resolver.md`. Summary:
+
+1. **Resolve DESIGN.md** via `wireframes/reference/design-md-resolver.md` (target app → file walk → `x-extends` cascade → staleness check). **If no DESIGN.md is found, abort with:** "DESIGN.md not found. Run `/wireframes` first to bootstrap the design-system file, then re-run `/prototype`." Do NOT auto-bootstrap; that's `/wireframes`' responsibility.
+2. **Resolve `design-overlay.css`:**
+   - If `{feature_folder}/wireframes/assets/design-overlay.css` exists AND is at least as fresh as DESIGN.md → copy to `{feature_folder}/prototype/assets/design-overlay.css`.
+   - Otherwise → regenerate from DESIGN.md via `wireframes/reference/design-md-to-css.md` directly into the prototype folder.
+3. **Generate `design-tokens.js`** via `reference/design-md-to-tokens-js.md` → `{feature_folder}/prototype/assets/design-tokens.js`. Always regenerated; cheap; never reused.
+4. **Load COMPONENTS.md** from the same dir as DESIGN.md (warn if absent — `/verify` populates it on the next implementation pass).
+5. **Pick layout anchor** from `x-information-architecture.layouts`:
+   - Inherit from `{feature_folder}/wireframes/.layout-anchor` marker file if present and still valid (announce: "Inheriting layout anchor `<name>` from /wireframes").
+   - Else AskUserQuestion (single-select). Persist choice to `{feature_folder}/prototype/.layout-anchor`.
+6. **Assemble decision context** by concatenating workstream `## Constraints & Scars` + DESIGN.md `## Anti-patterns` + `## Do's and Don'ts`.
+
+Output: in-memory `merged_design_md`, `components_inventory`, `layout_anchor`, `decision_context` — passed to Phases 4–6. On disk: `design-overlay.css` and `design-tokens.js` in `{feature_folder}/prototype/assets/`.
+
+**Subagents:** if available, dispatch one read-only subagent for DESIGN.md resolution + token generation. Otherwise inline.
+
+**Gate:** none for fresh DESIGN.md; user must respond to the staleness AskUserQuestion if the file is stale.
 
 ---
 
@@ -146,16 +173,46 @@ Dispatch a subagent (or run inline) with `reference/runtime-template.md` as the 
 
 Dispatch a subagent (or run inline) with `reference/components-template.md` as the spec. Output: `{feature_folder}/prototype/assets/components.js`. Must export the atoms listed in the template (Button, Input, Modal, Toast, Card, Table, EmptyState, Spinner, Badge, Avatar) on `window.__protoComponents`.
 
-### 4d. Generate styles.css (subagent)
+In addition to the existing inputs, the subagent receives **four blocks from Phase 1.5**:
 
-Read `{feature_folder}/wireframes/assets/house-style.json`. Apply `reference/styles-derivation.md` rules. Output: `{feature_folder}/prototype/assets/styles.css`. If `house-style.json` has `source: null`, write a minimal `styles.css` with just a comment — `prototype.css` defaults take over.
+1. **The merged DESIGN.md verbatim** with the instruction: "Tokens are read at runtime via `window.__designTokens`; structural decisions (component variants, voice) read here."
+2. **COMPONENTS.md content** (from `components_inventory`) with the instruction: "When emitting an atom, use variant names from COMPONENTS.md. If a needed variant doesn't exist in the inventory, emit the atom anyway but flag in the file footer comment under `/* New variants: <list> */` so reviewer can confirm."
+3. **`x-interaction` block (mandatory contract)** with the instruction:
+   > "Implement `x-interaction` literally. Specifically:
+   > - `modals.style` (centered / drawer-right / drawer-bottom / fullscreen) controls Modal positioning. Hard-code the matching class string.
+   > - `modals.dismiss` (backdrop-click / explicit-button / esc-key) controls which dismiss handlers Modal wires up. Wire ONLY the listed dismiss paths — no extras.
+   > - `destructiveActions.confirmation`: `always` → simple confirm modal; `double-click` → first click arms a 3-second visual countdown ring on the button; `type-to-confirm` → confirm modal with a text input that must match the resource name to enable the confirm button.
+   > - `focus.trapInModals: true` → Modal traps Tab/Shift-Tab within itself when open.
+   > - `focus.visibleStyle` → applied as the `:focus-visible` class on Button, Input, Select, etc.
+   > - `defaultStates.empty` (illustrated / minimal / none) → EmptyState atom default variant.
+   > - `defaultStates.loading` (skeleton / spinner / progress) → default Loading variant in components like Table.
+   > - `defaultStates.error` (inline-banner / full-page / toast) → default error rendering in components.
+   > - `shortcuts` → wire as global keydown handlers in runtime.js (cross-reference Phase 4b); advertise in a `?` keyboard-shortcut modal.
+   > Pull values from `window.__designTokens.interaction.*` at runtime; do not duplicate the values inline."
+4. **`x-content.buttonVerbs` and `x-content.formats`** with the instruction: "Use these exact verbs in default Button labels — 'Save', 'Create', 'Delete'. Don't invent 'Submit' or 'Add'. Date and currency formats come from `window.__designTokens.content.formats`."
+5. **`decision_context`** with the instruction: "Honor every anti-pattern listed. If a component must violate one, flag in the file footer with rationale."
 
-**Subagent dispatch:** 4b, 4c, 4d are independent — fire 3 parallel subagents in one message when available. Otherwise run sequentially.
+### 4d. Apply design overlay + emit thin styles.css
+
+**Tokens are already produced in Phase 1.5.** `design-overlay.css` (CSS variables from DESIGN.md) and `design-tokens.js` (JS-shaped tokens) live at `{feature_folder}/prototype/assets/`. This phase:
+
+1. **Confirm both files exist.** If either is missing, return to Phase 1.5 and regenerate.
+2. **Emit a thin `styles.css`** (≤ 30 lines typical) containing ONLY prototype-only utility classes that aren't in `prototype.css` and don't belong in DESIGN.md:
+   - Mock-data shimmer animations
+   - Scroll-snap overrides for prototype-only carousels
+   - File-protocol fallbacks
+   - Anything device-specific that the overlay doesn't address
+   Most prototypes will not need any custom styles here — emit a one-line comment file in that case.
+3. Do NOT duplicate tokens from `design-overlay.css` here. The overlay is canonical for tokens.
+
+`reference/styles-derivation.md` is **superseded** as of v2.8.0 — the legacy `house-style.json` codepath is gone. See the banner at the top of that file.
+
+**Subagent dispatch:** 4b, 4c are independent — fire 2 parallel subagents in one message when available. 4d runs inline (it's small) after 1.5 confirms the overlay and tokens are present.
 
 **Validation after 4d:**
-- Balanced braces in `styles.css`
-- No `url(http*)` external URLs
-- No `@import` statements
+- `design-overlay.css` exists and is non-empty (or contains only a header comment if DESIGN.md had no tokens)
+- `design-tokens.js` exists and parses (`grep -q "window.__designTokens" design-tokens.js`)
+- `styles.css` (if non-empty): balanced braces, no `url(http*)` external URLs, no `@import` statements
 
 ---
 
@@ -177,7 +234,8 @@ One subagent per device. Each receives:
 - Mock-data filenames AND the JSON contents (for inline-script fallbacks — subagent inlines the JSON verbatim)
 
 Strict rules (from `reference/device-html-template.md`):
-- Load `prototype.css`, `styles.css`, `runtime.js`, `components.js` in that order
+- **CSS load order** (cascade-critical): `prototype.css` → `design-overlay.css` → `styles.css`. The overlay must come AFTER `prototype.css` so its `:root` overrides take effect, and BEFORE `styles.css` so prototype-only utility classes can use the overlaid variables.
+- **JS load order** (dependency-critical): `design-tokens.js` → `runtime.js` → `components.js`. Tokens must load first so `window.__designTokens` is defined when runtime and components evaluate.
 - One screen component per wireframe screen, named `<PascalCaseSlug>Screen`, registered on `window.__screens`
 - Inline `<script type="application/json" id="mock-<entity>">` for every entity
 - Implement navigation across all screens via `useRoute` / `navigate`
@@ -190,9 +248,9 @@ Strict rules (from `reference/device-html-template.md`):
 After each device file is written:
 
 ```bash
-# 1. Required script tags present
-grep -c 'react@18\|babel/standalone\|runtime.js\|components.js' "{feature_folder}/prototype/index.<device>.html"
-# Expected: ≥4
+# 1. Required script + style tags present (in correct order)
+grep -c 'react@18\|babel/standalone\|design-tokens.js\|runtime.js\|components.js\|design-overlay.css' "{feature_folder}/prototype/index.<device>.html"
+# Expected: ≥6
 
 # 2. All entities have inline-data fallback
 # (compare meta mock-entities content to <script id=mock-*> count)
@@ -218,7 +276,21 @@ For each per-device HTML file, run up to 2 refinement loops. Stop early when zer
 
 **Step 1 — Dispatch reviewer subagent (parallel where possible):**
 - One reviewer per device file
-- Prompt: load `reference/eval-rubric.md`. Score the file against all six heuristic groups (I, J, M, A, V, R). Return JSON findings array.
+- Prompt: load `reference/eval-rubric.md` AND the following from Phase 1.5:
+  - DESIGN.md `## Anti-patterns` and `## Do's and Don'ts` (verbatim) — score the file against each.
+  - The `x-interaction` block — score against the **mandatory contract checklist** below.
+  - COMPONENTS.md content — flag use of variants not in the inventory.
+- Score the file against all six rubric groups (I, J, M, A, V, R) PLUS the contract checks. Return JSON findings array; tag each finding with `source: "rubric:<id>" | "design-md:antipattern:<n>" | "x-interaction:<key>" | "components-md:<name>"`.
+
+**`x-interaction` contract checklist** (severity ≥ medium when violated):
+- Modal positioning class matches `interaction.modals.style`?
+- Modal dismiss handlers match `interaction.modals.dismiss` exactly (no extra paths)?
+- Destructive Button confirmation matches `interaction.destructiveActions.confirmation` literally (simple-confirm / double-click countdown / type-to-confirm)?
+- Modal traps focus when `interaction.focus.trapInModals: true`?
+- `interaction.focus.visibleStyle` applied to Button, Input, Select, etc.?
+- Declared `interaction.shortcuts` wired up in runtime AND advertised in a `?` modal?
+- Default empty/loading/error states match `interaction.defaultStates`?
+- Button labels honor `content.buttonVerbs` (Save/Create/Delete, not Submit/Add)?
 
 **Step 2 — Apply fixes:**
 - High/medium → apply via `Edit` (or have a generator subagent re-emit the affected section)
@@ -242,6 +314,7 @@ For each journey:
 1. Trace screens through the prototype (subagent reads device HTML, walks the route table from `runtime.js`)
 2. Count clicks, keystrokes, decisions, screen transitions, modal interruptions per step
 3. Apply thresholds; flag exceedances with severity
+4. **Copy check:** confirm button labels and confirmation copy honor `merged_design_md.x-content.voice` and `x-content.buttonVerbs`. Mismatched verbs ("Submit" where DESIGN.md says "Save") are findings at severity medium.
 
 **Subagents:** one per journey, parallel where available.
 
@@ -338,12 +411,17 @@ Tell the user: "Prototype is ready. Open `{served_url_or_file_path}` to review. 
 
 ## Phase 11: Workstream Enrichment
 
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.**
 
-- Brand color overrides applied during Phase 4d → workstream `## Tech Stack`
-- Recurring interaction patterns (modal dismissal, form layout, latency tuning) → workstream `## Design System / UI Patterns`
-- Device-specific decisions made during Phase 5 → workstream `## Constraints & Scars`
-- Mock-data realism heuristics that worked well → workstream `## Domain Notes`
+The four-field navigation contract under `## Wireframes & Design System` (`target_app`, `design_md_path`, `components_md_path`, `last_extraction_sha`) is **managed by `/wireframes` and `/verify` only**. `/prototype` reads these fields in Phase 1.5 but never writes them.
+
+The only field `/prototype` may write to the workstream is `target_app.path` if it's missing entirely — that's a one-time bootstrap, never a re-write.
+
+**Do NOT write** brand colors, typography, modal style, latency tuning, or recurring interaction patterns into `## Tech Stack` / `## Design System / UI Patterns`. Those facts are canonical in DESIGN.md (`x-interaction`, `x-content`, etc.). Duplicating creates drift.
+
+**`## Constraints & Scars`** is read-only from this skill. If a prototype run surfaces a genuinely new and reusable constraint (e.g. "this device family always needs portrait-only support" — cross-feature, not one-off), surface it as a Phase 8 finding with disposition "Update workstream scars" and let the user explicitly approve. Never auto-write.
+
+**`## Domain Notes`** can still receive mock-data realism heuristics that proved reusable (e.g. "ZIP codes for this domain need leading-zero handling"). This is not design-system content; it's domain knowledge. Keep this enrichment.
 
 This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
 
@@ -375,3 +453,9 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT add a separate AskUserQuestion gate around per-finding fixes if Phase 8 already handled them
 - Do NOT use `@import url(...)` for fonts or any external resources — breaks `file://` portability
 - Do NOT use `console.log` / `console.error` / `console.warn` in generated screen code — debug logs are findings, not features
+- Do NOT bootstrap DESIGN.md from `/prototype` — Phase 1.5 aborts cleanly when missing and tells the user to run `/wireframes` first. Bootstrap responsibility lives in `/wireframes` exclusively
+- Do NOT regenerate `design-overlay.css` if a fresh one exists in the wireframes folder — copy it instead. Within a feature, wireframes and prototype must use the same overlay (avoids visual drift between the two artifacts)
+- Do NOT treat `x-interaction` as advisory — Phase 4c subagent and Phase 6 reviewer enforce it as a contract. Modal style, dismiss paths, destructive confirmation, focus trap, shortcuts must match literally
+- Do NOT write design-system content (colors, typography, modal style, interaction patterns) into the workstream — those live in DESIGN.md / COMPONENTS.md (canonical). Phase 11 only writes `target_app.path` if missing
+- Do NOT keep the legacy `house-style.json` codepath alive — Phase 4d is rewritten to consume `design-overlay.css` + `design-tokens.js`. The legacy `reference/styles-derivation.md` is superseded
+- Do NOT load `design-tokens.js` after `runtime.js` or `components.js` — tokens must be on `window.__designTokens` before runtime/components evaluate, or atoms get `undefined` lookups

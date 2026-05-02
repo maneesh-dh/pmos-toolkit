@@ -1,3 +1,18 @@
+# High-Fi Styles Derivation — SUPERSEDED
+
+> **Superseded as of pmos-toolkit v2.8.0.** Phase 4d of `/prototype` no longer follows this document. Style is now driven by:
+>
+> - `design-artifact-resolver.md` — resolves DESIGN.md, copies/regenerates `design-overlay.css`, generates `design-tokens.js`.
+> - `design-md-to-tokens-js.md` — produces the JS tokens artifact (`window.__designTokens`).
+> - `wireframes/reference/design-md-spec.md` — DESIGN.md schema (base + `x-*` extensions).
+> - `wireframes/reference/design-md-to-css.md` — CSS overlay generator (reused from `/wireframes`).
+>
+> Phase 4d now emits at most a thin `styles.css` for prototype-only utilities (shimmer animations, scroll-snap overrides) — never tokens. Tokens come from `design-overlay.css` (CSS) and `design-tokens.js` (JS).
+>
+> This file is retained as a historical reference for plans that link to it. New work follows the docs above.
+>
+> ---
+
 # High-Fi Styles Derivation
 
 How Phase 4d produces `assets/styles.css` from the wireframes' `house-style.json`. The wireframes pipeline already extracted brand tokens; this phase reskins them for high-fidelity (no annotation chrome, real hover/focus/active states, polished typography ramp).

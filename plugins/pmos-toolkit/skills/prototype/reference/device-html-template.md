@@ -14,11 +14,13 @@ Each `index.<device>.html` follows this structure. Generated once per device by 
   <meta name="mock-entities" content="users,products,orders">
 
   <link rel="stylesheet" href="./assets/prototype.css">
+  <link rel="stylesheet" href="./assets/design-overlay.css">
   <link rel="stylesheet" href="./assets/styles.css">
 
   <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="./assets/design-tokens.js"></script>
   <script src="./assets/runtime.js"></script>
   <script type="text/babel" src="./assets/components.js" data-presets="react"></script>
 </head>
@@ -112,7 +114,7 @@ CSS for these lives in `prototype.css` keyed off `body.device-<name>`. Subagent 
 
 ## Strict rules for the generator subagent
 
-1. **Load order is fixed.** Don't move `runtime.js` after Babel scripts.
+1. **Load order is fixed.** CSS: `prototype.css` → `design-overlay.css` → `styles.css`. JS: `design-tokens.js` (sets `window.__designTokens`) → `runtime.js` → `components.js`. Don't move `runtime.js` after Babel scripts. Don't load `design-tokens.js` after `runtime.js` / `components.js` — atoms reading `window.__designTokens` will get `undefined`.
 2. **Inline data is mandatory.** Every entity in `<meta name="mock-entities">` must have a corresponding `<script type="application/json" id="mock-<entity>">` block with the JSON inlined verbatim from `assets/<entity>.json`.
 3. **One screen component per wireframe screen.** Naming: `<PascalCaseSlug>Screen` (e.g., `UserDetailScreen` for `user-detail` slug).
 4. **Every screen component must register on `window.__screens`.**

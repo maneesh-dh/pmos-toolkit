@@ -69,8 +69,8 @@ The reviewer subagent uses this rubric to score a single per-device prototype HT
 
 | ID | Heuristic | What to check |
 |----|-----------|---------------|
-| V1 | High-fi palette applied | Real brand colors from `styles.css`; no neutral wireframe-only grays unless the brand is genuinely neutral. |
-| V2 | Typography stack matches house-style | Font family from `house-style.json` applied; weights and sizes form a clear ramp. |
+| V1 | High-fi palette applied | Real brand colors from `design-overlay.css` (generated from DESIGN.md `colors`); no neutral wireframe-only grays unless the brand is genuinely neutral. |
+| V2 | Typography stack matches DESIGN.md | Font family from DESIGN.md `typography.body.fontFamily` applied via `--wf-font-sans`; weights and sizes form a clear ramp consistent with `typography.*` entries. |
 | V3 | Components.js atoms used consistently | Buttons all use `Button` atom; inputs all use `Input` atom; no one-off inline styling that diverges. |
 | V4 | No wireframe annotations | Zero `.annotation`, `.state-tab`, `.wireframe-frame` artifacts; this is the prototype, not the wireframe. |
 

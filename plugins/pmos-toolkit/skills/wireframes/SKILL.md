@@ -250,6 +250,8 @@ If DESIGN.md `x-information-architecture.layouts` has entries:
 
 The chosen layout name + skeleton (from `x-information-architecture.layouts.<name>.skeleton`) is the `layout_anchor` passed to Phase 3.
 
+**Persist the chosen layout name** to `{feature_folder}/wireframes/.layout-anchor` (single-line text file). This lets `/prototype` Phase 1.5 inherit the anchor without re-asking.
+
 If no layouts are declared, skip — generators infer from DESIGN.md `## Layout` prose.
 
 ### 2.6c — Assemble decision context

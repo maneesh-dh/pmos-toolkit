@@ -152,6 +152,7 @@ For each role:
    - Ask 1-2 specific questions via AskUserQuestion (preferred when genuine gaps exist)
    - **OR** state explicitly: "No questions from this role — [specific reason, citing which requirements sections already cover the role's concerns]"
 3. Note answers or stated assumptions as decisions for the spec
+4. **If the user picks a non-recommended option** in any AskUserQuestion you issued for this role, before moving to the next role ask: "Does this choice change any existing invariant or contract? If yes, capture it as a Decision-Log entry with the trade-off explicit." See `../_shared/structured-ask-edge-cases.md` §2 for the canonical form.
 
 **Anti-pattern:** Silently skipping a role because "the requirements are detailed enough" — this denies the user visibility into which perspectives were evaluated. The "Skip if..." column in the table above is the ONLY valid reason to skip a role entirely without announcement. If a role is applicable (not in the "Skip if" condition), you MUST announce it.
 
@@ -518,6 +519,8 @@ For every loop that produces findings (structural or design-critique):
 **Platform fallback (no `AskUserQuestion`):** list findings as a numbered table with columns [Finding | Proposed Fix | Options: Fix/Modify/Skip/Defer]; ask the user to reply with the disposition numbers. Do NOT silently self-fix.
 
 **Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." This forces the user to re-state each finding in their reply. Always structure the ask.
+
+**Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
 ### Exit Criteria (ALL must be true)
 

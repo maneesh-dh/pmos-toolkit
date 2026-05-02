@@ -141,7 +141,19 @@ Work through the plan's tasks in order. For each task:
 
    Overwrite the file's body on a re-run; preserve `started_at` from the first attempt.
 8. **Mark task as completed** in your task tracker.
-9. **Move to next task** — only after verification passes, evidence is produced, and task is marked complete.
+9. **Move to next task** — only after verification passes, evidence is produced, and task is marked complete. Before moving on, run **Phase 2.5: Phase Boundary Check** (below) — it may halt the session.
+
+### Phase 2.5: Phase Boundary Check
+
+Skip this phase entirely if the plan has no `## Phase N` headings (flat plan). Otherwise, after each task's done-log is written, follow `../_shared/phase-boundary-handler.md`:
+
+1. Determine whether the just-completed task is the last in its `## Phase N` group.
+2. If yes: invoke /verify with `--scope phase --feature <slug> --phase <N>` (see `verify/SKILL.md` for the invocation contract). Evidence is written to `{feature_folder}/verify/<YYYY-MM-DD>-phase-<N>/`.
+3. Write `{feature_folder}/execute/phase-N.md` with the phase log frontmatter (schema in `_shared/phase-boundary-handler.md`).
+4. **If verify failed:** do NOT compact, do NOT continue. Escalate to the user with the failure summary. The phase-N.md log is left with `verify_status: failed` so the next session's resolver can pick up at the failed task.
+5. **If verify passed:** emit the `HALT_FOR_COMPACT` message ("Phase N verified green. Run `/compact` to clear context, then re-invoke `/execute --resume` to continue with phase N+1.") and end the /execute turn. The resolver in the next session sees the sealed phase log and picks up at the next phase's first task.
+
+This is a hard-stop on green by design (spec O1 default). The user can re-invoke immediately if they want to skip the compact.
 
 ### Verify-Fix Loop (per task)
 

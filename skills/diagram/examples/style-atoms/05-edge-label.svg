@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="120" viewBox="0 0 480 120"
+     font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+  <title>Edge label atom — 12/400 ink-muted on surface-muted pill.</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 6" refX="8" refY="3"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 8 3 L 0 6 z" fill="context-stroke"/>
+    </marker>
+  </defs>
+  <rect x="40" y="40" width="120" height="40" rx="4" ry="4"
+        fill="#FFFFFF" stroke="#475569" stroke-width="1.5"/>
+  <text x="100" y="60" text-anchor="middle" dominant-baseline="middle"
+        font-size="14" fill="#0F172A">Source</text>
+  <rect x="320" y="40" width="120" height="40" rx="4" ry="4"
+        fill="#FFFFFF" stroke="#475569" stroke-width="1.5"/>
+  <text x="380" y="60" text-anchor="middle" dominant-baseline="middle"
+        font-size="14" fill="#0F172A">Target</text>
+  <path d="M 160 60 L 316 60" fill="none" stroke="#475569" stroke-width="1.5"
+        marker-end="url(#arrow)"/>
+  <rect x="216" y="48" width="48" height="24" rx="4" ry="4"
+        fill="#F4F5F7" stroke="#475569" stroke-width="1"/>
+  <text x="240" y="60" text-anchor="middle" dominant-baseline="middle"
+        font-size="12" fill="#475569">creates</text>
+</svg>

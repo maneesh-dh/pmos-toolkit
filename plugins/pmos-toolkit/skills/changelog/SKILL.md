@@ -9,7 +9,7 @@ Generate user-facing changelog entries, prepended (newest first).
 
 ## Determine docs_path
 
-Check for `.pmos/settings.yaml` in the current repo. If found, read `docs_path` (default: `.pmos`). If not found, use `docs/`. Use `{docs_path}/changelog.md` as the output path.
+Check for `.pmos/settings.yaml` in the current repo. If found, read `docs_path` (default: `.pmos`). If not found, use `docs/pmos/` (or legacy `docs/` if the repo already has `docs/{requirements,specs,plans,features}/` folders — see `product-context/context-loading.md` Step 1). Use `{docs_path}/changelog.md` as the output path.
 
 ## Process
 

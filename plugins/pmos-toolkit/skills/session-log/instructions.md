@@ -1,6 +1,6 @@
 # Session Log
 
-Capture session learnings as concise bullet points, prepended (newest first). Determine `{docs_path}` by reading `.pmos/settings.yaml` if it exists (default: `.pmos`); otherwise use `docs/`.
+Capture session learnings as concise bullet points, prepended (newest first). Determine `{docs_path}` by reading `.pmos/settings.yaml` if it exists (default: `.pmos`); otherwise use `docs/pmos/` (or legacy `docs/` if the repo already has `docs/{requirements,specs,plans,features}/` folders — see `product-context/context-loading.md` Step 1).
 
 ## Process
 

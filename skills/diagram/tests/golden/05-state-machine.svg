@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800"
+     font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+  <title>Four-state machine: draft, submitted, approved, rejected.</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 8 6" refX="8" refY="3"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 8 3 L 0 6 z" fill="context-stroke"/>
+    </marker>
+  </defs>
+  <rect x="160" y="376" width="160" height="48" rx="8" ry="8"
+        fill="#FFFFFF" stroke="#0F172A" stroke-width="2"/>
+  <text x="240" y="400" text-anchor="middle" dominant-baseline="middle"
+        font-size="16" font-weight="600" fill="#0F172A">Draft</text>
+  <rect x="540" y="376" width="160" height="48" rx="4" ry="4"
+        fill="#FFFFFF" stroke="#475569" stroke-width="1.5"/>
+  <text x="620" y="400" text-anchor="middle" dominant-baseline="middle"
+        font-size="14" fill="#0F172A">Submitted</text>
+  <rect x="920" y="200" width="160" height="48" rx="4" ry="4"
+        fill="#FFFFFF" stroke="#475569" stroke-width="1.5"/>
+  <text x="1000" y="224" text-anchor="middle" dominant-baseline="middle"
+        font-size="14" fill="#0F172A">Approved</text>
+  <rect x="920" y="560" width="160" height="48" rx="4" ry="4"
+        fill="#FFFFFF" stroke="#B91C1C" stroke-width="1.5"/>
+  <text x="1000" y="584" text-anchor="middle" dominant-baseline="middle"
+        font-size="14" fill="#0F172A">Rejected</text>
+  <path d="M 320 400 L 536 400" fill="none" stroke="#475569" stroke-width="1.5"
+        marker-end="url(#arrow)"/>
+  <path d="M 700 400 L 916 224" fill="none" stroke="#475569" stroke-width="1.5"
+        marker-end="url(#arrow)"/>
+  <path d="M 700 400 L 916 584" fill="none" stroke="#475569" stroke-width="1.5"
+        marker-end="url(#arrow)"/>
+  <g class="legend">
+    <rect x="80" y="80" width="240" height="80" rx="4" ry="4"
+          fill="#FFFFFF" stroke="#475569" stroke-width="1"/>
+    <rect x="96" y="96" width="16" height="16" fill="#FFFFFF" stroke="#475569" stroke-width="1.5"/>
+    <text x="120" y="104" dominant-baseline="middle" font-size="12" fill="#0F172A">Normal state</text>
+    <rect x="96" y="124" width="16" height="16" fill="#FFFFFF" stroke="#B91C1C" stroke-width="1.5"/>
+    <text x="120" y="132" dominant-baseline="middle" font-size="12" fill="#0F172A">Error state</text>
+  </g>
+</svg>

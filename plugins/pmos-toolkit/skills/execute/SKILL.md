@@ -2,7 +2,7 @@
 name: execute
 description: Execute an implementation plan end-to-end — task-by-task TDD implementation with deploy verification, frontend testing, and manual spot checks. Supports git worktree isolation. Use when the user says "implement the plan", "start building", "execute this", "code this up", or has a plan doc ready for implementation.
 user-invocable: true
-argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>]"
+argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>] [--resume | --restart | --from T<N>]"
 ---
 
 # Plan Executor
@@ -43,7 +43,37 @@ Before any other work, follow the context loading instructions in `product-conte
 
 ---
 
+## Phase 0.4: Feature Disambiguation
+
+**If `--restart` was passed:** before doing anything else, count the existing `done` task logs under `{feature_folder}/execute/` (or all candidate feature folders if no plan path was given). Issue `AskUserQuestion`: "Restart will discard prior progress logs (X tasks marked done across N feature(s)). Confirm restart from scratch?" with options **Confirm restart** / **Cancel**. On Cancel, abort the /execute invocation immediately. On Confirm, skip the rest of Phase 0.4 and Phase 0.5 entirely and proceed to Phase 1 as a fresh start.
+
+Otherwise: if no `<path-to-plan-doc>` and no `--feature` were provided, follow `../_shared/execute-resume.md` Phase 0.4 to scan the repo for in-flight features (folders under `{docs_path}/` with non-`done` task logs in their `execute/` subdir). If multiple candidates exist, present them via `AskUserQuestion` and let the user pick. If exactly one, use it. If none, error out — there is nothing to resume and no plan to execute.
+
+Skip this phase entirely if the plan path was given (no ambiguity).
+
+---
+
+## Phase 0.5: Resume Resolution
+
+Follow `../_shared/execute-resume.md` Phase 0.5 to:
+
+1. Parse the plan, extract `[T1...TN]` with their `Goal:` lines and any `## Phase N` groupings.
+2. Scan `{feature_folder}/execute/task-*.md` and `phase-*.md`, parse frontmatter.
+3. Classify each task: `not-started` | `done` | `done-sealed` | `done-but-drifted` | `in-flight` | `failed`, plus `-with-commits` annotation from the git-log cross-check.
+4. Pick the resume point: lowest-N task whose state is not `done` and not `done-sealed`.
+5. Check worktree liveness — present, recreate-from-branch, or fresh-start.
+6. Render the **Resume Report** to chat (markdown table from `../_shared/execute-resume.md` "Resume Report Rendering"), then confirm via `AskUserQuestion` (Resume / Restart task / Jump to specific / Restart from T1 / Cancel).
+7. Set `resume_mode = (mode, resume_task_index)` for Phase 1.
+
+**Skip this phase entirely** if `--restart` was passed, or if no logs exist under `{feature_folder}/execute/` (fresh execution). If `--from T<N>` was passed, skip the resolver and set `resume_mode = ("manual", N)` directly. Tasks in phases entirely before T<N> are treated as implicitly sealed by the manual override — no retroactive phase verify is run. If `--resume` was passed, force this phase even if the resolver would otherwise skip.
+
+---
+
 ## Phase 1: Setup
+
+**Branch on `resume_mode` from Phase 0.5:**
+- **Fresh start** (`resume_mode` unset, or mode == `"restart"`): run all steps below.
+- **Resume** (mode in `{"resume", "manual"}`): skip steps 3, 4, and the baseline test run inside step 3. Worktree must be present (Phase 0.5 verified or recreated it). Cd into the worktree from the previous session's logs (`worktree_path` field). Skip directly to step 5 (verify verification tooling) — it must re-run, since dev servers / Playwright / type-checkers may not be running in this fresh shell.
 
 1. **Locate the plan.** Follow `../.shared/resolve-input.md` with `phase=plan`, `label="plan"`.
 2. **Read the plan and its upstream spec end-to-end.** Understand the "Done when" criteria and final verification task.
@@ -84,10 +114,48 @@ Work through the plan's tasks in order. For each task:
    - **API tasks:** curl every new/modified endpoint against the running dev server. Paste the output.
    - **UI tasks:** open the affected page in Playwright MCP (or fallback). Paste screenshot or programmatic output.
    - If you cannot produce runtime evidence for an API or UI task, the task is not done. Do not commit.
-6. **Commit** — small, focused commit per task. Not one giant commit at the end.
-7. **Write per-task log** to `{feature_folder}/execute/task-{NN}.md` where `NN` matches the task number from the plan (zero-padded 2 digits, e.g. `task-01.md`, `task-12.md`). Capture: task name/number, files touched, key decisions, deviations, runtime evidence, and verification outcome. Overwrite if a re-run hits the same task.
+6. **Commit** — small, focused commit per task. Not one giant commit at the end. **Commit subject MUST contain the task number in the form `T<N>`** (e.g., `feat(T5): add SOP migration` or `T5: add SOP migration`). The Phase 0.5 resolver greps `\bT[0-9]+\b` from `git log` to detect mid-task interruption — without `T<N>` in the subject, in-flight detection degrades.
+7. **Maintain the per-task log** at `{feature_folder}/execute/task-{NN}.md` (zero-padded 2 digits). The log has a structured frontmatter and a free-form body. Lifecycle:
+
+   - **At task start** (before TDD work begins): write the file with `status: in-flight`, populated frontmatter (see schema below), and an empty body. This is the "in-flight marker" that resume detects if the session crashes.
+   - **As files are touched:** append paths to `files_touched` in the frontmatter (used by phase-scoped /verify in Phase 2.5).
+   - **At task completion** (verify-fix loop passed AND runtime evidence produced): update `status: done`, set `completed_at`, and write the body (key decisions, deviations, runtime evidence, verification outcome).
+   - **At task failure** (3-attempt budget exhausted): update `status: failed`, set `completed_at`, write the body with the failure mode.
+
+   **Frontmatter schema:**
+
+   ```yaml
+   ---
+   task_number: 5
+   task_name: "Add SOP migration"
+   task_goal_hash: <sha256 of plan T<N> Goal: line, normalized — see ../_shared/execute-resume.md "Hash Normalization Rule">
+   plan_path: "{feature_folder}/03_plan.md"
+   branch: "feature/sop-editor"
+   worktree_path: ".worktrees/sop-editor"
+   status: in-flight | done | failed
+   started_at: 2026-05-02T14:32:11Z
+   completed_at: 2026-05-02T14:48:30Z   # only when status != in-flight
+   files_touched:
+     - src/sop/migrations/0042_add_remediation.py
+     - tests/sop/test_migration_0042.py
+   ---
+   ```
+
+   Overwrite the file's body on a re-run; preserve `started_at` from the first attempt.
 8. **Mark task as completed** in your task tracker.
-9. **Move to next task** — only after verification passes, evidence is produced, and task is marked complete.
+9. **Move to next task** — only after verification passes, evidence is produced, and task is marked complete. Before moving on, run **Phase 2.5: Phase Boundary Check** (below) — it may halt the session.
+
+### Phase 2.5: Phase Boundary Check
+
+Skip this phase entirely if the plan has no `## Phase N` headings (flat plan). Otherwise, after each task's done-log is written, follow `../_shared/phase-boundary-handler.md`:
+
+1. Determine whether the just-completed task is the last in its `## Phase N` group.
+2. If yes: invoke /verify with `--scope phase --feature <slug> --phase <N>` (see `verify/SKILL.md` for the invocation contract). Evidence is written to `{feature_folder}/verify/<YYYY-MM-DD>-phase-<N>/`.
+3. Write `{feature_folder}/execute/phase-N.md` with the phase log frontmatter (schema in `../_shared/phase-boundary-handler.md`).
+4. **If verify failed:** do NOT compact, do NOT continue. Escalate to the user with the failure summary. The phase-N.md log is left with `verify_status: failed` so the next session's resolver can pick up at the failed task.
+5. **If verify passed:** emit the `HALT_FOR_COMPACT` message ("Phase N verified green. Run `/compact` to clear context, then re-invoke `/execute --resume` to continue with phase N+1.") and end the /execute turn. The resolver in the next session sees the sealed phase log and picks up at the next phase's first task.
+
+This is a hard-stop on green by design (spec O1 default). The user can re-invoke immediately if they want to skip the compact.
 
 ### Verify-Fix Loop (per task)
 
@@ -261,3 +329,5 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT leave discovered issues as "known gaps" — fix them and add tests
 - Do NOT make one giant commit at the end — commit after each task
 - Do NOT stop at the first passing test run — re-read the spec for completeness
+- Do NOT silently re-do tasks marked `done` in `task-NN.md` without checking the `task_goal_hash` against the current plan — drift detection exists for a reason; surface `done-but-drifted` to the user instead of either skipping or quietly redoing
+- Do NOT skip the Phase 2.5 Phase Boundary Check when the plan has `## Phase N` headings — full /verify at boundaries is the design's purpose; suppressing it defeats the cross-session compact handshake

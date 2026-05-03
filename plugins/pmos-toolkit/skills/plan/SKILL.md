@@ -262,6 +262,37 @@ Before defining tasks, map out which files will be created or modified and what 
 
 ### Task Design Rules
 
+#### Optional: `## Phase N` Groupings (for large plans)
+
+For plans with **more than ~12 tasks**, group tasks under `## Phase N: <name>` headings. Each phase boundary triggers full `/verify` + a `/compact` handshake when /execute reaches the end of the phase (see `execute/SKILL.md` Phase 2.5).
+
+**Template:**
+
+```markdown
+## Tasks
+
+## Phase 1: Schema and Migration
+[Phase rationale: 1-2 sentences on why these tasks group as a deployable slice.]
+
+### T1: ...
+### T2: ...
+### T3: ...
+
+## Phase 2: API Layer
+[Phase rationale.]
+
+### T4: ...
+### T5: ...
+```
+
+**Rules:**
+- Phases are **optional**. Plans ≤ 8 tasks should skip them.
+- Each phase boundary triggers **full /verify** (multi-agent code review + interactive QA) — slow. Make phases **deployable slices** of 5–10 tasks. Avoid 1–2 task phases (verify cost dwarfs the work).
+- Phases are contiguous: a task belongs to exactly one phase; phase numbering starts at 1; no gaps.
+- Phase 1 always begins at T1.
+
+Plans without `## Phase N` headings continue to work — /execute treats them as a single implicit phase verified once at the end.
+
 **TDD (red/green):** Every task that produces code must follow: write failing test -> verify it fails -> implement -> verify it passes -> commit. Show the actual test code, not "write a test for X."
 
 **Bite-sized steps:** Each step is one action (2-5 minutes). Tasks map to ~1 hour of work. Steps within tasks map to ~1-5 minutes.
@@ -454,3 +485,4 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT omit `**Wireframe refs:**` on UI tasks when wireframes exist — the link is what carries polish/consistency expectations into /verify Phase 4 sub-step 3f
 - Do NOT instruct tasks to copy the wireframe's visual style verbatim. Wireframes are reference for IA / copy / states / journeys; visual style follows the host app's design system. Tasks should say "follow host-app pattern X" rather than "match wireframe pixel-for-pixel."
 - Do NOT let TN's frontend smoke test stop at "renders correctly" — it must include hard-reload, an error-path probe, the UX polish checklist, and (if wireframes exist) a wireframe diff. Polish belongs in the plan, not as a verify afterthought.
+- Do NOT create `## Phase N` groupings of 1–2 tasks — each phase boundary triggers full /verify (multi-agent code review + interactive QA), which dwarfs the implementation cost of a tiny phase. Target 5–10 tasks per phase, or skip phases entirely for small plans.

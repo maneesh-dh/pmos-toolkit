@@ -2,7 +2,7 @@
 name: grill
 description: Adversarially interview the user about a plan, spec, requirements doc, ADR, design, or code change to surface unresolved decisions and shaky assumptions. Walks the decision tree branch by branch — one question at a time, each with a recommended answer. Use when the user says "grill me", "stress-test this plan", "poke holes in my design", "interview me about X", or wants an adversarial review before committing to a direction.
 user-invocable: true
-argument-hint: "[<path-to-artifact-or-topic>] [--depth=quick|standard|deep]"
+argument-hint: "[<path-to-artifact-or-topic>] [--depth=quick|standard|deep] [--save|--no-save]"
 ---
 
 # Grill
@@ -88,7 +88,7 @@ For each branch, in order:
 
 ## Phase 3: Grill Report
 
-Emit a compact report at the end. Do not write to a file unless the user asks — the report goes in the chat.
+Emit a compact report at the end. The report always goes in the chat. Persisting to a file is **opt-in** (see Phase 3b).
 
 ```markdown
 # Grill Report — <artifact>
@@ -112,13 +112,32 @@ If the artifact is a pipeline doc (`01_requirements.md`, `02_spec.md`, `03_plan.
 
 ---
 
+## Phase 3b: Optional Save
+
+After emitting the chat report, offer to persist it.
+
+1. **Skip the prompt** if the user passed `--no-save` (do nothing) or `--save` (save without asking).
+
+2. **Resolve the save path** in this order:
+   - Target is inside a pipeline feature dir (matches `.../NN_<slug>/` where `NN` is two digits) → `<feature_dir>/grills/{YYYY-MM-DD}_{slug}.md`
+   - Target is a repo file outside the pipeline → `<repo_root>/.pmos/grills/{YYYY-MM-DD}_{slug}.md`
+   - Target is an inline topic or has no file → `~/.pmos/grills/{YYYY-MM-DD}_{slug}.md`
+
+3. **Build the slug** from the artifact filename (without extension) or, for inline topics, the first 4–5 meaningful words of the topic. Lowercase, hyphenated, ASCII only. If a file already exists at the resolved path, append `-2`, `-3`, … until unique.
+
+4. **Prompt** (unless `--save`/`--no-save` was passed): "Save grill report to `<resolved_path>`? [Y/n]" — single yes/no question per `_shared/interactive-prompts.md`.
+
+5. **On save:** create parent directories as needed, write the same markdown report shown in chat, and confirm the path back to the user.
+
+---
+
 ## Anti-Patterns (DO NOT)
 
 - Do NOT batch questions. One `AskUserQuestion` call = one question.
 - Do NOT ask questions answerable from the codebase. Grep first.
 - Do NOT hedge the recommended option ("maybe consider X?"). Take a position; the user can override.
 - Do NOT grill stated-and-justified decisions just to fill the quota. Stop when the leverage runs out.
-- Do NOT write the Grill Report to a file by default — it lives in the chat. Only persist if the user asks.
+- Do NOT write the Grill Report to a file silently — always show it in chat first, then offer to persist (Phase 3b).
 - Do NOT segue into implementing the fixes you surface. The terminal state is the Grill Report.
 
 ---

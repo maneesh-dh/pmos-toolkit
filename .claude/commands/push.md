@@ -11,7 +11,7 @@ You are running the agent-skills repo push workflow. Follow these phases in orde
 
 ## Track progress
 
-This command has 9 phases. Create one `TodoWrite` task per phase. Mark each `in_progress` when you start it and `completed` when it finishes.
+This command has 10 phases. Create one `TodoWrite` task per phase. Mark each `in_progress` when you start it and `completed` when it finishes.
 
 ## Phase 0 — Sanity & state
 
@@ -54,6 +54,43 @@ If "Move" → run `git mv skills/<name> plugins/pmos-toolkit/skills/<name>` and 
 ### 1b. New skill but plugin.json unchanged
 
 Check: did `plugins/pmos-toolkit/skills/` gain a new directory in this batch of changes? If yes, ensure version will be bumped (Phase 2).
+
+## Phase 1.5 — README freshness check
+
+If Phase 1 detected new or removed skills under `plugins/pmos-toolkit/skills/`, the README's Skills section is stale.
+
+Compare:
+- Skill directories on disk: `/bin/ls plugins/pmos-toolkit/skills/ | grep -vE "^(_shared|\.shared|\.system)$"`
+- Skill rows in README: `/usr/bin/grep -oE '/pmos-toolkit:[a-z-]+' README.md | sort -u`
+
+For any difference (new skill missing from README OR removed skill still listed):
+
+Surface via `AskUserQuestion`:
+
+```
+question: "README is out of sync — <new-skills> missing, <removed-skills> still listed. Update?"
+options:
+  - Update README now (Recommended)
+  - Skip — I'll update README in a follow-up
+  - Cancel /push
+```
+
+If "Update":
+1. Read each new skill's `SKILL.md` to extract its `description:` field
+2. Add a row to the appropriate section of the Skills table (Pipeline / Enhancers / Artifacts & docs / Tracking & context / Utilities — categorize based on the skill's purpose; ask the user if unclear)
+3. Remove rows for any deleted skills
+4. Update the pipeline-flow diagram if a pipeline skill was added/removed
+5. Show the user the diff before staging:
+
+```
+question: "README updated. Proceed with this diff?"
+options:
+  - Looks good (Recommended)
+  - Let me edit it manually
+  - Cancel /push
+```
+
+Stage the updated README so it lands in the same commit as the skill change.
 
 ## Phase 2 — Version bump decision
 
@@ -260,6 +297,7 @@ If any push failed in Phase 8, list the failed remote(s) and suggest manual retr
 - ❌ Auto-resolving merge conflicts (always stop and ask)
 - ❌ Skipping JSON schema validation when schemas changed
 - ❌ Forgetting to bump BOTH `.claude-plugin` and `.codex-plugin` versions to match
+- ❌ Pushing a new skill without updating README's Skills table (Phase 1.5 catches this)
 
 ## Arguments
 

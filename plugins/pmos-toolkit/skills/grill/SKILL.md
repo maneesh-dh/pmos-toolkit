@@ -32,7 +32,7 @@ This is **orthogonal to the pipeline** — not a stage. Use it on any artifact a
    |---|---|---|
    | quick | top-level decisions only | 3–5 |
    | standard | top-level + immediate sub-branches | 6–12 |
-   | deep | full decision tree to leaves | 15+ (stop on user's call) |
+   | deep | full decision tree to leaves | **no limit** — keep going until the tree is exhausted or the user calls stop |
 
 3. **Summarize what you read** in 3–5 bullets so the user can confirm you've understood the artifact correctly. If the summary is wrong, fix it before grilling — interrogating a misread is wasted turns.
 
@@ -82,7 +82,7 @@ For each branch, in order:
 6. **Stop conditions** (any one):
    - All branches at the chosen depth are resolved.
    - User says "stop" / "enough" / "wrap it up".
-   - You've hit the depth's question budget and the next branch is low-leverage.
+   - For `quick` and `standard` only: you've hit the depth's question budget and the next branch is low-leverage. **Deep mode has no question budget** — only the user or an exhausted tree stops it.
 
 ---
 

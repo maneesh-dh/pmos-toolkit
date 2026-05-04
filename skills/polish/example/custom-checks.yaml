@@ -1,0 +1,36 @@
+# /polish custom checks — copy to ~/.pmos/polish/custom-checks.yaml
+#
+# Validated against schemas/custom-checks.schema.json at Phase 0.
+# Documents the two custom-check modes (regex, prompt) and per-preset threshold overrides.
+
+thresholds:
+  technical:
+    em_dash_per_200w_max: 0       # I never want em-dashes in technical docs
+    passive_max_pct: 10
+  concise:
+    sentence_stddev_min: 3        # Allow shorter monotone runs in PRD bullets
+
+checks:
+  - id: no-marketing-speak
+    fail_when: regex
+    pattern: "(?i)\\b(unlock|empower|revolutionize|game-changing|cutting-edge|synergy|paradigm shift)\\b"
+    rationale: "Marketing verbs read as fluff."
+    risk: low
+
+  - id: no-first-person-singular
+    fail_when: regex
+    pattern: "(?i)\\b(I|me|my|mine)\\b"
+    rationale: "Team docs should say 'we' not 'I'."
+    applies_to_presets: [technical, concise]
+    risk: low
+
+  - id: no-emoji-bullets
+    fail_when: prompt
+    prompt_text: "Find any bulleted list where any bullet starts with an emoji decoration (e.g., ✅, 🚀, ⚡). Cite the offending bullets."
+    rationale: "Emoji bullets read as low-effort and break grep."
+
+  - id: no-rhetorical-questions
+    fail_when: prompt
+    prompt_text: "Find any rhetorical question used as a section opener or paragraph opener (a question the author immediately answers themselves). Cite each occurrence."
+    rationale: "Rhetorical questions are a corporate-speak tell."
+    applies_to_presets: [technical, concise]

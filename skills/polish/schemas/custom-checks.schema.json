@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://pmos-toolkit.local/schemas/polish-custom-checks.schema.json",
+  "title": "Polish custom checks",
+  "description": "User-defined binary checks and per-preset threshold overrides for /polish.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "thresholds": {
+      "type": "object",
+      "description": "Per-preset overrides of built-in rubric thresholds.",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^(preserve|concise|narrative|technical)$": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "passive_max_pct":              { "type": "number", "minimum": 0, "maximum": 100 },
+            "sentence_stddev_min":          { "type": "number", "minimum": 0 },
+            "em_dash_per_200w_max":         { "type": "number", "minimum": 0 },
+            "tricolon_max_per_500w":        { "type": "number", "minimum": 0 },
+            "section_min_words_per_heading":{ "type": "number", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "checks": {
+      "type": "array",
+      "description": "User-defined binary checks. Each has a unique id and either a regex pattern or a prompt question.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "fail_when", "rationale"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "description": "Lowercase, hyphenated unique identifier."
+          },
+          "fail_when": {
+            "type": "string",
+            "enum": ["regex", "prompt"]
+          },
+          "pattern": {
+            "type": "string",
+            "description": "Required when fail_when=regex. Standard regex syntax. Use (?i) for case-insensitive."
+          },
+          "prompt_text": {
+            "type": "string",
+            "description": "Required when fail_when=prompt. The question /polish poses to the LLM judge. The judge response is structured automatically; you only write the question."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this check exists. Surfaced to the user when the check fires."
+          },
+          "applies_to_presets": {
+            "type": "array",
+            "description": "Restrict this check to specific presets. Default = all presets.",
+            "items": {
+              "type": "string",
+              "enum": ["preserve", "concise", "narrative", "technical"]
+            },
+            "uniqueItems": true
+          },
+          "risk": {
+            "type": "string",
+            "description": "Override the default high-risk classification for custom checks. Low-risk checks are auto-applied without per-finding approval.",
+            "enum": ["low", "high"],
+            "default": "high"
+          }
+        },
+        "allOf": [
+          {
+            "if":   { "properties": { "fail_when": { "const": "regex" } } },
+            "then": { "required": ["pattern"] }
+          },
+          {
+            "if":   { "properties": { "fail_when": { "const": "prompt" } } },
+            "then": { "required": ["prompt_text"] }
+          }
+        ]
+      }
+    }
+  }
+}

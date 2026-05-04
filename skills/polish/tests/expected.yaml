@@ -1,0 +1,67 @@
+# Per-fixture detection contracts for /polish tests.
+#
+# Each entry asserts:
+#   - which built-in check ids should fire on the fixture (exact set, no more no less)
+#   - locked-zone byte ranges that must be byte-identical post-polish
+#   - acceptable word-count delta range after polish
+#   - voice-marker tolerance (for preserve preset)
+#
+# Property-based — does NOT assert on specific rewrite wording (LLM rewrites are non-deterministic).
+
+ai-slop-blog.md:
+  expected_failures: [1, 5, 6a, 6b, 8, 9, 14]
+  word_count_delta_pct: [-40, -15]
+  preset: preserve
+
+clean-readme.md:
+  expected_failures: []
+  word_count_delta_pct: [0, 0]
+  preset: technical
+
+pr-description.md:
+  expected_failures: [4, 9, 14]
+  word_count_delta_pct: [-30, -10]
+  preset: concise
+
+locked-zones.md:
+  expected_failures: [9]                           # hedging in surrounding prose only
+  word_count_delta_pct: [-10, 0]
+  preset: technical
+  locked_zone_assertions:
+    - "fenced code block at line 5-15 byte-identical post-polish"
+    - "frontmatter at line 1-4 byte-identical post-polish"
+    - "link URL in '(https://example.com)' byte-identical"
+    - "footnote definition byte-identical"
+
+custom-check-test.md:
+  expected_failures: [1, "no-marketing-speak"]    # built-in + user-defined
+  word_count_delta_pct: [-20, -5]
+  preset: technical
+  custom_checks_file: ../../example/custom-checks.yaml
+
+voice-preserve.md:
+  expected_failures: [9, 13]
+  word_count_delta_pct: [-15, -5]
+  preset: preserve
+  voice_tolerance:
+    avg_sentence_length_pct: 20                    # within ±20% of original
+    contraction_rate_pct: 20
+
+large-doc-12k.md:
+  expected_failures: [1, 2, 5, 11]
+  word_count_delta_pct: [-25, -10]
+  preset: concise
+  chunking_assertions:
+    - "doc is chunked on H2 boundaries"
+    - "global checks (2, 11) run on whole doc, not per-chunk"
+    - "stitch-back boundary lines byte-identical to original"
+
+huge-doc-30k.md:
+  expected_behavior: "refuse"
+  refuse_message_contains: "Doc too large for a single polish run"
+
+small-but-dense.md:
+  expected_failures: [4, 9, 13, 14]
+  word_count_delta_pct: [-25, -5]
+  preset: preserve
+  iteration_assertion: "iteration 2 triggers (cascading findings); size does NOT short-circuit iteration"

@@ -1,5 +1,11 @@
 .DS_Store
 .worktrees/
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
 # pmos-toolkit per-repo session pointer
 .pmos/current-feature

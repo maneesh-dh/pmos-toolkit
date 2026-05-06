@@ -30,9 +30,18 @@ def test_five_captions_use_2_cols_with_one_span():
     assert r["cols_per_caption"] == 2
     assert r["gutter"] == 16
     assert len(r["columns"]) == 5
-    # The middle column should be the wide one
     widths = [c["width"] for c in r["columns"]]
-    assert widths[2] == 2 * widths[0]
+    # The middle column is wide (≈ 2 * narrow); integer-division slack lands here so
+    # the rightmost edge lines up with margin-R exactly (no 1-2px gap).
+    assert 2 * widths[0] <= widths[2] <= 2 * widths[0] + r["gutter"]
+
+
+def test_five_captions_consume_full_usable_width():
+    """Regression: the rightmost column must end at canvas-width - margin (no slack)."""
+    r = caption_layout(5, total_width=1280, margin=64)
+    last = r["columns"][-1]
+    right_edge = last["x"] + last["width"]
+    assert right_edge == 1280 - 64
 
 
 def test_caption_layout_rejects_out_of_range():

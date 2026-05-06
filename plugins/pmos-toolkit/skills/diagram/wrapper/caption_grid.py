@@ -52,7 +52,10 @@ def caption_layout(n: int, total_width: int = 1280, margin: int = 64) -> dict:
         # Narrow_w * 4 + Wide_w + 4*16 = usable; Wide_w == 2*Narrow_w
         # So Narrow_w * 6 = usable - 64 ⇒ Narrow_w = (usable - 64) / 6
         narrow_w = (usable - 4 * gutter) // 6
-        wide_w = narrow_w * 2
+        # Distribute integer-division slack into the wide column so the
+        # rightmost edge lands exactly at margin-R (no 1-2px gap).
+        slack = usable - (6 * narrow_w + 4 * gutter)
+        wide_w = narrow_w * 2 + slack
         widths = [narrow_w, narrow_w, wide_w, narrow_w, narrow_w]
 
     columns = []

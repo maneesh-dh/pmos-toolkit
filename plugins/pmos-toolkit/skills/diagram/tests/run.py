@@ -693,13 +693,15 @@ def evaluate(svg_path: str | pathlib.Path, theme: str = "technical") -> dict[str
                 for cmd, rest in cmds:
                     nums = [float(n) for n in re.findall(_NUM, rest)]
                     if cmd == "M":
+                        if len(nums) < 2:
+                            continue
                         cur = (nums[0], nums[1])
                         waypoints.append(apply(m, *cur))
-                        for i in range(2, len(nums), 2):
+                        for i in range(2, len(nums) - 1, 2):
                             cur = (nums[i], nums[i + 1])
                             waypoints.append(apply(m, *cur))
                     elif cmd == "L":
-                        for i in range(0, len(nums), 2):
+                        for i in range(0, len(nums) - 1, 2):
                             cur = (nums[i], nums[i + 1])
                             waypoints.append(apply(m, *cur))
                     elif cmd == "H":

@@ -197,14 +197,23 @@ print(json.dumps(run.evaluate('<out>.svg.tmp'), indent=2))
    - `high`-rigor: dispatch a `general-purpose` subagent with the prompt template from `eval/rubric.md`. Pass the PNG and the source SVG.
    - `medium` / `low`-rigor: run the reviewer prompt inline.
 
-3. **Reviewer returns** the JSON shape from `eval/rubric.md`:
+3. **Reviewer returns** the JSON shape from `eval/rubric.md` (keys are stable IDs):
    ```json
    {
-     "items": { "1": {"verdict": "...", "evidence": "..."}, ... "7": ... },
-     "blocker_count": <count of items 1-6 failing>,
-     "top_priorities": [...]
+     "items": {
+       "primary-emphasis": {"verdict": "pass|fail", "evidence": "..."},
+       "clear-entry": {"verdict": "pass|fail", "evidence": "..."},
+       "legibility": {"verdict": "pass|fail", "evidence": "..."},
+       "legend-coverage": {"verdict": "pass|fail", "evidence": "..."},
+       "arrowhead-consistency": {"verdict": "pass|fail", "evidence": "..."},
+       "style-atom-match": {"verdict": "pass|fail", "evidence": "..."},
+       "visual-balance": {"verdict": "pass|fail", "evidence": "..."}
+     },
+     "blocker_count": "<count of gating items that failed (visual-balance is advisory)>",
+     "top_priorities": ["<stable-id of most-important fix>", "..."]
    }
    ```
+   When the active theme injects items via `rubricOverrides.add`, those stable IDs also appear as keys in `items` and count toward `blocker_count`.
 
 4. **Decision:**
    - `blocker_count == 0` → combined gate satisfied → proceed to Phase 7.

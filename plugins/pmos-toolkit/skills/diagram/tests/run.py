@@ -72,6 +72,97 @@ def load_theme(name: str) -> dict:
 SIDECAR_SCHEMA_VERSION = 2
 
 
+# ---------- Rubric prompt assembly ----------
+
+# Stable IDs map to the 7 core rubric items. The mapping is fixed; theme files
+# refer to these IDs by string. Kept in code (not config) because the IDs are
+# part of the sidecar schema.
+RUBRIC_CORE_ITEMS: list[dict[str, str]] = [
+    {
+        "id": "primary-emphasis",
+        "title": "Primary node emphasis",
+        "gating": "true",
+        "prompt": "Is there exactly one visually-emphasized 'primary' node, distinguished by size OR weight OR position OR color (theme accent)?",
+    },
+    {
+        "id": "clear-entry",
+        "title": "Clear starting point",
+        "gating": "true",
+        "prompt": "Does the diagram have a clear starting point — top-left node for left-right flows, top-center for top-down hierarchies, an explicitly labeled start/input/user, or the primary node if it doubles as the entry?",
+    },
+    {
+        "id": "legibility",
+        "title": "Label legibility at 50% scale",
+        "gating": "true",
+        "prompt": "Is every text label fully legible at 50% raster scale (no clipping, no occlusion by other elements, no overlap with connectors)?",
+    },
+    {
+        "id": "legend-coverage",
+        "title": "Legend coverage",
+        "gating": "true",
+        "prompt": "Does each color used in the diagram appear in the legend with a clear meaning? Auto-pass when only ink plus at most one accent is used.",
+    },
+    {
+        "id": "arrowhead-consistency",
+        "title": "Arrowhead consistency",
+        "gating": "true",
+        "prompt": "Are arrowheads consistently directional? No mix of bidirectional and directional without a legend explanation; no connectors missing arrowheads where direction is implied.",
+    },
+    {
+        "id": "style-atom-match",
+        "title": "Style atoms match",
+        "gating": "true",
+        "prompt": "Does the diagram match the active theme's reference atoms (palette tokens, stroke weights, type scale, corner radii, edge label pill, legend block)?",
+    },
+    {
+        "id": "visual-balance",
+        "title": "Visual balance",
+        "gating": "false",
+        "prompt": "Advisory: is the largest empty quadrant ≤ 35% of canvas area AND the densest 25% region ≤ 60% of nodes?",
+    },
+]
+
+
+def build_rubric_prompt(theme: dict) -> str:
+    """Materialize the reviewer prompt for the given theme.
+
+    Iterates RUBRIC_CORE_ITEMS, skipping any whose id is in
+    theme.rubricOverrides.waive, and appends each entry from
+    theme.rubricOverrides.add (each: {id, prompt, evidenceHint}).
+    """
+    overrides = theme.get("rubricOverrides", {}) or {}
+    waive = set(overrides.get("waive") or [])
+    add = list(overrides.get("add") or [])
+
+    lines: list[str] = []
+    lines.append(f"# Vision rubric for theme: {theme.get('displayName') or theme.get('name')}")
+    lines.append("")
+    lines.append("Return JSON keyed by stable item ID. For each item: pass|fail with one-")
+    lines.append("sentence concrete evidence (coords, label text, named element, or quadrant).")
+    lines.append("")
+
+    for item in RUBRIC_CORE_ITEMS:
+        if item["id"] in waive:
+            continue
+        gating = "GATING" if item["gating"] == "true" else "ADVISORY"
+        lines.append(f"## `{item['id']}` — {item['title']} ({gating})")
+        lines.append(f"> {item['prompt']}")
+        lines.append("")
+
+    if add:
+        lines.append("## Theme add-items (gating)")
+        lines.append("")
+        for entry in add:
+            lines.append(f"### `{entry['id']}`")
+            lines.append(f"> {entry['prompt']}")
+            hint = entry.get("evidenceHint")
+            if hint:
+                lines.append(f"_Evidence hint: {hint}_")
+            lines.append("")
+
+    return "\n".join(lines)
+
+
 def read_sidecar(path: str | pathlib.Path) -> dict | None:
     """Read a v2 sidecar JSON. Returns None if missing or schemaVersion != 2.
 

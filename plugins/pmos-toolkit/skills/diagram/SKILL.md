@@ -30,7 +30,7 @@ These instructions use Claude Code tool names. In other environments:
 
 ## Track Progress
 
-This skill has multiple phases. Create one task per phase using your agent's task-tracking tool (e.g., `TodoWrite` in Claude Code, equivalent in other agents). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+This skill has multiple phases (0, 1, 2, 3, 4, 5, 6, 6.6, 7, 8). Phase 6.6 runs only in `--mode infographic`. Create one task per phase you'll touch using your agent's task-tracking tool (e.g., `TodoWrite` in Claude Code, equivalent in other agents). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
 
 ---
 
@@ -362,7 +362,9 @@ If a generic `learnings-capture.md` is not found, append entries directly to `~/
 - Do NOT use font sizes below 12px — even for "subtle annotations". Move the content to the legend or remove it.
 - Do NOT write SVGs that include `<image>`, `<foreignObject>`, `<animate>`, `filter`, drop shadows, or gradients (themes' anti-patterns sections).
 - Do NOT exceed 30 primary nodes. At 21–30 you MUST prompt for a split before proceeding.
-- Do NOT mix orthogonal and curved connectors in one diagram. Pick one style and stick with it.
+- Do NOT mix connectors unless the active theme permits role-keyed mixing (`connectors.mixingPermitted: true`). Even then, mixing within a single role is forbidden.
+- Do NOT skip Phase 6.6 in infographic mode. Auto-generated copy + user-review checkpoint + slim wrapper rubric are mandatory; failures ship-with-warning, never silently.
+- Do NOT use `<foreignObject>` for diagram-interior content. It is permitted only inside Phase 6.6 wrapper text zones, and only when the renderer is Playwright.
 - Do NOT silently dump prose findings in Phase 6. Always use the Findings Presentation Protocol with structured options.
 - Do NOT delete `~/.pmos/diagram-cache/` files outside of the explicit `--clear-cache` flag.
 
@@ -373,21 +375,43 @@ If a generic `learnings-capture.md` is not found, append entries directly to `~/
 ```
 skills/diagram/
 ├── SKILL.md                       # this file (orchestrator)
+├── themes/
+│   ├── _schema.json               # JSON Schema for theme.yaml (positive-list; rejects layout keys)
+│   ├── technical/                 # default theme
+│   │   ├── theme.yaml
+│   │   ├── style.md
+│   │   └── atoms/                 # 8 visual primitives — NOT templates
+│   └── editorial/                 # cream + dashed-container + pinned-accent + pastel-chip aesthetic
+│       ├── theme.yaml
+│       ├── style.md
+│       ├── atoms/                 # 5 visual primitives
+│       └── infographic/
+│           └── editorial-v1.md    # Phase 6.6 layout zones, caption grid, slim wrapper rubric
 ├── eval/
-│   ├── rubric.md                  # 7-item binary vision rubric + reviewer prompt template
-│   └── code-metrics.md            # xml.etree-based metric specifications (impl in tests/run.py)
+│   ├── rubric.md                  # 7-item diagram rubric + 4-item wrapper rubric (theme-aware waive/add)
+│   └── code-metrics.md            # xml.etree-based metric specs (impl in tests/run.py)
 ├── reference/
 │   ├── svg-primer.md              # SVG authoring scaffold + gotchas
 │   ├── render-to-raster.md        # detection + invocation for Playwright MCP / rsvg / cairosvg
-│   └── sidecar-schema.md          # <slug>.diagram.json schema (schemaVersion: 1) + versioning policy
-├── themes/                        # theme directories — each ships theme.yaml + style.md + atoms/
-│   ├── _schema.json               # JSON Schema for theme.yaml (positive-list; rejects layout keys)
-│   └── technical/                 #   default theme (was top-level style.md + examples/style-atoms/)
-│       ├── theme.yaml
-│       ├── style.md
-│       └── atoms/                 # 8 visual primitives — NOT templates
+│   └── sidecar-schema.md          # v2 schema (theme/mode/role/wrappedText) + versioning policy
+├── wrapper/                       # Phase 6.6 composition module
+│   ├── caption_grid.py            # auto-fit grid (3/4/5 captions) + clamp policy
+│   ├── anchors.py                 # color vs ordinal mode decision + ordinal-marker assignment
+│   └── compose.py                 # editorial-v1 wrapper SVG composition
 └── tests/
-    ├── golden/                    # 5 passing fixtures + .expected.json snapshots
-    ├── defects/                   # 10 fixtures, one violation each
-    └── run.py                     # eval impl + selftest runner (invoked by --selftest)
+    ├── conftest.py                # shared fixtures (theme_editorial, theme_technical)
+    ├── run.py                     # eval impl + selftest runner (invoked by --selftest)
+    ├── golden/                    # technical fixtures + golden/editorial/ subdir
+    ├── defects/                   # technical fixtures + defects/editorial/ subdir
+    ├── test_theme_schema.py
+    ├── test_theme_loader.py
+    ├── test_sidecar.py
+    ├── test_rubric_loader.py
+    ├── test_editorial_theme.py
+    ├── test_role_consistency.py
+    ├── test_caption_grid.py
+    ├── test_anchors.py
+    ├── test_wrapper_compose.py
+    ├── test_wrapper_rubric.py
+    └── test_caption_color_validator.py
 ```

@@ -447,6 +447,56 @@ def collect_defs(root):
 
 # ---------- Main evaluation ----------
 
+def check_caption_colors_in_diagram(svg_text_or_path) -> tuple[bool, str]:
+    """Verify every caption-rule stroke inside `<g id=zone-captions>` appears as
+    a fill/stroke color inside `<g id=zone-diagram>`. Surface tokens and
+    ink-muted are excluded from the requirement.
+
+    Returns (ok, reason). Used by the infographic eval pipeline.
+    """
+    if isinstance(svg_text_or_path, (str, pathlib.Path)) and pathlib.Path(svg_text_or_path).is_file():
+        svg_text = pathlib.Path(svg_text_or_path).read_text()
+    else:
+        svg_text = str(svg_text_or_path)
+
+    # Extract the zone-diagram block
+    diag_match = re.search(r'<g\s+id="zone-diagram"[^>]*>(.*?)</g>\s*<g\s+id="zone-(?:legend|captions|footer)"',
+                           svg_text, flags=re.DOTALL)
+    if not diag_match:
+        # Fall back to anything between zone-diagram and end of svg
+        diag_match = re.search(r'<g\s+id="zone-diagram"[^>]*>(.*?)</svg>', svg_text, flags=re.DOTALL)
+    diag_block = diag_match.group(1) if diag_match else ""
+
+    cap_match = re.search(r'<g\s+id="zone-captions"[^>]*>(.*?)</g>\s*<g\s+id="zone-footer"',
+                          svg_text, flags=re.DOTALL)
+    if not cap_match:
+        cap_match = re.search(r'<g\s+id="zone-captions"[^>]*>(.*?)</svg>', svg_text, flags=re.DOTALL)
+    cap_block = cap_match.group(1) if cap_match else ""
+
+    if not cap_block:
+        return True, ""  # no captions to validate
+
+    diagram_colors = {h.upper() for h in re.findall(r"#[0-9A-Fa-f]{6}", diag_block)}
+
+    # Captions: collect strokes from elements with class="caption-rule"
+    caption_strokes: set[str] = set()
+    for m in re.finditer(r'class="caption-rule"[^>]*stroke="(#[0-9A-Fa-f]{6})"', cap_block):
+        caption_strokes.add(m.group(1).upper())
+    # Also handle stroke before class
+    for m in re.finditer(r'stroke="(#[0-9A-Fa-f]{6})"[^>]*class="caption-rule"', cap_block):
+        caption_strokes.add(m.group(1).upper())
+
+    # Tolerated absences: ink-muted + surface tokens (caption-rule may legitimately use these in ordinal mode)
+    excluded = {"#475569", "#FFFFFF", "#F4F5F7", "#F4EFE6", "#9CA3AF"}
+    bad = [c for c in caption_strokes if c not in diagram_colors and c not in excluded]
+    if bad:
+        return False, (
+            f"caption-color-not-in-diagram: caption rule(s) use {sorted(bad)} "
+            f"but those colors are absent from the diagram interior"
+        )
+    return True, ""
+
+
 def check_role_style_consistency(
     svg_path: str | pathlib.Path,
     sidecar_path: str | pathlib.Path,
@@ -517,11 +567,22 @@ def evaluate(svg_path: str | pathlib.Path, theme: str = "technical") -> dict[str
     diagnostics: dict[str, Any] = {"off_grid_coords": []}
 
     # Role-style-consistency hard-fail (themes with mixingPermitted: true only)
+    sidecar_path = svg_path.with_suffix(".diagram.json")
     if theme_dict["connectors"].get("mixingPermitted"):
-        sidecar = svg_path.with_suffix(".diagram.json")
-        ok, reason = check_role_style_consistency(svg_path, sidecar)
+        ok, reason = check_role_style_consistency(svg_path, sidecar_path)
         if not ok:
             hard_fails.append(reason)
+
+    # Caption-color-not-in-diagram hard-fail (infographic mode only)
+    if sidecar_path.is_file():
+        try:
+            sidecar_data = json.loads(sidecar_path.read_text())
+            if sidecar_data.get("mode") == "infographic":
+                ok2, reason2 = check_caption_colors_in_diagram(svg_path)
+                if not ok2:
+                    hard_fails.append(reason2)
+        except json.JSONDecodeError:
+            pass
 
     # Collect title
     title_el = root.find(f"{{{SVG_NS}}}title")
@@ -903,6 +964,7 @@ def run_corpus(update_snapshots: bool = False) -> int:
         "arrowhead-inconsistent":   ("vision", None),  # not detectable by code; documented
         "cream-but-mixed-connectors-within-one-role": ("hard", "role-style-consistency"),
         "eyebrow-not-uppercase":    ("vision", None),  # editorial-specific vision check
+        "infographic-caption-color-not-in-diagram": ("hard", "caption-color-not-in-diagram"),
     }
     for svg, theme_name in _iter_corpus(DEFECTS_DIR):
         stem = svg.stem

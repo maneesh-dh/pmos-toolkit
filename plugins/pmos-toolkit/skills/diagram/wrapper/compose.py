@@ -206,7 +206,8 @@ def _resolve_color_token(value: str, theme: dict) -> str:
 # --------------------------------------------------------------------------
 def _parse_diagram(diagram_svg: str) -> tuple[str, tuple[float, float, float, float]]:
     """Return (inner_xml, (vbX, vbY, vbW, vbH)) for the diagram SVG."""
-    if diagram_svg.lstrip().startswith("<svg"):
+    stripped = diagram_svg.lstrip()
+    if stripped.startswith("<svg") or stripped.startswith("<?xml"):
         text = diagram_svg
     else:
         # treat as path

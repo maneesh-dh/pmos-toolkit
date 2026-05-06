@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="1346" viewBox="0 0 1280 1346" font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+<title>Four inputs feed Context Fragments which the Computation Box consumes</title>
+<rect class="bg" x="0" y="0" width="1280" height="1346" fill="#F4EFE6"/>
+<g id="zone-eyebrow" transform="translate(0,56)">
+<text x="64" y="14" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="400" fill="#475569" letter-spacing="0.96">HARNESS ENGINEERING · CONTEXT FRAGMENTS</text>
+</g>
+<g id="zone-headline" transform="translate(0,104)">
+<text x="64" y="44" font-size="36" font-weight="700" fill="#0F172A"><tspan x="64" dy="0"><tspan font-weight="400">Four inputs feed Context Fragments which the</tspan></tspan><tspan x="64" dy="52"><tspan font-weight="400">Computation Box consumes</tspan></tspan></text>
+</g>
+<g id="zone-lede" transform="translate(0,232)">
+<text x="64" y="18" font-size="16" font-weight="400" fill="#0F172A"><tspan x="64" dy="0"><tspan font-weight="400">Every model call assembles</tspan><tspan font-weight="600">context fragments</tspan><tspan font-weight="400">from the system prompt, callable surfaces, hook outputs, and recalled memory.</tspan></tspan><tspan x="64" dy="22"><tspan font-weight="400">The computation box consumes the assembled context.</tspan></tspan></text>
+</g>
+<g id="zone-fig-label" transform="translate(0,300)">
+<text x="64" y="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="400" fill="#475569" letter-spacing="0.96">FIG. 1 — CONTEXT FRAGMENT FAN-IN</text>
+</g>
+<g id="zone-diagram" transform="translate(0,340)">
+<g transform="translate(80,16) scale(0.875000) translate(-0.0,-0.0)">
+
+  <title>Editorial flow fan-in — four context inputs feed Context Fragments which the Computation Box consumes</title>
+  <defs>
+    <marker id="arrow-ink" viewBox="0 0 8 6" refX="8" refY="3"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 8 3 L 0 6 z" fill="context-stroke"/>
+    </marker>
+  </defs>
+
+  <!-- Cream surface -->
+  <rect class="bg" x="0" y="0" width="1280" height="800" fill="#F4EFE6"/>
+
+  <!-- Dashed outer container (theme defining-move) -->
+  <rect class="container" x="16" y="16" width="1248" height="768" fill="#F4EFE6"
+        stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4 4"/>
+
+  <!-- Eyebrow -->
+  <text x="32" y="56"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="12" font-weight="400" fill="#475569" letter-spacing="0.96">EXTERNAL CONTEXT (OBJECTS WE POPULATE)</text>
+
+  <!-- Left column: 4 input nodes (240x120, primary stroke ink 1.5) -->
+  <!-- N1: System prompt -->
+  <rect x="64" y="120" width="240" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="184" y="172" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">System prompt</text>
+  <text x="184" y="200" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">base + user-appended</text>
+
+  <!-- N2: Tools/Skills/MCP -->
+  <rect x="64" y="272" width="240" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="184" y="324" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Tools · Skills · MCP</text>
+  <text x="184" y="352" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">callable surfaces</text>
+
+  <!-- N3: Hooks/Middleware -->
+  <rect x="64" y="424" width="240" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="184" y="476" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Hooks · Middleware</text>
+  <text x="184" y="504" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">pre/post intercepts</text>
+
+  <!-- N4: Memory store -->
+  <rect x="64" y="576" width="240" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="184" y="628" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Memory store</text>
+  <text x="184" y="656" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">recalled facts + traces</text>
+
+  <!-- Center: Context Fragments (red-orange border, accent-emphasis) -->
+  <rect x="480" y="320" width="240" height="160" rx="6" fill="#F4EFE6" stroke="#B8351A" stroke-width="2"/>
+  <text x="600" y="384" text-anchor="middle" font-size="20" font-weight="600" fill="#0F172A">Context Fragments</text>
+  <text x="600" y="412" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">assembled into the prompt</text>
+  <text x="600" y="436" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">at every model call</text>
+
+  <!-- Right: Computation Box (chip-ink fill, surface text — solid black) -->
+  <rect x="920" y="320" width="280" height="160" rx="4" fill="#0F172A"/>
+  <text x="1060" y="376" text-anchor="middle"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="12" font-weight="400" fill="#F4EFE6" letter-spacing="0.96">MODEL · FORWARD PASS</text>
+  <text x="1060" y="412" text-anchor="middle" font-size="20" font-weight="600" fill="#F4EFE6">Computation Box</text>
+  <text x="1060" y="440" text-anchor="middle" font-size="12" font-weight="400" fill="#F4EFE6">over the assembled context</text>
+
+  <!-- Connectors -->
+  <!-- e1..e4: contribution role — curved, ink, no dash -->
+  <path id="e1" d="M 304 180 C 380 180, 420 360, 480 360" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e2" d="M 304 332 C 380 332, 420 388, 480 388" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e3" d="M 304 484 C 380 484, 420 416, 480 416" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e4" d="M 304 636 C 380 636, 420 444, 480 444" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+
+  <!-- e5: emphasis role — orthogonal, accent-emphasis, no dash -->
+  <line id="e5" x1="720" y1="400" x2="920" y2="400" stroke="#B8351A" stroke-width="2" marker-end="url(#arrow-ink)"/>
+
+</g>
+</g>
+<g id="zone-legend" transform="translate(0,1096)">
+<rect x="64" y="6" width="16" height="16" rx="2" fill="#1E3A8A"/>
+<text x="88" y="20" font-size="12" fill="#0F172A">accent-primary</text>
+<rect x="280" y="6" width="16" height="16" rx="2" fill="#B8351A"/>
+<text x="304" y="20" font-size="12" fill="#0F172A">accent-emphasis</text>
+</g>
+<g id="zone-captions" transform="translate(0,1152)">
+<line class="caption-rule" x1="64" y1="0" x2="64" y2="106" stroke="#475569" stroke-width="2"/>
+<text x="76" y="16" font-size="16" font-weight="700" fill="#0F172A">●</text>
+<text x="76" y="38" font-size="14" font-weight="600" fill="#0F172A">System prompt</text>
+<text x="76" y="60" font-size="13" font-weight="400" fill="#0F172A"><tspan x="76" dy="0"><tspan font-weight="400">base instruction layer plus</tspan></tspan></text>
+<text x="76" y="78" font-size="13" font-weight="400" fill="#0F172A"><tspan x="76" dy="0"><tspan font-weight="400">user-appended turn directives.</tspan></tspan></text>
+<line class="caption-rule" x1="358" y1="0" x2="358" y2="106" stroke="#475569" stroke-width="2"/>
+<text x="370" y="16" font-size="16" font-weight="700" fill="#0F172A">▲</text>
+<text x="370" y="38" font-size="14" font-weight="600" fill="#0F172A">Tools and hooks</text>
+<text x="370" y="60" font-size="13" font-weight="400" fill="#0F172A"><tspan x="370" dy="0"><tspan font-weight="400">callable surfaces and pre/post</tspan></tspan></text>
+<text x="370" y="78" font-size="13" font-weight="400" fill="#0F172A"><tspan x="370" dy="0"><tspan font-weight="400">intercepts add structured</tspan></tspan></text>
+<text x="370" y="96" font-size="13" font-weight="400" fill="#0F172A"><tspan x="370" dy="0"><tspan font-weight="400">fragments.</tspan></tspan></text>
+<line class="caption-rule" x1="652" y1="0" x2="652" y2="106" stroke="#475569" stroke-width="2"/>
+<text x="664" y="16" font-size="16" font-weight="700" fill="#0F172A">■</text>
+<text x="664" y="38" font-size="14" font-weight="600" fill="#0F172A">Recalled memory</text>
+<text x="664" y="60" font-size="13" font-weight="400" fill="#0F172A"><tspan x="664" dy="0"><tspan font-weight="400">previously stored facts and traces</tspan></tspan></text>
+<text x="664" y="78" font-size="13" font-weight="400" fill="#0F172A"><tspan x="664" dy="0"><tspan font-weight="400">re-enter as fragments.</tspan></tspan></text>
+<line class="caption-rule" x1="946" y1="0" x2="946" y2="106" stroke="#475569" stroke-width="2"/>
+<text x="958" y="16" font-size="16" font-weight="700" fill="#0F172A">◆</text>
+<text x="958" y="38" font-size="14" font-weight="600" fill="#0F172A">Computation</text>
+<text x="958" y="60" font-size="13" font-weight="400" fill="#0F172A"><tspan x="958" dy="0"><tspan font-weight="400">the model performs a forward pass</tspan></tspan></text>
+<text x="958" y="78" font-size="13" font-weight="400" fill="#0F172A"><tspan x="958" dy="0"><tspan font-weight="400">over the assembled context.</tspan></tspan></text>
+</g>
+<g id="zone-footer" transform="translate(0,1282)">
+<text x="64" y="12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" font-weight="400" fill="#475569" letter-spacing="0.96">PMOS-TOOLKIT · /DIAGRAM EDITORIAL</text>
+</g>
+</svg>

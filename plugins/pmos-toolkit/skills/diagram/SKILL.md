@@ -298,7 +298,7 @@ If a generic `learnings-capture.md` is not found, append entries directly to `~/
 - Do NOT use `AskUserQuestion` to ask "should I proceed?" — only to gather decisions or surface findings. Each question must have a clear default fallback for non-AskUserQuestion environments.
 - Do NOT skip the renderer hard-gate. If no renderer is available, refuse to run; never silently downgrade to "code-only eval".
 - Do NOT brainstorm from a hardcoded list of diagram types ("flowchart vs hierarchy vs swimlane"). Always reason from the specific content's structure.
-- Do NOT copy the structure of any file in `examples/style-atoms/` — those are visual primitives, not templates. Re-derive layout each time.
+- Do NOT copy the structure of any file in `themes/technical/atoms/` (or any theme's `atoms/` directory) — those are visual primitives, not templates. Re-derive layout each time.
 - Do NOT regenerate the entire SVG when the user requests a tweak via the extend flow. Apply minimal patches preserving sidecar `positions`.
 - Do NOT use colors outside the 6-token palette (style.md §5.1). The contrast metric will hard-fail any out-of-table combination.
 - Do NOT use font sizes below 12px — even for "subtle annotations". Move the content to the legend or remove it.
@@ -315,7 +315,6 @@ If a generic `learnings-capture.md` is not found, append entries directly to `~/
 ```
 skills/diagram/
 ├── SKILL.md                       # this file (orchestrator)
-├── style.md                       # tokens, typography, layout, components, a11y, canvases, anti-patterns
 ├── eval/
 │   ├── rubric.md                  # 7-item binary vision rubric + reviewer prompt template
 │   └── code-metrics.md            # xml.etree-based metric specifications (impl in tests/run.py)
@@ -323,7 +322,11 @@ skills/diagram/
 │   ├── svg-primer.md              # SVG authoring scaffold + gotchas
 │   ├── render-to-raster.md        # detection + invocation for Playwright MCP / rsvg / cairosvg
 │   └── sidecar-schema.md          # <slug>.diagram.json schema (schemaVersion: 1) + versioning policy
-├── examples/style-atoms/          # 8 visual primitives — NOT templates
+├── themes/                        # theme directories — each ships theme.yaml + style.md + atoms/
+│   └── technical/                 #   default theme (was top-level style.md + examples/style-atoms/)
+│       ├── theme.yaml
+│       ├── style.md
+│       └── atoms/                 # 8 visual primitives — NOT templates
 └── tests/
     ├── golden/                    # 5 passing fixtures + .expected.json snapshots
     ├── defects/                   # 10 fixtures, one violation each

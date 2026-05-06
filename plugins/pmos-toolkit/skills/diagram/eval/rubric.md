@@ -89,7 +89,7 @@ The 12px-min font rule is enforced separately by the code metric; this item catc
 
 ### 6. Style atoms match (gating)
 
-> Does the diagram match the reference style atoms in `examples/style-atoms/` — palette tokens, stroke weights, type scale, corner radii, edge label pill style, legend block style?
+> Does the diagram match the active theme's reference style atoms in `themes/<theme>/atoms/` — palette tokens, stroke weights, type scale, corner radii, edge label pill style, legend block style?
 
 **Pass** if a side-by-side with the style atoms shows the same visual vocabulary.
 **Fail** if shapes have wrong corner radii, stroke weights deviate, type sizes are off-scale, or legend formatting differs from the reference.

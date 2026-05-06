@@ -20,6 +20,14 @@ Record byte ranges that must remain byte-identical after polish:
 1. **Detection skips locked zones** — the rubric never fires inside a lock. No false positives the user can't act on.
 2. **Patches that intersect locked zones are rejected** before review (treated as patch failure → retry).
 
+## Polishable words — definition
+
+**Polishable words = total words − words inside locked zones.**
+
+This is the count that drives every size and chunking decision. Compute it after lock zones are detected (Phase 1) and before size bucketing. Total word count is misleading for table-heavy docs (PRDs, strategic memos): a 16,000-word doc dominated by tables may have only ~3,000 polishable words and should be treated as a single-chunk run.
+
+The `low_confidence: true` voice-sampling flag triggers at <200 **polishable** words, not total.
+
 ## Size buckets (Phase 1)
 
 Measured on **polishable prose only** — lock-zone bytes are excluded from the word count.
@@ -54,6 +62,18 @@ calls = chunks × per_chunk_local_calls
 ```
 
 For sub-4,000-word docs, `chunks = 1` (the trivial case).
+
+## Final-Write sizing (Phase 7)
+
+Chunked **patch generation** is one concern; the **final Write** of the polished file is another. Use this table to decide whether to write the polished file in one shot or to stitch via multiple Edits per H1:
+
+| Polishable words | Expected patches | Final-Write strategy                                              |
+|-------------------|------------------|-------------------------------------------------------------------|
+| < 4,000           | ~5–20            | Single `Write` of the whole polished doc                          |
+| 4,000 – 10,000    | ~20–50           | Single `Write` is fine; chunked-rubric still applies              |
+| 10,000 – 25,000   | ~50–150          | **MUST** chunk the Write — emit one `Write` of the new file then per-H1 `Edit` calls, OR assemble in memory and `Write` once if the agent can hold the full polished doc reliably |
+
+The 10k+ rule exists because a single Write of a 60k-character file with 80+ inline edits is where agents tend to drop fixes silently. Per-H1 chunking gives the user a visible patch log.
 
 ## Hard ceiling
 

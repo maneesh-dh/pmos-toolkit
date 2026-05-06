@@ -1,6 +1,6 @@
 ---
 name: polish
-description: Critique and refactor any markdown document for clarity, concision, voice, and de-AI-slop — runs a binary pass/fail rubric of writing principles, auto-applies safe mechanical fixes, surfaces high-risk changes per-finding, and writes a polished version preserving author voice. Use when the user says "polish this draft", "tighten this prose", "remove the AI slop", "make this more concise", "critique my writing", or wants to clean up a PRD/blog/README/email before sharing.
+description: Critique and refactor a single markdown document for clarity, concision, voice, and de-AI-slop — runs a binary pass/fail rubric of writing principles, auto-applies safe mechanical fixes, surfaces high-risk changes per-finding, and writes a polished version preserving author voice. Single-doc only; for batches, the caller is responsible for parallelization (subagents cannot invoke this skill). Use when the user says "polish this draft", "tighten this prose", "remove the AI slop", "make this more concise", "critique my writing", or wants to clean up a PRD/blog/README/email before sharing.
 user-invocable: true
 argument-hint: "<file-path | URL | 'inline text' | notion://<id>> [--preset <name>] [--dry-run] [--checks <path>]"
 ---
@@ -8,6 +8,12 @@ argument-hint: "<file-path | URL | 'inline text' | notion://<id>> [--preset <nam
 # /polish
 
 **Announce at start:** "Using /polish to critique and refactor this document."
+
+## Track Progress (do this FIRST)
+
+**This is the first action of the skill, before any other tool call.** Before you read any input, load any context, or run any phase, create one `TodoWrite` task for each of the 9 phases. Mark each task `in_progress` when you start it, `completed` when it finishes — never batch completions. Phase 4 (patch generation) gets one sub-task per surfaced finding so the user sees concrete progress.
+
+If you have already taken any other action (Read, Bash, AskUserQuestion, Write, Edit) before creating the 9 phase tasks, you have skipped this step. Stop, create the tasks now, and resume.
 
 ## Platform Adaptation
 
@@ -17,10 +23,6 @@ These instructions use Claude Code tool names. In other environments:
 - **No `WebFetch`:** Refuse URL input mode with a note; ask the user to paste the content.
 - **No Notion MCP:** Refuse `notion://` input with a note; ask the user to export the page first.
 - **No subagents:** Run all phases sequentially in the main agent.
-
-## Track Progress
-
-This skill has 9 phases. At startup, create one `TodoWrite` task per phase. Mark each task `in_progress` when you start it, `completed` when it finishes — never batch completions. Phase 4 (patch generation) gets one sub-task per surfaced finding so the user sees concrete progress.
 
 ## Load Learnings
 
@@ -54,6 +56,8 @@ If a required tool isn't available, refuse the input mode with a one-line note.
 
 **Compute lock zones.** Per `reference/chunking.md` lock-zone rules: code fences, inline code, HTML blocks, frontmatter, link URLs, footnote refs/defs, table cells with <8 words, Notion non-prose placeholders. Patches that intersect locked zones are rejected; the rubric never fires inside them.
 
+**Compute polishable word count.** `polishable_words = total_words − words_inside_locked_zones`. This count drives all size/chunking decisions and the `low_confidence` flag. Total word count is misleading for table-heavy docs — see `reference/chunking.md` for the definition.
+
 **Voice sample.** Follow `reference/voice-sampling.md`. Extract the marker JSON (avg sentence length, stddev, register, person, idiomatic phrases, contraction rate). Set `low_confidence: true` if <200 polishable words.
 
 **Doc-type classifier.** Cheap signals first (filename prefix, frontmatter `type:`). Only fall back to a single LLM classifier call if no signal matches.
@@ -86,11 +90,31 @@ Follow `reference/rubric.md` — runs all 14 built-in checks plus any user-defin
 - Structured output schema: `{verdict: "pass" | "fail", cited_spans: [{line, excerpt}], rationale: string}`
 - A `fail` verdict with no `cited_spans` is treated as `pass` (no evidence → no action)
 
-**Output of this phase:** a list of failed checks, each with cited spans, classified as **local** or **global** (per `reference/rubric.md` table).
+**Output of this phase: emit a structured rubric block inline in the response.** This block is a hard pre-condition for Phase 4 — if it does not exist, Phase 4 cannot start. Format:
+
+```yaml
+rubric_results:
+  - check: 1-em-dash-density
+    verdict: fail
+    scope: local
+    cited_spans:
+      - {line: 42, excerpt: "...the system — which was — designed..."}
+      - {line: 78, excerpt: "..."}
+  - check: 2-lede-buried
+    verdict: pass
+    scope: global
+  # ... one entry per check (14 built-in + any custom)
+summary:
+  failed_local: <N>
+  failed_global: <N>
+  total_failed: <N>
+```
+
+The `total_failed` value feeds the Phase 4 budget formula directly. No `rubric_results` block → no patches.
 
 ## Phase 4 — Estimate budget + targeted refactor passes
 
-**Budget estimate first.** Print to user before generating any patches:
+**Budget estimate first.** Emit this block **verbatim** (substitute values only — do not reword the labels or replace the prompt with a custom shape) before generating any patches:
 
 ```
 Rubric run: <N> of 14 checks failed
@@ -98,7 +122,7 @@ Estimated work: ~<calls> LLM calls, ~<seconds>s
 Continue? [Y / Downscope / Dry-run only]
 ```
 
-Formula: `calls = (llm_judge_failures × 1.3 retries avg) + global_check_count + (×2 if iter-2 likely)`. Cost intentionally NOT shown — pricing varies. If estimate >30 calls, prompt is mandatory (no default-Y).
+`<N>` MUST equal `summary.total_failed` from the Phase 3 `rubric_results` block. Formula: `calls = (llm_judge_failures × 1.3 retries avg) + global_check_count + (×2 if iter-2 likely)`. Cost intentionally NOT shown — pricing varies. If estimate >30 calls, prompt is mandatory (no default-Y). The Surgical/Comprehensive/Full/Findings-only shape is **not** a substitute — that's a preset decision (Phase 2), not a budget decision.
 
 If `--dry-run`, stop here and print the rubric report. Do not generate patches.
 
@@ -114,6 +138,8 @@ If `--dry-run`, stop here and print the rubric report. Do not generate patches.
 **Voice-conflict abort.** If conflicts >30% of attempted patches in a non-low-confidence run → abort with: *"Voice constraints too strict for this doc — re-run with `--preset concise` or `--preset narrative`."*
 
 ## Phase 5 — Findings Presentation Protocol
+
+**Hard rule — Phase 5 is a write-gate.** Do NOT emit any `Write` or `Edit` to the polished file (or to `<original>.polished.md`) until at least one `AskUserQuestion` round on surfaced high-risk findings has been answered. The only exception: if the surfaced-findings list is empty (zero high-risk findings — all auto-apply category), proceed directly to Phase 6. A bulk-scope question ("Surgical / Comprehensive / Full") is **not** a substitute for per-finding surfacing — that's preset selection, not finding disposition.
 
 Follow `reference/findings-protocol.md`. Summary:
 
@@ -151,6 +177,7 @@ Polish complete: <input> → <output>
 Voice: <detected> → applied "<preset>"
 Findings: 14 checks run, <N> failed, <auto> auto-fixed, <user> user-fixed, <deferred> deferred
 Iterations: <N> of 2 (max)
+Learnings captured: <N> (see ~/.pmos/learnings.md ## /polish)
 
 Before → After:
   Words:                 1,842 → 1,310  (-29%)
@@ -169,6 +196,8 @@ Replace <original> with the polished version? [y/N]
    - URL/inline/Notion inputs: skip the replace prompt.
 
 ## Phase 8 — Capture Learnings
+
+**Run this BEFORE printing the Phase 7 summary block.** The summary's `Learnings captured: <N>` line cannot be filled honestly otherwise. The order is: Phase 6 apply → Phase 7 file write → Phase 8 reflection → Phase 7 summary block + replace prompt.
 
 **This skill is not complete until the learnings-capture process has run.** Read and follow `~/.pmos/learnings/learnings-capture.md` (if available) or these inline steps:
 
@@ -194,6 +223,10 @@ Append new entries to `~/.pmos/learnings.md` under `## /polish`. Proposing zero 
 - Do NOT write line numbers into defer comments — they go stale immediately.
 - Do NOT iterate beyond 2 polish iterations. The cap is hard.
 - Do NOT batch findings into prose dumps ending in "let me know what to fix." Use AskUserQuestion or the platform fallback table.
+- Do NOT emit any `Write` or `Edit` to the polished file before the Phase 5 AskUserQuestion round has completed (unless zero high-risk findings exist). A bulk-scope question is NOT a substitute for per-finding surfacing.
+- Do NOT skip Phase 3's `rubric_results` YAML block. No structured rubric output → Phase 4 cannot start.
+- Do NOT attempt to polish multiple docs in one invocation. `/polish` is single-doc; subagents cannot invoke skills (SUBAGENT-STOP), so multi-doc parallelization is the caller's responsibility.
+- Do NOT begin Phase 0 (or any other phase) before creating the 9 per-phase `TodoWrite` tasks. Per-phase task tracking is the first action of the skill, not an afterthought.
 - Do NOT charge ahead if the model emits `PRESERVE_VOICE_CONFLICT` — promote it to a high-risk finding for the user.
 - Do NOT exceed the 25,000 polishable-word ceiling. Refuse with split-and-retry guidance.
 - Do NOT skip Phase 8. Learning capture is mandatory; zero learnings is fine, but the reflection must happen.

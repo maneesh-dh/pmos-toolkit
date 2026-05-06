@@ -123,6 +123,55 @@ RUBRIC_CORE_ITEMS: list[dict[str, str]] = [
 ]
 
 
+WRAPPER_RUBRIC_ITEMS: list[dict[str, str]] = [
+    {
+        "id": "wrapper-typography-hierarchy",
+        "title": "Typography hierarchy",
+        "prompt": "Eyebrow, H1, lede, fig label, captions, and footer read in clear visual hierarchy with no two zones competing for the eye.",
+    },
+    {
+        "id": "wrapper-text-fit",
+        "title": "Text fit",
+        "prompt": "No lede or caption text overflows its zone; line breaks fall on word boundaries; no clipped or truncated-without-ellipsis text.",
+    },
+    {
+        "id": "wrapper-figure-proportion",
+        "title": "Figure proportion",
+        "prompt": "The diagram fills its zone without dominating the page or feeling lost; surrounding zones breathe.",
+    },
+    {
+        "id": "wrapper-edge-padding",
+        "title": "Edge padding",
+        "prompt": "No element kisses the canvas edge or a zone boundary; margins are visually consistent top, bottom, left, right.",
+    },
+]
+
+
+def build_wrapper_rubric_prompt() -> str:
+    """Materialize the slim 4-item wrapper rubric prompt.
+
+    Single pass, no refinement loop. Run inline regardless of --rigor.
+    """
+    lines: list[str] = []
+    lines.append("# Wrapper rubric (Phase 6.6 — single pass, ship-with-warning on fail)")
+    lines.append("")
+    lines.append("Score each item pass|fail with one-sentence concrete evidence (zone names,")
+    lines.append("pixel coords, label text). Do NOT speculate. Output JSON only:")
+    lines.append("{")
+    lines.append('  "wrapper_items": {')
+    lines.append('    "wrapper-typography-hierarchy": {"verdict": "pass|fail", "evidence": "..."},')
+    lines.append("    ...")
+    lines.append("  },")
+    lines.append('  "wrapper_blocker_count": <count of failing items>')
+    lines.append("}")
+    lines.append("")
+    for item in WRAPPER_RUBRIC_ITEMS:
+        lines.append(f"## `{item['id']}` — {item['title']}")
+        lines.append(f"> {item['prompt']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
 def build_rubric_prompt(theme: dict) -> str:
     """Materialize the reviewer prompt for the given theme.
 

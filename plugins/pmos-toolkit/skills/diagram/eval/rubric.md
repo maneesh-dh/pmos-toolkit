@@ -163,6 +163,25 @@ If any gating item fails:
 
 ---
 
+## Wrapper rubric (Phase 6.6, infographic mode only)
+
+When `--mode infographic` is active, after the wrapper composes the editorial-v1 layout, a separate **slim 4-item rubric** runs as a **single pass** (no refinement loop). It is INLINE regardless of `--rigor`.
+
+| Stable ID | Item |
+|---|---|
+| `wrapper-typography-hierarchy` | Eyebrow, H1, lede, fig label, captions, and footer read in clear visual hierarchy with no two zones competing for the eye. |
+| `wrapper-text-fit` | No lede or caption text overflows its zone; line breaks fall on word boundaries; no clipped or truncated-without-ellipsis text. |
+| `wrapper-figure-proportion` | The diagram fills its zone without dominating the page or feeling lost. |
+| `wrapper-edge-padding` | No element kisses the canvas edge or a zone boundary; margins are visually consistent. |
+
+**Pass condition:** all 4 items pass.
+
+**Failure handling:** ship-with-warning. Prepend `<!-- WRAPPER QUALITY WARNING: <ids> -->` to the composite SVG immediately after `<?xml`. **Wrapper rubric failures DO NOT GATE.** The full 7-item diagram rubric in Phase 5 has already gated; this wrapper pass is supplementary insurance, not a second hard gate.
+
+The reviewer prompt is materialized by `tests/run.py:build_wrapper_rubric_prompt()` and uses the JSON shape `{wrapper_items: {<id>: {verdict, evidence}}, wrapper_blocker_count}` — distinct from the diagram rubric's `items` / `blocker_count` keys so callers don't conflate them.
+
+---
+
 ## Anti-flake guidance for the reviewer
 
 - **Always cite concrete evidence.** "Looks unbalanced" is not acceptable; "top-right quadrant is empty (~40%) while bottom-left has 6 of 8 nodes" is.

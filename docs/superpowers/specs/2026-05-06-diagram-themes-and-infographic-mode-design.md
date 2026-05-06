@@ -251,18 +251,19 @@ wrapperRubricResults: [...]
 
 ## 8. Rubric Override Loader
 
-`eval/rubric.md` becomes generic (theme-agnostic). The 7 items get stable IDs:
+`eval/rubric.md` becomes generic (theme-agnostic). The existing 7 review items are preserved with stable IDs (renamed only — content unchanged so existing fixtures and reviewer prompts continue to ground correctly):
 
-| ID | Item |
-|---|---|
-| `legibility` | All text ≥ 12px, no rotation > 30°, contrast ≥ AA |
-| `hierarchy` | Visual weight matches conceptual importance |
-| `whitespace` | Groups separated, no kissing edges |
-| `single-accent` | Exactly one accent color used |
-| `single-connector-style` | Orthogonal XOR curved, not mixed |
-| `arrowhead-consistency` | One marker style throughout |
-| `role-style-consistency` | If the theme permits mixed connectors, all edges sharing a `role` use the same connector style |
-| `informational-fit` (advisory) | Diagram answers the question implied by the description |
+| ID | Item | Gating? |
+|---|---|---|
+| `primary-emphasis` | Exactly one visually-emphasized "primary" node (size, weight, position, or color) | gating |
+| `clear-entry` | Diagram has a clear starting point a viewer could finger-trace | gating |
+| `legibility` | Every text label legible at 50% scale (no clipping, no occlusion, no overlap) | gating |
+| `legend-coverage` | Each color used appears in the legend with a clear meaning (auto-pass when only ink + ≤1 of accent/warn used) | gating |
+| `arrowhead-consistency` | All connectors use the same arrowhead style and direction is obvious | gating |
+| `style-atom-match` | Diagram matches the active theme's atoms (palette tokens, stroke weights, type scale, corner radii, edge labels, legend block, container chrome). **Theme-aware** — dispatches against `themes/<active>/atoms/`. | gating |
+| `visual-balance` | Largest empty quadrant ≤ 35% canvas, densest 25% region ≤ 60% nodes | advisory |
+
+The spec's earlier draft listed aspirational IDs like `single-accent` and `single-connector-style`. Those concerns are subsumed under `style-atom-match` (it dispatches on the active theme; a technical-theme diagram with two accents fails because the technical atoms only show one, while an editorial-theme diagram with two accents passes because editorial atoms show two). This keeps the 7-item rubric stable while remaining theme-aware.
 
 In Phase 5, the reviewer prompt is templated with the active theme's `rubricOverrides.waive` list. Waived items are dropped from the rubric for that run; the reviewer sees only the items that apply. Waived items are recorded in the sidecar `evalSummary.waivedItems` so it is auditable why a diagram passed without a check the reader might expect.
 

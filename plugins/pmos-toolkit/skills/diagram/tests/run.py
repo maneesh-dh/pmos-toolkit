@@ -69,6 +69,41 @@ def load_theme(name: str) -> dict:
     return theme
 
 
+SIDECAR_SCHEMA_VERSION = 2
+
+
+def read_sidecar(path: str | pathlib.Path) -> dict | None:
+    """Read a v2 sidecar JSON. Returns None if missing or schemaVersion != 2.
+
+    v1 sidecars are intentionally ignored (treated as absent) per the v2 policy.
+    Newer-than-v2 sidecars raise ValueError so callers can surface the version mismatch.
+    """
+    p = pathlib.Path(path)
+    if not p.is_file():
+        return None
+    try:
+        data = json.loads(p.read_text())
+    except json.JSONDecodeError:
+        return None
+    sv = data.get("schemaVersion")
+    if sv == SIDECAR_SCHEMA_VERSION:
+        return data
+    if isinstance(sv, int) and sv > SIDECAR_SCHEMA_VERSION:
+        raise ValueError(
+            f"sidecar at {p} was written by a newer /diagram "
+            f"(schemaVersion {sv}). Upgrade the skill or use a different --out path."
+        )
+    return None  # v1 or unknown — treat as absent
+
+
+def write_sidecar(path: str | pathlib.Path, payload: dict) -> None:
+    """Write a v2 sidecar to `path`. Stamps schemaVersion if absent."""
+    p = pathlib.Path(path)
+    payload = dict(payload)
+    payload.setdefault("schemaVersion", SIDECAR_SCHEMA_VERSION)
+    p.write_text(json.dumps(payload, indent=2) + "\n")
+
+
 def build_palette_set(theme: dict) -> set[str]:
     """Build the union of allowed hex colors for the given theme.
 

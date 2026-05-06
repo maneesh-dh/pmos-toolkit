@@ -80,8 +80,8 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 1. **Read `--source` if provided.** Extract entities, relationships, and any explicit hierarchy or order. If the doc is long, surface your extracted entity list to the user (via `AskUserQuestion` "is this the right entity set?" with options Confirm / Refine / Add missing) before brainstorming. Prose-fallback: print the extracted list and proceed assuming it is correct unless contradicted in the next message.
 
 2. **Existing-output check.** If `<out>.svg` already exists:
-   - Look for sibling `<out>.diagram.json` sidecar.
-   - Apply tolerant-read per `reference/sidecar-schema.md` (refuse only if `schemaVersion` is newer than current `1`).
+   - Look for sibling `<out>.diagram.json` sidecar; load via `read_sidecar()` (see `tests/run.py`). It returns `None` when the file is missing OR has a pre-v2 `schemaVersion` (v1 sidecars are intentionally ignored). It raises `ValueError` for any version newer than the current schema (refuse).
+   - If `read_sidecar()` returned `None`, treat the sidecar as absent and skip directly to the **Different concept** branch below.
    - **Same concept** (sidecar `concept` field substantially matches current input — case-insensitive substring or ≥0.6 Jaccard on tokens):
      - `AskUserQuestion`: "Existing diagram is for the same concept. Extend with the new instruction, or redraw from scratch?"
        Options: **Extend** / **Redraw** / **Cancel**.
@@ -270,9 +270,13 @@ If user picks **alt framing** → restart at Phase 2 with the next brainstormed 
    <!-- DIAGRAM QUALITY WARNING: <comma-separated remaining fails> -->
    ```
 
-2. **Write `<out>.diagram.json`** sidecar per `reference/sidecar-schema.md`:
-   - `schemaVersion: 1`
-   - `concept`, `approach`, `alternativesConsidered`, `canvas`, `entities`, `relationships`, `positions`, `colorAssignments`, `evalSummary`, `createdAt` (ISO 8601 UTC), `createdBy: "pmos-toolkit:diagram@v1"`.
+2. **Write `<out>.diagram.json`** sidecar via `write_sidecar()` per `reference/sidecar-schema.md`:
+   - `schemaVersion: 2`
+   - `theme` — the active theme name (from `--theme`, default `technical`).
+   - `mode` — `"diagram"` for vanilla draws; `"infographic"` when invoked with `--mode infographic`.
+   - `concept`, `approach`, `alternativesConsidered`, `canvas`, `entities`, `positions`, `colorAssignments`, `evalSummary`, `createdAt` (ISO 8601 UTC), `createdBy: "pmos-toolkit:diagram@v2"`.
+   - `relationships[]` includes `role` for every relationship that was assigned one in Phase 3 (mandatory under themes with `connectors.mixingPermitted: true`; optional otherwise).
+   - `evalSummary.visionItems` uses stable rubric IDs (e.g. `"primary-emphasis": "pass"`) — see `eval/rubric.md`.
 
 3. **Print final stdout** (one line of path + one line of eval summary):
    ```

@@ -2,7 +2,7 @@
 name: diagram
 description: Generate a single SVG vector diagram from a free-form description (with optional source markdown) — architecture, flow, hierarchy, dependency, sequence, state, mental-model, etc. Brainstorms 2–3 structural framings from first principles, asks the user to pick, then drafts and self-evaluates against a hybrid rubric (deterministic SVG metrics with hard-fails + a 7-item binary vision rubric on a rendered raster) with up to 2 refinement loops. Applies a configurable theme (default `technical`; switch with `--theme editorial`) so every output is consistent. Standalone utility — does not load workstream context. Use when the user says "draw a diagram", "create an architecture diagram", "show how X flows", "make an SVG of this concept", "diagram this", or wants a vector visual of any system/flow/structure.
 user-invocable: true
-argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--theme technical|editorial] [--rigor high|medium|low] [--clear-cache] [--selftest]"
+argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--theme technical|editorial] [--mode diagram|infographic] [--rigor high|medium|low] [--clear-cache] [--selftest]"
 ---
 
 # `/diagram` — SVG Diagram Generator
@@ -44,7 +44,7 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 
 1. **Parse args.**
    - Positional: free-form description (required, unless `--clear-cache` or `--selftest` is the only arg).
-   - Flags: `--source <path>`, `--out <path>`, `--approach <text>`, `--theme <name>` (default `technical`), `--rigor high|medium|low` (default `high`), `--clear-cache`, `--selftest`.
+   - Flags: `--source <path>`, `--out <path>`, `--approach <text>`, `--theme <name>` (default `technical`), `--mode diagram|infographic` (default `diagram`), `--rigor high|medium|low` (default `high`), `--clear-cache`, `--selftest`.
    - Derive `<slug>` = first 5–6 content words of the description, kebab-cased.
    - **Resolve `{docs_path}`**: read `.pmos/settings.yaml` in the current repo; if present, use its `docs_path` value (default in that file is `.pmos`). If `.pmos/settings.yaml` does not exist, fall back to `docs/pmos/` (create on demand).
    - Default `--out` = `{docs_path}/diagrams/<slug>.svg`. Create the `diagrams/` subdirectory if it doesn't exist.
@@ -71,7 +71,9 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 
 4. **Resolve `--theme`** (default `technical`). Load `themes/<theme>/theme.yaml` and validate it against `themes/_schema.json`. If the file is missing or schema validation fails, print the error and exit 2. The active theme governs palette, typography, stroke choices, connector dispatch, arrowhead style, and rubric overrides.
 
-5. **Read `themes/<theme>/style.md`** end-to-end. You will be quoting its tokens throughout.
+5. **Resolve `--mode`** (default `diagram`). If `--mode infographic` AND `theme.infographic.supported: false`, refuse with: `Theme '<theme>' does not support infographic mode. Use --theme editorial or --mode diagram.` Exit 2.
+
+6. **Read `themes/<theme>/style.md`** end-to-end. You will be quoting its tokens throughout.
 
 ---
 
@@ -269,6 +271,43 @@ options:
 Prose-fallback: ship-with-warning by default.
 
 If user picks **alt framing** → restart at Phase 2 with the next brainstormed approach pre-selected; loop budget is fresh. If even the alternative fails its terminal handler, default to ship-with-warning.
+
+---
+
+## Phase 6.6 — Editorial wrapper (only if `--mode infographic`)
+
+Runs after Phase 6 produces a clean diagram. Skipped if `--mode diagram` or the active theme has `infographic.supported: false` (Phase 0 already rejects the latter combo with a clear error).
+
+> **Extend short-circuit.** If we entered Phase 6.6 via the Extend branch in Phase 1 and the existing sidecar has a populated `wrappedText`, skip step 1 (copy generation) and step 2 (user-review checkpoint). Reuse `wrappedText` directly. Steps 3–7 still run.
+
+1. **Generate copy.** Assemble a single inline LLM prompt with: original description, `--source` markdown if provided, the entity model + relationships, the chosen Phase 2 framing, and the color-to-element assignments captured in the working sidecar. Returns JSON `{eyebrow, headline, lede, figLabel, captions[], footer}`. The prompt is short and structured; **run inline** rather than via subagent (D7).
+
+2. **User-review checkpoint.** `AskUserQuestion`: "Generated infographic copy — accept, edit a field, or regenerate?"
+   - **Accept** → proceed to step 3.
+   - **Edit field** → present each field one at a time (one `AskUserQuestion` per field with current text shown in description; user picks Keep / Replace / Skip-this-field; "Other" lets them rewrite).
+   - **Regenerate** → re-prompt the LLM once with whatever feedback the user types. Only one regen attempt; further iterations require manual edits.
+
+   Prose-fallback (no `AskUserQuestion`): print the JSON, accept by default, allow the user to reject in their next message.
+
+3. **Caption count clamp** (per spec D8). Apply via `wrapper.caption_grid.clamp_captions()`:
+   - Length > 5 → drop weakest by body length until 5 remain. Sidecar `captionCountClamp.from/to` records the change.
+   - Length < 3 → re-prompt the LLM once for 3+. If still < 3 → drop the caption block entirely (sidecar `captionCountClamp.to: 0`).
+
+4. **Determine caption anchor mode** via `wrapper.anchors.decide_anchor_mode(diagram_colors)`:
+   - Count distinct hex values used inside the diagram, excluding `ink-muted` and surface tokens.
+   - ≥ 3 → `captionAnchorMode = "color"` (each caption draws its left rule in its `anchorColor`).
+   - < 3 → `captionAnchorMode = "ordinal"` (each caption gets a glyph from `["●", "▲", "■", "◆", "★"]`; matching glyph drawn next to the corresponding diagram element).
+   - Sidecar records the chosen mode.
+
+5. **Color remap** (color mode only). For each caption whose `anchorColor` is not actually present inside the diagram, replace with `ink` and record `{from, to, reason}` in `captionAnchorRemaps`. The `caption-color-not-in-diagram` code check (run.py) catches any leftover mismatches as a hard-fail in step 7's eval.
+
+6. **Compose wrapper SVG** via `wrapper.compose.compose_wrapper(diagram_svg, wrappedText, theme, anchor_mode, renderer, font_metrics_available)`. Returns the composite SVG text. Wrapper preserves source diagram element `id` attributes verbatim inside `zone-diagram` so ordinal-marker mirroring can find them.
+
+7. **Render the composite to PNG** per `reference/render-to-raster.md`. Run the slim **wrapper rubric** INLINE (no subagent dispatch, regardless of `--rigor` tier — single pass, no refinement loop). The 4 items: `wrapper-typography-hierarchy`, `wrapper-text-fit`, `wrapper-figure-proportion`, `wrapper-edge-padding`. If `wrapper_blocker_count > 0`, prepend an XML comment to the composite: `<!-- WRAPPER QUALITY WARNING: <ids> -->`. **Wrapper rubric failures DO NOT GATE — they ship-with-warning.** The full 7-item diagram rubric in Phase 5 already gated; this is supplementary insurance.
+
+8. **Write sidecar v2** with `mode: "infographic"`, `wrapperLayout: "editorial-v1"`, `wrappedText`, `captionAnchorMode`, `captionAnchorRemaps`, `captionCountClamp`, `wrapperRubricResults`. Phase 7 finalizes the SVG move and the sidecar write.
+
+See `themes/editorial/infographic/editorial-v1.md` for the full layout spec.
 
 ---
 

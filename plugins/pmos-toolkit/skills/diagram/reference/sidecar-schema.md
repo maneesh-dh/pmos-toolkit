@@ -66,6 +66,40 @@ Written next to every successful SVG in Phase 7. Read in Phase 1 to power the ex
 }
 ```
 
+### Infographic-mode additions
+
+When `mode: "infographic"`, the sidecar additionally carries the wrapper state needed for the Extend flow and post-hoc audit:
+
+```json
+{
+  "mode": "infographic",
+  "wrapperLayout": "editorial-v1",
+  "wrappedText": {
+    "eyebrow": "HARNESS ENGINEERING · SYSTEMS VIEW",
+    "headline": "...",
+    "lede": "..." ,
+    "figLabel": "FIG. 1 — ...",
+    "captions": [
+      {"title": "...", "body": "...", "anchorColor": "#1E3A8A", "anchorElementId": "e1"}
+    ],
+    "footer": "..."
+  },
+  "captionAnchorMode": "color | ordinal",
+  "captionAnchorRemaps": [
+    {"from": "#FF00FF", "to": "ink", "reason": "color absent from diagram"}
+  ],
+  "captionCountClamp": {"from": 7, "to": 5, "reason": "drop-weakest"},
+  "wrapperRubricResults": {
+    "wrapper-typography-hierarchy": "pass",
+    "wrapper-text-fit": "pass",
+    "wrapper-figure-proportion": "pass",
+    "wrapper-edge-padding": "pass"
+  }
+}
+```
+
+These fields are absent (not `null`) when `mode: "diagram"`.
+
 ## Field semantics
 
 - **`schemaVersion`** — integer. v2 introduced `theme`, `mode`, `relationships[].role`, `relationships[]._svgId`, and stable rubric-ID keys for `visionItems`. v1 sidecars are not read (see Versioning policy).

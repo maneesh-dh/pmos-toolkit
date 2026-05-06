@@ -20,15 +20,77 @@ import sys
 import xml.etree.ElementTree as ET
 from typing import Any
 
+try:
+    import yaml
+except ImportError:
+    print("ERROR: PyYAML is required for theme-aware /diagram selftest.", file=sys.stderr)
+    print("Install with: pip install pyyaml", file=sys.stderr)
+    sys.exit(2)
+
+try:
+    from jsonschema import validate as _jsonschema_validate
+except ImportError:
+    print("ERROR: jsonschema is required for theme schema validation.", file=sys.stderr)
+    print("Install with: pip install jsonschema", file=sys.stderr)
+    sys.exit(2)
+
 SVG_NS = "http://www.w3.org/2000/svg"
 NSMAP = {"svg": SVG_NS}
 
-PALETTE = {"#FFFFFF", "#F4F5F7", "#0F172A", "#475569", "#2563EB", "#B91C1C"}
 PALETTE_KEYWORDS = {"none", "transparent", "context-stroke", "context-fill", "currentcolor"}
 
 HERE = pathlib.Path(__file__).parent
 GOLDEN_DIR = HERE / "golden"
 DEFECTS_DIR = HERE / "defects"
+THEMES_DIR = HERE.parent / "themes"
+SCHEMA_PATH = THEMES_DIR / "_schema.json"
+
+
+# ---------- Theme loading ----------
+
+_THEME_CACHE: dict[str, dict] = {}
+
+
+def load_theme(name: str) -> dict:
+    """Load themes/<name>/theme.yaml, validate against _schema.json, return parsed dict.
+
+    Raises FileNotFoundError if the theme directory or theme.yaml is missing.
+    Raises jsonschema.ValidationError if the YAML fails schema validation.
+    """
+    if name in _THEME_CACHE:
+        return _THEME_CACHE[name]
+    theme_path = THEMES_DIR / name / "theme.yaml"
+    if not theme_path.is_file():
+        raise FileNotFoundError(f"theme not found: {theme_path}")
+    theme = yaml.safe_load(theme_path.read_text())
+    schema = json.loads(SCHEMA_PATH.read_text())
+    _jsonschema_validate(theme, schema)
+    _THEME_CACHE[name] = theme
+    return theme
+
+
+def build_palette_set(theme: dict) -> set[str]:
+    """Build the union of allowed hex colors for the given theme.
+
+    Includes ink, inkMuted, warn, surface, surfaceMuted, every accent hex, and
+    every categoryChip hex. All values upper-cased for set comparison.
+    """
+    pal = theme["palette"]
+    surf = theme.get("surface", {})
+    out: set[str] = set()
+    for key in ("ink", "inkMuted", "warn", "surface", "surfaceMuted"):
+        v = pal.get(key)
+        if v:
+            out.add(v.upper())
+    for key in ("background", "muted"):
+        v = surf.get(key)
+        if v:
+            out.add(v.upper())
+    for accent in pal.get("accents", []):
+        out.add(accent["hex"].upper())
+    for chip in pal.get("categoryChips", []):
+        out.add(chip["hex"].upper())
+    return out
 
 
 # ---------- Affine matrix helpers ----------
@@ -203,8 +265,10 @@ def collect_defs(root):
 
 # ---------- Main evaluation ----------
 
-def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
+def evaluate(svg_path: str | pathlib.Path, theme: str = "technical") -> dict[str, Any]:
     svg_path = pathlib.Path(svg_path)
+    theme_dict = load_theme(theme)
+    palette = build_palette_set(theme_dict)
     tree = ET.parse(svg_path)
     root = tree.getroot()
     styles = parse_styles(root)
@@ -254,7 +318,7 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
                 # We don't allow named colors or rgb()
                 palette_violations.append(f"{attr}={v} on <{local_tag}>")
                 continue
-            if v.upper() not in PALETTE:
+            if v.upper() not in palette:
                 palette_violations.append(f"{attr}={v} on <{local_tag}>")
 
         # Collect coords for grid-snap
@@ -405,7 +469,7 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
         if not t["fill"].startswith("#"):
             continue
         fill = t["fill"].upper()
-        if fill not in PALETTE:
+        if fill not in palette:
             continue  # already caught by palette check
         # Find smallest enclosing node bbox; default canvas
         bg = canvas_fill
@@ -420,7 +484,7 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
                         if c in styles and "fill" in styles[c]:
                             node_fill = styles[c]["fill"]
                             break
-                if node_fill and node_fill.upper() in PALETTE:
+                if node_fill and node_fill.upper() in palette:
                     bg = node_fill.upper()
                     smallest_area = w * h
         ratio = contrast_ratio(fill, bg)

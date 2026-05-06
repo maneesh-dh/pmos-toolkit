@@ -95,9 +95,9 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 3. **Entity model.** From either `--source` or the description, build an internal list:
    ```
    entities = [{id, label, category}]
-   relationships = [{from, to, label?, kind: directed|bidirectional}]
+   relationships = [{from, to, label?, kind: directed|bidirectional, role?: contribution|emphasis|feedback|dependency|reference}]
    ```
-   This becomes the sidecar's `entities` / `relationships` arrays in Phase 7.
+   When the active theme has `connectors.mixingPermitted: true`, Phase 3 MUST assign a `role` to every relationship (default to `default` only when no other role fits). When `mixingPermitted: false`, `role` is optional and ignored at draw time. This becomes the sidecar's `entities` / `relationships` arrays in Phase 7.
 
 ---
 

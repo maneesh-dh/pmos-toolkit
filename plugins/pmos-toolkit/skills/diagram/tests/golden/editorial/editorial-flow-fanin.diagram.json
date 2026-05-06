@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 2,
+  "concept": "Four context inputs feed Context Fragments which the Computation Box consumes",
+  "theme": "editorial",
+  "mode": "diagram",
+  "approach": "left-right fan-in",
+  "alternativesConsidered": [],
+  "canvas": {"aspect": "16:10", "width": 1280, "height": 800},
+  "entities": [
+    {"id": "system-prompt", "label": "System prompt", "category": "input"},
+    {"id": "tools", "label": "Tools · Skills · MCP", "category": "input"},
+    {"id": "hooks", "label": "Hooks · Middleware", "category": "input"},
+    {"id": "memory", "label": "Memory store", "category": "input"},
+    {"id": "fragments", "label": "Context Fragments", "category": "central"},
+    {"id": "computation", "label": "Computation Box", "category": "terminal"}
+  ],
+  "relationships": [
+    {"from": "system-prompt", "to": "fragments", "kind": "directed", "role": "contribution", "_svgId": "e1"},
+    {"from": "tools",         "to": "fragments", "kind": "directed", "role": "contribution", "_svgId": "e2"},
+    {"from": "hooks",         "to": "fragments", "kind": "directed", "role": "contribution", "_svgId": "e3"},
+    {"from": "memory",        "to": "fragments", "kind": "directed", "role": "contribution", "_svgId": "e4"},
+    {"from": "fragments",     "to": "computation", "kind": "directed", "role": "emphasis", "_svgId": "e5"}
+  ],
+  "positions": {},
+  "colorAssignments": {"input": "ink", "central": "accent-emphasis-border", "terminal": "chip-ink"},
+  "evalSummary": {},
+  "createdAt": "2026-05-06T13:50:00Z",
+  "createdBy": "pmos-toolkit:diagram@v2"
+}

@@ -208,7 +208,7 @@ def build_palette_set(theme: dict) -> set[str]:
         v = pal.get(key)
         if v:
             out.add(v.upper())
-    for key in ("background", "muted"):
+    for key in ("background", "muted", "containerStrokeColor"):
         v = surf.get(key)
         if v:
             out.add(v.upper())
@@ -377,6 +377,13 @@ def has_legend_class(path_cls):
     return any(c in {"legend", "edge-label", "edge-pill"} for c in path_cls)
 
 
+def is_chrome_class(path_cls):
+    """Backdrop / outer container rects are not nodes — themes use them for theme-level
+    chrome (e.g., editorial's dashed boundary or a cream surface backdrop). Mark with
+    class='bg' or class='container' to opt out of node-occlusion checks."""
+    return any(c in {"bg", "container", "backdrop", "chrome"} for c in path_cls)
+
+
 def in_defs(el, defs_set):
     return el in defs_set
 
@@ -529,7 +536,7 @@ def evaluate(svg_path: str | pathlib.Path, theme: str = "technical") -> dict[str
             coords_for_grid.append((f"<{local_tag}>@{k}={raw}", val, m[4 if k in ('x','x1','x2','cx') else 5]))
 
         # NODE detection
-        if local_tag in ("rect", "circle", "ellipse") and not has_legend_class(path_cls):
+        if local_tag in ("rect", "circle", "ellipse") and not has_legend_class(path_cls) and not is_chrome_class(path_cls):
             try:
                 if local_tag == "rect":
                     x = float(el.get("x", 0)); y = float(el.get("y", 0))
@@ -780,14 +787,30 @@ def evaluate(svg_path: str | pathlib.Path, theme: str = "technical") -> dict[str
 
 # ---------- Selftest harness ----------
 
+def _iter_corpus(base_dir: pathlib.Path) -> list[tuple[pathlib.Path, str]]:
+    """Yield (svg_path, theme_name) for every fixture under base_dir.
+
+    Top-level *.svg → theme=technical (default).
+    base_dir/<theme>/*.svg → theme=<theme> (Phase 2+).
+    """
+    out: list[tuple[pathlib.Path, str]] = []
+    for svg in sorted(base_dir.glob("*.svg")):
+        out.append((svg, "technical"))
+    for sub in sorted(base_dir.iterdir()) if base_dir.is_dir() else []:
+        if sub.is_dir():
+            for svg in sorted(sub.glob("*.svg")):
+                out.append((svg, sub.name))
+    return out
+
+
 def run_corpus(update_snapshots: bool = False) -> int:
     failures: list[str] = []
 
     print("=" * 64)
     print("GOLDEN")
     print("=" * 64)
-    for svg in sorted(GOLDEN_DIR.glob("*.svg")):
-        result = evaluate(svg)
+    for svg, theme_name in _iter_corpus(GOLDEN_DIR):
+        result = evaluate(svg, theme=theme_name)
         snap = svg.with_suffix(".expected.json")
         actual = {
             "code_score": result["code_score"],
@@ -829,11 +852,13 @@ def run_corpus(update_snapshots: bool = False) -> int:
         "mixed-reading-direction":  ("vision", None),  # not detectable by code; documented
         "crossing-storm":           ("soft", "edge_crossings"),
         "arrowhead-inconsistent":   ("vision", None),  # not detectable by code; documented
+        "cream-but-mixed-connectors-within-one-role": ("hard", "role-style-consistency"),
+        "eyebrow-not-uppercase":    ("vision", None),  # editorial-specific vision check
     }
-    for svg in sorted(DEFECTS_DIR.glob("*.svg")):
+    for svg, theme_name in _iter_corpus(DEFECTS_DIR):
         stem = svg.stem
         expectation = DEFECT_EXPECT.get(stem)
-        result = evaluate(svg)
+        result = evaluate(svg, theme=theme_name)
         if expectation is None:
             failures.append(f"{svg.name}: no expectation in DEFECT_EXPECT")
             print(f"  ?     {svg.name} (unmapped)")

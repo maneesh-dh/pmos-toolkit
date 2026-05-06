@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400"
+     font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+  <title>DEFECT: editorial theme; eyebrow text is mixed case rather than mono uppercase</title>
+
+  <rect class="bg" x="0" y="0" width="800" height="400" fill="#F4EFE6"/>
+  <rect class="container" x="16" y="16" width="768" height="368" fill="#F4EFE6"
+        stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4 4"/>
+
+  <!-- DEFECT: this eyebrow is mixed-case, breaking the editorial defining-move -->
+  <text x="32" y="56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="12" font-weight="400" fill="#475569" letter-spacing="0.96">External Context (objects we populate)</text>
+
+  <rect x="320" y="160" width="160" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="400" y="208" text-anchor="middle" font-size="14" font-weight="600" fill="#0F172A">Lone node</text>
+</svg>

@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 2,
+  "concept": "Six facets of observability radiating from a central concept",
+  "theme": "editorial",
+  "mode": "diagram",
+  "approach": "radial mind map",
+  "alternativesConsidered": [],
+  "canvas": {"aspect": "16:10", "width": 1280, "height": 800},
+  "entities": [
+    {"id": "observability", "label": "Observability", "category": "central"},
+    {"id": "logs", "label": "Logs", "category": "facet"},
+    {"id": "metrics", "label": "Metrics", "category": "facet"},
+    {"id": "traces", "label": "Traces", "category": "facet"},
+    {"id": "alerts", "label": "Alerts", "category": "facet"},
+    {"id": "profiling", "label": "Profiling", "category": "facet"},
+    {"id": "dashboards", "label": "Dashboards", "category": "facet"}
+  ],
+  "relationships": [
+    {"from": "observability", "to": "logs",       "kind": "directed", "role": "contribution", "_svgId": "e1"},
+    {"from": "observability", "to": "metrics",    "kind": "directed", "role": "contribution", "_svgId": "e2"},
+    {"from": "observability", "to": "traces",     "kind": "directed", "role": "contribution", "_svgId": "e3"},
+    {"from": "observability", "to": "alerts",     "kind": "directed", "role": "contribution", "_svgId": "e4"},
+    {"from": "observability", "to": "profiling",  "kind": "directed", "role": "contribution", "_svgId": "e5"},
+    {"from": "observability", "to": "dashboards", "kind": "directed", "role": "contribution", "_svgId": "e6"}
+  ],
+  "positions": {},
+  "colorAssignments": {"central": "ink", "facet": "ink"},
+  "evalSummary": {},
+  "createdAt": "2026-05-06T13:55:00Z",
+  "createdBy": "pmos-toolkit:diagram@v2"
+}

@@ -43,3 +43,19 @@ def test_layout_keys_explicitly_rejected():
 def test_extends_rejected_in_v1():
     with pytest.raises(ValidationError):
         validate({**MINIMAL, "extends": "technical"}, load_schema())
+
+
+def test_technical_theme_validates_against_schema():
+    import yaml
+    path = pathlib.Path(__file__).parents[1] / "themes" / "technical" / "theme.yaml"
+    theme = yaml.safe_load(path.read_text())
+    validate(theme, load_schema())
+    assert theme["name"] == "technical"
+    assert theme["connectors"]["mixingPermitted"] is False
+    assert theme["infographic"]["supported"] is False
+    assert theme["rubricOverrides"]["waive"] == []
+    assert theme["rubricOverrides"]["add"] == []
+    assert theme["palette"]["ink"].upper() == "#0F172A"
+    assert theme["palette"]["inkMuted"].upper() == "#475569"
+    assert theme["palette"]["warn"].upper() == "#B91C1C"
+    assert any(a["hex"].upper() == "#2563EB" for a in theme["palette"]["accents"])

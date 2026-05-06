@@ -1,0 +1,61 @@
+# Technical theme — codifies the original /diagram house style as theme tokens.
+# This file is the canonical source for palette, typography, stroke, connector,
+# and arrowhead choices for the default theme. Layout decisions (direction,
+# canvas, placement) are NOT theme tokens and live in SKILL.md Phase 2.
+#
+# See themes/_schema.json for the strict positive-list schema.
+# See themes/technical/style.md for the human-readable spec mirroring this file.
+
+name: technical
+displayName: Technical
+
+surface:
+  background: "#FFFFFF"
+  muted: "#F4F5F7"
+
+palette:
+  ink: "#0F172A"
+  inkMuted: "#475569"
+  warn: "#B91C1C"
+  surface: "#FFFFFF"
+  surfaceMuted: "#F4F5F7"
+  accents:
+    - name: accent
+      hex: "#2563EB"
+
+typography:
+  body:
+    stack: "Inter, ui-sans-serif, system-ui, -apple-system, sans-serif"
+    weights: [400, 600]
+    sizes: [12, 14, 16, 20]
+
+connectors:
+  mixingPermitted: false
+  byRole:
+    default:
+      shape: orthogonal
+      stroke: inkMuted
+      dashed: false
+
+arrowheads:
+  style: filled-triangle
+  sizes:
+    default: "8x6"
+
+chips:
+  radius: 4
+  padding: "4px 8px"
+  fontSize: 12
+
+nodeChrome:
+  primaryStroke: ink
+  primaryRadius: 8
+  secondaryStroke: inkMuted
+  secondaryRadius: 4
+
+rubricOverrides:
+  waive: []
+  add: []
+
+infographic:
+  supported: false

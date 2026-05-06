@@ -1,0 +1,203 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "diagram theme.yaml",
+  "description": "Strict positive-list schema for /diagram themes. Layout-related keys (direction, canvas, nodePositions, readingOrder, placement, layout) MUST NOT appear here — they are runtime decisions, not theme tokens.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "displayName",
+    "surface",
+    "palette",
+    "typography",
+    "connectors",
+    "arrowheads",
+    "rubricOverrides",
+    "infographic"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "surface": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["background"],
+      "properties": {
+        "background": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "muted": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+      }
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ink", "inkMuted", "accents"],
+      "properties": {
+        "ink": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "inkMuted": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "warn": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "surface": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "surfaceMuted": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "accents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["hex"],
+            "properties": {
+              "name": {"type": "string"},
+              "hex": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "pinnedRole": {
+                "type": "string",
+                "enum": ["contribution", "emphasis", "feedback", "dependency", "reference"]
+              }
+            }
+          }
+        },
+        "categoryChips": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "hex"],
+            "properties": {
+              "name": {"type": "string"},
+              "hex": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+            }
+          }
+        }
+      }
+    },
+    "typography": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["body"],
+      "properties": {
+        "body": {"$ref": "#/definitions/typeBlock"},
+        "display": {"$ref": "#/definitions/typeBlock"},
+        "mono": {"$ref": "#/definitions/typeBlock"},
+        "eyebrow": {"$ref": "#/definitions/typeBlock"}
+      }
+    },
+    "connectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mixingPermitted"],
+      "properties": {
+        "mixingPermitted": {"type": "boolean"},
+        "byRole": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["shape", "stroke", "dashed"],
+            "properties": {
+              "shape": {"type": "string", "enum": ["orthogonal", "curve", "straight"]},
+              "stroke": {"type": "string"},
+              "dashed": {"type": "boolean"}
+            }
+          }
+        }
+      }
+    },
+    "arrowheads": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["style", "sizes"],
+      "properties": {
+        "style": {"type": "string", "enum": ["filled-triangle", "open-triangle", "line"]},
+        "sizes": {
+          "type": "object",
+          "additionalProperties": {"type": "string", "pattern": "^[0-9]+x[0-9]+$"},
+          "required": ["default"],
+          "properties": {
+            "default": {"type": "string", "pattern": "^[0-9]+x[0-9]+$"}
+          }
+        }
+      }
+    },
+    "chips": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "radius": {"type": "number"},
+        "padding": {"type": "string"},
+        "fontSize": {"type": "number"}
+      }
+    },
+    "nodeChrome": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "primaryStroke": {"type": "string"},
+        "primaryRadius": {"type": "number"},
+        "secondaryStroke": {"type": "string"},
+        "secondaryRadius": {"type": "number"}
+      }
+    },
+    "rubricOverrides": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["waive", "add"],
+      "properties": {
+        "waive": {
+          "type": "array",
+          "items": {"type": "string"}
+        },
+        "add": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "prompt", "evidenceHint"],
+            "properties": {
+              "id": {"type": "string"},
+              "prompt": {"type": "string"},
+              "evidenceHint": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "infographic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["supported"],
+      "properties": {
+        "supported": {"type": "boolean"},
+        "layout": {"type": "string"},
+        "wrapperRubric": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "prompt"],
+            "properties": {
+              "id": {"type": "string"},
+              "prompt": {"type": "string"}
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "typeBlock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stack", "weights", "sizes"],
+      "properties": {
+        "stack": {"type": "string"},
+        "weights": {"type": "array", "items": {"type": "integer"}},
+        "sizes": {"type": "array", "items": {"type": "number"}},
+        "letterSpacing": {"type": "string"},
+        "case": {"type": "string", "enum": ["upper", "lower", "title", "sentence", "none"]}
+      }
+    }
+  }
+}

@@ -391,6 +391,64 @@ def collect_defs(root):
 
 # ---------- Main evaluation ----------
 
+def check_role_style_consistency(
+    svg_path: str | pathlib.Path,
+    sidecar_path: str | pathlib.Path,
+) -> tuple[bool, str]:
+    """For each role with ≥ 2 edges, all edges' (stroke, dasharray, tag) tuples
+    must be identical. Sidecar `relationships[]._svgId` keys are looked up in the
+    SVG via element id. Returns (ok, reason).
+    """
+    svg_path = pathlib.Path(svg_path)
+    sidecar_path = pathlib.Path(sidecar_path)
+    if not sidecar_path.is_file():
+        return True, ""
+    sidecar = json.loads(sidecar_path.read_text())
+    rels = sidecar.get("relationships") or []
+    role_to_ids: dict[str, list[str]] = {}
+    for rel in rels:
+        role = rel.get("role")
+        sid = rel.get("_svgId")
+        if not role or not sid:
+            continue
+        role_to_ids.setdefault(role, []).append(sid)
+
+    if not role_to_ids:
+        return True, ""
+
+    tree = ET.parse(svg_path)
+    root = tree.getroot()
+    by_id: dict[str, ET.Element] = {}
+    for el in root.iter():
+        eid = el.get("id")
+        if eid:
+            by_id[eid] = el
+
+    def edge_signature(el: ET.Element) -> tuple[str, str, str]:
+        tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
+        stroke = (el.get("stroke") or "").upper()
+        dash = el.get("stroke-dasharray") or ""
+        return (tag, stroke, dash)
+
+    for role, ids in role_to_ids.items():
+        if len(ids) < 2:
+            continue
+        sigs: list[tuple[str, tuple[str, str, str]]] = []
+        for sid in ids:
+            el = by_id.get(sid)
+            if el is None:
+                return False, f"role-style-consistency: role '{role}' references missing svgId '{sid}'"
+            sigs.append((sid, edge_signature(el)))
+        first_sig = sigs[0][1]
+        for sid, sig in sigs[1:]:
+            if sig != first_sig:
+                return False, (
+                    f"role-style-consistency: role '{role}' edge {sigs[0][0]} "
+                    f"uses {first_sig}, edge {sid} uses {sig}; expected one style per role"
+                )
+    return True, ""
+
+
 def evaluate(svg_path: str | pathlib.Path, theme: str = "technical") -> dict[str, Any]:
     svg_path = pathlib.Path(svg_path)
     theme_dict = load_theme(theme)
@@ -401,6 +459,13 @@ def evaluate(svg_path: str | pathlib.Path, theme: str = "technical") -> dict[str
     defs_set = collect_defs(root)
     hard_fails: list[str] = []
     diagnostics: dict[str, Any] = {"off_grid_coords": []}
+
+    # Role-style-consistency hard-fail (themes with mixingPermitted: true only)
+    if theme_dict["connectors"].get("mixingPermitted"):
+        sidecar = svg_path.with_suffix(".diagram.json")
+        ok, reason = check_role_style_consistency(svg_path, sidecar)
+        if not ok:
+            hard_fails.append(reason)
 
     # Collect title
     title_el = root.find(f"{{{SVG_NS}}}title")

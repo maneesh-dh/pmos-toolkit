@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400"
+     font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+  <title>DEFECT: editorial theme; two feedback-role edges use different stroke patterns (one dashed, one solid)</title>
+  <defs>
+    <marker id="arrow-ink" viewBox="0 0 8 6" refX="8" refY="3"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 8 3 L 0 6 z" fill="context-stroke"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="800" height="400" fill="#F4EFE6"/>
+  <rect class="container" x="16" y="16" width="768" height="368" fill="#F4EFE6"
+        stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4 4"/>
+
+  <text x="32" y="56" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="12" font-weight="400" fill="#475569" letter-spacing="0.96">DEFECT · MIXED FEEDBACK STYLES</text>
+
+  <rect x="80" y="120" width="160" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="160" y="168" text-anchor="middle" font-size="14" font-weight="600" fill="#0F172A">Source A</text>
+
+  <rect x="80" y="240" width="160" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="160" y="288" text-anchor="middle" font-size="14" font-weight="600" fill="#0F172A">Source B</text>
+
+  <rect x="560" y="180" width="160" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="640" y="228" text-anchor="middle" font-size="14" font-weight="600" fill="#0F172A">Sink</text>
+
+  <!-- e1: feedback, dashed (correct editorial style) -->
+  <path id="e1" d="M 240 160 C 360 160, 440 200, 560 220" fill="none"
+        stroke="#1E3A8A" stroke-width="1.5" stroke-dasharray="6 4"
+        marker-end="url(#arrow-ink)"/>
+
+  <!-- e2: feedback, but SOLID — violates role-style-consistency -->
+  <path id="e2" d="M 240 280 C 360 280, 440 240, 560 220" fill="none"
+        stroke="#1E3A8A" stroke-width="1.5"
+        marker-end="url(#arrow-ink)"/>
+</svg>

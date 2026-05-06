@@ -1,15 +1,15 @@
 ---
 name: diagram
-description: Generate a single SVG vector diagram from a free-form description (with optional source markdown) — architecture, flow, hierarchy, dependency, sequence, state, mental-model, etc. Brainstorms 2–3 structural framings from first principles, asks the user to pick, then drafts and self-evaluates against a hybrid rubric (deterministic SVG metrics with hard-fails + a 7-item binary vision rubric on a rendered raster) with up to 2 refinement loops. Applies a fixed house style (style.md) so every output is consistent. Standalone utility — does not load workstream context. Use when the user says "draw a diagram", "create an architecture diagram", "show how X flows", "make an SVG of this concept", "diagram this", or wants a vector visual of any system/flow/structure.
+description: Generate a single SVG vector diagram from a free-form description (with optional source markdown) — architecture, flow, hierarchy, dependency, sequence, state, mental-model, etc. Brainstorms 2–3 structural framings from first principles, asks the user to pick, then drafts and self-evaluates against a hybrid rubric (deterministic SVG metrics with hard-fails + a 7-item binary vision rubric on a rendered raster) with up to 2 refinement loops. Applies a configurable theme (default `technical`; switch with `--theme editorial`) so every output is consistent. Standalone utility — does not load workstream context. Use when the user says "draw a diagram", "create an architecture diagram", "show how X flows", "make an SVG of this concept", "diagram this", or wants a vector visual of any system/flow/structure.
 user-invocable: true
-argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--rigor high|medium|low] [--clear-cache] [--selftest]"
+argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--theme technical|editorial] [--mode diagram|infographic] [--rigor high|medium|low] [--clear-cache] [--selftest]"
 ---
 
 # `/diagram` — SVG Diagram Generator
 
 **Announce at start:** "Using the diagram skill to generate an SVG from your description."
 
-Produce one `.svg` file plus a `<slug>.diagram.json` sidecar that records the design decisions. Skill enforces a fixed visual style (`style.md`) and a hybrid eval (`eval/code-metrics.md` + `eval/rubric.md`). The skill is **standalone** — it does not load workstream context, does not gate any pipeline stage. Invoke any time you need a diagram.
+Produce one `.svg` file plus a `<slug>.diagram.json` sidecar that records the design decisions. Skill enforces a configurable theme (`themes/<theme>/theme.yaml` + `style.md`) and a hybrid eval (`eval/code-metrics.md` + `eval/rubric.md`). The skill is **standalone** — it does not load workstream context, does not gate any pipeline stage. Invoke any time you need a diagram.
 
 ---
 
@@ -30,7 +30,7 @@ These instructions use Claude Code tool names. In other environments:
 
 ## Track Progress
 
-This skill has multiple phases. Create one task per phase using your agent's task-tracking tool (e.g., `TodoWrite` in Claude Code, equivalent in other agents). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+This skill has multiple phases (0, 1, 2, 3, 4, 5, 6, 6.6, 7, 8). Phase 6.6 runs only in `--mode infographic`. Create one task per phase you'll touch using your agent's task-tracking tool (e.g., `TodoWrite` in Claude Code, equivalent in other agents). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
 
 ---
 
@@ -44,7 +44,7 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 
 1. **Parse args.**
    - Positional: free-form description (required, unless `--clear-cache` or `--selftest` is the only arg).
-   - Flags: `--source <path>`, `--out <path>`, `--approach <text>`, `--rigor high|medium|low` (default `high`), `--clear-cache`, `--selftest`.
+   - Flags: `--source <path>`, `--out <path>`, `--approach <text>`, `--theme <name>` (default `technical`), `--mode diagram|infographic` (default `diagram`), `--rigor high|medium|low` (default `high`), `--clear-cache`, `--selftest`.
    - Derive `<slug>` = first 5–6 content words of the description, kebab-cased.
    - **Resolve `{docs_path}`**: read `.pmos/settings.yaml` in the current repo; if present, use its `docs_path` value (default in that file is `.pmos`). If `.pmos/settings.yaml` does not exist, fall back to `docs/pmos/` (create on demand).
    - Default `--out` = `{docs_path}/diagrams/<slug>.svg`. Create the `diagrams/` subdirectory if it doesn't exist.
@@ -69,7 +69,11 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
    ```
    Exit non-zero. Vision review is non-negotiable; without it half the eval is missing.
 
-4. **Read style.md** end-to-end. You will be quoting its tokens throughout.
+4. **Resolve `--theme`** (default `technical`). Load `themes/<theme>/theme.yaml` and validate it against `themes/_schema.json`. If the file is missing or schema validation fails, print the error and exit 2. The active theme governs palette, typography, stroke choices, connector dispatch, arrowhead style, and rubric overrides.
+
+5. **Resolve `--mode`** (default `diagram`). If `--mode infographic` AND `theme.infographic.supported: false`, refuse with: `Theme '<theme>' does not support infographic mode. Use --theme editorial or --mode diagram.` Exit 2.
+
+6. **Read `themes/<theme>/style.md`** end-to-end. You will be quoting its tokens throughout.
 
 ---
 
@@ -78,12 +82,12 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 1. **Read `--source` if provided.** Extract entities, relationships, and any explicit hierarchy or order. If the doc is long, surface your extracted entity list to the user (via `AskUserQuestion` "is this the right entity set?" with options Confirm / Refine / Add missing) before brainstorming. Prose-fallback: print the extracted list and proceed assuming it is correct unless contradicted in the next message.
 
 2. **Existing-output check.** If `<out>.svg` already exists:
-   - Look for sibling `<out>.diagram.json` sidecar.
-   - Apply tolerant-read per `reference/sidecar-schema.md` (refuse only if `schemaVersion` is newer than current `1`).
+   - Look for sibling `<out>.diagram.json` sidecar; load via `read_sidecar()` (see `tests/run.py`). It returns `None` when the file is missing OR has a pre-v2 `schemaVersion` (v1 sidecars are intentionally ignored). It raises `ValueError` for any version newer than the current schema (refuse).
+   - If `read_sidecar()` returned `None`, treat the sidecar as absent and skip directly to the **Different concept** branch below.
    - **Same concept** (sidecar `concept` field substantially matches current input — case-insensitive substring or ≥0.6 Jaccard on tokens):
      - `AskUserQuestion`: "Existing diagram is for the same concept. Extend with the new instruction, or redraw from scratch?"
        Options: **Extend** / **Redraw** / **Cancel**.
-     - On **Extend**: read the existing SVG. Treat sidecar `positions` and `colorAssignments` as fixed. Apply the new instruction as a minimal patch (e.g., recolor a single node, add a single connector, relabel a node). Skip Phase 2 (no new brainstorm). Proceed to Phase 4 with the patched SVG.
+     - On **Extend**: read the existing SVG. Treat sidecar `positions` and `colorAssignments` as fixed. **If the sidecar has `mode: "infographic"` and a populated `wrappedText`, also treat `wrappedText` as fixed** — Phase 6.6 will skip its copy-generation and user-review steps. Apply the new instruction as a minimal patch (e.g., recolor a single node, add a single connector, relabel a node). Skip Phase 2 (no new brainstorm). Proceed to Phase 4 with the patched SVG.
      - On **Redraw**: discard the existing SVG (don't delete yet — overwrite at Phase 7). Use the sidecar's `approach` as a starting hint to Phase 2 but allow new framings.
      - On **Cancel**: exit 0.
    - **Different concept** (or sidecar absent / unreadable):
@@ -93,9 +97,9 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 3. **Entity model.** From either `--source` or the description, build an internal list:
    ```
    entities = [{id, label, category}]
-   relationships = [{from, to, label?, kind: directed|bidirectional}]
+   relationships = [{from, to, label?, kind: directed|bidirectional, role?: contribution|emphasis|feedback|dependency|reference}]
    ```
-   This becomes the sidecar's `entities` / `relationships` arrays in Phase 7.
+   When the active theme has `connectors.mixingPermitted: true`, Phase 3 MUST assign a `role` to every relationship (default to `default` only when no other role fits). When `mixingPermitted: false`, `role` is optional and ignored at draw time. This becomes the sidecar's `entities` / `relationships` arrays in Phase 7.
 
 ---
 
@@ -130,7 +134,7 @@ Record the chosen framing and the rejected ones in sidecar `approach` and `alter
 
 ## Phase 3 — Draft
 
-1. **Choose canvas.** Pick from `style.md` §5.7 by content shape:
+1. **Choose canvas.** Pick from the active theme's `style.md` §5.7 by content shape:
    - 16:10 (1280×800) — flows, architectures, sequences (default).
    - 1:1 (1280×1280) — hierarchies, concept maps, radial.
    - 4:5 (1280×1600) — tall trees, deep stacks.
@@ -146,16 +150,18 @@ Record the chosen framing and the rejected ones in sidecar `approach` and `alter
    - Content elements.
    - Legend block (top-right) only if ≥ 2 categorical colors used.
 
-4. **Apply style.md tokens strictly.**
-   - Palette: ONLY `#FFFFFF`, `#F4F5F7`, `#0F172A`, `#475569`, `#2563EB`, `#B91C1C`.
-   - Typography: 12 / 14 / 16 / 20 only; 400 / 600 only.
-   - Stroke: 1 / 1.5 / 2 only.
-   - Radii: 0 / 4 / 8 only.
-   - Spacing: 4 / 8 / 16 / 24 / 32 only.
+4. **Apply the active theme's tokens strictly.**
+   - Palette: only colors declared in the theme's `palette` block (`ink`, `inkMuted`, `warn`, `surface`, `surfaceMuted`, every `accents[].hex`, every `categoryChips[].hex`).
+   - Typography: sizes and weights from `theme.typography.body` (and `display` / `mono` / `eyebrow` when defined). For the default `technical` theme that's 12 / 14 / 16 / 20 at weights 400 / 600.
+   - Stroke: weights from `theme.nodeChrome.primaryStroke` and the theme's stated defaults (technical: 1 / 1.5 / 2).
+   - Radii: from `theme.nodeChrome.primaryRadius` / chip radii (technical: 0 / 4 / 8).
+   - Spacing: 4-px grid is global (4 / 8 / 16 / 24 / 32) — not theme-specific.
 
-5. **Connector style** is one judgment call per diagram: orthogonal (right-angle paths) for flows/architectures/sequences; curves for mind maps/networks/dependency graphs. Do not mix.
+5. **Connector style.** Inspect `theme.connectors`:
+   - If `mixingPermitted: false`, use a single style for the whole diagram — orthogonal for flows/architectures/sequences, curves for mind maps/networks/dependency graphs. Pick once and stick with it.
+   - If `mixingPermitted: true`, assign every relationship a `role` (one of `contribution | emphasis | feedback | dependency | reference`; default to `default` when unsure) and look up `theme.connectors.byRole[role]` to get `{shape, stroke, dashed}`. All edges sharing a role MUST use the same lookup result — mixing within a role is forbidden.
 
-6. **Color usage.** 1–4 colors as content needs. `accent` (#2563EB) is the singular emphasis color. `warn` (#B91C1C) for error/stop states only. If ≥ 2 categorical colors used → legend is mandatory.
+6. **Color usage.** 1–4 colors as content needs. Use ONLY colors declared in the active theme's `palette` block. When the theme defines `palette.accents[].pinnedRole`, that mapping is fixed across every diagram drawn under the theme; never reassign a pinned-role accent per diagram. If ≥ 2 categorical colors are used → legend is mandatory.
 
 7. **Write the SVG to a temp path** first (`<out>.svg.tmp`). Don't overwrite the real file until Phase 7.
 
@@ -193,14 +199,23 @@ print(json.dumps(run.evaluate('<out>.svg.tmp'), indent=2))
    - `high`-rigor: dispatch a `general-purpose` subagent with the prompt template from `eval/rubric.md`. Pass the PNG and the source SVG.
    - `medium` / `low`-rigor: run the reviewer prompt inline.
 
-3. **Reviewer returns** the JSON shape from `eval/rubric.md`:
+3. **Reviewer returns** the JSON shape from `eval/rubric.md` (keys are stable IDs):
    ```json
    {
-     "items": { "1": {"verdict": "...", "evidence": "..."}, ... "7": ... },
-     "blocker_count": <count of items 1-6 failing>,
-     "top_priorities": [...]
+     "items": {
+       "primary-emphasis": {"verdict": "pass|fail", "evidence": "..."},
+       "clear-entry": {"verdict": "pass|fail", "evidence": "..."},
+       "legibility": {"verdict": "pass|fail", "evidence": "..."},
+       "legend-coverage": {"verdict": "pass|fail", "evidence": "..."},
+       "arrowhead-consistency": {"verdict": "pass|fail", "evidence": "..."},
+       "style-atom-match": {"verdict": "pass|fail", "evidence": "..."},
+       "visual-balance": {"verdict": "pass|fail", "evidence": "..."}
+     },
+     "blocker_count": "<count of gating items that failed (visual-balance is advisory)>",
+     "top_priorities": ["<stable-id of most-important fix>", "..."]
    }
    ```
+   When the active theme injects items via `rubricOverrides.add`, those stable IDs also appear as keys in `items` and count toward `blocker_count`.
 
 4. **Decision:**
    - `blocker_count == 0` → combined gate satisfied → proceed to Phase 7.
@@ -259,6 +274,43 @@ If user picks **alt framing** → restart at Phase 2 with the next brainstormed 
 
 ---
 
+## Phase 6.6 — Editorial wrapper (only if `--mode infographic`)
+
+Runs after Phase 6 produces a clean diagram. Skipped if `--mode diagram` or the active theme has `infographic.supported: false` (Phase 0 already rejects the latter combo with a clear error).
+
+> **Extend short-circuit.** If we entered Phase 6.6 via the Extend branch in Phase 1 and the existing sidecar has a populated `wrappedText`, skip step 1 (copy generation) and step 2 (user-review checkpoint). Reuse `wrappedText` directly. Steps 3–7 still run.
+
+1. **Generate copy.** Assemble a single inline LLM prompt with: original description, `--source` markdown if provided, the entity model + relationships, the chosen Phase 2 framing, and the color-to-element assignments captured in the working sidecar. Returns JSON `{eyebrow, headline, lede, figLabel, captions[], footer}`. The prompt is short and structured; **run inline** rather than via subagent (D7).
+
+2. **User-review checkpoint.** `AskUserQuestion`: "Generated infographic copy — accept, edit a field, or regenerate?"
+   - **Accept** → proceed to step 3.
+   - **Edit field** → present each field one at a time (one `AskUserQuestion` per field with current text shown in description; user picks Keep / Replace / Skip-this-field; "Other" lets them rewrite).
+   - **Regenerate** → re-prompt the LLM once with whatever feedback the user types. Only one regen attempt; further iterations require manual edits.
+
+   Prose-fallback (no `AskUserQuestion`): print the JSON, accept by default, allow the user to reject in their next message.
+
+3. **Caption count clamp** (per spec D8). Apply via `wrapper.caption_grid.clamp_captions()`:
+   - Length > 5 → drop weakest by body length until 5 remain. Sidecar `captionCountClamp.from/to` records the change.
+   - Length < 3 → re-prompt the LLM once for 3+. If still < 3 → drop the caption block entirely (sidecar `captionCountClamp.to: 0`).
+
+4. **Determine caption anchor mode** via `wrapper.anchors.decide_anchor_mode(diagram_colors)`:
+   - Count distinct hex values used inside the diagram, excluding `ink-muted` and surface tokens.
+   - ≥ 3 → `captionAnchorMode = "color"` (each caption draws its left rule in its `anchorColor`).
+   - < 3 → `captionAnchorMode = "ordinal"` (each caption gets a glyph from `["●", "▲", "■", "◆", "★"]`; matching glyph drawn next to the corresponding diagram element).
+   - Sidecar records the chosen mode.
+
+5. **Color remap** (color mode only). For each caption whose `anchorColor` is not actually present inside the diagram, replace with `ink` and record `{from, to, reason}` in `captionAnchorRemaps`. The `caption-color-not-in-diagram` code check (run.py) catches any leftover mismatches as a hard-fail in step 7's eval.
+
+6. **Compose wrapper SVG** via `wrapper.compose.compose_wrapper(diagram_svg, wrappedText, theme, anchor_mode, renderer, font_metrics_available)`. Returns the composite SVG text. Wrapper preserves source diagram element `id` attributes verbatim inside `zone-diagram` so ordinal-marker mirroring can find them.
+
+7. **Render the composite to PNG** per `reference/render-to-raster.md`. Run the slim **wrapper rubric** INLINE (no subagent dispatch, regardless of `--rigor` tier — single pass, no refinement loop). The 4 items: `wrapper-typography-hierarchy`, `wrapper-text-fit`, `wrapper-figure-proportion`, `wrapper-edge-padding`. If `wrapper_blocker_count > 0`, prepend an XML comment to the composite: `<!-- WRAPPER QUALITY WARNING: <ids> -->`. **Wrapper rubric failures DO NOT GATE — they ship-with-warning.** The full 7-item diagram rubric in Phase 5 already gated; this is supplementary insurance.
+
+8. **Write sidecar v2** with `mode: "infographic"`, `wrapperLayout: "editorial-v1"`, `wrappedText`, `captionAnchorMode`, `captionAnchorRemaps`, `captionCountClamp`, `wrapperRubricResults`. Phase 7 finalizes the SVG move and the sidecar write.
+
+See `themes/editorial/infographic/editorial-v1.md` for the full layout spec.
+
+---
+
 ## Phase 7 — Finalize: SVG + sidecar
 
 1. **Move** `<out>.svg.tmp` → `<out>.svg`. If shipped-with-warning, prepend an XML comment immediately after the `<?xml` declaration:
@@ -266,9 +318,13 @@ If user picks **alt framing** → restart at Phase 2 with the next brainstormed 
    <!-- DIAGRAM QUALITY WARNING: <comma-separated remaining fails> -->
    ```
 
-2. **Write `<out>.diagram.json`** sidecar per `reference/sidecar-schema.md`:
-   - `schemaVersion: 1`
-   - `concept`, `approach`, `alternativesConsidered`, `canvas`, `entities`, `relationships`, `positions`, `colorAssignments`, `evalSummary`, `createdAt` (ISO 8601 UTC), `createdBy: "pmos-toolkit:diagram@v1"`.
+2. **Write `<out>.diagram.json`** sidecar via `write_sidecar()` per `reference/sidecar-schema.md`:
+   - `schemaVersion: 2`
+   - `theme` — the active theme name (from `--theme`, default `technical`).
+   - `mode` — `"diagram"` for vanilla draws; `"infographic"` when invoked with `--mode infographic`.
+   - `concept`, `approach`, `alternativesConsidered`, `canvas`, `entities`, `positions`, `colorAssignments`, `evalSummary`, `createdAt` (ISO 8601 UTC), `createdBy: "pmos-toolkit:diagram@v2"`.
+   - `relationships[]` includes `role` for every relationship that was assigned one in Phase 3 (mandatory under themes with `connectors.mixingPermitted: true`; optional otherwise).
+   - `evalSummary.visionItems` uses stable rubric IDs (e.g. `"primary-emphasis": "pass"`) — see `eval/rubric.md`.
 
 3. **Print final stdout** (one line of path + one line of eval summary):
    ```
@@ -298,13 +354,17 @@ If a generic `learnings-capture.md` is not found, append entries directly to `~/
 - Do NOT use `AskUserQuestion` to ask "should I proceed?" — only to gather decisions or surface findings. Each question must have a clear default fallback for non-AskUserQuestion environments.
 - Do NOT skip the renderer hard-gate. If no renderer is available, refuse to run; never silently downgrade to "code-only eval".
 - Do NOT brainstorm from a hardcoded list of diagram types ("flowchart vs hierarchy vs swimlane"). Always reason from the specific content's structure.
-- Do NOT copy the structure of any file in `examples/style-atoms/` — those are visual primitives, not templates. Re-derive layout each time.
+- Do NOT copy the structure of any file in `themes/technical/atoms/` (or any theme's `atoms/` directory) — those are visual primitives, not templates. Re-derive layout each time.
 - Do NOT regenerate the entire SVG when the user requests a tweak via the extend flow. Apply minimal patches preserving sidecar `positions`.
-- Do NOT use colors outside the 6-token palette (style.md §5.1). The contrast metric will hard-fail any out-of-table combination.
+- Do NOT use colors outside the active theme's declared palette. The contrast metric will hard-fail any out-of-token combination, regardless of theme.
+- Do NOT reassign pinned-role accents per diagram. When a theme defines `palette.accents[].pinnedRole` (e.g. editorial pins `feedback` to `#1E3A8A`), that mapping is permanent across every diagram drawn under the theme.
+- Do NOT mix connector styles within a single role even when the theme permits mixed connectors. Each role uses one consistent style across the diagram.
 - Do NOT use font sizes below 12px — even for "subtle annotations". Move the content to the legend or remove it.
-- Do NOT write SVGs that include `<image>`, `<foreignObject>`, `<animate>`, `filter`, drop shadows, or gradients (style.md §5.9).
+- Do NOT write SVGs that include `<image>`, `<foreignObject>`, `<animate>`, `filter`, drop shadows, or gradients (themes' anti-patterns sections).
 - Do NOT exceed 30 primary nodes. At 21–30 you MUST prompt for a split before proceeding.
-- Do NOT mix orthogonal and curved connectors in one diagram. Pick one style and stick with it.
+- Do NOT mix connectors unless the active theme permits role-keyed mixing (`connectors.mixingPermitted: true`). Even then, mixing within a single role is forbidden.
+- Do NOT skip Phase 6.6 in infographic mode. Auto-generated copy + user-review checkpoint + slim wrapper rubric are mandatory; failures ship-with-warning, never silently.
+- Do NOT use `<foreignObject>` for diagram-interior content. It is permitted only inside Phase 6.6 wrapper text zones, and only when the renderer is Playwright.
 - Do NOT silently dump prose findings in Phase 6. Always use the Findings Presentation Protocol with structured options.
 - Do NOT delete `~/.pmos/diagram-cache/` files outside of the explicit `--clear-cache` flag.
 
@@ -315,17 +375,43 @@ If a generic `learnings-capture.md` is not found, append entries directly to `~/
 ```
 skills/diagram/
 ├── SKILL.md                       # this file (orchestrator)
-├── style.md                       # tokens, typography, layout, components, a11y, canvases, anti-patterns
+├── themes/
+│   ├── _schema.json               # JSON Schema for theme.yaml (positive-list; rejects layout keys)
+│   ├── technical/                 # default theme
+│   │   ├── theme.yaml
+│   │   ├── style.md
+│   │   └── atoms/                 # 8 visual primitives — NOT templates
+│   └── editorial/                 # cream + dashed-container + pinned-accent + pastel-chip aesthetic
+│       ├── theme.yaml
+│       ├── style.md
+│       ├── atoms/                 # 5 visual primitives
+│       └── infographic/
+│           └── editorial-v1.md    # Phase 6.6 layout zones, caption grid, slim wrapper rubric
 ├── eval/
-│   ├── rubric.md                  # 7-item binary vision rubric + reviewer prompt template
-│   └── code-metrics.md            # xml.etree-based metric specifications (impl in tests/run.py)
+│   ├── rubric.md                  # 7-item diagram rubric + 4-item wrapper rubric (theme-aware waive/add)
+│   └── code-metrics.md            # xml.etree-based metric specs (impl in tests/run.py)
 ├── reference/
 │   ├── svg-primer.md              # SVG authoring scaffold + gotchas
 │   ├── render-to-raster.md        # detection + invocation for Playwright MCP / rsvg / cairosvg
-│   └── sidecar-schema.md          # <slug>.diagram.json schema (schemaVersion: 1) + versioning policy
-├── examples/style-atoms/          # 8 visual primitives — NOT templates
+│   └── sidecar-schema.md          # v2 schema (theme/mode/role/wrappedText) + versioning policy
+├── wrapper/                       # Phase 6.6 composition module
+│   ├── caption_grid.py            # auto-fit grid (3/4/5 captions) + clamp policy
+│   ├── anchors.py                 # color vs ordinal mode decision + ordinal-marker assignment
+│   └── compose.py                 # editorial-v1 wrapper SVG composition
 └── tests/
-    ├── golden/                    # 5 passing fixtures + .expected.json snapshots
-    ├── defects/                   # 10 fixtures, one violation each
-    └── run.py                     # eval impl + selftest runner (invoked by --selftest)
+    ├── conftest.py                # shared fixtures (theme_editorial, theme_technical)
+    ├── run.py                     # eval impl + selftest runner (invoked by --selftest)
+    ├── golden/                    # technical fixtures + golden/editorial/ subdir
+    ├── defects/                   # technical fixtures + defects/editorial/ subdir
+    ├── test_theme_schema.py
+    ├── test_theme_loader.py
+    ├── test_sidecar.py
+    ├── test_rubric_loader.py
+    ├── test_editorial_theme.py
+    ├── test_role_consistency.py
+    ├── test_caption_grid.py
+    ├── test_anchors.py
+    ├── test_wrapper_compose.py
+    ├── test_wrapper_rubric.py
+    └── test_caption_color_validator.py
 ```

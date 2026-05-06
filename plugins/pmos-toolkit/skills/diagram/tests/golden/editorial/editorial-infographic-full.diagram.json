@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 2,
+  "concept": "Editorial-v1 infographic wrapping the context-fragments fan-in diagram",
+  "theme": "editorial",
+  "mode": "infographic",
+  "wrapperLayout": "editorial-v1",
+  "approach": "left-right fan-in (wrapped)",
+  "alternativesConsidered": [],
+  "canvas": {"aspect": "auto", "width": 1280, "height": 1264},
+  "entities": [],
+  "relationships": [],
+  "positions": {},
+  "colorAssignments": {},
+  "wrappedText": {
+    "eyebrow": "HARNESS ENGINEERING · CONTEXT FRAGMENTS",
+    "headline": "Four inputs feed Context Fragments which the Computation Box consumes",
+    "lede": "Every model call assembles **context fragments** from the system prompt, callable surfaces, hook outputs, and recalled memory. The computation box consumes the assembled context.",
+    "figLabel": "FIG. 1 — CONTEXT FRAGMENT FAN-IN",
+    "captions": [
+      {"title": "System prompt", "body": "base instruction layer plus user-appended turn directives."},
+      {"title": "Tools and hooks", "body": "callable surfaces and pre/post intercepts add structured fragments."},
+      {"title": "Recalled memory", "body": "previously stored facts and traces re-enter as fragments."},
+      {"title": "Computation", "body": "the model performs a forward pass over the assembled context."}
+    ],
+    "footer": "PMOS-TOOLKIT · /DIAGRAM EDITORIAL"
+  },
+  "captionAnchorMode": "ordinal",
+  "captionAnchorRemaps": [],
+  "captionCountClamp": {},
+  "wrapperRubricResults": {},
+  "evalSummary": {},
+  "createdAt": "2026-05-06T14:10:00Z",
+  "createdBy": "pmos-toolkit:diagram@v2"
+}

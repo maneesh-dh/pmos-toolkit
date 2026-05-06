@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800"
+     font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+  <title>Editorial radial mind map — six facets of "observability" radiating from the center concept</title>
+  <defs>
+    <marker id="arrow-ink" viewBox="0 0 8 6" refX="8" refY="3"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 8 3 L 0 6 z" fill="context-stroke"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1280" height="800" fill="#F4EFE6"/>
+  <rect class="container" x="16" y="16" width="1248" height="768" fill="#F4EFE6"
+        stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4 4"/>
+
+  <!-- Eyebrow -->
+  <text x="32" y="56"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="12" font-weight="400" fill="#475569" letter-spacing="0.96">CONCEPT MAP · OBSERVABILITY</text>
+
+  <!-- Center node — the question being mapped -->
+  <rect x="560" y="340" width="160" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="2"/>
+  <text x="640" y="396" text-anchor="middle" font-size="20" font-weight="600" fill="#0F172A">Observability</text>
+  <text x="640" y="424" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">six facets</text>
+
+  <!-- 6 radial nodes (120x80) at 60° increments, distance ~280 from center (640,400) -->
+  <!-- N1 (0° right): Logs -->
+  <rect x="860" y="360" width="120" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="920" y="396" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Logs</text>
+  <text x="920" y="416" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">events</text>
+
+  <!-- N2 (60° upper-right): Metrics -->
+  <rect x="720" y="116" width="120" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="780" y="152" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Metrics</text>
+  <text x="780" y="172" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">timeseries</text>
+
+  <!-- N3 (120° upper-left): Traces -->
+  <rect x="440" y="116" width="120" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="500" y="152" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Traces</text>
+  <text x="500" y="172" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">spans</text>
+
+  <!-- N4 (180° left): Alerts -->
+  <rect x="300" y="360" width="120" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="360" y="396" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Alerts</text>
+  <text x="360" y="416" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">SLO breaches</text>
+
+  <!-- N5 (240° lower-left): Profiling -->
+  <rect x="440" y="604" width="120" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="500" y="640" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Profiling</text>
+  <text x="500" y="660" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">flame graphs</text>
+
+  <!-- N6 (300° lower-right): Dashboards -->
+  <rect x="720" y="604" width="120" height="80" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="780" y="640" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Dashboards</text>
+  <text x="780" y="660" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">overview</text>
+
+  <!-- 6 contribution edges (curved, ink, no dash) — center → radial -->
+  <path id="e1" d="M 720 400 C 780 400, 820 400, 860 400" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e2" d="M 700 348 C 720 320, 760 220, 780 196" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e3" d="M 580 348 C 560 320, 520 220, 500 196" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e4" d="M 560 400 C 500 400, 460 400, 420 400" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e5" d="M 580 452 C 560 480, 520 580, 500 604" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e6" d="M 700 452 C 720 480, 760 580, 780 604" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+</svg>

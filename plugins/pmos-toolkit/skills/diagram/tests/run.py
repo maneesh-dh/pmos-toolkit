@@ -20,15 +20,252 @@ import sys
 import xml.etree.ElementTree as ET
 from typing import Any
 
+try:
+    import yaml
+except ImportError:
+    print("ERROR: PyYAML is required for theme-aware /diagram selftest.", file=sys.stderr)
+    print("Install with: pip install pyyaml", file=sys.stderr)
+    sys.exit(2)
+
+try:
+    from jsonschema import validate as _jsonschema_validate
+except ImportError:
+    print("ERROR: jsonschema is required for theme schema validation.", file=sys.stderr)
+    print("Install with: pip install jsonschema", file=sys.stderr)
+    sys.exit(2)
+
 SVG_NS = "http://www.w3.org/2000/svg"
 NSMAP = {"svg": SVG_NS}
 
-PALETTE = {"#FFFFFF", "#F4F5F7", "#0F172A", "#475569", "#2563EB", "#B91C1C"}
 PALETTE_KEYWORDS = {"none", "transparent", "context-stroke", "context-fill", "currentcolor"}
 
 HERE = pathlib.Path(__file__).parent
 GOLDEN_DIR = HERE / "golden"
 DEFECTS_DIR = HERE / "defects"
+THEMES_DIR = HERE.parent / "themes"
+SCHEMA_PATH = THEMES_DIR / "_schema.json"
+
+
+# ---------- Theme loading ----------
+
+_THEME_CACHE: dict[str, dict] = {}
+
+
+def load_theme(name: str) -> dict:
+    """Load themes/<name>/theme.yaml, validate against _schema.json, return parsed dict.
+
+    Raises FileNotFoundError if the theme directory or theme.yaml is missing.
+    Raises jsonschema.ValidationError if the YAML fails schema validation.
+    """
+    if name in _THEME_CACHE:
+        return _THEME_CACHE[name]
+    theme_path = THEMES_DIR / name / "theme.yaml"
+    if not theme_path.is_file():
+        raise FileNotFoundError(f"theme not found: {theme_path}")
+    theme = yaml.safe_load(theme_path.read_text())
+    schema = json.loads(SCHEMA_PATH.read_text())
+    _jsonschema_validate(theme, schema)
+    _THEME_CACHE[name] = theme
+    return theme
+
+
+SIDECAR_SCHEMA_VERSION = 2
+
+
+# ---------- Rubric prompt assembly ----------
+
+# Stable IDs map to the 7 core rubric items. The mapping is fixed; theme files
+# refer to these IDs by string. Kept in code (not config) because the IDs are
+# part of the sidecar schema.
+RUBRIC_CORE_ITEMS: list[dict[str, str]] = [
+    {
+        "id": "primary-emphasis",
+        "title": "Primary node emphasis",
+        "gating": "true",
+        "prompt": "Is there exactly one visually-emphasized 'primary' node, distinguished by size OR weight OR position OR color (theme accent)?",
+    },
+    {
+        "id": "clear-entry",
+        "title": "Clear starting point",
+        "gating": "true",
+        "prompt": "Does the diagram have a clear starting point — top-left node for left-right flows, top-center for top-down hierarchies, an explicitly labeled start/input/user, or the primary node if it doubles as the entry?",
+    },
+    {
+        "id": "legibility",
+        "title": "Label legibility at 50% scale",
+        "gating": "true",
+        "prompt": "Is every text label fully legible at 50% raster scale (no clipping, no occlusion by other elements, no overlap with connectors)?",
+    },
+    {
+        "id": "legend-coverage",
+        "title": "Legend coverage",
+        "gating": "true",
+        "prompt": "Does each color used in the diagram appear in the legend with a clear meaning? Auto-pass when only ink plus at most one accent is used.",
+    },
+    {
+        "id": "arrowhead-consistency",
+        "title": "Arrowhead consistency",
+        "gating": "true",
+        "prompt": "Are arrowheads consistently directional? No mix of bidirectional and directional without a legend explanation; no connectors missing arrowheads where direction is implied.",
+    },
+    {
+        "id": "style-atom-match",
+        "title": "Style atoms match",
+        "gating": "true",
+        "prompt": "Does the diagram match the active theme's reference atoms (palette tokens, stroke weights, type scale, corner radii, edge label pill, legend block)?",
+    },
+    {
+        "id": "visual-balance",
+        "title": "Visual balance",
+        "gating": "false",
+        "prompt": "Advisory: is the largest empty quadrant ≤ 35% of canvas area AND the densest 25% region ≤ 60% of nodes?",
+    },
+]
+
+
+WRAPPER_RUBRIC_ITEMS: list[dict[str, str]] = [
+    {
+        "id": "wrapper-typography-hierarchy",
+        "title": "Typography hierarchy",
+        "prompt": "Eyebrow, H1, lede, fig label, captions, and footer read in clear visual hierarchy with no two zones competing for the eye.",
+    },
+    {
+        "id": "wrapper-text-fit",
+        "title": "Text fit",
+        "prompt": "No lede or caption text overflows its zone; line breaks fall on word boundaries; no clipped or truncated-without-ellipsis text.",
+    },
+    {
+        "id": "wrapper-figure-proportion",
+        "title": "Figure proportion",
+        "prompt": "The diagram fills its zone without dominating the page or feeling lost; surrounding zones breathe.",
+    },
+    {
+        "id": "wrapper-edge-padding",
+        "title": "Edge padding",
+        "prompt": "No element kisses the canvas edge or a zone boundary; margins are visually consistent top, bottom, left, right.",
+    },
+]
+
+
+def build_wrapper_rubric_prompt() -> str:
+    """Materialize the slim 4-item wrapper rubric prompt.
+
+    Single pass, no refinement loop. Run inline regardless of --rigor.
+    """
+    lines: list[str] = []
+    lines.append("# Wrapper rubric (Phase 6.6 — single pass, ship-with-warning on fail)")
+    lines.append("")
+    lines.append("Score each item pass|fail with one-sentence concrete evidence (zone names,")
+    lines.append("pixel coords, label text). Do NOT speculate. Output JSON only:")
+    lines.append("{")
+    lines.append('  "wrapper_items": {')
+    lines.append('    "wrapper-typography-hierarchy": {"verdict": "pass|fail", "evidence": "..."},')
+    lines.append("    ...")
+    lines.append("  },")
+    lines.append('  "wrapper_blocker_count": <count of failing items>')
+    lines.append("}")
+    lines.append("")
+    for item in WRAPPER_RUBRIC_ITEMS:
+        lines.append(f"## `{item['id']}` — {item['title']}")
+        lines.append(f"> {item['prompt']}")
+        lines.append("")
+    return "\n".join(lines)
+
+
+def build_rubric_prompt(theme: dict) -> str:
+    """Materialize the reviewer prompt for the given theme.
+
+    Iterates RUBRIC_CORE_ITEMS, skipping any whose id is in
+    theme.rubricOverrides.waive, and appends each entry from
+    theme.rubricOverrides.add (each: {id, prompt, evidenceHint}).
+    """
+    overrides = theme.get("rubricOverrides", {}) or {}
+    waive = set(overrides.get("waive") or [])
+    add = list(overrides.get("add") or [])
+
+    lines: list[str] = []
+    lines.append(f"# Vision rubric for theme: {theme.get('displayName') or theme.get('name')}")
+    lines.append("")
+    lines.append("Return JSON keyed by stable item ID. For each item: pass|fail with one-")
+    lines.append("sentence concrete evidence (coords, label text, named element, or quadrant).")
+    lines.append("")
+
+    for item in RUBRIC_CORE_ITEMS:
+        if item["id"] in waive:
+            continue
+        gating = "GATING" if item["gating"] == "true" else "ADVISORY"
+        lines.append(f"## `{item['id']}` — {item['title']} ({gating})")
+        lines.append(f"> {item['prompt']}")
+        lines.append("")
+
+    if add:
+        lines.append("## Theme add-items (gating)")
+        lines.append("")
+        for entry in add:
+            lines.append(f"### `{entry['id']}`")
+            lines.append(f"> {entry['prompt']}")
+            hint = entry.get("evidenceHint")
+            if hint:
+                lines.append(f"_Evidence hint: {hint}_")
+            lines.append("")
+
+    return "\n".join(lines)
+
+
+def read_sidecar(path: str | pathlib.Path) -> dict | None:
+    """Read a v2 sidecar JSON. Returns None if missing or schemaVersion != 2.
+
+    v1 sidecars are intentionally ignored (treated as absent) per the v2 policy.
+    Newer-than-v2 sidecars raise ValueError so callers can surface the version mismatch.
+    """
+    p = pathlib.Path(path)
+    if not p.is_file():
+        return None
+    try:
+        data = json.loads(p.read_text())
+    except json.JSONDecodeError:
+        return None
+    sv = data.get("schemaVersion")
+    if sv == SIDECAR_SCHEMA_VERSION:
+        return data
+    if isinstance(sv, int) and sv > SIDECAR_SCHEMA_VERSION:
+        raise ValueError(
+            f"sidecar at {p} was written by a newer /diagram "
+            f"(schemaVersion {sv}). Upgrade the skill or use a different --out path."
+        )
+    return None  # v1 or unknown — treat as absent
+
+
+def write_sidecar(path: str | pathlib.Path, payload: dict) -> None:
+    """Write a v2 sidecar to `path`. Stamps schemaVersion if absent."""
+    p = pathlib.Path(path)
+    payload = dict(payload)
+    payload.setdefault("schemaVersion", SIDECAR_SCHEMA_VERSION)
+    p.write_text(json.dumps(payload, indent=2) + "\n")
+
+
+def build_palette_set(theme: dict) -> set[str]:
+    """Build the union of allowed hex colors for the given theme.
+
+    Includes ink, inkMuted, warn, surface, surfaceMuted, every accent hex, and
+    every categoryChip hex. All values upper-cased for set comparison.
+    """
+    pal = theme["palette"]
+    surf = theme.get("surface", {})
+    out: set[str] = set()
+    for key in ("ink", "inkMuted", "warn", "surface", "surfaceMuted"):
+        v = pal.get(key)
+        if v:
+            out.add(v.upper())
+    for key in ("background", "muted", "containerStrokeColor"):
+        v = surf.get(key)
+        if v:
+            out.add(v.upper())
+    for accent in pal.get("accents", []):
+        out.add(accent["hex"].upper())
+    for chip in pal.get("categoryChips", []):
+        out.add(chip["hex"].upper())
+    return out
 
 
 # ---------- Affine matrix helpers ----------
@@ -189,6 +426,13 @@ def has_legend_class(path_cls):
     return any(c in {"legend", "edge-label", "edge-pill"} for c in path_cls)
 
 
+def is_chrome_class(path_cls):
+    """Backdrop / outer container rects are not nodes — themes use them for theme-level
+    chrome (e.g., editorial's dashed boundary or a cream surface backdrop). Mark with
+    class='bg' or class='container' to opt out of node-occlusion checks."""
+    return any(c in {"bg", "container", "backdrop", "chrome"} for c in path_cls)
+
+
 def in_defs(el, defs_set):
     return el in defs_set
 
@@ -203,14 +447,142 @@ def collect_defs(root):
 
 # ---------- Main evaluation ----------
 
-def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
+def check_caption_colors_in_diagram(svg_text_or_path) -> tuple[bool, str]:
+    """Verify every caption-rule stroke inside `<g id=zone-captions>` appears as
+    a fill/stroke color inside `<g id=zone-diagram>`. Surface tokens and
+    ink-muted are excluded from the requirement.
+
+    Returns (ok, reason). Used by the infographic eval pipeline.
+    """
+    if isinstance(svg_text_or_path, (str, pathlib.Path)) and pathlib.Path(svg_text_or_path).is_file():
+        svg_text = pathlib.Path(svg_text_or_path).read_text()
+    else:
+        svg_text = str(svg_text_or_path)
+
+    # Extract the zone-diagram block
+    diag_match = re.search(r'<g\s+id="zone-diagram"[^>]*>(.*?)</g>\s*<g\s+id="zone-(?:legend|captions|footer)"',
+                           svg_text, flags=re.DOTALL)
+    if not diag_match:
+        # Fall back to anything between zone-diagram and end of svg
+        diag_match = re.search(r'<g\s+id="zone-diagram"[^>]*>(.*?)</svg>', svg_text, flags=re.DOTALL)
+    diag_block = diag_match.group(1) if diag_match else ""
+
+    cap_match = re.search(r'<g\s+id="zone-captions"[^>]*>(.*?)</g>\s*<g\s+id="zone-footer"',
+                          svg_text, flags=re.DOTALL)
+    if not cap_match:
+        cap_match = re.search(r'<g\s+id="zone-captions"[^>]*>(.*?)</svg>', svg_text, flags=re.DOTALL)
+    cap_block = cap_match.group(1) if cap_match else ""
+
+    if not cap_block:
+        return True, ""  # no captions to validate
+
+    diagram_colors = {h.upper() for h in re.findall(r"#[0-9A-Fa-f]{6}", diag_block)}
+
+    # Captions: collect strokes from elements with class="caption-rule"
+    caption_strokes: set[str] = set()
+    for m in re.finditer(r'class="caption-rule"[^>]*stroke="(#[0-9A-Fa-f]{6})"', cap_block):
+        caption_strokes.add(m.group(1).upper())
+    # Also handle stroke before class
+    for m in re.finditer(r'stroke="(#[0-9A-Fa-f]{6})"[^>]*class="caption-rule"', cap_block):
+        caption_strokes.add(m.group(1).upper())
+
+    # Tolerated absences: ink-muted + surface tokens (caption-rule may legitimately use these in ordinal mode)
+    excluded = {"#475569", "#FFFFFF", "#F4F5F7", "#F4EFE6", "#9CA3AF"}
+    bad = [c for c in caption_strokes if c not in diagram_colors and c not in excluded]
+    if bad:
+        return False, (
+            f"caption-color-not-in-diagram: caption rule(s) use {sorted(bad)} "
+            f"but those colors are absent from the diagram interior"
+        )
+    return True, ""
+
+
+def check_role_style_consistency(
+    svg_path: str | pathlib.Path,
+    sidecar_path: str | pathlib.Path,
+) -> tuple[bool, str]:
+    """For each role with ≥ 2 edges, all edges' (stroke, dasharray, tag) tuples
+    must be identical. Sidecar `relationships[]._svgId` keys are looked up in the
+    SVG via element id. Returns (ok, reason).
+    """
     svg_path = pathlib.Path(svg_path)
+    sidecar_path = pathlib.Path(sidecar_path)
+    if not sidecar_path.is_file():
+        return True, ""
+    sidecar = json.loads(sidecar_path.read_text())
+    rels = sidecar.get("relationships") or []
+    role_to_ids: dict[str, list[str]] = {}
+    for rel in rels:
+        role = rel.get("role")
+        sid = rel.get("_svgId")
+        if not role or not sid:
+            continue
+        role_to_ids.setdefault(role, []).append(sid)
+
+    if not role_to_ids:
+        return True, ""
+
+    tree = ET.parse(svg_path)
+    root = tree.getroot()
+    by_id: dict[str, ET.Element] = {}
+    for el in root.iter():
+        eid = el.get("id")
+        if eid:
+            by_id[eid] = el
+
+    def edge_signature(el: ET.Element) -> tuple[str, str, str]:
+        tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
+        stroke = (el.get("stroke") or "").upper()
+        dash = el.get("stroke-dasharray") or ""
+        return (tag, stroke, dash)
+
+    for role, ids in role_to_ids.items():
+        if len(ids) < 2:
+            continue
+        sigs: list[tuple[str, tuple[str, str, str]]] = []
+        for sid in ids:
+            el = by_id.get(sid)
+            if el is None:
+                return False, f"role-style-consistency: role '{role}' references missing svgId '{sid}'"
+            sigs.append((sid, edge_signature(el)))
+        first_sig = sigs[0][1]
+        for sid, sig in sigs[1:]:
+            if sig != first_sig:
+                return False, (
+                    f"role-style-consistency: role '{role}' edge {sigs[0][0]} "
+                    f"uses {first_sig}, edge {sid} uses {sig}; expected one style per role"
+                )
+    return True, ""
+
+
+def evaluate(svg_path: str | pathlib.Path, theme: str = "technical") -> dict[str, Any]:
+    svg_path = pathlib.Path(svg_path)
+    theme_dict = load_theme(theme)
+    palette = build_palette_set(theme_dict)
     tree = ET.parse(svg_path)
     root = tree.getroot()
     styles = parse_styles(root)
     defs_set = collect_defs(root)
     hard_fails: list[str] = []
     diagnostics: dict[str, Any] = {"off_grid_coords": []}
+
+    # Role-style-consistency hard-fail (themes with mixingPermitted: true only)
+    sidecar_path = svg_path.with_suffix(".diagram.json")
+    if theme_dict["connectors"].get("mixingPermitted"):
+        ok, reason = check_role_style_consistency(svg_path, sidecar_path)
+        if not ok:
+            hard_fails.append(reason)
+
+    # Caption-color-not-in-diagram hard-fail (infographic mode only)
+    if sidecar_path.is_file():
+        try:
+            sidecar_data = json.loads(sidecar_path.read_text())
+            if sidecar_data.get("mode") == "infographic":
+                ok2, reason2 = check_caption_colors_in_diagram(svg_path)
+                if not ok2:
+                    hard_fails.append(reason2)
+        except json.JSONDecodeError:
+            pass
 
     # Collect title
     title_el = root.find(f"{{{SVG_NS}}}title")
@@ -254,7 +626,7 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
                 # We don't allow named colors or rgb()
                 palette_violations.append(f"{attr}={v} on <{local_tag}>")
                 continue
-            if v.upper() not in PALETTE:
+            if v.upper() not in palette:
                 palette_violations.append(f"{attr}={v} on <{local_tag}>")
 
         # Collect coords for grid-snap
@@ -274,7 +646,7 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
             coords_for_grid.append((f"<{local_tag}>@{k}={raw}", val, m[4 if k in ('x','x1','x2','cx') else 5]))
 
         # NODE detection
-        if local_tag in ("rect", "circle", "ellipse") and not has_legend_class(path_cls):
+        if local_tag in ("rect", "circle", "ellipse") and not has_legend_class(path_cls) and not is_chrome_class(path_cls):
             try:
                 if local_tag == "rect":
                     x = float(el.get("x", 0)); y = float(el.get("y", 0))
@@ -321,13 +693,15 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
                 for cmd, rest in cmds:
                     nums = [float(n) for n in re.findall(_NUM, rest)]
                     if cmd == "M":
+                        if len(nums) < 2:
+                            continue
                         cur = (nums[0], nums[1])
                         waypoints.append(apply(m, *cur))
-                        for i in range(2, len(nums), 2):
+                        for i in range(2, len(nums) - 1, 2):
                             cur = (nums[i], nums[i + 1])
                             waypoints.append(apply(m, *cur))
                     elif cmd == "L":
-                        for i in range(0, len(nums), 2):
+                        for i in range(0, len(nums) - 1, 2):
                             cur = (nums[i], nums[i + 1])
                             waypoints.append(apply(m, *cur))
                     elif cmd == "H":
@@ -405,7 +779,7 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
         if not t["fill"].startswith("#"):
             continue
         fill = t["fill"].upper()
-        if fill not in PALETTE:
+        if fill not in palette:
             continue  # already caught by palette check
         # Find smallest enclosing node bbox; default canvas
         bg = canvas_fill
@@ -420,7 +794,7 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
                         if c in styles and "fill" in styles[c]:
                             node_fill = styles[c]["fill"]
                             break
-                if node_fill and node_fill.upper() in PALETTE:
+                if node_fill and node_fill.upper() in palette:
                     bg = node_fill.upper()
                     smallest_area = w * h
         ratio = contrast_ratio(fill, bg)
@@ -525,14 +899,30 @@ def evaluate(svg_path: str | pathlib.Path) -> dict[str, Any]:
 
 # ---------- Selftest harness ----------
 
+def _iter_corpus(base_dir: pathlib.Path) -> list[tuple[pathlib.Path, str]]:
+    """Yield (svg_path, theme_name) for every fixture under base_dir.
+
+    Top-level *.svg → theme=technical (default).
+    base_dir/<theme>/*.svg → theme=<theme> (Phase 2+).
+    """
+    out: list[tuple[pathlib.Path, str]] = []
+    for svg in sorted(base_dir.glob("*.svg")):
+        out.append((svg, "technical"))
+    for sub in sorted(base_dir.iterdir()) if base_dir.is_dir() else []:
+        if sub.is_dir():
+            for svg in sorted(sub.glob("*.svg")):
+                out.append((svg, sub.name))
+    return out
+
+
 def run_corpus(update_snapshots: bool = False) -> int:
     failures: list[str] = []
 
     print("=" * 64)
     print("GOLDEN")
     print("=" * 64)
-    for svg in sorted(GOLDEN_DIR.glob("*.svg")):
-        result = evaluate(svg)
+    for svg, theme_name in _iter_corpus(GOLDEN_DIR):
+        result = evaluate(svg, theme=theme_name)
         snap = svg.with_suffix(".expected.json")
         actual = {
             "code_score": result["code_score"],
@@ -574,11 +964,14 @@ def run_corpus(update_snapshots: bool = False) -> int:
         "mixed-reading-direction":  ("vision", None),  # not detectable by code; documented
         "crossing-storm":           ("soft", "edge_crossings"),
         "arrowhead-inconsistent":   ("vision", None),  # not detectable by code; documented
+        "cream-but-mixed-connectors-within-one-role": ("hard", "role-style-consistency"),
+        "eyebrow-not-uppercase":    ("vision", None),  # editorial-specific vision check
+        "infographic-caption-color-not-in-diagram": ("hard", "caption-color-not-in-diagram"),
     }
-    for svg in sorted(DEFECTS_DIR.glob("*.svg")):
+    for svg, theme_name in _iter_corpus(DEFECTS_DIR):
         stem = svg.stem
         expectation = DEFECT_EXPECT.get(stem)
-        result = evaluate(svg)
+        result = evaluate(svg, theme=theme_name)
         if expectation is None:
             failures.append(f"{svg.name}: no expectation in DEFECT_EXPECT")
             print(f"  ?     {svg.name} (unmapped)")

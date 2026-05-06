@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800"
+     font-family="Inter, ui-sans-serif, system-ui, sans-serif">
+  <title>Editorial flow fan-in — four context inputs feed Context Fragments which the Computation Box consumes</title>
+  <defs>
+    <marker id="arrow-ink" viewBox="0 0 8 6" refX="8" refY="3"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 8 3 L 0 6 z" fill="context-stroke"/>
+    </marker>
+  </defs>
+
+  <!-- Cream surface -->
+  <rect class="bg" x="0" y="0" width="1280" height="800" fill="#F4EFE6"/>
+
+  <!-- Dashed outer container (theme defining-move) -->
+  <rect class="container" x="16" y="16" width="1248" height="768" fill="#F4EFE6"
+        stroke="#9CA3AF" stroke-width="1" stroke-dasharray="4 4"/>
+
+  <!-- Eyebrow -->
+  <text x="32" y="56"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="12" font-weight="400" fill="#475569" letter-spacing="0.96">EXTERNAL CONTEXT (OBJECTS WE POPULATE)</text>
+
+  <!-- Left column: 4 input nodes (240x120, primary stroke ink 1.5) -->
+  <!-- N1: System prompt -->
+  <rect x="64" y="120" width="240" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="184" y="172" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">System prompt</text>
+  <text x="184" y="200" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">base + user-appended</text>
+
+  <!-- N2: Tools/Skills/MCP -->
+  <rect x="64" y="272" width="240" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="184" y="324" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Tools · Skills · MCP</text>
+  <text x="184" y="352" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">callable surfaces</text>
+
+  <!-- N3: Hooks/Middleware -->
+  <rect x="64" y="424" width="240" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="184" y="476" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Hooks · Middleware</text>
+  <text x="184" y="504" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">pre/post intercepts</text>
+
+  <!-- N4: Memory store -->
+  <rect x="64" y="576" width="240" height="120" rx="6" fill="#F4EFE6" stroke="#0F172A" stroke-width="1.5"/>
+  <text x="184" y="628" text-anchor="middle" font-size="16" font-weight="600" fill="#0F172A">Memory store</text>
+  <text x="184" y="656" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">recalled facts + traces</text>
+
+  <!-- Center: Context Fragments (red-orange border, accent-emphasis) -->
+  <rect x="480" y="320" width="240" height="160" rx="6" fill="#F4EFE6" stroke="#B8351A" stroke-width="2"/>
+  <text x="600" y="384" text-anchor="middle" font-size="20" font-weight="600" fill="#0F172A">Context Fragments</text>
+  <text x="600" y="412" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">assembled into the prompt</text>
+  <text x="600" y="436" text-anchor="middle" font-size="12" font-weight="400" fill="#475569">at every model call</text>
+
+  <!-- Right: Computation Box (chip-ink fill, surface text — solid black) -->
+  <rect x="920" y="320" width="280" height="160" rx="4" fill="#0F172A"/>
+  <text x="1060" y="376" text-anchor="middle"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="12" font-weight="400" fill="#F4EFE6" letter-spacing="0.96">MODEL · FORWARD PASS</text>
+  <text x="1060" y="412" text-anchor="middle" font-size="20" font-weight="600" fill="#F4EFE6">Computation Box</text>
+  <text x="1060" y="440" text-anchor="middle" font-size="12" font-weight="400" fill="#F4EFE6">over the assembled context</text>
+
+  <!-- Connectors -->
+  <!-- e1..e4: contribution role — curved, ink, no dash -->
+  <path id="e1" d="M 304 180 C 380 180, 420 360, 480 360" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e2" d="M 304 332 C 380 332, 420 388, 480 388" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e3" d="M 304 484 C 380 484, 420 416, 480 416" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+  <path id="e4" d="M 304 636 C 380 636, 420 444, 480 444" fill="none" stroke="#0F172A" stroke-width="1.5" marker-end="url(#arrow-ink)"/>
+
+  <!-- e5: emphasis role — orthogonal, accent-emphasis, no dash -->
+  <line id="e5" x1="720" y1="400" x2="920" y2="400" stroke="#B8351A" stroke-width="2" marker-end="url(#arrow-ink)"/>
+</svg>

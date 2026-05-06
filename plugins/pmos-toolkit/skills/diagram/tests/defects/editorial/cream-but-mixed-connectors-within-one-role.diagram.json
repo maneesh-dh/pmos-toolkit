@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 2,
+  "concept": "DEFECT — two feedback-role edges with different stroke patterns",
+  "theme": "editorial",
+  "mode": "diagram",
+  "approach": "left-right fan-in",
+  "alternativesConsidered": [],
+  "canvas": {"aspect": "2:1", "width": 800, "height": 400},
+  "entities": [
+    {"id": "src-a", "label": "Source A", "category": "input"},
+    {"id": "src-b", "label": "Source B", "category": "input"},
+    {"id": "sink",  "label": "Sink",     "category": "terminal"}
+  ],
+  "relationships": [
+    {"from": "src-a", "to": "sink", "kind": "directed", "role": "feedback", "_svgId": "e1"},
+    {"from": "src-b", "to": "sink", "kind": "directed", "role": "feedback", "_svgId": "e2"}
+  ],
+  "positions": {},
+  "colorAssignments": {},
+  "evalSummary": {},
+  "createdAt": "2026-05-06T13:55:00Z",
+  "createdBy": "pmos-toolkit:diagram@v2"
+}

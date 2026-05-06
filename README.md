@@ -76,6 +76,7 @@ pmos-toolkit/
 | Skill | Description |
 |-------|-------------|
 | `/pmos-toolkit:create-skill` | Create a new skill with cross-platform conventions and project save paths |
+| `/pmos-toolkit:diagram` | Generate a single SVG vector diagram from a free-form description — brainstorms 2–3 framings, drafts, and self-evaluates against a hybrid SVG-metrics + vision rubric |
 | `/pmos-toolkit:mac-health` | Diagnose battery drain, orphaned processes, browser extension leaks, and cleanup opportunities |
 
 **Pipeline flow:**

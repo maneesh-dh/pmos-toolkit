@@ -1,6 +1,6 @@
 ---
 name: diagram
-description: Generate a single SVG vector diagram from a free-form description (with optional source markdown) — architecture, flow, hierarchy, dependency, sequence, state, mental-model, etc. Brainstorms 2–3 structural framings from first principles, asks the user to pick, then drafts and self-evaluates against a hybrid rubric (deterministic SVG metrics with hard-fails + a 7-item binary vision rubric on a rendered raster) with up to 2 refinement loops. Applies a fixed house style (style.md) so every output is consistent. Standalone utility — does not load workstream context. Use when the user says "draw a diagram", "create an architecture diagram", "show how X flows", "make an SVG of this concept", "diagram this", or wants a vector visual of any system/flow/structure.
+description: Generate a single SVG vector diagram from a free-form description (with optional source markdown) — architecture, flow, hierarchy, dependency, sequence, state, mental-model, etc. Brainstorms 2–3 structural framings from first principles, asks the user to pick, then drafts and self-evaluates against a hybrid rubric (deterministic SVG metrics with hard-fails + a 7-item binary vision rubric on a rendered raster) with up to 2 refinement loops. Applies a configurable theme (default `technical`; switch with `--theme editorial`) so every output is consistent. Standalone utility — does not load workstream context. Use when the user says "draw a diagram", "create an architecture diagram", "show how X flows", "make an SVG of this concept", "diagram this", or wants a vector visual of any system/flow/structure.
 user-invocable: true
 argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--theme technical|editorial] [--rigor high|medium|low] [--clear-cache] [--selftest]"
 ---
@@ -9,7 +9,7 @@ argument-hint: "<free-form description> [--source <path>] [--out <path>] [--appr
 
 **Announce at start:** "Using the diagram skill to generate an SVG from your description."
 
-Produce one `.svg` file plus a `<slug>.diagram.json` sidecar that records the design decisions. Skill enforces a fixed visual style (`style.md`) and a hybrid eval (`eval/code-metrics.md` + `eval/rubric.md`). The skill is **standalone** — it does not load workstream context, does not gate any pipeline stage. Invoke any time you need a diagram.
+Produce one `.svg` file plus a `<slug>.diagram.json` sidecar that records the design decisions. Skill enforces a configurable theme (`themes/<theme>/theme.yaml` + `style.md`) and a hybrid eval (`eval/code-metrics.md` + `eval/rubric.md`). The skill is **standalone** — it does not load workstream context, does not gate any pipeline stage. Invoke any time you need a diagram.
 
 ---
 

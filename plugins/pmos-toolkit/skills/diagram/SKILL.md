@@ -2,7 +2,7 @@
 name: diagram
 description: Generate a single SVG vector diagram from a free-form description (with optional source markdown) — architecture, flow, hierarchy, dependency, sequence, state, mental-model, etc. Brainstorms 2–3 structural framings from first principles, asks the user to pick, then drafts and self-evaluates against a hybrid rubric (deterministic SVG metrics with hard-fails + a 7-item binary vision rubric on a rendered raster) with up to 2 refinement loops. Applies a fixed house style (style.md) so every output is consistent. Standalone utility — does not load workstream context. Use when the user says "draw a diagram", "create an architecture diagram", "show how X flows", "make an SVG of this concept", "diagram this", or wants a vector visual of any system/flow/structure.
 user-invocable: true
-argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--rigor high|medium|low] [--clear-cache] [--selftest]"
+argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--theme technical|editorial] [--rigor high|medium|low] [--clear-cache] [--selftest]"
 ---
 
 # `/diagram` — SVG Diagram Generator
@@ -44,7 +44,7 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 
 1. **Parse args.**
    - Positional: free-form description (required, unless `--clear-cache` or `--selftest` is the only arg).
-   - Flags: `--source <path>`, `--out <path>`, `--approach <text>`, `--rigor high|medium|low` (default `high`), `--clear-cache`, `--selftest`.
+   - Flags: `--source <path>`, `--out <path>`, `--approach <text>`, `--theme <name>` (default `technical`), `--rigor high|medium|low` (default `high`), `--clear-cache`, `--selftest`.
    - Derive `<slug>` = first 5–6 content words of the description, kebab-cased.
    - **Resolve `{docs_path}`**: read `.pmos/settings.yaml` in the current repo; if present, use its `docs_path` value (default in that file is `.pmos`). If `.pmos/settings.yaml` does not exist, fall back to `docs/pmos/` (create on demand).
    - Default `--out` = `{docs_path}/diagrams/<slug>.svg`. Create the `diagrams/` subdirectory if it doesn't exist.
@@ -69,7 +69,9 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
    ```
    Exit non-zero. Vision review is non-negotiable; without it half the eval is missing.
 
-4. **Read style.md** end-to-end. You will be quoting its tokens throughout.
+4. **Resolve `--theme`** (default `technical`). Load `themes/<theme>/theme.yaml` and validate it against `themes/_schema.json`. If the file is missing or schema validation fails, print the error and exit 2. The active theme governs palette, typography, stroke choices, connector dispatch, arrowhead style, and rubric overrides.
+
+5. **Read `themes/<theme>/style.md`** end-to-end. You will be quoting its tokens throughout.
 
 ---
 
@@ -130,7 +132,7 @@ Record the chosen framing and the rejected ones in sidecar `approach` and `alter
 
 ## Phase 3 — Draft
 
-1. **Choose canvas.** Pick from `style.md` §5.7 by content shape:
+1. **Choose canvas.** Pick from the active theme's `style.md` §5.7 by content shape:
    - 16:10 (1280×800) — flows, architectures, sequences (default).
    - 1:1 (1280×1280) — hierarchies, concept maps, radial.
    - 4:5 (1280×1600) — tall trees, deep stacks.
@@ -146,16 +148,18 @@ Record the chosen framing and the rejected ones in sidecar `approach` and `alter
    - Content elements.
    - Legend block (top-right) only if ≥ 2 categorical colors used.
 
-4. **Apply style.md tokens strictly.**
-   - Palette: ONLY `#FFFFFF`, `#F4F5F7`, `#0F172A`, `#475569`, `#2563EB`, `#B91C1C`.
-   - Typography: 12 / 14 / 16 / 20 only; 400 / 600 only.
-   - Stroke: 1 / 1.5 / 2 only.
-   - Radii: 0 / 4 / 8 only.
-   - Spacing: 4 / 8 / 16 / 24 / 32 only.
+4. **Apply the active theme's tokens strictly.**
+   - Palette: only colors declared in the theme's `palette` block (`ink`, `inkMuted`, `warn`, `surface`, `surfaceMuted`, every `accents[].hex`, every `categoryChips[].hex`).
+   - Typography: sizes and weights from `theme.typography.body` (and `display` / `mono` / `eyebrow` when defined). For the default `technical` theme that's 12 / 14 / 16 / 20 at weights 400 / 600.
+   - Stroke: weights from `theme.nodeChrome.primaryStroke` and the theme's stated defaults (technical: 1 / 1.5 / 2).
+   - Radii: from `theme.nodeChrome.primaryRadius` / chip radii (technical: 0 / 4 / 8).
+   - Spacing: 4-px grid is global (4 / 8 / 16 / 24 / 32) — not theme-specific.
 
-5. **Connector style** is one judgment call per diagram: orthogonal (right-angle paths) for flows/architectures/sequences; curves for mind maps/networks/dependency graphs. Do not mix.
+5. **Connector style.** Inspect `theme.connectors`:
+   - If `mixingPermitted: false`, use a single style for the whole diagram — orthogonal for flows/architectures/sequences, curves for mind maps/networks/dependency graphs. Pick once and stick with it.
+   - If `mixingPermitted: true`, assign every relationship a `role` (one of `contribution | emphasis | feedback | dependency | reference`; default to `default` when unsure) and look up `theme.connectors.byRole[role]` to get `{shape, stroke, dashed}`. All edges sharing a role MUST use the same lookup result — mixing within a role is forbidden.
 
-6. **Color usage.** 1–4 colors as content needs. `accent` (#2563EB) is the singular emphasis color. `warn` (#B91C1C) for error/stop states only. If ≥ 2 categorical colors used → legend is mandatory.
+6. **Color usage.** 1–4 colors as content needs. Use ONLY colors declared in the active theme's `palette` block. When the theme defines `palette.accents[].pinnedRole`, that mapping is fixed across every diagram drawn under the theme; never reassign a pinned-role accent per diagram. If ≥ 2 categorical colors are used → legend is mandatory.
 
 7. **Write the SVG to a temp path** first (`<out>.svg.tmp`). Don't overwrite the real file until Phase 7.
 
@@ -300,9 +304,11 @@ If a generic `learnings-capture.md` is not found, append entries directly to `~/
 - Do NOT brainstorm from a hardcoded list of diagram types ("flowchart vs hierarchy vs swimlane"). Always reason from the specific content's structure.
 - Do NOT copy the structure of any file in `themes/technical/atoms/` (or any theme's `atoms/` directory) — those are visual primitives, not templates. Re-derive layout each time.
 - Do NOT regenerate the entire SVG when the user requests a tweak via the extend flow. Apply minimal patches preserving sidecar `positions`.
-- Do NOT use colors outside the 6-token palette (style.md §5.1). The contrast metric will hard-fail any out-of-table combination.
+- Do NOT use colors outside the active theme's declared palette. The contrast metric will hard-fail any out-of-token combination, regardless of theme.
+- Do NOT reassign pinned-role accents per diagram. When a theme defines `palette.accents[].pinnedRole` (e.g. editorial pins `feedback` to `#1E3A8A`), that mapping is permanent across every diagram drawn under the theme.
+- Do NOT mix connector styles within a single role even when the theme permits mixed connectors. Each role uses one consistent style across the diagram.
 - Do NOT use font sizes below 12px — even for "subtle annotations". Move the content to the legend or remove it.
-- Do NOT write SVGs that include `<image>`, `<foreignObject>`, `<animate>`, `filter`, drop shadows, or gradients (style.md §5.9).
+- Do NOT write SVGs that include `<image>`, `<foreignObject>`, `<animate>`, `filter`, drop shadows, or gradients (themes' anti-patterns sections).
 - Do NOT exceed 30 primary nodes. At 21–30 you MUST prompt for a split before proceeding.
 - Do NOT mix orthogonal and curved connectors in one diagram. Pick one style and stick with it.
 - Do NOT silently dump prose findings in Phase 6. Always use the Findings Presentation Protocol with structured options.
@@ -323,6 +329,7 @@ skills/diagram/
 │   ├── render-to-raster.md        # detection + invocation for Playwright MCP / rsvg / cairosvg
 │   └── sidecar-schema.md          # <slug>.diagram.json schema (schemaVersion: 1) + versioning policy
 ├── themes/                        # theme directories — each ships theme.yaml + style.md + atoms/
+│   ├── _schema.json               # JSON Schema for theme.yaml (positive-list; rejects layout keys)
 │   └── technical/                 #   default theme (was top-level style.md + examples/style-atoms/)
 │       ├── theme.yaml
 │       ├── style.md

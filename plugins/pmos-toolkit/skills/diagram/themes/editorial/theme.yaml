@@ -1,0 +1,92 @@
+# Editorial / Cream theme — for editorial-essay-style diagrams and infographics.
+# Defining moves: cream surface, dashed outer container, mono uppercase eyebrows,
+# two co-equal pinned-role accents (deep blue feedback, red-orange emphasis),
+# solid-black computation blocks, pastel category chips.
+#
+# See themes/editorial/style.md for the human-readable spec mirroring this file.
+# See docs/superpowers/specs/2026-05-06-diagram-themes-and-infographic-mode-design.md §5–§7.
+
+name: editorial
+displayName: "Editorial / Cream"
+
+surface:
+  background: "#F4EFE6"
+  containerChrome: dashed
+  containerStrokeColor: "#9CA3AF"
+  containerStrokeDasharray: "4 4"
+
+palette:
+  ink: "#0F172A"
+  inkMuted: "#475569"
+  warn: "#B91C1C"
+  surface: "#F4EFE6"
+  accents:
+    - { token: accent-primary,  hex: "#1E3A8A", pinnedRole: feedback }
+    - { token: accent-emphasis, hex: "#B8351A", pinnedRole: emphasis }  # darkened from spec's #D9421C to pass WCAG AA on cream (5.15:1)
+  categoryChips:
+    - { token: chip-warm, hex: "#F5C9B8", textOn: ink }
+    - { token: chip-cool, hex: "#DCE0F0", textOn: ink }
+    - { token: chip-ink,  hex: "#0F172A", textOn: surface }
+
+typography:
+  display:
+    stack: "Inter Tight, ui-sans-serif, system-ui, sans-serif"
+    weight: 700
+    sizes: [28, 36, 44]
+  body:
+    stack: "Inter, ui-sans-serif, system-ui, sans-serif"
+    weights: [400, 600]
+    sizes: [12, 14, 16, 20]
+  eyebrow:
+    stack: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+    weight: 400
+    size: 12
+    transform: uppercase
+    letterSpacing: 0.08
+
+connectors:
+  mixingPermitted: true
+  byRole:
+    contribution: { shape: curved,     stroke: ink,             dashed: false }
+    emphasis:     { shape: orthogonal, stroke: accent-emphasis, dashed: false }
+    feedback:     { shape: curved,     stroke: accent-primary,  dashed: true  }
+    dependency:   { shape: orthogonal, stroke: inkMuted,        dashed: false }
+    reference:    { shape: orthogonal, stroke: inkMuted,        dashed: true  }
+    default:      { shape: orthogonal, stroke: inkMuted,        dashed: false }
+
+arrowheads:
+  style: filled-triangle
+  sizes:
+    default: "8x6"
+    emphasis: "10x7"
+
+chips:
+  enabled: true
+  cornerRadius: 4
+  paddingX: 8
+  paddingY: 4
+
+nodeChrome:
+  primaryStroke: 1.5
+  primaryRadius: 6
+  computationBlock:
+    fill: chip-ink
+    text: surface
+    radius: 4
+
+rubricOverrides:
+  waive: []
+  add:
+    - id: "eyebrow-mono-uppercase-applied"
+      prompt: "Each major group has a monospace uppercase eyebrow label"
+      evidenceHint: "look above container groups"
+    - id: "container-chrome-matches-theme"
+      prompt: "Outer container uses the theme's dashed boundary"
+      evidenceHint: "outermost rect should be dashed"
+    - id: "role-style-consistency"
+      prompt: "All edges sharing a `role` use the same connector style (stroke/dash/shape)"
+      evidenceHint: "compare like-roled edges' SVG attributes"
+
+infographic:
+  supported: true
+  layout: editorial-v1

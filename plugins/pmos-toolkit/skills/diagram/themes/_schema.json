@@ -30,7 +30,10 @@
       "required": ["background"],
       "properties": {
         "background": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
-        "muted": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+        "muted": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "containerChrome": {"type": "string", "enum": ["none", "framed", "dashed"]},
+        "containerStrokeColor": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+        "containerStrokeDasharray": {"type": "string"}
       }
     },
     "palette": {
@@ -51,6 +54,7 @@
             "required": ["hex"],
             "properties": {
               "name": {"type": "string"},
+              "token": {"type": "string"},
               "hex": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
               "pinnedRole": {
                 "type": "string",
@@ -64,10 +68,12 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["name", "hex"],
+            "required": ["hex"],
             "properties": {
               "name": {"type": "string"},
-              "hex": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"}
+              "token": {"type": "string"},
+              "hex": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+              "textOn": {"type": "string"}
             }
           }
         }
@@ -97,7 +103,7 @@
             "additionalProperties": false,
             "required": ["shape", "stroke", "dashed"],
             "properties": {
-              "shape": {"type": "string", "enum": ["orthogonal", "curve", "straight"]},
+              "shape": {"type": "string", "enum": ["orthogonal", "curve", "curved", "straight"]},
               "stroke": {"type": "string"},
               "dashed": {"type": "boolean"}
             }
@@ -125,8 +131,12 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "enabled": {"type": "boolean"},
         "radius": {"type": "number"},
+        "cornerRadius": {"type": "number"},
         "padding": {"type": "string"},
+        "paddingX": {"type": "number"},
+        "paddingY": {"type": "number"},
         "fontSize": {"type": "number"}
       }
     },
@@ -134,10 +144,19 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "primaryStroke": {"type": "string"},
+        "primaryStroke": {"type": ["string", "number"]},
         "primaryRadius": {"type": "number"},
-        "secondaryStroke": {"type": "string"},
-        "secondaryRadius": {"type": "number"}
+        "secondaryStroke": {"type": ["string", "number"]},
+        "secondaryRadius": {"type": "number"},
+        "computationBlock": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "fill": {"type": "string"},
+            "text": {"type": "string"},
+            "radius": {"type": "number"}
+          }
+        }
       }
     },
     "rubricOverrides": {
@@ -190,12 +209,14 @@
     "typeBlock": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["stack", "weights", "sizes"],
       "properties": {
         "stack": {"type": "string"},
+        "weight": {"type": "integer"},
         "weights": {"type": "array", "items": {"type": "integer"}},
+        "size": {"type": "number"},
         "sizes": {"type": "array", "items": {"type": "number"}},
-        "letterSpacing": {"type": "string"},
+        "letterSpacing": {"type": ["string", "number"]},
+        "transform": {"type": "string", "enum": ["uppercase", "lowercase", "capitalize", "none"]},
         "case": {"type": "string", "enum": ["upper", "lower", "title", "sentence", "none"]}
       }
     }

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="160" viewBox="0 0 320 160">
+  <title>editorial pastel chip stack atom — alternating peach + lilac rows</title>
+  <rect x="0" y="0" width="320" height="160" fill="#F4EFE6"/>
+  <rect x="16" y="16" width="288" height="32" rx="4" fill="#F5C9B8"/>
+  <text x="32" y="36" font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+        font-size="14" font-weight="600" fill="#0F172A">User instruction (warm)</text>
+  <rect x="16" y="52" width="288" height="32" rx="4" fill="#DCE0F0"/>
+  <text x="32" y="72" font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+        font-size="14" font-weight="600" fill="#0F172A">Tool descriptor (cool)</text>
+  <rect x="16" y="88" width="288" height="32" rx="4" fill="#F5C9B8"/>
+  <text x="32" y="108" font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+        font-size="14" font-weight="600" fill="#0F172A">Memory record (warm)</text>
+  <rect x="16" y="124" width="288" height="32" rx="4" fill="#DCE0F0"/>
+  <text x="32" y="144" font-family="Inter, ui-sans-serif, system-ui, sans-serif"
+        font-size="14" font-weight="600" fill="#0F172A">Hook output (cool)</text>
+</svg>

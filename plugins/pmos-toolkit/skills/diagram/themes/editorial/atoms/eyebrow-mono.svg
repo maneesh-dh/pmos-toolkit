@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="48" viewBox="0 0 400 48">
+  <title>editorial eyebrow atom — mono uppercase 12px</title>
+  <rect x="0" y="0" width="400" height="48" fill="#F4EFE6"/>
+  <text x="16" y="28"
+        font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
+        font-size="12" font-weight="400" fill="#475569"
+        letter-spacing="0.96"
+        textLength="320">EXTERNAL CONTEXT (OBJECTS WE POPULATE)</text>
+</svg>

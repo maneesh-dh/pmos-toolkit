@@ -159,3 +159,25 @@ flush_and_exit_destructive() {
   return 2
 }
 export -f flush_and_exit_destructive
+
+# Stand-in for Section 0 step 6 (refusal check).
+simulate_refusal_check() {
+  local name="" file="" mode=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --skill-name) name="$2"; shift 2;;
+      --skill-file) file="$2"; shift 2;;
+      --mode) mode="$2"; shift 2;;
+      *) shift;;
+    esac
+  done
+  if [[ "$mode" != "non-interactive" ]]; then return 0; fi
+  if ! grep -qE '^[[:space:]]*<!-- non-interactive: refused' "$file"; then return 0; fi
+  local marker reason alt
+  marker=$(grep -m1 '<!-- non-interactive: refused' "$file")
+  reason=$(echo "$marker" | sed -nE 's/.*reason:[[:space:]]*([^;]+);.*/\1/p' | sed 's/[[:space:]]*$//')
+  alt=$(echo "$marker"   | sed -nE 's/.*alternative:[[:space:]]*(.+)[[:space:]]+-->[[:space:]]*$/\1/p')
+  echo "--non-interactive not supported by /${name}: ${reason}. ${alt}" >&2
+  return 64
+}
+export -f simulate_refusal_check

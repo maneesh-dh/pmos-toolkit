@@ -7,6 +7,8 @@ argument-hint: "<path-to-requirements-doc>"
 
 # /msf-req — Motivation / Friction / Satisfaction on a Requirements Doc
 
+<!-- non-interactive: refused; reason: recommendations-only with free-form persona inference and journey confirmation; alternative: run /wireframes --apply-edits via parent flow -->
+
 Evaluate a requirements document by simulating end-user experience across personas and journeys. Identifies hidden friction, motivation gaps, and satisfaction shortfalls before `/spec`. Produces recommendations only — never edits the source requirements doc.
 
 Best applied to **Tier 3 requirements** (features / product launches) after `/requirements` and before `/spec`. For wireframe-grounded analysis, use `/msf-wf` instead.

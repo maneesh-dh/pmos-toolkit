@@ -66,47 +66,47 @@ Use workstream context (loaded by step 3 below) to inform technical decisions �
 3. **Check for existing spec.** Look at `{feature_folder}/02_spec.md` for an existing file.
    - If found: read it, ask the user if this is an update or fresh start.
    - If not found: proceed.
-4. **Detect the tier** from the requirements doc (carry forward the same tier if tagged, otherwise assess):
+4. **Detect the tier.** If the requirements doc has a `Tier:` tag in its frontmatter or header, **carry it forward without asking**. If it is untagged, OR the user entered the pipeline at `/spec` without a requirements doc, assess the tier from the table below and **confirm with the user via `AskUserQuestion`** before proceeding (recommend the assessed tier as option 1).
 
 | Tier | Scope | Sections | Length |
 |------|-------|----------|--------|
-| **Tier 1: Bug Fix / Minor Enhancement** | Isolated fix or small change | Problem, Root Cause Analysis, Fix Approach, Edge Cases, Testing Strategy | ~1-2 pages |
+| **Tier 1: Bug Fix / Minor Enhancement** | Isolated fix or small change | Problem, Root Cause Analysis, Fix Approach, Decision Log (lightweight), Edge Cases, Testing Strategy | ~1-2 pages |
 | **Tier 2: Enhancement / UX Overhaul** | Improving existing behavior, adding to existing surface | Problem, Goals, Decision Log, Relevant FR tables, API changes (if any), Frontend Design (if any), Edge Cases, Testing Strategy | ~3-6 pages |
 | **Tier 3: Feature / New System** | New capability, new surface, major redesign | ALL sections mandatory including Architecture diagrams, Sequence diagrams, Full FR/NFR tables, API contracts, DB schema (SQL), Frontend design, Feature flags, Rollout strategy | ~6-15 pages |
 
-**Announce:** "This looks like a Tier N spec. Using the [tier name] template."
+**Announce:** "This looks like a Tier N spec. Using the [tier name] template." (When the tier was carried forward from a tagged requirements doc, no confirmation question is needed — just announce.)
 
-**Gate:** Do not proceed until you have confirmed understanding of the requirements and the tier.
+**Gate:** Do not proceed until you have confirmed understanding of the requirements and (where required) the user has confirmed the tier.
 
 ---
 
-## Phase 2: Research (Parallel Subagents)
+## Phase 2: Research
 
 **Tier 1:** Read the specific files/functions involved in the bug. No broader research needed.
 
-**Tier 2-3:** Dispatch subagents to explore:
+**Tier 2-3: Dispatch up to 2 subagents in parallel.** Each has an explicit return contract:
 
-### 1a. Existing Implementation & Patterns
-- Read the codebase areas that will be impacted
-- Note current architecture patterns, data models, API conventions
-- Read test patterns used in adjacent features
-- Identify reusable components, utilities, and infrastructure
+### Subagent A — Existing Implementation & Patterns
+**Always run for Tier 2-3.** Returns:
+- File paths + 1-line summaries of code areas the spec will impact
+- Current architecture patterns, data models, API conventions in use
+- Test patterns from adjacent features (file paths)
+- Reusable components/utilities/infrastructure already available
 
-### 1b. Industry Research (Tier 2+)
+### Subagent B — Industry Research & Alternatives
+**Tier 3: always run.** **Tier 2: run only when the design has a non-obvious architectural choice** (e.g., queue vs. webhook vs. polling; relational vs. document; sync vs. async; new infrastructure component). Skip for routine UX overhauls and additive enhancements on an established stack — state explicitly in the spec why you skipped.
 
-Goal: the technical design should be informed by how comparable systems are actually built, not just by what's already in this repo.
+Returns:
+- **Comparables table:** 2–4 (T3) or 2 (T2) named examples — products, OSS projects, engineering blog posts. Architecture used + documented trade-offs.
+- **Alternatives table:** 3+ (T3) or 2 (T2) materially different design shapes with trade-offs (complexity, latency, cost, failure modes, operational burden).
+- Established patterns / frameworks / standards that apply, with a build-vs-adopt recommendation.
+- Known failure modes / anti-patterns from comparable systems (scaling cliffs, consistency bugs, migration pain).
+- For Tier 3: explicit recommendation + rejected-alternatives section.
 
-Investigate, with named examples:
-- **How comparable systems implement this:** 2–4 concrete examples (products, OSS projects, engineering blog posts). What architecture do they use? What trade-offs did they document?
-- **Alternative technical approaches:** At least 2–3 materially different design shapes (e.g., queue vs. webhook vs. polling; relational vs. document; server-rendered vs. client-rendered). Capture tradeoffs: complexity, latency, cost, failure modes, operational burden.
-- **Established patterns, frameworks, libraries, standards** that apply — and whether adopting vs. building is the better call here.
-- **Known failure modes / anti-patterns:** scaling cliffs, consistency bugs, migration pain others have hit with these approaches.
+### Reconciliation
+After both subagents return, reconcile any conflicts (e.g., A says "we already have a queue" but B recommends webhooks) explicitly in the Decision Log of the spec — do not silently pick one.
 
-Depth: Tier 2 → 2 competitors/references, 2 alternatives, brief. Tier 3 → 3–4 references, 3+ alternatives, deeper writeup with explicit recommendation + rejected-alternatives section.
-
-Collect all sources for the Research Sources table.
-
-Track all sources in a Research Sources table.
+Track all sources in the Research Sources table of the spec.
 
 ---
 
@@ -147,7 +147,7 @@ Run roles in this order. Each role's decisions inform the next — architecture 
 4. **Verify each link exists** in the current codebase with a grep or file read — not assumption
 5. If any link is missing, flag it as a **gap to implement** in the spec
 
-**Trigger heuristic:** if the feature mentions search, index, sync, export, import, process, queue, cache, or aggregate — run the trace. Skip for purely CRUD or purely UI features.
+**Trigger (property-based):** Run the data flow trace whenever the feature has the property *"data persisted by one code path is consumed by a different code path."* This includes — but is not limited to — search/indexing, notifications, feeds, digests, audit logs, sync, export, import, queues, caches, aggregations, and report generation. Skip for purely CRUD-on-a-single-entity features or purely UI/UX changes that don't introduce new persistence-to-read flows. When in doubt, run the trace — it's cheap.
 
 **When to adjust:** If the project is primarily a frontend/UX change with minimal backend work, move Designer to position 2 (before DBA) — the UX may drive what data needs to be stored. State your reordering rationale when you announce the first role.
 
@@ -155,25 +155,44 @@ For Tier 2 (2-3 roles), pick from this list in order — don't jump to role 5 wh
 
 ### Role Protocol (MANDATORY for Tier 2-3)
 
-**Every applicable role MUST be announced to the user**, even when you have no questions. This ensures the user can verify that all perspectives were considered.
-
-For each role:
+For each role with **at least one genuine question or stated assumption**:
 1. **Announce:** "Speaking as [Role]:"
-2. **Either:**
-   - Ask 1-2 specific questions via AskUserQuestion (preferred when genuine gaps exist)
-   - **OR** state explicitly: "No questions from this role — [specific reason, citing which requirements sections already cover the role's concerns]"
-3. Note answers or stated assumptions as decisions for the spec
-4. **If the user picks a non-recommended option** in any AskUserQuestion you issued for this role, before moving to the next role ask: "Does this choice change any existing invariant or contract? If yes, capture it as a Decision-Log entry with the trade-off explicit." See `../_shared/structured-ask-edge-cases.md` §2 for the canonical form.
+2. Ask 1-2 specific questions via `AskUserQuestion` (batch up to 4 within the same role) OR state the assumption you're proceeding with as a Decision-Log entry.
+3. Note answers or stated assumptions as decisions for the spec.
+4. **If the user picks a non-recommended option** in any `AskUserQuestion` you issued for this role, before moving to the next role ask: "Does this choice change any existing invariant or contract? If yes, capture it as a Decision-Log entry with the trade-off explicit." See `../_shared/structured-ask-edge-cases.md` §2.
 
-**Anti-pattern:** Silently skipping a role because "the requirements are detailed enough" — this denies the user visibility into which perspectives were evaluated. The "Skip if..." column in the table above is the ONLY valid reason to skip a role entirely without announcement. If a role is applicable (not in the "Skip if" condition), you MUST announce it.
+For roles with **no genuine questions** — do NOT announce inline. Instead, at the end of Phase 3, emit a single **"Roles considered, no questions"** block:
+
+```text
+Silent roles considered:
+- DBA — no schema changes; covered by §X of requirements
+- DevOps — Tier 2, deployment unchanged
+- Senior Analyst — FR coverage already validated by Architect role
+```
+
+Each silent-role entry MUST cite the specific reason (which requirements section, or which earlier role's answer, makes this role's concerns moot). The user gets the same audit trail without per-role chat noise.
+
+**Anti-pattern:** Silently skipping a role with no entry in the silent-roles block. The "Skip if..." column in the role table is the ONLY valid reason to omit a role from BOTH the inline interview AND the silent-roles block.
 
 ---
 
-## Phase 4: Think Hard About Verification
+## Phase 4: Verification Plan Sketch
 
-Before writing the spec, think creatively about how to verify the implementation. This is a CORE part of the spec, not an afterthought.
+Before writing the spec, sketch HOW each major requirement will be verified, and **emit the sketch in chat for the user to confirm or push back on**. This is a CORE part of the spec, not an afterthought — surfacing it as a chat artifact (rather than a thinking-only step) catches under-thought verification when it's still cheap to fix.
 
-Good verification patterns:
+Format:
+
+```markdown
+**Verification plan sketch (Phase 4):**
+
+| Requirement | Verification approach |
+|-------------|----------------------|
+| FR-01 | Unit test: assert X given Y; integration test: hit /endpoint and verify Z |
+| FR-02 | Playwright flow: log in → navigate → assert visible element |
+| NFR-01 (perf) | k6 script targeting /api/foo at 100 RPS; assert p95 < 200ms |
+```
+
+Good verification patterns to draw from:
 - Automated unit + integration tests with specific assertions
 - CLI scripts to verify APIs before building frontend
 - Playwright MCP for end-to-end frontend flow testing
@@ -181,13 +200,26 @@ Good verification patterns:
 - Synthetic data scenarios that exercise edge cases
 - Before/after comparison reports
 
-For each major feature area, define HOW it will be verified.
+**Gate:** Wait for user acknowledgment of the sketch before moving to Phase 5. If the user pushes back on an approach, revise inline; do not write the spec until the sketch is accepted.
 
 ---
 
 ## Phase 5: Write the Spec
 
-Save to `{feature_folder}/02_spec.md`. Overwrite if it already exists.
+Save to `{feature_folder}/02_spec.md`.
+
+**Before overwriting an existing spec:** if `{feature_folder}/02_spec.md` exists AND has uncommitted changes (check `git status --porcelain "{feature_folder}/02_spec.md"`), commit it first:
+
+```bash
+git add "{feature_folder}/02_spec.md"
+git commit -m "docs: snapshot prior spec before /spec rewrite"
+```
+
+This makes git the backup; the rewrite then proceeds normally with `Write` (no `.bak` files needed). If the file exists but is already committed, no pre-commit is needed — just proceed.
+
+### Status Field Lifecycle
+
+All templates start at `**Status:** Draft`. The status is promoted to `**Status:** Ready for Plan` only on user confirmation in Phase 7 (see that phase). Downstream skills (`/simulate-spec`, `/plan`) check this field and warn the user if invoked against a `Draft` spec.
 
 ### Tier 1 Template: Bug Fix / Minor Enhancement
 
@@ -207,13 +239,20 @@ Save to `{feature_folder}/02_spec.md`. Overwrite if it already exists.
 ## 3. Fix Approach
 [What changes, why this approach over alternatives]
 
-## 4. Edge Cases
+## 4. Decision Log
+[Lightweight — 1–3 rows expected. Capture the fix-approach choice and any rejected alternatives. Skip the table entirely only if there was exactly one obvious fix with no alternatives considered.]
+
+| # | Decision | Options Considered | Rationale |
+|---|----------|-------------------|-----------|
+| D1 | [What was decided] | (a) ..., (b) ... | [Why] |
+
+## 5. Edge Cases
 
 | # | Scenario | Condition | Expected Behavior |
 |---|----------|-----------|-------------------|
 | E1 | [Name] | [Trigger] | [What happens] |
 
-## 5. Testing Strategy
+## 6. Testing Strategy
 [Exact tests to write, exact verification commands]
 ```
 
@@ -268,11 +307,6 @@ Save to `{feature_folder}/02_spec.md`. Overwrite if it already exists.
 
 ## 10. Testing & Verification Strategy
 [What to test, how, exact commands]
-
-## 11. Open Questions
-
-| # | Question | Owner | Needed By |
-|---|----------|-------|-----------|
 ```
 
 ### Tier 3 Template: Feature / New System
@@ -450,14 +484,6 @@ CREATE TABLE ... (
 | Source | Type | Key Takeaway |
 |--------|------|-------------|
 | [path or URL] | Existing code / External | [What we learned] |
-
----
-
-## 17. Open Questions
-
-| # | Question | Owner | Needed By |
-|---|----------|-------|-----------|
-| 1 | [Unresolved decision] | [name] | [date or "before plan"] |
 ```
 
 ### Document Guidelines (all tiers)
@@ -473,9 +499,7 @@ CREATE TABLE ... (
 
 ## Phase 6: Review Loops
 
-**Tier 1:** Run 1 review loop, then final review.
-
-**Tier 2-3:** Run minimum 2 loops, continue until exit criteria are met.
+**Loop count is emergent — there is no minimum or maximum.** Run review loops until the universal exit checklist (below) is satisfied: every applicable item is `pass` and the user has confirmed no further concerns. A single clean loop is a valid stopping point; a Tier 3 spec may need four. The exit criteria are the contract, not the loop count.
 
 ### Two Types of Review
 
@@ -517,12 +541,12 @@ For every loop that produces findings (structural or design-critique):
 
 1. **Group findings by category** (e.g., "Missing API error shapes", "Unclear component boundaries", "Undocumented decisions"). Small categories can be merged; never present more than 4 findings in a single batch.
 2. **One question per finding** via `AskUserQuestion`. Use this shape:
-   - `question`: one-sentence restatement of the finding + the proposed fix (concrete — e.g., "Add 409 response for duplicate email to POST /users" not "tighten error handling")
+   - `question`: **prefix with severity tag `[Blocker]`, `[Should-fix]`, or `[Nit]`**, then a one-sentence restatement of the finding + the proposed fix. Example: `[Blocker] Add 409 response for duplicate email to POST /users` or `[Nit] Rename §6.2 heading from 'DB' to 'Database Design' for consistency`. Severity definitions: **Blocker** = spec cannot ship without this fix (missing requirement coverage, broken contract); **Should-fix** = real defect, ship-blocker absent good reason to defer; **Nit** = cosmetic or stylistic.
    - `options` (up to 4):
      - **Fix as proposed** — agent applies the stated change via `Edit`
      - **Modify** — user edits the proposal (free-form reply expected next turn)
      - **Skip** — not an issue; drop it (note briefly in Review Log)
-     - **Defer** — log in Open Questions with rationale
+     - **Defer** — log in the Review Log with rationale; must be resolved (decided OR split into a follow-up spec) before exit, since Open Questions are forbidden in the published spec
 3. **Batch up to 4 questions per `AskUserQuestion` call.** If there are more findings, issue multiple calls sequentially, one category per call.
 4. **Skip `AskUserQuestion` only for findings that need open-ended input** (e.g., "what retry policy should the worker use?"). For those, ask inline as a normal follow-up after the batch — do not shoehorn into options.
 5. **After dispositions arrive,** apply them in order, update the Review Log row to cite dispositions, then ask the user if they see additional gaps before declaring the loop complete.
@@ -533,54 +557,89 @@ For every loop that produces findings (structural or design-critique):
 
 **Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
-### Exit Criteria (ALL must be true)
+### Escape Hatch: Structural Findings
 
-- Every requirement from the requirements doc is covered
-- Decision log has entries with rationale for every non-trivial choice
-- API contracts complete with req/res/error shapes (Tier 2-3)
-- Edge cases have specific conditions and behaviors
-- Testing strategy has exact verification commands
-- No open clarifications from user
-- Last loop found only cosmetic issues
-- **User has confirmed they have no further concerns** (do not self-declare exit)
+A finding that requires re-architecting (not an inline fix) — e.g., "the whole event-driven approach is wrong, this should be transactional" — does NOT belong in the standard Fix/Modify/Skip/Defer flow. The "fix issues inline" rule of the Loop Protocol assumes local edits.
+
+**When you detect a structural finding:**
+1. Pause the loop immediately. Do not batch it with other findings.
+2. Surface it to the user with a dedicated `AskUserQuestion`:
+   - `question`: state the structural concern + the architectural shift it implies (one sentence each).
+   - Options:
+     - **Revise scope and re-enter Phase 3** — multi-role review with the new architectural direction; spec is rewritten substantially.
+     - **Defer** — log in the Review Log with rationale; ship the current architecture and revisit in a follow-up.
+     - **Accept trade-off** — keep the current architecture; document the rejected alternative in the Decision Log with the trade-off explicit.
+     - **Modify** — user proposes a different resolution path next turn.
+3. After the user picks, resume the loop: either back to Phase 3 (option 1), to applying remaining findings (options 2/3), or to a free-form discussion (option 4).
+
+A structural finding is one where the proposed fix would invalidate three or more existing spec sections. If you can fix it with a localized edit to one or two sections, it's not structural — handle it through the standard flow.
+
+### Universal Exit Checklist
+
+All items below must be `pass` or `N/A` (with a stated reason for N/A). Loop until satisfied.
+
+| # | Criterion | When N/A |
+|---|-----------|----------|
+| 1 | Every requirement from the requirements doc is covered by a numbered FR/NFR | Never N/A — if there is no requirements doc, this skill should not have started |
+| 2 | Decision Log has entries with Options Considered + Rationale for every non-trivial choice | Tier 1 with a single obvious fix and no alternatives |
+| 3 | API contracts complete with request + response + error shapes | No API surface introduced or changed |
+| 4 | DB schema is actual SQL with migration notes | No DB changes |
+| 5 | Sequence diagrams present (one per flow, error paths included) | Fewer than 3 components interact in any flow |
+| 6 | Edge cases have specific Conditions + Expected Behaviors | Never N/A — Tier 1 still requires this |
+| 7 | Verification Plan Sketch (from Phase 4) is reflected in §14 with exact commands | Never N/A |
+| 8 | Frontend design specifies hierarchy + state + interactions | No frontend changes |
+| 9 | Rollout strategy documented (flags, migration order, rollback) | Tier 1-2 with no deploy-time risk |
+| 10 | **Open Questions section is empty (no unresolved items)** | Never N/A — see below |
+| 11 | Last loop produced only `[Nit]` findings or none | Never N/A |
+| 12 | User has explicitly confirmed no further concerns | Never N/A — do not self-declare exit |
+
+**Open Questions are forbidden at exit.** The spec is the contract; if a decision is not made, the spec is not done. Resolve every open question before promoting status — either decide and log to the Decision Log, or split the unresolved scope into a follow-up spec and remove it from this one. The Review Log may carry deferred items DURING work, but the published spec must have none.
 
 ---
 
-## Phase 7: Final Review
+## Phase 7: Final Review — Conciseness, Readability, Coherence
 
-Run one final improvement pass:
+Phase 6 already covered structural completeness and design soundness. Phase 7 is the **fresh-eyes prose pass** — what remains after the spec is structurally and architecturally sound:
 
-1. **Requirements coverage** — Re-read the requirements doc. Is EVERYTHING covered? List gaps.
-2. **Conciseness** — Can sections be tightened without losing essence?
-3. **Missing standard sections** — Any typical spec sections absent?
-4. **Coherence** — Any conflicting specifications?
-5. **Engineer readability** — Can a different engineer fully understand what to build, how to build it, and how to verify it?
+1. **Conciseness** — Can sections be tightened without losing essence? Flag verbose passages.
+2. **Engineer readability** — Read as a stranger to this feature. Can you build it from this doc alone? Where do you stumble?
+3. **Cross-section coherence** — Do §6 (architecture), §9 (APIs), §10 (schema), and §11 (frontend) tell one consistent story? Flag any place where two sections imply different shapes.
 
-**Share your analysis with the user BEFORE modifying anything.** Use the same `AskUserQuestion` batching as review loops (see Phase 6 Findings Presentation Protocol) — one question per final-review finding with Fix / Modify / Skip / Defer options, up to 4 per call. Do NOT declare the spec complete until the user confirms.
+(Requirements coverage and missing-section checks are owned by the Phase 6 universal exit checklist — do NOT re-run them here.)
 
-After final fixes, commit:
-```
+**Share findings via the same `AskUserQuestion` batching as Phase 6** — including the `[Blocker]/[Should-fix]/[Nit]` severity tags. Up to 4 per call. Apply dispositions inline.
+
+**On user confirmation that the spec is complete:**
+
+1. Promote the status field in the spec doc using `Edit` with `old_string="**Status:** Draft"` and `new_string="**Status:** Ready for Plan"`.
+
+2. Commit:
+
+```bash
 git add {feature_folder}/02_spec.md
-git commit -m "docs: add spec for <feature>"
+git commit -m "docs: spec ready for plan — <feature>"
 ```
 
-Ask the user: "I believe the spec is ready. Do you have any remaining concerns? Next options:
-- `/pmos-toolkit:simulate-spec` — pressure-test the design against scenarios and adversarial failure modes before planning (recommended for Tier 2-3)
-- `/pmos-toolkit:plan` — proceed directly to implementation planning"
+3. Ask the user:
 
-The user's confirmation is required before declaring completion.
+> "Spec is Ready for Plan. Next options:
+> - `/pmos-toolkit:simulate-spec` — pressure-test the design against scenarios and adversarial failure modes (recommended for Tier 2-3)
+> - `/pmos-toolkit:plan` — proceed directly to implementation planning"
+
+The user's explicit confirmation is required before promoting status. Do not self-declare completion.
 
 ---
 
 ## Phase 8: Workstream Enrichment
 
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow `_shared/pipeline-setup.md` Section C. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow `_shared/pipeline-setup.md` Section C.
 
+For this skill, evaluate whether anything from this session is worth writing back to the workstream. Signals to look for:
 - Tech stack decisions → workstream `## Tech Stack`
 - Architectural constraints → workstream `## Constraints & Scars`
 - Key design decisions → workstream `## Key Decisions`
 
-This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
+**The reflection is mandatory; writing entries is not.** If the spec produced no workstream-level signal (typical for small Tier 2 specs that operate within established constraints), explicitly state "No workstream-level signals from this session" and exit. Forced enrichment produces noise; zero entries is a valid outcome.
 
 ---
 
@@ -592,15 +651,20 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 
 ## Anti-Patterns (DO NOT)
 
-- Do NOT skip the multi-role interview for Tier 2-3 — each role catches different gaps
+- Do NOT skip the multi-role interview for Tier 2-3 — each role catches different gaps. Roles with no questions go in the silent-roles summary block, not omitted.
 - Do NOT write API contracts without response shapes and error responses
 - Do NOT write DB schemas as prose — show actual SQL
 - Do NOT write "add tests" without specifying what to test and how
-- Do NOT treat verification as an afterthought — it's a core section
+- Do NOT treat verification as an afterthought — Phase 4 emits a sketch in chat before the spec is written
 - Do NOT create a new spec file in each review loop — update the original
-- Do NOT stop after 1 review loop for Tier 2-3 — minimum is 2
+- Do NOT promote status to "Ready for Plan" before user confirmation
+- Do NOT ship a spec with non-empty Open Questions — resolve or split scope
+- Do NOT self-declare loop completion — the user gates exit
 - Do NOT write decision entries without "Options Considered" and "Rationale"
 - Do NOT ask questions for the sake of asking — only ask what genuinely helps
 - Do NOT skip sequence diagrams for multi-component interactions (Tier 3)
 - Do NOT over-specify internal implementation details — prescribe the interface, leave the internals to engineering judgment
 - Do NOT combine multiple scenarios into one sequence diagram — one diagram per flow
+- Do NOT force-fit a structural finding into the inline-edit flow — use the Phase 6 escape hatch
+- Do NOT batch findings without `[Blocker]/[Should-fix]/[Nit]` severity tags
+- Do NOT run industry research at Tier 2 unless the design has a non-obvious architectural choice

@@ -65,5 +65,5 @@ No findings deferred to backlog.
 |-------|-------|--------|---------------|-----------|
 | /diagram | requirements | completed | docs/pmos/features/2026-05-08_update-skills-diagram-on-failure/01_requirements.md | 2026-05-08 |
 | /diagram | plan | completed | docs/pmos/features/2026-05-08_update-skills-diagram-on-failure/03_plan.md | 2026-05-08 |
-| /diagram | execute | in-progress | — | — |
-| /diagram | verify | pending | — | — |
+| /diagram | execute | completed | docs/pmos/features/2026-05-08_update-skills-diagram-on-failure/execute/task-{01..05}.md | 2026-05-08 |
+| /diagram | verify | in-progress | — | — |

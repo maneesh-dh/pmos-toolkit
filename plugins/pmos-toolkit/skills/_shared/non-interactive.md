@@ -60,8 +60,8 @@ function emit_pending() {
     pending_call_tag = "";
   }
 }
-/<!-- non-interactive-block:start -->/ { in_inlined=1; next }
-/<!-- non-interactive-block:end -->/   { in_inlined=0; next }
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
 in_inlined { next }
 /^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
   emit_pending();

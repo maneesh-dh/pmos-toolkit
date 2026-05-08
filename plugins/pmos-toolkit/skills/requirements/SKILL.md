@@ -10,7 +10,7 @@ argument-hint: "<initial thoughts or observations to seed the requirements> [--f
 Brainstorm with the user, research existing patterns, and produce a requirements document that defines the **problem** and **high-level solution direction**. This is the FIRST stage in the pipeline:
 
 ```
-/requirements  →  [/msf, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
+/requirements  →  [/msf-req, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
  (this skill)      optional enhancers
 ```
 
@@ -317,7 +317,7 @@ Use the template matching the detected tier. Delete sections marked optional ("o
 
 ---
 
-**For UX friction analysis, run `/msf` after this doc is committed.**
+**For UX friction analysis, run `/msf-req` after this doc is committed.**
 ```
 
 #### Tier 3 Template: Feature / Product Launch
@@ -551,7 +551,7 @@ Read `~/.pmos/learnings.md` if you haven't already (Phase 0 step 6). Reflect on 
 Tell the user, scaling the message by tier:
 
 - **Tier 1 / Tier 2:** "Requirements captured and committed. When ready, run `/spec` to create the detailed technical specification."
-- **Tier 3:** "Requirements captured and committed. Optional next steps: `/creativity` (alternative angles), `/msf` (UX friction analysis). When ready: `/spec`."
+- **Tier 3:** "Requirements captured and committed. Optional next steps: `/creativity` (alternative angles), `/msf-req` (UX friction analysis). When ready: `/spec`."
 
 **The terminal state is handoff to `/spec`.** Do NOT start writing a spec or implementation plan from this skill.
 

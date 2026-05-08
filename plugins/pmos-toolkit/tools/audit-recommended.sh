@@ -58,13 +58,13 @@ TOTAL_FAIL=0
 
 for skill_file in "${TARGETS[@]}"; do
   if [[ ! -f "$skill_file" ]]; then
-    echo "MISSING: $skill_file"
+    echo "MISSING: $skill_file" >&2
     TOTAL_FAIL=$((TOTAL_FAIL+1))
     continue
   fi
 
   if grep -qE '^[[:space:]]*<!-- non-interactive: refused' "$skill_file"; then
-    echo "REFUSED: $(basename "$(dirname "$skill_file")")/SKILL.md (exempt)"
+    echo "REFUSED: $(basename "$(dirname "$skill_file")")/SKILL.md (exempt)" >&2
     continue
   fi
 
@@ -76,7 +76,12 @@ for skill_file in "${TARGETS[@]}"; do
       [[ -z "${line:-}" ]] && continue
       n_calls=$((n_calls+1))
       if [[ "$tag" != "-" ]]; then
-        n_defer=$((n_defer+1))
+        if [[ ! "$tag" =~ ^(destructive|free-form|ambiguous)$ ]]; then
+          n_unmarked=$((n_unmarked+1))
+          echo "UNMARKED: $skill_file:$line — defer-only tag has invalid reason '$tag' (expected: destructive|free-form|ambiguous)" >&2
+        else
+          n_defer=$((n_defer+1))
+        fi
       elif [[ "$has_recc" == "1" ]]; then
         n_recc=$((n_recc+1))
       else

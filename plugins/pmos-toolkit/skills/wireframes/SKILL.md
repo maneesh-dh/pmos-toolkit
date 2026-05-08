@@ -2,7 +2,7 @@
 name: wireframes
 description: Generate static HTML wireframes (single-file, mid-fi, Tailwind) for a user-facing feature — covers all screens, components, states, and target devices. Optional bridge between /requirements and /spec in the requirements -> spec -> plan pipeline (run before /spec when the feature is user-facing). Auto-triggers /requirements if no req doc exists. Optionally extracts a "house style" from the host repo's frontend (Tailwind tokens, component library, layout patterns) so wireframes match the existing app, and accepts screenshots (`--screenshots`) of existing flows as IA anchors for "extend this flow" requests. Self-evaluates each wireframe against UX heuristics with a reviewer subagent and runs up to 2 self-refinement loops. Use when the user says "create wireframes", "mock up the UI", "wireframe this feature", "design the screens", "show me the UI states", "extend this existing flow", or has a requirements doc ready and wants visuals before the spec.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--screenshots <path>] [--bootstrap-design-only]"
+argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--screenshots <path>] [--bootstrap-design-only] [--non-interactive | --interactive]"
 ---
 
 # Wireframe Generator
@@ -37,7 +37,7 @@ For all other invocations, proceed through every phase below as usual.
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** State your assumption (default device = desktop-web; default scope = all components from the req doc), document it in the output's README, and proceed. The user reviews after completion.
+- **No interactive prompt tool:** State your assumption (default device = desktop-web; default scope = all components from the req doc), document it in the output's README, and proceed. The user reviews after completion.
 - **No subagents:** Generate wireframes sequentially in the main agent; run the reviewer critique inline rather than dispatching a separate reviewer agent.
 - **No background processes:** Skip the local server and print the absolute `file://` path to `index.html` instead.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
@@ -98,6 +98,91 @@ Use workstream context (loaded by step 3 below) — design tokens, brand voice, 
 
 ---
 
+<!-- non-interactive-block:start -->
+1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
+   - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).
+   - `parent_marker` is set if the original prompt's first line matches `^\[mode: (interactive|non-interactive)\]$` (FR-06.1).
+   - `settings.default_mode` is `.pmos/settings.yaml :: default_mode` if present and one of `interactive`/`non-interactive`. Unknown values → warn on stderr `settings: invalid default_mode value '<v>'; ignoring` and fall through (FR-01.3).
+   - If `.pmos/settings.yaml` is malformed (not parseable as YAML, or missing `version`): print to stderr `settings.yaml malformed; fix and re-run` and exit 64 (FR-01.5).
+   - On Phase 0 entry, always print to stderr exactly: `mode: <mode> (source: <source>)` (FR-01.2).
+
+2. **Per-checkpoint classifier.** Before issuing any `AskUserQuestion` call, classify it (FR-02):
+   - Use the awk extractor below to find the line of this call's `question:` key in the live SKILL.md (FR-02.6).
+   - The defer-only tag, if present, is the literal previous non-empty line: `<!-- defer-only: <reason> -->` where `<reason>` ∈ {`destructive`, `free-form`, `ambiguous`} (FR-02.5).
+   - Decision (in order): tag adjacent → DEFER; multiSelect with 0 Recommended → DEFER; 0 options OR no option label ends in `(Recommended)` → DEFER; else AUTO-PICK the (Recommended) option (FR-02.2).
+
+3. **Buffer + flush.** Maintain an append-only OQ buffer in conversation memory. On each AUTO-PICK or DEFER classification, append one entry per the schema in spec §11.2. At end-of-skill (or in a caught error before exit), flush (FR-03):
+   - Primary artifact is single Markdown → append `## Open Questions (Non-Interactive Run)` section with one fenced YAML block per entry; update prose frontmatter (`**Mode:**`, `**Run Outcome:**`, `**Open Questions:** N` where N counts deferred only — see FR-03.4) (FR-03.1).
+   - Skill produces multiple artifacts → write a single `_open_questions.md` aggregator at the artifact directory root; primary artifact's frontmatter `**Open Questions:** N — see _open_questions.md` (FR-03.5).
+   - Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md` (FR-03.2).
+   - No persistent artifact (chat-only) → emit buffer to stderr at end-of-run as a single block prefixed `--- OPEN QUESTIONS ---` (FR-03.3).
+   - Mid-skill error → flush partial buffer under heading `## Open Questions (Non-Interactive Run — partial; skill errored)`; set `**Run Outcome:** error`; exit 1 (E13).
+
+4. **Subagent dispatch.** When dispatching a child skill via Task tool or inline invocation, prepend the literal first line: `[mode: <current-mode>]\n` to the child's prompt (FR-06).
+
+5. **Awk extractor.** The classifier and `tools/audit-recommended.sh` MUST both use the function below. Loaded at script init time; sourcing differs per consumer.
+
+<!-- awk-extractor:start -->
+```awk
+# Find AskUserQuestion call sites and their adjacent defer-only tags.
+# Input: a SKILL.md file (stdin or argv).
+# Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
+in_inlined { next }
+/^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
+  match($0, /defer-only:[[:space:]]*[a-z-]+/);
+  pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
+  sub(/^[[:space:]]+/, "", pending_tag);
+  pending_line = NR;
+  next;
+}
+/^[[:space:]]*$/ {
+  emit_pending();
+  pending_tag = "";
+  next;
+}
+/AskUserQuestion/ {
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
+  pending_tag = "";
+  next;
+}
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
+```
+<!-- awk-extractor:end -->
+
+6. **Refusal check.** If this SKILL.md contains a `<!-- non-interactive: refused; ... -->` marker (regex: `<!--[[:space:]]*non-interactive:[[:space:]]*refused`), and `mode` resolved to `non-interactive`: emit refusal per Section A and exit 64 (FR-07).
+
+7. **Pre-rollout BC.** If the `--non-interactive` argument is present BUT this SKILL.md does NOT contain the `<!-- non-interactive-block:start -->` marker (i.e., this skill hasn't been rolled out yet): emit `WARNING: --non-interactive not yet supported by /<skill>; falling back to interactive.` to stderr; continue in interactive mode (FR-08).
+
+8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
+<!-- non-interactive-block:end -->
+
 ## Phase 1: Locate Requirements
 
 1. **Find the requirements doc.** Follow `../.shared/resolve-input.md` with `phase=requirements`, `label="requirements doc"`. Accept either a path or inline feature description.
@@ -114,8 +199,10 @@ Use workstream context (loaded by step 3 below) — design tokens, brand voice, 
    - Copy each image to `{feature_folder}/wireframes/assets/source-screens/`
    - Run vision-extraction per the prompt template in that file
    - Append a section per screenshot to `{feature_folder}/wireframes/assets/source-screens.md`
+   <!-- defer-only: ambiguous -->
    - Defer the journey-anchoring `AskUserQuestion` step to the journey-confirmation gate below (so the user reviews journeys and screenshot mappings together)
    - If no screenshots provided, skip this step entirely.
+<!-- defer-only: ambiguous -->
 4. **Confirm understanding.** Summarize the journeys you'll wireframe AND (if step 3.5 ran) propose anchor mappings between each screenshot and a journey step. Ask the user to confirm both via `AskUserQuestion` (batch ≤ 4 per call, screenshots first then journey list, sequential calls if needed). Update `source-screens.md` "Anchored to" lines per the user's answers. Platform fallback: present journeys + proposed mappings as a numbered list and ask for confirmation in free text.
 
 **Gate:** Do not proceed until the user confirms the journey list.
@@ -134,6 +221,7 @@ Read every item in the requirements doc. For each, classify into one of three tr
 | **Comparison / before-after** | restyle, remove stripes, change a single visual property | Single-screen "before / after" wireframe (1 file, 2 states) |
 | **Trivially specifiable** | data fix, label change, link wiring, refactor | Skip wireframe — note in handoff that /spec proceeds directly |
 
+<!-- defer-only: ambiguous -->
 Present the triage table via `AskUserQuestion` (one question per row OR a single multiSelect with labeled rows) so the user confirms classifications before any inventory work. Default recommendations should be visible. Per the Rigor & Corner-Cut Protocol, **announce every "skip wireframe" and "comparison only" classification with rationale** — these are scope-cuts, not silent omissions.
 
 After triage, only the items classed "Net-new IA / flow" or "Comparison / before-after" enter the inventory below. Skipped items get listed in the Phase 8 spec handoff under "Skipped from wireframing — proceed directly to /spec".
@@ -166,6 +254,7 @@ A wireframe file MUST cover every state for its component — use a state-switch
 
 ### 2c. Device Selection
 
+<!-- defer-only: ambiguous -->
 Ask the user (`AskUserQuestion`, multiSelect=true) which devices to target:
 
 - desktop-web
@@ -178,6 +267,7 @@ Default offered: whatever the req doc declared. If silent, recommend `desktop-we
 
 ### 2d. Clarifying Questions
 
+<!-- defer-only: ambiguous -->
 Use `AskUserQuestion` (max 4 per call) to resolve genuine ambiguities about scope, IA, or interaction model. Do NOT ask cosmetic questions — those are reviewer-loop concerns. If you have no genuine ambiguities, skip and announce why.
 
 **Gate:** Do not proceed until the user confirms the component inventory, state matrix, and device list. Print the matrix as a table:
@@ -204,6 +294,7 @@ Detailed procedure lives in three reference docs:
 
 ### 2.5a — Resolve target app
 
+<!-- defer-only: ambiguous -->
 Follow `reference/design-md-resolver.md` Step 1 (workstream-first, then frontend detection, then AskUserQuestion if ambiguous). The chosen `app_dir` persists to the workstream `## Wireframes & Design System` section as `target_app.path`.
 
 ### 2.5b — Find or create DESIGN.md
@@ -212,14 +303,17 @@ Follow `reference/design-md-resolver.md` Step 2 (walk: `<app>/DESIGN.md` → `pa
 
 - **Found** → load it. Resolve `x-extends` per resolver Step 3. Run staleness check per resolver Step 4.
   - **Fresh** → proceed to 2.5c.
+  <!-- defer-only: destructive -->
   - **Stale** → AskUserQuestion: **Re-extract** / **Use as-is** / **Abort**. Re-extract runs `reference/design-md-extractor.md` Branch A and rewrites the file (preserving any hand-edited `## Anti-patterns` and `x-content.voice` — diff and confirm before overwrite).
 - **Not found** → run `reference/design-md-extractor.md`:
   - **Frontend present** → Branch A (auto-extract).
   - **Greenfield** → Branch B (interactive elicitation, 4 questions).
+  <!-- defer-only: ambiguous -->
   - **Monorepo with shared `packages/ui/`** → AskUserQuestion: write to **shared base** (`packages/ui/DESIGN.md`) or **app-specific** (`<app_dir>/DESIGN.md`, with `x-extends` to the shared base if one exists). Recommend shared.
 
 ### 2.5c — Confirm with user
 
+<!-- defer-only: ambiguous -->
 After load/create, AskUserQuestion:
 - **Question:** "Use this DESIGN.md for wireframes?"
 - **Options:** **Use as-is** / **Edit before continuing** / **Discard for this run**
@@ -238,6 +332,7 @@ Update the workstream `## Wireframes & Design System` section per resolver Step 
 
 If this is the first DESIGN.md created for this workstream AND the workstream has a non-empty `## Design System / UI Patterns` section (legacy from older `/wireframes` runs):
 1. Show the user the existing patterns and the proposed DESIGN.md additions (into `## Anti-patterns` / `## Do's and Don'ts`).
+<!-- defer-only: ambiguous -->
 2. AskUserQuestion: **Migrate (recommended)** / **Skip migration**.
 3. On migrate: append patterns to DESIGN.md, replace the workstream section's body with `→ See DESIGN.md at <path>`.
 
@@ -261,13 +356,16 @@ Output of this phase is three in-memory blobs passed to Phase 3:
 COMPONENTS.md lives in the same dir as DESIGN.md. Procedure per `reference/components-md-spec.md` ("Extractor procedure"):
 
 - **Found and fresh** (commit SHA matches DESIGN.md's `x-source.sha` ± any `/verify` updates) → load.
+<!-- defer-only: destructive -->
 - **Found but stale** → offer re-extract via AskUserQuestion: **Re-extract** / **Use as-is**.
+<!-- defer-only: ambiguous -->
 - **Missing AND host frontend exists** → run the extractor; write to `<dirname design_md_path>/COMPONENTS.md`; AskUserQuestion accept/edit/skip gate (same shape as 2.5c).
 - **Missing AND greenfield** → write a stub COMPONENTS.md (header + `_No components yet._`). Don't block.
 
 ### 2.6b — Pick a layout anchor
 
 If DESIGN.md `x-information-architecture.layouts` has entries:
+<!-- defer-only: ambiguous -->
 - AskUserQuestion (single-select): "Which existing layout does this feature follow?"
 - Options: each named layout + "None — start fresh"
 - Cap at 4; if more, recommend the 3 most common (by call-site count if available, else alphabetical).
@@ -390,15 +488,16 @@ For each generated wireframe file, run up to 2 refinement loops. Stop early when
 
 ### Findings Presentation Protocol (cross-file rollup)
 
+<!-- defer-only: ambiguous -->
 After all per-file refinement is done, present a cross-file rollup of any unresolved high/medium findings to the user via `AskUserQuestion`:
 
-1. **Group findings by heuristic category** (max 4 per batch — respects the `AskUserQuestion` 4-question limit).
+1. **Group findings by heuristic category** (max 4 per batch — respects the 4-question limit).
 2. **One question per finding**:
    - `question`: one-sentence finding + which file(s) it affects + proposed fix
    - `options`: **Fix as proposed** / **Modify** / **Skip** / **Defer**
 3. **Batch up to 4 questions per call**; sequential calls for more.
 4. **Open-ended findings** (free-form fixes): ask inline as a follow-up.
-5. **Platform fallback** (no `AskUserQuestion`): present findings as a numbered table with disposition column; do NOT silently self-fix.
+5. **Platform fallback** (no interactive prompt tool): present findings as a numbered table with disposition column; do NOT silently self-fix.
 
 **Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." Always structure the ask.
 
@@ -456,6 +555,7 @@ Wireframes are now generated. Phase 6 hands off to `/msf-wf` for combined MSF + 
 
 **Behavior:**
 - `/msf-wf` runs persona alignment, MSF Pass A (grounded in wireframe DOM), and PSYCH Pass B (per-screen scoring with directional thresholds).
+<!-- defer-only: ambiguous -->
 - With `--apply-edits`, each finding is presented via `AskUserQuestion` for Fix / Modify / Skip / Defer disposition. Approved findings are applied as inline `Edit` calls to the relevant `.html` files.
 - Output: a single `msf-findings.md` co-located with the wireframes folder, containing both the MSF analysis matrix and the PSYCH scoring tables.
 

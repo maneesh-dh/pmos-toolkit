@@ -24,3 +24,22 @@ load test_helper
   awk '/<!-- non-interactive-block:start -->/,/<!-- non-interactive-block:end -->/' "$SHARED_FILE" \
     | grep -q 'awk-extractor'
 }
+
+@test "Section A defines refusal regex and exit 64" {
+  awk '/^## Section A/,/^## Section B/' "$SHARED_FILE" \
+    | grep -qE 'exit[[:space:]]+64'
+  awk '/^## Section A/,/^## Section B/' "$SHARED_FILE" \
+    | grep -qE '\^--non-interactive not supported by'
+}
+
+@test "Section B contains parser markers" {
+  awk '/^## Section B/,/^## Section C/' "$SHARED_FILE" \
+    | grep -q '<!-- parser-snippet:start -->'
+  awk '/^## Section B/,/^## Section C/' "$SHARED_FILE" \
+    | grep -q '<!-- parser-snippet:end -->'
+}
+
+@test "Section C documents [mode: ...] prefix marker" {
+  awk '/^## Section C/,0' "$SHARED_FILE" \
+    | grep -qE '\[mode: (interactive|non-interactive)\]'
+}

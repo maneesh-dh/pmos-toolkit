@@ -75,3 +75,66 @@ Supporting skills paste the block between the markers below into their own Phase
 <!-- non-interactive-block:end -->
 
 ---
+
+## Section A — Refusal pattern + exit-64 contract
+
+Skills that structurally forbid `--non-interactive` declare it via a marker near the top of their SKILL.md:
+
+    <!-- non-interactive: refused; reason: <one-line reason>; alternative: <one-line pointer> -->
+
+When detected with `mode == non-interactive`, emit to stderr:
+
+    --non-interactive not supported by /<skill>: <reason>. <alternative>
+
+Then exit 64. The regex used by `tests/non-interactive/refusal.bats` to assert this:
+
+    ^--non-interactive not supported by /[a-z-]+: .+\. .+
+
+Refusal is one-directional: `<!-- non-interactive: refused; ... -->` does NOT block `--interactive` (the symmetric flag) (FR-07.2).
+
+---
+
+## Section B — Downstream Open-Questions parser snippet
+
+Downstream pipeline skills (`/spec`, `/plan`, etc.) extract the previous artifact's `## Open Questions (Non-Interactive Run)` block as a JSON array. Inline this snippet in their Phase 1 input-loading:
+
+<!-- parser-snippet:start -->
+```bash
+# Usage: parse_open_questions <artifact-path>
+# Stdout: JSON array of OQ entries; [] if no block; exit 0 always (warns on malformed YAML)
+parse_open_questions() {
+  local artifact="$1"
+  local docs
+  docs="$(awk '
+    /^## Open Questions \(Non-Interactive Run/ { in_section=1; next }
+    in_section && /^```yaml$/                  { in_block=1; if (count++) print "---"; next }
+    in_section && /^```$/ && in_block          { in_block=0; next }
+    in_section && in_block                     { print }
+  ' "$artifact")"
+  if [[ -z "$docs" ]]; then
+    echo '[]'
+    return 0
+  fi
+  printf '%s\n' "$docs" | yq eval-all '[.]' --output-format=json 2>/dev/null || echo '[]'
+}
+```
+<!-- parser-snippet:end -->
+
+Parser handles missing block by emitting `[]`; malformed YAML in a block emits parsable entries with stderr warnings (FR-09.2).
+
+---
+
+## Section C — Subagent propagation prefix recipe
+
+When a parent skill (running `--non-interactive`) dispatches a child skill, the parent prepends the marker as the literal first line of the child's prompt:
+
+    [mode: non-interactive]
+    <rest of child prompt as usual>
+
+Marker grammar: `^\[mode: (interactive|non-interactive)\]$` on its own line (FR-06.1). Case-sensitive; followed immediately by `\n`.
+
+The child's Phase 0 (instruction below) scans the original prompt's first 256 bytes for the marker before checking flags or settings. If the marker matches, the value enters the resolver as `parent_marker`.
+
+Child entries merged into the parent's OQ buffer use id format `OQ-<child-skill-name>-NNN` (FR-06.2).
+
+Anti-pattern: parent passes mode via natural-language argument ("invoke /verify in non-interactive mode"). Forbidden — depends on LLM faithfulness; use the marker.

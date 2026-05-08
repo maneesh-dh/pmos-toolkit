@@ -145,8 +145,9 @@ user: /execute resumes from T7
 
 | ID | Requirement |
 |----|-------------|
-| FR-10 | Phase 2 has explicit "detect stack signals" step: globs for `package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`. Records detected stack(s) in Code Study Notes' "Stack signals" subsection (D61) |
-| FR-11 | `_shared/stacks/<stack>.md` exists for at least: `node`, `python`, `rails`, `go`, `static`. Each file contains: prereq verification commands (T0), lint/test/format commands, API smoke pattern by interface (HTTP/GraphQL/gRPC/CLI/static), common fixture patterns |
+| FR-10 | Phase 2 has explicit "detect stack signals" step: globs for **manifest files** (`package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`) AND **lockfile signatures** for JS-stack disambiguation. Records detected stack(s) in Code Study Notes' "Stack signals" subsection (D61) |
+| FR-10a | JS-stack disambiguation: presence of `package.json` triggers a lockfile inspection. `package-lock.json` → `npm`; `yarn.lock` (no `.yarnrc.yml`) → `yarn-classic`; `.yarnrc.yml` + `yarn.lock` → `yarn-berry`; `pnpm-lock.yaml` → `pnpm`; `bun.lockb` → `bun`. When no lockfile is present alongside `package.json`, default to `npm` and emit a low-risk finding ("no lockfile detected; using npm template") |
+| FR-11 | `_shared/stacks/<stack>.md` exists for at least: `npm`, `pnpm`, `yarn-classic`, `yarn-berry`, `bun`, `python`, `rails`, `go`, `static`. Each file contains: prereq verification commands (T0), lint/test/format commands, API smoke pattern by interface (HTTP/GraphQL/gRPC/CLI/static), common fixture patterns. The five JS-stack files share a common preamble fragment that they include via copy-paste (no skill-time templating) — common parts kept in sync via a CI lint that diffs the preambles (Open Q: maintenance policy still tracked in OQ #3) |
 | FR-12 | T0 (Prerequisite Check) task is auto-generated from detected stack(s); T0 is read-only and idempotent; /execute fails fast on T0 failure |
 | FR-13 | TN's API smoke step is generated from detected stack — never `curl \| json.tool` baked in |
 | FR-14 | When stack detection is ambiguous (multiple signals) /plan asks user via AskUserQuestion (or, in `--non-interactive`, picks the dominant signal by file-count and logs in Auto-decisions made:) |
@@ -164,6 +165,7 @@ user: /execute resumes from T7
 | FR-24 | File-action verbs: Create, Modify, Delete, Move, Rename, Test (D48). Move/Rename rows specify source AND destination |
 | FR-25 | Execution-order diagram is auto-rendered Mermaid from per-task `**Depends on:**` lines (D25). Emitted as an inline ` ```mermaid ` fenced block in the plan markdown — rendered natively by GitHub and most markdown viewers; no external rendering pipeline required |
 | FR-26 | When `## Phase N` groupings are used, last phase's verify IS the TN — no separate end-of-plan TN task (D4) |
+| FR-26a | Phase-boundary /verify trigger. When `## Phase N` groupings exist, /execute runs full /verify at every phase boundary as a deployable-slice gate. The LAST phase's /verify IS the TN (per FR-26). Intermediate phase boundaries each get their own /verify run. Inherited from /plan v1 implicit behavior; made explicit in v2 (S2-1) |
 | FR-27 | Phase grouping rule: phases are used when a deployable slice exists mid-plan; size = "enough to be worth a /verify run." No task-count thresholds (D9) |
 
 ### 6.4 Per-task fields (load-bearing)
@@ -175,6 +177,7 @@ Every task includes:
 | FR-30 | `**Goal:**` | Always | One-sentence task purpose |
 | FR-31 | `**Spec refs:**` | Always | Cite anchor IDs from /spec frontmatter (cross-skill: requires /spec to emit anchors at all tiers — out of scope for this spec, see Open Questions) |
 | FR-31a | Broken-ref detection. Phase 4 hard-fails when any task's `**Spec refs:**` cites an anchor that does not exist in the current `02_spec.md`. Same rule applies to `**Wireframe refs:**` against the `wireframes/` folder (referenced HTML file must exist). /verify Phase 4 re-runs both checks before declaring done — catches drift introduced by post-plan spec or wireframe edits | | |
+| FR-31b | Spec content drift detection. Phase 0 records a SHA-256 hash of each cited spec section's content (the section body between its anchor heading and the next sibling heading). Phase 4 re-hashes the same sections from the current spec; any task whose Spec refs cite a section whose content hash changed since Phase 0 read produces a high-risk finding "spec content drift on FR-XX since plan started — re-validate task rationale." Catches mid-run spec edits that don't break anchors but invalidate task rationale | | |
 | FR-32 | `**Wireframe refs:**` | If UI-touching (S4) | Wireframes-as-reference per D7; layout-pattern gaps must be called out |
 | FR-33 | `**Files:**` | Always | Create/Modify/Delete/Move/Rename/Test rows |
 | FR-34 | `**Depends on:**` | Always (may be `none`) | Task IDs gating this task; /execute consumes for ordering and [P] inference |
@@ -206,7 +209,7 @@ Every task includes:
 | FR-52 | /plan invokes `/backlog set {id} plan_doc={path}` then `/backlog set {id} status=planned` when `--backlog <id>` is passed; on failure warns and continues |
 | FR-53 | /plan deferred-work auto-capture targets out-of-scope notices (adjacent bugs, refactor opportunities) via a new `## Notices` section the hook scans — not deferred spec items (D11). Spec coverage gaps remain a Phase 4 hard-fail |
 | FR-54 | Phase 2 globs `{docs_path}/features/*/03_plan.md` (excluding current) and greps for impacted file paths; conflicts produce a Risks-table row with Mitigation = "coordinate with feature X" + Open Question (D43) |
-| FR-54a | "In flight" definition for FR-54: peer plans whose plan frontmatter `status` is `Draft`, `Planned`, or `Executing`. Plans with `status: Done` or `status: Archived`, or feature folders containing `04_complete.md` or `05_verified.md`, are excluded from the conflict scan |
+| FR-54a | "In flight" definition for FR-54: peer plans whose plan frontmatter `status` is `Draft`, `Planned`, or `Executing`. Plans with `status: Done` or `status: Archived`, or feature folders containing `04_complete.md` or `05_verified.md`, are excluded from the conflict scan. **Including `Draft` is intentional** — two simultaneously-drafted plans is exactly the case the scan must catch; excluding Draft would produce false negatives during concurrent feature design |
 | FR-55 | If `--backlog <id>` passed: Phase 4 check that every backlog acceptance criterion maps to a task or TN line OR is in a `## Backlog Out-of-Scope` subsection with rationale (D53) |
 | FR-56 | On planning defect during /execute: /execute writes `{feature_folder}/03_plan_defect_<task-id>.md`; /plan invoked as `/plan --fix-from <task-id>` reads the defect, enters Edit mode scoped to that task and downstream, preserves completed-task refs (D42) |
 
@@ -215,8 +218,14 @@ Every task includes:
 | ID | Requirement |
 |----|-------------|
 | FR-60 | When `03_plan.md` exists, /plan offers three modes via AskUserQuestion: **Edit** (in-place fix, no review loops, no Supersedes header), **Replan** (overwrite with `Supersedes: 03_plan_pre-replan_<ISO date>.md` header, full Phase 4 loops, preserve completed-task refs), **Append** (new tasks added to existing list, review loop scoped to additions only) (D26) |
+| FR-60a | Append-mode rules. New tasks append to the end of the existing task list with fresh IDs that do not reuse any prior task ID (e.g., existing T1-T12 → new T13, T14, ... regardless of gaps). Each new task's `**Depends on:**` may reference any existing task ID. Phase 4 review loop is scoped to: (a) the new tasks, and (b) any existing task whose dependency graph the new tasks alter. Skip-List dedupe scope: fingerprints whose source-task-ID is in the reviewed scope are dedupe candidates; entries from out-of-scope tasks remain inert |
 | FR-61 | `--non-interactive` flag suppresses confirmation gates: Phase 1 summary auto-confirms, Phase 4 high-risk findings auto-applied per "apply Recommended option even on high-risk; AskUserQuestion only when no Recommended exists for high-risk." Auto-applied choices persist to sidecar `03_plan_auto.md` (one entry per choice: prompt verbatim + option chosen + rationale). The sidecar is **overwritten** on every /plan run — it always reflects the auto-decisions of the most-recent run, not historical accumulation. The plan body has a single one-line pointer near the top: "See `03_plan_auto.md` for N auto-decisions made during non-interactive run." |
+| FR-61a | Non-interactive halt protocol. When a high-risk decision has no Recommended option (e.g., spec re-open per E13), /plan in `--non-interactive` mode does NOT silently default. Instead it halts with exit code 2 and writes `{feature_folder}/03_plan_blocked.md` containing: (a) the blocking decision in one sentence, (b) the conflict observed (spec text vs repo standard / etc.), (c) a recommended human action ("update spec to align with repo standard, or document override in spec"). No partial `03_plan.md` is written. Caller (subagent / cron / CI) treats exit code 2 as "human review required" |
 | FR-62 | Phase 0 step 0 = unconditional `Read` of `_shared/pipeline-setup.md` (D35). Drop conditional-on-edge-case rule |
+| FR-66 | Concurrent-invocation lock. /plan acquires an advisory lockfile at `{feature_folder}/.plan.lock` on Phase 0 entry containing `pid + ISO timestamp + skill_version`. Releases on successful completion or fatal error (Python `try/finally` or equivalent). If the lockfile exists at entry, /plan refuses with platform-aware error: "Another /plan run is in progress (pid=X, started=ISO). If you are sure that run is dead, re-invoke with `--force-lock` to clear and proceed." Prevents silent overwrites of `03_plan.md` from concurrent invocations |
+| FR-67 | Cap_Hit Abandon disposition behavior. When user picks "Abandon" at the cap-hit prompt (§8.3) for an interactive run: /plan exits with no plan written. If `03_plan.md` already existed at Phase 0 (Replan/Edit/Append entry), restore from `03_plan_pre-cap-abandon_<ISO timestamp>.md` backup taken on Phase 0 entry. The backup is deleted on successful completion (any non-Abandon exit) |
+| FR-67a | --fix-from upstream root cause. /plan --fix-from supports `--widen-to <upstream-task-id>` to extend Edit-mode scope upstream when /execute determined the defect's root cause precedes the named task (e.g., T7 failed because T5 made a faulty assumption — re-plan from T5 onward). Without --widen-to, scope defaults to defect-task + downstream only |
+| FR-67b | --fix-from cross-phase downstream. In phased plans, --fix-from on T11 (in phase 2) defaults Edit-mode scope to T11 + same-phase downstream tasks only; subsequent phases (3, 4, ...) are untouched. User can pass `--cross-phase-downstream` to extend scope through later phases when the defect invalidates downstream-phase assumptions |
 | FR-63 | Slug derivation lives in `_shared/pipeline-setup.md` and is shared by /requirements, /spec, /plan: kebab-case, derived from spec H1 title, max 5 words, ASCII only (D45) |
 | FR-64 | Phase 0 reads both `~/.pmos/learnings.md` and `<repo_root>/.pmos/learnings.md`. On conflict, repo-local wins. Both can be overridden by skill body unless tagged `override: true` (D27, D57) |
 | FR-65 | Folder picker (when no `--feature` and no `current_feature`) offers via AskUserQuestion: most-recently-modified folder, best slug-match against spec H1, create-new-with-derived-slug, Other (free-form, partial-match fallback) (D49) |
@@ -240,9 +249,42 @@ Every task includes:
 | FR-102 | Plan inherits glossary from spec via citation (`see 02_spec.md §X for glossary`); plan introduces no new domain terms not already defined in the spec. Phase 4 check: novel domain term → finding (low-risk: re-word; high-risk: add to spec, halt) (D58) |
 | FR-103 | Plan tests are illustrative reference shape, not literal. /execute may adapt to host conventions (fixture names, framework version, helper signatures). Phase 4 checks shape preservation (same inputs/outputs/assertions), not literal text match (D52) |
 | FR-104 | Bug-fix TDD task shape (when S5 trigger fires): step 1 writes a regression test that *reproduces the bug* against current code, step 2 confirms the test fails on pre-fix HEAD, step 3 implements the fix, step 4 confirms the test passes. Distinct from new-feature TDD which writes a test for desired behavior with no expectation of pre-existing failure (D55) |
+| FR-104a | Three-signal precedence on disagreement (most-specific wins): per-task `**TDD:** <value>` overrides spec frontmatter `type:` overrides /backlog item `type=`. When an override is exercised, /plan emits a Decision-Log entry citing the override and rationale (e.g., "Task T7 within bugfix-typed spec is treated as new-feature TDD because it adds a brand-new code path discovered during Phase 2 code study"). Prevents silent disagreement |
 | FR-105 | TDD-optional task types (per `**TDD:** no — <reason>`): pure refactors covered by existing tests, config/IaC changes, CSS-only tweaks, prototype spikes, file moves/renames without behavior change. Author must state the reason; Phase 4 reviews the justification rather than the existence of TDD (D2) |
 
-### 6.10 Platform neutrality
+### 6.10 Sidecar hardening
+
+| ID | Requirement |
+|----|-------------|
+| FR-43a | Skip-List entry integrity. Each Skip-List row carries an `entry_hash` (SHA-256 of `fingerprint + rationale`). /plan re-validates on read; tampered rows (hash mismatch) are ignored with a low-risk finding "Skip List entry hash mismatch — entry ignored." Prevents silent suppression by manual edits |
+| FR-43b | Skip-List heading robustness. Missing `## Skip List` heading is treated as "no skip list active"; any entries below an absent heading are orphaned and ignored, with a low-risk finding "Skip List heading missing; entries below ignored" |
+| FR-43c | Sidecar atomic writes. All sidecar writes use write-then-rename atomic pattern (`tempfile + rename`). Write failures abort /plan with a platform-aware error rather than declaring the loop done with stale state |
+| FR-43d | Replan archive heading uniqueness. Archive headings include time-of-day suffix: `## Archived (pre-replan YYYY-MM-DD HH:MM:SS)`. Same-day re-Replans never collide |
+
+### 6.11 Minor hardening (consolidated)
+
+| ID | Requirement |
+|----|-------------|
+| FR-12a | T0 (Prerequisite Check) is mandatory at **all tiers**, including Tier 1 reduced TN. Tier 1 reduced TN is "T0 + lint + test + Done-when walkthrough"; T0 was previously implicit |
+| FR-14a | Stack-detection tiebreak. When multiple signals are equal by file-count weight, tiebreak by alphabetical stack name (deterministic, reproducible). Logged in Auto-decisions if non-interactive |
+| FR-16 | Bidirectional wireframe coverage. Phase 4 hard-fails when any HTML file in `wireframes/` is not referenced by ≥1 task's `**Wireframe refs:**` line OR explicitly listed in a plan-level `## Wireframes Out of Scope` subsection with rationale. Catches dropped screens at plan time |
+| FR-16a | Vestigial-wireframes auto-skip. When the plan has no UI signal (per S4) but `wireframes/` exists, /plan auto-emits a `## Wireframes Out of Scope` subsection listing every wireframe with rationale "backend-only plan; UI flows out of scope." Avoids forced-ceremony for vestigial folders |
+| FR-40a | Convergence Warning placement. The `## Convergence Warning` section (FR-40 cap-hit + non-interactive) lives in `03_plan.md` body near the top — NOT in a sidecar. Visibility to /verify and human reviewers is the priority. Asymmetry with auto-decisions sidecar is intentional: warnings need to be impossible to miss; auto-decisions are an audit log |
+| FR-42a | Loop-2 subagent timeout. Blind-review subagent dispatch (FR-42) has a 5-minute wall-clock timeout. On timeout: skip subagent findings (treat as if no findings returned), emit a low-risk note in Review Log "Loop 2 subagent timed out; no blind-review findings consumed." Prevents indefinite hangs |
+| FR-42b | Nested subagent gating. When /plan itself runs as a subagent, it does not dispatch the Loop-2 blind-review subagent (FR-42). Detection: skill checks for caller-supplied environment marker (e.g., `PMOS_NESTED=1`). Falls back to self-review-only on Loop 2 |
+| FR-50a | Malformed YAML frontmatter. /plan refuses with platform-aware error "Spec frontmatter parse error at line N: <yaml-lib message>. Fix YAML syntax and re-run." Does not attempt partial recovery |
+| FR-52a | /backlog write-back retry. /plan retries `/backlog set` calls up to 3 times with exponential backoff (1s, 2s, 4s). On final failure, emits a low-risk warning "Backlog write-back failed for BG-X; back-link is orphaned. Re-run `/backlog set BG-X plan_doc=03_plan.md status=planned` manually." Continues with plan generation |
+| FR-100a | Sidecar version markers. Every sidecar (`03_plan_review.md`, `03_plan_auto.md`, `03_plan_defect_*.md`) carries `skill_version: pmos-toolkit/<semver>` in frontmatter. /plan and consumers warn on major-version mismatch; minor-version mismatches are silently accepted |
+| FR-100b | Sidecar lifecycle. `03_plan_review.md` and `03_plan_auto.md` are overwritten on each /plan run (never appended); `03_plan_defect_*.md` is owned by /execute and removed by /execute on successful resume past the defect task. No long-lived sidecar accumulation |
+| FR-110 | /execute fail-fast on plan-validation gaps. If /execute reads a plan with a dependency cycle, missing required field, or contract violation that Phase 4 should have caught, /execute halts with a "plan defect" report (not a defect-file handoff) and instructs the user to run `/grill 03_plan.md` and re-plan. Does not attempt repair |
+| FR-111 | Cross-skill contract version. The plan/spec/execute/backlog interlock surface carries `contract_version: 1` in plan frontmatter. Bumped only when a breaking change ships. Backwards-compat shim per S3 keys on this field |
+| FR-112 | /backlog type enum (extension of §7.3): `feature`, `enhancement`, `bug`, `chore`, `docs`, `spike`. The bug-fix TDD trigger (FR-104a) keys on `bug`; other values map to new-feature TDD by default |
+| FR-113 | Shared-resource absolute paths. §7.4 references resolve to `plugins/pmos-toolkit/skills/_shared/stacks/<stack>.md` and `plugins/pmos-toolkit/skills/_shared/platform-strings.md` and `plugins/pmos-toolkit/skills/_shared/pipeline-setup.md` (relative to repo root) |
+| FR-41b | Post-auto-apply re-validation. After auto-applying low-risk findings within a loop, /plan does NOT re-run structural/design checks within the same loop. Re-validation happens at Loop N+1. Avoids infinite-loop risk; minor stale-state findings deferred one loop is acceptable |
+| FR-114 | NFR section. /plan v2 spec intentionally omits an NFR section: the skill is markdown-on-disk, no runtime/memory budget applies in the traditional sense. Performance considerations (Phase 2 peer-plan glob latency on large feature directories) are surfaced via the FR-90 phase-token-size check, not via NFRs |
+| FR-115 | Coordinated rollout order. The cross-skill change set ships in order: (1) shared resources (`_shared/stacks/*.md`, `_shared/platform-strings.md`, `_shared/pipeline-setup.md` updates) merged first; (2) /spec frontmatter+anchors update merged second; (3) /plan v2 + /execute v2 + /backlog type-field merged together in one minor version. Steps 1 and 2 land while /plan v1 still runs (back-compat reads ignore new fields); step 3 atomically activates v2 behavior |
+
+### 6.12 Platform neutrality
 
 | ID | Requirement |
 |----|-------------|
@@ -302,6 +344,66 @@ Add a `type` field to backlog item frontmatter with values `feature | enhancemen
 | `_shared/platform-strings.md` | Per-platform phrasing for closing offer + skill-invocation references |
 | `_shared/pipeline-setup.md` updates | Slug derivation function (FR-63); folder-picker logic (FR-65) |
 
+### 7.5 Defect file contract (`03_plan_defect_<task-id>.md`)
+
+Written by /execute on planning defect; read by /plan --fix-from.
+
+**Frontmatter (required):**
+```yaml
+---
+defect_task: T7
+generated_by_skill_version: pmos-toolkit/<semver>
+generated_at: <ISO 8601 timestamp>
+plan_ref: ../03_plan.md
+spec_ref: ../02_spec.md
+---
+```
+
+**Body sections (required, in order):**
+
+1. `## Failure Context` — what happened, exit code if applicable, last-output excerpt (≤50 lines, redacted of secrets), reproduction steps.
+2. `## Affected Artifacts` — files modified, db state changes, external services touched, environment side-effects (containers started, ports bound, etc.).
+3. `## Suggested Fix Direction` — free-form hints from /execute (failed assumptions, observed-vs-expected, candidate root causes). **May be empty.** /plan --fix-from reads frontmatter + sections 1 and 2 as authoritative; section 3 is advisory.
+
+### 7.6 Sidecar file contracts
+
+#### `{feature_folder}/03_plan_review.md`
+
+Owned by /plan; readable by /verify, /grill, /execute. **Overwritten on each /plan run.**
+
+**Frontmatter:**
+```yaml
+---
+plan_ref: 03_plan.md
+generated_at: <ISO 8601>
+skill_version: pmos-toolkit/<semver>
+---
+```
+
+**Required sections (in order):**
+
+1. `## Skip List` — table with columns: `fingerprint | first_loop | last_seen_loop | rationale`. Empty table OK.
+2. `## Review Log` — table with columns: `loop | findings | dispositions | applied_at`. One row per loop run.
+3. `## Archived (pre-replan <YYYY-MM-DD HH:MM:SS>)` — optional, present after Replan; same shape as Skip List, frozen.
+
+#### `{feature_folder}/03_plan_auto.md`
+
+Owned by /plan; written only when `--non-interactive` was used. **Overwritten on each /plan run.**
+
+**Frontmatter:**
+```yaml
+---
+plan_ref: 03_plan.md
+run_started_at: <ISO 8601>
+skill_version: pmos-toolkit/<semver>
+non_interactive: true
+---
+```
+
+**Required sections:**
+
+1. `## Auto-decisions` — table with columns: `question_text | chosen_option | rationale | confidence`. `confidence` ∈ {high, medium, low}; reflects whether the chosen option was the unambiguous Recommended (high), Recommended in a contested batch (medium), or default-when-no-Recommended-exists path (low — and triggers FR-61a halt).
+
 ---
 
 ## 8. Frontend Design
@@ -326,6 +428,38 @@ Per Findings Presentation Protocol, max 4 high-risk findings per call.
 
 - **Interactive:** "Loop 4 still finds {N} issues. Continue / Accept-and-proceed / Abandon."
 - **Non-interactive:** no prompt; auto Accept-and-proceed + write `## Convergence Warning` block.
+
+### 8.4 Stack-ambiguity picker (FR-14)
+
+Triggered when Phase 2 detects multiple stack signals.
+
+- **Question:** "Multiple stack signals detected: {list}. Which is the dominant stack for this plan?"
+- **Options:** {detected stack 1 (Recommended — by file count)} / {detected stack 2} / {Mono-repo: pick all} / Other
+- **Non-interactive:** pick by file-count weight; tie → alphabetical; log to `03_plan_auto.md` with confidence=medium.
+
+### 8.5 Folder picker (FR-65)
+
+Triggered when no `--feature` flag and `current_feature` not set.
+
+- **Question:** "No feature folder selected. Pick or create:"
+- **Options:** {most-recently-modified folder} (Recommended) / {best slug-match against spec H1} / Create new with derived slug `{slug}` / Other (free-form, partial-match fallback)
+- **Non-interactive:** default to best slug-match if exact slug exists; else create new; log to `03_plan_auto.md` with confidence=high (slug-match) or low (create-new in non-interactive).
+
+### 8.6 Simulate-spec findings surface (FR-51)
+
+Triggered when `02_simulate-spec_*.md` is present in feature folder with unresolved findings.
+
+- **Question (per finding, batched up to 4):** one-sentence finding + severity + simulate-spec recommendation.
+- **Options:** Update spec to address before planning (halt /plan) / Treat as Open Question in plan / Accept as risk / Skip (already resolved upstream)
+- **Non-interactive:** any finding with severity=blocker triggers FR-61a halt; significant defaults to "Treat as Open Question"; minor/forward-compat default to "Accept as risk."
+
+### 8.7 Spec re-open (E13)
+
+Triggered when Phase 2 code study contradicts a spec decision.
+
+- **Question:** "Spec decision conflicts with repo standard. {Spec text} vs {observed standard}. How to resolve?"
+- **Options:** Halt /plan and update spec / Document override in spec via Decision Log entry / Accept spec as-is despite divergence (with rationale) / Skip — not actually a conflict
+- **Non-interactive:** triggers FR-61a halt (no Recommended option exists for high-risk spec divergence; user judgment required).
 
 ---
 

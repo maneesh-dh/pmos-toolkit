@@ -9,7 +9,7 @@ Capture session learnings as concise bullet points, prepended (newest first).
 
 ## Load Workstream Context
 
-Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}`. Use `{docs_path}/session-log.md` as the output path.
+Before any other work, follow `_shared/pipeline-setup.md` Section 0 to read `.pmos/settings.yaml` and resolve `{docs_path}`. If settings.yaml is missing, run first-run setup per Section A. Use `{docs_path}/session-log.md` as the output path.
 
 ## Process
 
@@ -33,7 +33,7 @@ Only include bullets that apply. No empty sections, no headers within the entry.
 
 4. **Write** — Prepend the entry to `{docs_path}/session-log.md`. If the file doesn't exist, create it with a single H1 header `# Session Log` followed by the entry.
 
-5. **Workstream Enrichment** — If a workstream was loaded, follow the enrichment instructions in `product-context/context-loading.md` Step 4. Session log signals: decisions with reasoning → workstream `## Key Decisions`; gotchas → workstream `## Constraints & Scars`.
+5. **Workstream Enrichment** — If a workstream was loaded, follow `_shared/pipeline-setup.md` Section C. Session log signals: decisions with reasoning → workstream `## Key Decisions`; gotchas → workstream `## Constraints & Scars`.
 
 ## Rules
 

@@ -313,7 +313,7 @@ Source: backlog/items/{id}-{slug}.md
 
 ### Step 3: Resolve feature folder
 
-Follow `../_shared/feature-folder.md` with `skill_name=backlog`, `feature_arg=<--feature value or empty>`, and `feature_hint=<title of the backlog item being promoted>`. The protocol typically creates a new folder for the promoted item (default to **Create new** with the derived slug). Use the returned `{feature_folder}` for the output path. The protocol also updates `.pmos/current-feature` so subsequent pipeline skills pick up the same folder.
+Follow `../_shared/pipeline-setup.md` Section B (feature-folder rules) with `skill_name=backlog`, `feature_arg=<--feature value or empty>`, and `feature_hint=<title of the backlog item being promoted>`. The protocol typically creates a new folder for the promoted item (default to **Create new** with the derived slug). Use the returned `{feature_folder}` for the output path. Folder creation also updates `settings.current_feature` in `.pmos/settings.yaml` so subsequent pipeline skills pick up the same folder.
 
 ### Step 4: Seed the feature folder
 
@@ -321,7 +321,7 @@ Write the seed (from Step 2) to `{feature_folder}/01_requirements.md`. If that f
 
 ### Step 5: Invoke the target skill
 
-Invoke the target skill (`/requirements` or `/spec`) with `--backlog {id}` so the pipeline-bridge consent gate opens. The target skill resolves its input from the current feature folder per `_shared/feature-folder.md` + `.shared/resolve-input.md` (so the seeded `01_requirements.md` is picked up automatically). The user's session continues inside the target skill.
+Invoke the target skill (`/requirements` or `/spec`) with `--backlog {id}` so the pipeline-bridge consent gate opens. The target skill resolves its input from the current feature folder per `_shared/pipeline-setup.md` Section 0 + `.shared/resolve-input.md` (so the seeded `01_requirements.md` is picked up automatically). The user's session continues inside the target skill.
 
 ### Step 6: On return, report
 

@@ -7,7 +7,7 @@ argument-hint: "<initial thoughts or observations to seed the requirements> [--f
 
 # Requirements Document Generator
 
-Brainstorm with the user, research existing patterns, and produce a requirements document that defines the **problem** and **high-level solution direction**. This is the FIRST stage in a 3-stage pipeline:
+Brainstorm with the user, research existing patterns, and produce a requirements document that defines the **problem** and **high-level solution direction**. This is the FIRST stage in the pipeline:
 
 ```
 /requirements  →  [/msf, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
@@ -16,7 +16,7 @@ Brainstorm with the user, research existing patterns, and produce a requirements
 
 A requirements doc answers "What are we building and why?" — it contains ZERO implementation details. No database schemas, no API contracts, no code. Those belong in the spec.
 
-**The acid test:** Could a product designer read every sentence and use it to evaluate design options? If not, it's implementation detail and doesn't belong here.
+**The acid test (dual):** (a) Could a product designer read every sentence and use it to evaluate design options? (b) Could a spec author write `02_spec.md` from this doc with no remaining "why are we building this?" or "what's the user trying to do?" questions? If either fails, the doc isn't done.
 
 **Announce at start:** "Using the requirements skill to brainstorm and create a requirements document."
 
@@ -38,16 +38,26 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 - If `--backlog <id>` was passed: load the item via `cat <repo>/backlog/items/{id}-*.md` and use its content as the seed alongside any user-provided argument. Remember `<id>` for use at the end of the skill.
 - If no argument was provided AND `<repo>/backlog/items/` exists: run the auto-prompt flow per `pipeline-bridge.md`. If the user picks an item, set `<id>` and use its content as the seed.
 
-**At skill end (after writing the requirements doc):**
-- If `<id>` was set, invoke `/backlog set {id} source={doc_path}`. On failure, warn and continue.
+**At skill end (after the requirements doc is written AND committed):**
+- **Guard:** Only invoke `/backlog set {id} source={doc_path}` when (a) the doc was actually written this run AND (b) the commit succeeded. Skip silently if either fails.
+- **Re-run idempotency:** If the same `--backlog id` was used in a prior run and the source path differs, append a one-line history entry to the backlog item: `- {YYYY-MM-DD}: requirements doc rewritten by user`.
 
 ---
 
-## Phase 0: Load Workstream Context
+## Phase 0: Pipeline Setup (inline — do not skip)
 
-Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform brainstorming — product understanding, user segments, metrics, and constraints make requirements more grounded. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /requirements` and factor them into your approach for this session.
-
-**Resolve feature folder.** Follow `../_shared/feature-folder.md` with `skill_name=requirements`, `feature_arg=<value of --feature flag if provided, else empty>`, and `feature_hint=<short user-supplied feature name from the conversation>`. Use the returned folder path as `{feature_folder}` for the rest of this run. The protocol creates the folder if needed.
+<!-- pipeline-setup-block:start -->
+1. **Read `.pmos/settings.yaml`.**
+   - If missing → you MUST invoke the `Read` tool on `_shared/pipeline-setup.md` Section A and run first-run setup before proceeding. (Skipping this Read is the most common cause of folder-naming defects.)
+2. Set `{docs_path}` from `settings.docs_path`.
+3. If `settings.workstream` is non-null → load `~/.pmos/workstreams/{workstream}.md` as context preamble; if frontmatter `type` is `charter` or `feature` and a `product` field exists, also load `~/.pmos/workstreams/{product}.md` read-only.
+4. Resolve `{feature_folder}`:
+   - If `--feature <slug>` was passed → glob `{docs_path}/features/*_<slug>/`. **Exactly 1 match required**; on 0 or 2+ → you MUST `Read` `_shared/pipeline-setup.md` Section B before acting.
+   - Else if `settings.current_feature` is set AND `{docs_path}/features/{current_feature}/` exists → use it.
+   - Else → ask user (offer: create new with derived slug, pick existing from folder list, or specify via Other...).
+5. **Edge cases — you MUST `Read` `_shared/pipeline-setup.md` Section B before acting:** slug collision, slug validation failure, legacy date-less folder encountered, ambiguous `--feature` lookup, any folder creation.
+6. Read `~/.pmos/learnings.md` if present; note entries under `## /<this-skill-name>` and factor them into approach (skill body wins on conflict; surface conflicts to user before applying).
+<!-- pipeline-setup-block:end -->
 
 ---
 
@@ -55,66 +65,80 @@ Before any other work, follow the context loading instructions in `product-conte
 
 ### Determine Input Mode
 
-The user's input can take several forms. Handle each differently:
+The user's input can take several forms. Handle each via mode-specific phase routing:
 
-| Input Mode | What you receive | How to proceed |
-|------------|-----------------|----------------|
-| **Raw thoughts** | Rough observations, a problem statement, or scattered ideas | Full brainstorm flow (Phase 1-2) |
-| **Existing doc update** | Path to an existing requirements doc + new observations | Read the doc, summarize what's there, ask if this is an update or extension, then brainstorm only the delta |
-| **Multiple text inputs** | Several pasted texts, screenshots, or references | Synthesize all inputs into a coherent problem statement first, then confirm understanding before brainstorming |
-| **Spec or detailed brief** | Already well-formed requirements that need shaping | Skip deep brainstorming, focus on gap analysis and structuring into the template |
+| Input Mode | What you receive | Phase routing |
+|------------|-----------------|---------------|
+| **Raw thoughts** | Rough observations, problem statement, or scattered ideas | Full flow (Phase 2 research → Phase 3 brainstorm → Phase 4 write) |
+| **Existing doc update** | Path to existing `01_requirements.md` + new observations | **Skip Phase 2 full research**; read prior Research Sources and refresh only delta-relevant areas (Phase 2 update-path). Phase 3 brainstorm runs on the delta only. |
+| **Multiple text inputs** | Several pasted texts, screenshots, or references | **Add Phase 1.5 synthesis step**: synthesize all inputs into a coherent problem statement; confirm understanding via `AskUserQuestion`; then proceed to Phase 2 |
+| **Spec or detailed brief** | Already well-formed requirements that need shaping | **Skip Phase 3 brainstorm**; structure inputs into the template; Phase 5 review applies a gap-analysis lens specifically |
 
 ### Steps
 
-1. **Read the user's input.** If the argument is unclear about which product/service/surface the requirements concern, use AskUserQuestion to clarify upfront — do not guess.
-2. **Scope check.** If the input describes multiple independent subsystems (e.g., "build X with chat, billing, analytics, and admin"), flag this immediately. Don't spend questions refining details of a project that needs decomposition first. Help the user break it into independent sub-requirements, each getting its own requirements doc.
+1. **Read the user's input.** If the argument is unclear about which product/service/surface the requirements concern, use `AskUserQuestion` to clarify upfront — do not guess.
+2. **Scope decomposition check.** Decompose into separate per-feature pipelines **only when ALL three** of the following hold:
+   - The input describes work targeting **different primary user roles**, AND
+   - The pieces can **ship independently** (no required ordering for value), AND
+   - The pieces have **non-overlapping acceptance criteria**.
+   If all three hold → propose N feature slugs, ask which to start with, run `/requirements` once per folder. **If any one fails** → treat as a single Tier 3 feature with multiple journeys; do not decompose.
 3. **Check for existing requirements.** Look in `{feature_folder}/01_requirements.md` for an existing file covering this feature.
    - If found: read it, summarize what's there, ask the user if this is an update or fresh start.
-   - If not found: proceed.
-4. **Detect the tier** based on the nature of the work:
+   - **If found AND `02_spec.md` or `03_plan.md` also exist in the folder:** issue a downstream-drift warning via `AskUserQuestion` BEFORE any further work:
+     > Updating requirements will desync `02_spec.md` and/or `03_plan.md`. Continue / cancel / run /verify after?
+4. **Detect the tier** based on these explicit signals. Pick the **highest-tier signal that fires**:
 
-| Tier | Scope | Sections | Length |
-|------|-------|----------|--------|
-| **Tier 1: Bug / Minor Fix** | Isolated defect or small correction | Problem, Root Cause, Fix Direction, Acceptance Criteria | ~0.5-1 page |
-| **Tier 2: Enhancement / UX Fix** | Improving existing behavior or adding to existing surface | Problem, Goals, Non-Goals, Solution Direction, User Journeys, Design Decisions, Open Questions | ~1-2 pages |
-| **Tier 3: Feature / Product Launch** | New capability, new surface, or major redesign | ALL sections mandatory including UX Analysis, Success Metrics, Research Sources, detailed User Journeys | ~2-4 pages |
+| Tier | Signals (any one fires the tier) |
+|------|----------------------------------|
+| **Tier 1: Bug / Minor Fix** | Isolated defect; reversible; no new user-visible flow; touches ≤1 surface |
+| **Tier 2: Enhancement / UX Fix** | Touches 1–2 existing surfaces; no new persona; no new data model; existing flow extended |
+| **Tier 3: Feature / Product Launch** | Touches ≥3 surfaces, OR introduces a new persona, OR introduces a new top-level data-model concept, OR is irreversible at the product level |
 
-**Announce:** "This looks like a Tier N requirement ([type]). Using the [tier name] template."
+| Tier | Sections | Length |
+|------|----------|--------|
+| **Tier 1** | Problem, Root Cause, Fix Direction, Acceptance Criteria, optional Decision/Open Questions/Investigated | ~0.5–1 page |
+| **Tier 2** | Problem, Why Now, Goals (with measured-by), Non-Goals, Solution Direction, User Journeys, Design Decisions, Open Questions | ~1–2 pages |
+| **Tier 3** | All Tier 2 sections + UX Analysis (Motivation/Friction/Satisfaction), Success Metrics table, Research Sources, alternate + error journeys | ~2–4 pages |
 
-The user can override the tier. If unsure, ask.
+5. **Announce + confirm tier.** Echo: `This looks like a Tier N requirement ([type]). Using the [tier name] template. Override?` Use `AskUserQuestion` if ambiguous. **Confirm before creating tasks** (next step) — overriding tier after task creation forces a clean-and-recreate.
 
-**Gate:** Do not proceed until you understand (a) what product/service area the requirements target and (b) the tier.
-
-**Create phase tasks** using your available task tracking tool, scaled to tier:
+6. **Create phase tasks** using your available task tracking tool, scaled to the **confirmed** tier:
 
 | Tier | Tasks to create |
 |------|----------------|
 | **Tier 1** | Intake, Write Document, Final Review |
-| **Tier 2** | Intake, Research (Code), Research (Industry), Brainstorm, Write Document, Review Loop 1, Review Loop 2, Final Review |
-| **Tier 3** | Intake, Research (Code), Research (Industry), Brainstorm, Write Document, Review Loop 1, Review Loop 2, Final Review |
+| **Tier 2** | Intake, Research (Code), Research (Industry), Brainstorm, Write Document, Review Loops, Final Review |
+| **Tier 3** | Intake, Research (Code), Research (Industry), Brainstorm, **UX Analysis**, **Success Metrics**, **Alternate/Error Journeys**, Write Document, Review Loops, Final Review |
 
 Mark each task as in-progress when you start it and completed when done.
 
 ---
 
-## Phase 2: Research (Parallel Subagents)
+## Phase 2: Research
 
-**Skip for Tier 1.** For Tier 2 and Tier 3, do both 1a and 1b. Tier 3 goes deeper on 1b (more sources, more alternatives).
+**Skip for Tier 1.** For Tier 2 and Tier 3, do both 2a and 2b. Tier 3 goes deeper on 2b (more sources, more alternatives).
 
-Dispatch subagents to explore:
+Dispatch subagents to explore. **Subagent return schema** (each subagent must return):
+1. **Summary** — ≤5 bullets capturing the most relevant findings.
+2. **Sources table** — `| Path/URL | 1-line takeaway |` per row.
+3. **Flagged gaps** — anything the subagent looked for but didn't find.
 
-### 1a. Existing Implementation & Patterns
-- Search the codebase for features similar to what's being described
-- Read existing UI pages, API endpoints, and data models in the relevant area
-- Note user flows that already exist and how adjacent features work
-- Identify patterns, conventions, and constraints from the existing system
+The parent agent merges by section without re-summarization. If summaries overlap, dedupe by source path/URL.
 
-### 1b. Industry Research (Tier 2+)
+### 2a. Existing Implementation & Patterns
+- Search the codebase for features similar to what's being described.
+- Read existing UI pages, API endpoints, and data models in the relevant area.
+- Note user flows that already exist and how adjacent features work.
+- Identify patterns, conventions, and constraints from the existing system.
+
+### 2b. Industry Research (Tier 2+)
 
 Goal: avoid inventing in a vacuum. Learn from how others have solved this problem before locking in a direction.
 
+**Pick competitors from the user's actual domain** — derive from workstream context, repo description, or ask the user via `AskUserQuestion`. Do NOT default to generic B2B-SaaS tools (Linear/Stripe/Notion/etc.) unless they're genuinely in-domain for this product. A fintech app, a creator tool, a developer infra project, or a consumer product needs domain-relevant peers, not the most-familiar names.
+
 Investigate, with named examples:
-- **Competitor / peer approaches:** How do 2–4 comparable products (Linear, Stripe, Notion, GitHub, Figma, Intercom — whichever are relevant) solve this exact problem? What does their UX flow look like? What did they choose NOT to do?
+- **Competitor / peer approaches:** How do 2–4 in-domain products solve this exact problem? What does their UX flow look like? What did they choose NOT to do?
 - **Alternative solution shapes:** Surface at least 2–3 genuinely different approaches (not variations of one). E.g., modal vs. inline vs. dedicated page; sync vs. async; rules engine vs. ML vs. heuristics. Note tradeoffs of each.
 - **Established patterns / frameworks / libraries:** Known design patterns, OSS libraries, or standards that apply (OAuth flows, CRDTs, command palettes, etc.).
 - **Anti-patterns and failure modes:** What have others gotten wrong here? Post-mortems, deprecated approaches, common complaints.
@@ -122,6 +146,15 @@ Investigate, with named examples:
 Depth: Tier 2 → 2–3 competitors, 2 alternatives, brief. Tier 3 → 3–4 competitors, 3+ alternatives, deeper writeup.
 
 Collect sources (URLs, product names, library docs, blog posts) — these go into the Research Sources table.
+
+### Update-path: refresh stale research selectively
+
+If Phase 1 detected an existing `01_requirements.md` and the user picked "update":
+
+1. Read the prior Research Sources table.
+2. For each row, check if its takeaway still holds (file still exists, URL still resonant for the delta).
+3. **Refresh only delta-relevant areas.** Do not re-research areas the prior table covered well that aren't affected by the user's update.
+4. Append new sources; mark stale ones with strikethrough rather than deleting.
 
 ### Research Output
 
@@ -134,58 +167,72 @@ Summarize findings before asking questions. Ground the conversation in what alre
 
 ## Phase 3: Collaborative Brainstorming
 
-Act as a **product director** and **senior analyst**. Use AskUserQuestion to ask questions — batch related questions into a single call (up to 4), but follow the natural conversation flow. Do not dump an unfocused checklist.
+Act as a **product director** and **senior analyst**. Ask questions via `AskUserQuestion`.
 
-**Key brainstorming principles (borrowed from Shape Up and Continuous Discovery):**
-- **One question at a time** — don't overwhelm with multiple questions per message
-- **Prefer multiple choice** when possible — easier for the user to answer than open-ended. Offer 2-4 options with your recommendation marked.
-- **Propose 2-3 approaches** before settling on a solution direction — present trade-offs and your recommendation. Lead with the recommended option and explain why.
-- **Incremental validation** — for Tier 3, present each section of the solution direction and get approval before moving on. Don't write the full doc then ask "does this look right?"
+### Question batching rule
+
+**One question per topic.** Use `AskUserQuestion`'s multi-question form (up to 4 questions per call) ONLY when the questions are genuinely related and the user can answer all in one pass without context switching. Don't batch unrelated questions for throughput; don't serialize related questions for caution.
+
+### Coverage checklist (NOT a script)
+
+The areas below are **areas the doc must cover** — not questions to ask reflexively. For each area, first check if user input + research already answered it. **Only ask if a real gap exists.**
+
+- **Problem & Users** — concrete problem statement; persona + context; current workaround and pain points; why-now trigger.
+- **Solution Direction** — 2–3 candidate approaches with trade-offs and your recommendation; key user journeys for the recommended approach; explicit out-of-scope items with reasons.
+- **UX lenses (Tier 3 mandatory; Tier 2 only if friction is the core problem)** —
+  - Motivation: job to be done, importance/urgency, alternatives.
+  - Friction: cognitive load, perceived effort, perceived loss.
+  - Satisfaction: does it fulfill the job; reassurance signals.
+- **Decisions** — for each non-trivial choice: options, trade-offs, your recommendation and why.
+
+**Brainstorm guidance:**
+- **Propose 2–3 approaches** before settling on a direction; lead with the recommended option and explain why.
+- **Incremental validation (Tier 3):** present each section of the solution direction and get approval before moving on. Do NOT write the full doc then ask "does this look right?"
 - **State assumptions** rather than asking obvious questions. Do NOT ask questions for the sake of asking.
 
-### Problem & Users
-- What specific problem does this solve? Who experiences it? (Be concrete — not "users are frustrated" but "agents who search for an issue can't find it because the search vocabulary doesn't match their mental model")
-- User personas — who are they, what's their context, what's their goal?
-- Current workaround and its pain points
-- Why now? What changed that makes this important?
+### Tier-based stop conditions
 
-### Solution Direction
-- Propose 2-3 approaches with trade-offs and your recommendation
-- What are the key user journeys for the recommended approach?
-- What's explicitly out of scope and why?
-
-### User Motivation, Friction & Satisfaction (Tier 2-3)
-
-Pick the relevant lenses — don't ask all of these, only what's relevant:
-
-**Motivation** — Why would the user act? What job are they doing? What's the cost of NOT doing it? What alternatives exist?
-
-**Friction** — What could stop them? Will they understand what this does at first glance? How complex is the decision? What's the perceived effort? What could they lose?
-
-**Satisfaction** — Does it fulfill the promised job? Does it meet or exceed expectations? Does it feel reassuring?
-
-### Decision Points
-Surface decisions that need to be made NOW (before spec). For each:
-- What are the options?
-- What are the trade-offs?
-- What do you recommend and why?
-
-**Stop interviewing when you have enough to write a complete document.**
+Stop interviewing when:
+- **Tier 1:** Problem + Root Cause + Fix Direction are pinned.
+- **Tier 2:** Problem + Goals + Solution Direction + at least 1 user journey are pinned.
+- **Tier 3:** All mandatory sections have a non-placeholder answer or an Open Question entry.
 
 ---
 
 ## Phase 4: Write the Document
 
-Save to `{feature_folder}/01_requirements.md`. Overwrite if it already exists (git provides version history).
+Save to `{feature_folder}/01_requirements.md`.
 
-Use the template matching the detected tier. Delete sections marked "skip" for that tier.
+### Pre-write safety
 
-### Tier 1 Template: Bug / Minor Fix
+Before writing:
+
+1. Run `git status` on `{feature_folder}/01_requirements.md`.
+2. **If the file is dirty (uncommitted changes):** snapshot-commit before overwriting:
+   ```
+   git add {feature_folder}/01_requirements.md
+   git commit -m "snapshot: pre-/requirements-rewrite"
+   ```
+3. Then overwrite with the new content. Git provides version history.
+
+### Commit message verb
+
+After the write, commit with a verb conditional on whether the file existed at Phase 1 entry:
+
+- **Existed →** `docs: update requirements for <feature>`
+- **Did not exist →** `docs: add requirements for <feature>`
+
+### Templates
+
+Use the template matching the detected tier. Delete sections marked optional ("omit if empty") for that tier.
+
+#### Tier 1 Template: Bug / Minor Fix
 
 ```markdown
 # <Bug/Fix Name> — Requirements
 
 **Date:** YYYY-MM-DD
+**Last updated:** YYYY-MM-DD
 **Status:** Draft
 **Tier:** 1 — Bug Fix
 
@@ -198,40 +245,53 @@ Use the template matching the detected tier. Delete sections marked "skip" for t
 ### Reproduction / Root Cause
 [How to reproduce. What's causing it if known.]
 
+### Investigated
+[Optional. File paths and issue/PR links touched during root-cause analysis. Two-line section. Omit if empty.]
+
 ## Fix Direction
-[High-level approach to fixing it. Not the code — the strategy.]
+[High-level approach. Not the code — the strategy.]
 
 ## Acceptance Criteria
 - [ ] [Specific, testable criterion 1]
 - [ ] [Specific, testable criterion 2]
+
+## Decisions
+[Optional. Use the table format from Tier 2 if multiple fix approaches were considered. Omit if empty.]
+
+## Open Questions
+[Optional. Use the table format from Tier 2 if any unknowns remain. Omit if empty.]
 ```
 
-### Tier 2 Template: Enhancement / UX Fix
+#### Tier 2 Template: Enhancement / UX Fix
 
 ```markdown
 # <Feature Name> — Requirements
 
 **Date:** YYYY-MM-DD
+**Last updated:** YYYY-MM-DD
 **Status:** Draft
 **Tier:** 2 — Enhancement
 
 ## Problem
 [2-4 sentences. Specific user pain or gap.]
 
-### Who & Why Now
-[Persona + trigger for this work]
+### Who experiences this?
+[Persona + context]
+
+### Why now?
+[What changed that makes this a priority? What's the trigger?]
 
 ## Goals & Non-Goals
 
 ### Goals
-- [Observable user outcome 1]
-- [Observable user outcome 2]
+- [Observable user outcome 1] — measured by [signal]
+- [Observable user outcome 2] — measured by [signal]
 
 ### Non-Goals
 - NOT doing [X] — because [reason]
 
 ## Solution Direction
-[High-level approach. ASCII diagrams where useful.]
+[High-level approach. ASCII diagrams of user-observable behavior (screens, journeys, states) where useful — NOT internal architecture.]
 
 ## User Journeys
 
@@ -249,17 +309,24 @@ Use the template matching the detected tier. Delete sections marked "skip" for t
 
 ## Open Questions
 
-| # | Question | Owner | Needed By |
-|---|----------|-------|-----------|
-| 1 | [Unresolved decision] | [name] | [date] |
+| # | Question |
+|---|----------|
+| 1 | [Unresolved decision] |
+
+(Default 2-col. Add `Owner` and `Needed By` columns ONLY if the user mentioned a teammate/stakeholder during brainstorm, OR `~/.pmos/people/` is non-empty, OR the user mentioned a deadline.)
+
+---
+
+**For UX friction analysis, run `/msf` after this doc is committed.**
 ```
 
-### Tier 3 Template: Feature / Product Launch
+#### Tier 3 Template: Feature / Product Launch
 
 ```markdown
 # <Feature Name> — Requirements
 
 **Date:** YYYY-MM-DD
+**Last updated:** YYYY-MM-DD
 **Status:** Draft
 **Tier:** 3 — Feature
 
@@ -273,6 +340,8 @@ Use the template matching the detected tier. Delete sections marked "skip" for t
 [What changed that makes this a priority?]
 
 ## Goals & Non-Goals
+
+> Goals are observable user outcomes; Acceptance Criteria (engineering contracts) belong in `/spec`. Tier 1 carries both because it bypasses `/spec`.
 
 ### Goals
 - [Observable user outcome 1] — measured by [metric]
@@ -299,7 +368,7 @@ Use the template matching the detected tier. Delete sections marked "skip" for t
 - [How we know the user feels good about the experience]
 
 ## Solution Direction
-[High-level approach. ASCII diagrams or wireframe links where useful.]
+[High-level approach. ASCII diagrams of user-observable behavior or wireframe links where useful. NO internal architecture diagrams — those belong in `/spec`.]
 
 ## User Journeys
 
@@ -338,35 +407,36 @@ Use the template matching the detected tier. Delete sections marked "skip" for t
 
 ## Open Questions
 
-| # | Question | Owner | Needed By |
-|---|----------|-------|-----------|
-| 1 | [Unresolved decision] | [name] | [date or "before spec"] |
+| # | Question |
+|---|----------|
+| 1 | [Unresolved decision] |
+
+(Default 2-col. Add `Owner` and `Needed By` columns ONLY if the user mentioned a teammate/stakeholder during brainstorm, OR `~/.pmos/people/` is non-empty, OR the user mentioned a deadline.)
 ```
 
 ### Document Guidelines (all tiers)
-- Scannable — bullet points over paragraphs
-- User-perspective language — "the agent sees X", not "the system stores Y"
-- Link to wireframes/screenshots rather than describing visual design in prose
-- No implementation details — no DB schemas, no API routes, no code snippets
-- Bold the key constraint or decision in each paragraph — readers scan, they don't read linearly
-- One requirement per bullet — if it needs a paragraph, it's multiple requirements
-- Non-goals MUST include a "because" reason — naked exclusions invite re-litigation
+
+- **Goals vs. Acceptance Criteria boundary:** Goals are observable user outcomes ("users find the right issue 80% of the time"). Acceptance Criteria are engineering contracts ("search returns results in <300ms") — those belong in `/spec`. Tier 1 carries both because it bypasses `/spec`.
+- **Diagrams:** allowed if they describe what the user sees/does (screens, journeys, state transitions). Banned if they describe internal architecture (services, queues, DBs) — those belong in `/spec`.
+- **Wireframes link rule (conditional):** If wireframes exist for this feature folder, link them and avoid prose visual description. If not, describe screens at a behavior level only — do not invent visual detail.
+- Scannable — bullet points over paragraphs.
+- User-perspective language — "the agent sees X", not "the system stores Y".
+- No implementation details — no DB schemas, no API routes, no code snippets.
+- Bold the key constraint or decision in each paragraph — readers scan, they don't read linearly.
+- One requirement per bullet — if it needs a paragraph, it's multiple requirements.
+- Non-goals MUST include a "because" reason — naked exclusions invite re-litigation.
+- **Status lifecycle:** Draft on initial write → In Review when entering Phase 5 → Approved when Phase 5 user-confirms.
+- **`Last updated` field** refreshes on every commit.
 
 ---
 
-## Phase 5: Review Loops
+## Phase 5: Review (replaces former Phase 5 + Phase 6)
 
-After writing the initial document, run iterative review loops.
+After writing the initial document, run iterative review loops. There is **no minimum loop count** — the 6-gate exit (below) is the real forcing function. A clean first loop can be terminal.
 
-**Tier 1:** Run 1 review loop (quick pass), then the final review. No Review Log table needed.
+### Per-loop checks (run BOTH lenses every loop)
 
-**Tier 2-3:** Run minimum 2 loops, continue until exit criteria are met.
-
-### Two Types of Review
-
-Each loop runs BOTH checks:
-
-**A. Structural Checklist** (catches missing/incomplete sections):
+**A. Structural lens** (catches missing/incomplete sections):
 1. Every user journey walked through (happy path + errors + empty states)?
 2. Edge cases and error states covered?
 3. Non-goals explicitly stated with reasons?
@@ -374,28 +444,30 @@ Each loop runs BOTH checks:
 5. No implementation details leaking in?
 6. New-person readability test — can someone unfamiliar understand what we're building?
 
-**B. Product-Level Self-Critique** (catches shallow/incomplete thinking):
+**B. Product-level self-critique** (catches shallow/incomplete thinking):
 1. **Reviewer perspective:** If you were sent this document for review, what comments would you add? Read it as a critical reviewer, not the author — flag vague language, missing rationale, unstated assumptions, and gaps between steps.
 2. For each user journey — is there a moment where the user would feel confused, stuck, or unsure what to do next? Are there gaps between steps that assume the user "just knows"?
 3. Are there competing priorities or tensions in the requirements that haven't been acknowledged? (e.g., "simple onboarding" vs. "highly configurable" — which wins when they conflict?)
 4. Would a skeptical stakeholder ask "why not just do X instead?" — are those alternatives addressed?
 
-### Loop Protocol
+### Final-loop polish lens (formerly Phase 6 — runs as part of the LAST loop only)
 
-1. Run BOTH checklists above
-2. Log findings in the Review Log table (Tier 2-3):
-   ```
-   | Loop | Findings | Changes Made |
-   |------|----------|-------------|
-   ```
-3. **Present findings via `AskUserQuestion` — do NOT dump them as prose and wait for a free-form reply.** Findings shown as text force the user to hand-write dispositions; batching them as structured questions is faster, clearer, and produces a reviewable audit trail. See "Findings Presentation Protocol" below.
-4. Apply the user's dispositions (Fix as proposed / Modify / Skip / Defer) — see protocol below
-5. Fix issues inline — do NOT create a new file
-6. Commit: `git commit -m "docs: requirements review loop N for <feature>"`
+When the loop is producing only cosmetic findings, also run:
+- **Conciseness** — Can sections be tightened without losing essence?
+- **Coherence** — Any conflicting requirement statements?
+- **New-person test** — Can someone new to the team understand what we're trying to achieve with no blind spots?
 
-### Findings Presentation Protocol
+### Concrete ambiguity heuristics (replaces "no ambiguous language")
 
-For every loop that produces findings (structural or product-critique):
+A doc is unambiguous if **all** of the following hold:
+- No `etc.` or `and more` — every list is exhaustive or labeled "examples".
+- Every quantitative claim has a number ("most users" → "60% of users in Q2 study").
+- Every `should` and `might` either becomes `must` or moves to Open Questions.
+- No orphan pronouns — every `it`, `they`, `this` has a clear antecedent in the same paragraph.
+
+### Findings presentation protocol
+
+For every loop that produces findings:
 
 1. **Group findings by category** (e.g., "Missing journeys", "Unstated rationale", "Ambiguous language"). Small categories can be merged; never present more than 4 findings in a single batch.
 2. **One question per finding** via `AskUserQuestion`. Use this shape:
@@ -411,71 +483,96 @@ For every loop that produces findings (structural or product-critique):
 
 **Platform fallback (no `AskUserQuestion`):** list findings as a numbered table with columns [Finding | Proposed Fix | Options: Fix/Modify/Skip/Defer]; ask the user to reply with the disposition numbers. Do NOT silently self-fix.
 
-**Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." This forces the user to re-state each finding in their reply. Always structure the ask.
-
 **Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
-### Exit Criteria (ALL must be true)
+### Review Log table (Tier 2-3)
 
-- No gaps vs user's input/observations
-- Decision table has entries with rationale (3+ for Tier 3)
-- No ambiguous language that two engineers would interpret differently
-- No open clarifications from user
-- Last loop found only cosmetic issues
-- **User has confirmed they have no further concerns** (do not self-declare exit)
+Track every loop in the doc:
+
+```
+| Loop | Findings | Changes Made |
+|------|----------|-------------|
+```
+
+Tier 1 skips the Review Log (single quick pass).
+
+### Loop commit
+
+After applying dispositions:
+```
+git commit -m "docs: requirements review loop N for <feature>"
+```
+
+### 6-gate exit (ALL must hold to stop reviewing)
+
+1. **Both lenses ran** in the most-recent loop (structural + product-critique). For the loop you intend to be terminal, the polish lens also ran.
+2. **Findings logged** — either listed under each lens, or explicitly noted as "no findings under lens X".
+3. **Dispositions captured** for every finding via `AskUserQuestion` (Fix/Modify/Skip/Defer).
+4. **User explicitly confirmed** they have no further concerns. (Single yes/no — do NOT infer from silence or "looks good".)
+5. **Decision coverage:** every non-trivial design choice from research/brainstorm appears as a Decision row OR an Open Question. (Tier 2 needs ≥1; Tier 3 typically ≥3 but not a hard floor.)
+6. **Zero open clarifications** addressed to the user (no inline `[TODO]`, `[??]`, or open `AskUserQuestion`s waiting for reply).
+
+If any gate is unmet, run another loop. Do not self-declare exit.
 
 ---
 
-## Phase 6: Final Review
+## Phase 6: Workstream Enrichment
 
-Run one final improvement pass:
+**Skip if Tier 1.** Bug fixes don't reshape product understanding.
 
-1. **Conciseness** — Can sections be tightened without losing essence?
-2. **Missing journeys** — Any user flows or edge cases not covered?
-3. **Coherence** — Any conflicting requirement statements?
-4. **New-person test** — Can someone new to the team understand what we're trying to achieve with no blind spots?
+**Skip if no workstream was loaded** in Phase 0.
 
-**Share your analysis with the user BEFORE modifying anything.** Use the same `AskUserQuestion` batching as review loops (see Phase 5 Findings Presentation Protocol) — one question per final-review finding with Fix / Modify / Skip / Defer options, up to 4 per call. Do NOT declare the requirements complete until the user confirms.
-
-After final fixes, commit:
-```
-git add {feature_folder}/01_requirements.md
-git commit -m "docs: add requirements for <feature>"
-```
-
-Tell the user: "Requirements captured and committed. When ready, run `/spec` to create the detailed technical specification."
-
-**The terminal state is handoff to /spec.** Do NOT start writing a spec or implementation plan from this skill.
-
----
-
-## Phase 7: Workstream Enrichment
-
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+Otherwise, follow `_shared/pipeline-setup.md` Section C. For this skill, the signals to look for are:
 
 - User segments mentioned in the requirements → workstream `## User Segments`
 - Problem statements that refine the product's purpose → workstream `## Value Proposition` or `## Description`
 - Success metrics → workstream `## Key Metrics`
 
-This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
+This phase is mandatory whenever a workstream was loaded AND tier ≥ 2 — do not skip just because the core deliverable is complete.
 
 ---
 
-## Phase 8: Capture Learnings
+## Phase 7: Capture Learnings
 
-**This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Reflect on whether this session surfaced anything worth capturing — surprising behaviors, repeated corrections, non-obvious decisions. Proposing zero learnings is a valid outcome for a smooth session; the gate is that the reflection happens, not that an entry is written.
+**This skill is not complete until the learnings reflection has produced a one-line output.**
+
+Read `~/.pmos/learnings.md` if you haven't already (Phase 0 step 6). Reflect on whether this session surfaced anything worth capturing under `## /requirements`.
+
+**You MUST emit exactly one of these two lines:**
+- `Learning: <new entry written to ~/.pmos/learnings.md under ## /requirements>` — when the session surfaced a non-obvious lesson worth keeping (repeated correction, surprising behavior, validated approach).
+- `No new learnings this session because <specific reason tied to this session>` — when the session was smooth and routine. The reason must be specific (e.g., "the tier was clear from the start and the user accepted all defaults"), not boilerplate.
+
+**Empty reflection (no line emitted) counts as unfinished work** — the gate is the explicit one-line output, not the existence of a new entry.
+
+---
+
+## Phase 8: Handoff
+
+Tell the user, scaling the message by tier:
+
+- **Tier 1 / Tier 2:** "Requirements captured and committed. When ready, run `/spec` to create the detailed technical specification."
+- **Tier 3:** "Requirements captured and committed. Optional next steps: `/creativity` (alternative angles), `/msf` (UX friction analysis). When ready: `/spec`."
+
+**The terminal state is handoff to `/spec`.** Do NOT start writing a spec or implementation plan from this skill.
+
+If `--backlog <id>` was set and the doc + commit succeeded, invoke `/backlog set {id} source={doc_path}` per the Backlog Bridge contract above.
 
 ---
 
 ## Anti-Patterns (DO NOT)
 
-- Do NOT skip the research phase (Tier 2-3) — it grounds the brainstorm in reality
-- Do NOT dump a checklist of questions — ask ONE at a time, follow the conversation
-- Do NOT include implementation details (DB schemas, API routes, code) — that's the spec's job
-- Do NOT create a new document file in each review loop — update the original
-- Do NOT stop after 1 review loop for Tier 2-3 — minimum is 2
-- Do NOT write decision entries without "Options Considered" and "Rationale" columns
-- Do NOT skip research source tracking (Tier 2+) — future sessions need to know what was explored
-- Do NOT ask questions for the sake of asking — only ask what genuinely helps shape requirements
-- Do NOT use vague success metrics like "improve user experience" — be specific and measurable
-- Do NOT write non-goals without a "because" reason
+- Do NOT skip the research phase (Tier 2-3) — it grounds the brainstorm in reality.
+- Do NOT batch unrelated questions into a single `AskUserQuestion` for throughput.
+- Do NOT include implementation details (DB schemas, API routes, code) — that's the spec's job.
+- Do NOT create a new document file in each review loop — update the original.
+- Do NOT self-declare the 6-gate exit — gate 4 requires explicit user confirmation.
+- Do NOT write decision entries without "Options Considered" and "Rationale" columns.
+- Do NOT skip research source tracking (Tier 2+) — future sessions need to know what was explored.
+- Do NOT ask questions for the sake of asking — only ask what genuinely helps shape requirements.
+- Do NOT use vague success metrics like "improve user experience" — be specific and measurable.
+- Do NOT write non-goals without a "because" reason.
+- Do NOT default to generic B2B-SaaS competitors (Linear/Stripe/Notion) when researching. Pick in-domain peers.
+- Do NOT infer architecture-level diagrams as "high-level approach" — diagrams in this doc must depict user-observable behavior only.
+- Do NOT silently overwrite an existing `01_requirements.md` — snapshot-commit first if dirty.
+- Do NOT proceed past Phase 1 if `02_spec.md` or `03_plan.md` exist without surfacing the drift warning.
+- Do NOT skip the Phase 7 learnings line — empty reflection is unfinished work.

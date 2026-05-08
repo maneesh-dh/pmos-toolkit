@@ -80,11 +80,22 @@ Silently downgrading rigor is a small integrity leak that compounds across phase
 
 ---
 
-## Phase 0: Load Workstream Context & Learnings
+## Phase 0: Pipeline Setup (inline — do not skip)
 
-Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available — design tokens, brand voice, and prior wireframe conventions live here. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /wireframes` and factor them into your approach for this session.
+Use workstream context (loaded by step 3 below) — design tokens, brand voice, and prior wireframe conventions live here. Wireframes are commonly produced before /spec, so this skill may create the feature folder.
 
-**Resolve feature folder.** Follow `../_shared/feature-folder.md` with `skill_name=wireframes`, `feature_arg=<--feature value or empty>`, and `feature_hint=<topic from user input>`. Use the returned folder path as `{feature_folder}`. Wireframes are commonly produced before /spec, so this skill may create the folder.
+<!-- pipeline-setup-block:start -->
+1. **Read `.pmos/settings.yaml`.**
+   - If missing → you MUST invoke the `Read` tool on `_shared/pipeline-setup.md` Section A and run first-run setup before proceeding. (Skipping this Read is the most common cause of folder-naming defects.)
+2. Set `{docs_path}` from `settings.docs_path`.
+3. If `settings.workstream` is non-null → load `~/.pmos/workstreams/{workstream}.md` as context preamble; if frontmatter `type` is `charter` or `feature` and a `product` field exists, also load `~/.pmos/workstreams/{product}.md` read-only.
+4. Resolve `{feature_folder}`:
+   - If `--feature <slug>` was passed → glob `{docs_path}/features/*_<slug>/`. **Exactly 1 match required**; on 0 or 2+ → you MUST `Read` `_shared/pipeline-setup.md` Section B before acting.
+   - Else if `settings.current_feature` is set AND `{docs_path}/features/{current_feature}/` exists → use it.
+   - Else → ask user (offer: create new with derived slug, pick existing from folder list, or specify via Other...).
+5. **Edge cases — you MUST `Read` `_shared/pipeline-setup.md` Section B before acting:** slug collision, slug validation failure, legacy date-less folder encountered, ambiguous `--feature` lookup, any folder creation.
+6. Read `~/.pmos/learnings.md` if present; note entries under `## /<this-skill-name>` and factor them into approach (skill body wins on conflict; surface conflicts to user before applying).
+<!-- pipeline-setup-block:end -->
 
 ---
 

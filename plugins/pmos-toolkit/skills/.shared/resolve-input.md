@@ -24,7 +24,7 @@ Proceed. Skip remaining steps.
 
 ## Step 2: Current feature folder
 
-If a current feature folder is set (per `_shared/feature-folder.md`), check for the numbered file for this `phase`:
+If a current feature folder is set (per `_shared/pipeline-setup.md` Section 0 — `settings.current_feature`), check for the numbered file for this `phase`:
 - Found: echo `Using: <path>` and proceed.
 - Not found: continue to Step 3.
 

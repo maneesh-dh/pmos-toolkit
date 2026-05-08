@@ -119,7 +119,7 @@ If no docs: proceed with what we have. Empty sections will fill in over time.
    #   docs       — legacy layout for repos that started before the docs/pmos default
    docs_path: docs/pmos
    ```
-   **Pick `docs/pmos` unless the user explicitly says otherwise.** If the repo already has legacy `docs/{requirements,specs,plans,features}/` folders, set `docs_path: docs` instead so existing artifacts keep working — and tell the user how to migrate (see `product-context/context-loading.md` Step 1 migration recipe).
+   **Pick `docs/pmos` unless the user explicitly says otherwise.** If the repo already has legacy `docs/{requirements,specs,plans,features}/` folders, set `docs_path: docs` instead so existing artifacts keep working — and tell the user how to migrate (see `_shared/pipeline-setup.md` Section D for the migration recipe).
 5. Show what was created:
    > "Created workstream context at `~/.pmos/workstreams/{slug}.md`"
    > "Linked this repo via `.pmos/settings.yaml`"

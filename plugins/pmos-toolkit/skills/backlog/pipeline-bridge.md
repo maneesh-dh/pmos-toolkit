@@ -65,7 +65,9 @@ Each pipeline skill adds, near the top of its phase body, this Subroutine:
 ### Subroutine: Backlog Bridge
 
 If `--backlog <id>` was passed:
-- After writing the primary output doc, invoke `/backlog set <id> {field}={value}` for the relevant field per the lifecycle table.
+- After writing the primary output doc AND committing it, invoke `/backlog set <id> {field}={value}` for the relevant field per the lifecycle table.
+- **Guard:** only invoke the set when (a) the doc was actually written this run AND (b) the commit succeeded. Skip silently if either fails.
+- **Re-run idempotency:** if the same `<id>` was used in a prior run and the source path differs, append a one-line history entry to the backlog item: `- {YYYY-MM-DD}: <skill> doc rewritten by user`.
 - If the set fails (item not found, etc.), emit a single-line warning and continue.
 
 If `--backlog` was NOT passed AND argument is empty AND backlog/items/ exists:

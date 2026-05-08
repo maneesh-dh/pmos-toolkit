@@ -40,11 +40,22 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 
 ---
 
-## Phase 0: Load Workstream Context
+## Phase 0: Pipeline Setup (inline — do not skip)
 
-Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform technical decisions — product constraints, tech stack, and stakeholder concerns shape architecture choices. Also read `~/.pmos/learnings.md` if it exists. Note any entries under `## /spec` and factor them into your approach for this session.
+Use workstream context (loaded by step 3 below) to inform technical decisions — product constraints, tech stack, and stakeholder concerns shape architecture choices. The skill supports users who enter the pipeline at `/spec` (folder will be created in step 4 if needed).
 
-**Resolve feature folder.** Follow `../_shared/feature-folder.md` with `skill_name=spec`, `feature_arg=<--feature value or empty>`, and `feature_hint=<topic from user input or the requirements arg>`. Use the returned folder path as `{feature_folder}`. The protocol creates the folder if needed (supporting users who enter the pipeline at /spec).
+<!-- pipeline-setup-block:start -->
+1. **Read `.pmos/settings.yaml`.**
+   - If missing → you MUST invoke the `Read` tool on `_shared/pipeline-setup.md` Section A and run first-run setup before proceeding. (Skipping this Read is the most common cause of folder-naming defects.)
+2. Set `{docs_path}` from `settings.docs_path`.
+3. If `settings.workstream` is non-null → load `~/.pmos/workstreams/{workstream}.md` as context preamble; if frontmatter `type` is `charter` or `feature` and a `product` field exists, also load `~/.pmos/workstreams/{product}.md` read-only.
+4. Resolve `{feature_folder}`:
+   - If `--feature <slug>` was passed → glob `{docs_path}/features/*_<slug>/`. **Exactly 1 match required**; on 0 or 2+ → you MUST `Read` `_shared/pipeline-setup.md` Section B before acting.
+   - Else if `settings.current_feature` is set AND `{docs_path}/features/{current_feature}/` exists → use it.
+   - Else → ask user (offer: create new with derived slug, pick existing from folder list, or specify via Other...).
+5. **Edge cases — you MUST `Read` `_shared/pipeline-setup.md` Section B before acting:** slug collision, slug validation failure, legacy date-less folder encountered, ambiguous `--feature` lookup, any folder creation.
+6. Read `~/.pmos/learnings.md` if present; note entries under `## /<this-skill-name>` and factor them into approach (skill body wins on conflict; surface conflicts to user before applying).
+<!-- pipeline-setup-block:end -->
 
 ---
 
@@ -563,7 +574,7 @@ The user's confirmation is required before declaring completion.
 
 ## Phase 8: Workstream Enrichment
 
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow `_shared/pipeline-setup.md` Section C. For this skill, the signals to look for are:
 
 - Tech stack decisions → workstream `## Tech Stack`
 - Architectural constraints → workstream `## Constraints & Scars`

@@ -291,7 +291,7 @@ Cap the body at ~400 lines; if there are more findings than that, push the long 
 
 ## Phase 7: Workstream Enrichment
 
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow `_shared/pipeline-setup.md` Section C. For this skill, the signals to look for are:
 
 - Recurring high-severity heuristic IDs across journeys → workstream `## Known UX Friction`
 - Validated journeys + their entry contexts → workstream `## Journeys` (extend, don't replace)

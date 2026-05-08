@@ -162,7 +162,7 @@ ls ~/Desktop/Projects/agent-skills/plugins/pmos-toolkit/skills/
 
 Once saved at the correct path, the skill is invokable as `/pmos-toolkit:<skill-name>` after a session restart or `/reload-plugins`. No symlink, no manual registration.
 
-**Reference paths.** Convention 6 instructs new skills to reference `learnings/learnings-capture.md` and `product-context/context-loading.md` as relative paths. These resolve as **siblings** inside `plugins/pmos-toolkit/skills/` — saving the new skill anywhere else will leave those references dangling.
+**Reference paths.** Convention 6 instructs new skills to reference `learnings/learnings-capture.md` and `_shared/pipeline-setup.md` as relative paths. These resolve as **siblings** inside `plugins/pmos-toolkit/skills/` — saving the new skill anywhere else will leave those references dangling.
 
 **Sibling skills available to reference:**
 
@@ -276,7 +276,7 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /skill-name
 ```markdown
 ## Phase N: Workstream Enrichment
 
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow `_shared/pipeline-setup.md` Section C. For this skill, the signals to look for are:
 
 - [skill-specific signal] → workstream `## [Section]`
 

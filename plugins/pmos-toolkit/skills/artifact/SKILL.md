@@ -20,7 +20,7 @@ These instructions use Claude Code tool names. In other environments:
 
 ## Phase 0 — Load Context
 
-1. Follow `../product-context/context-loading.md` (relative to this skill dir) to resolve `{docs_path}` and load any active workstream context.
+1. Follow `../_shared/pipeline-setup.md` Section 0 (canonical inline block) to read `.pmos/settings.yaml`, resolve `{docs_path}`, and load workstream context. If settings.yaml is missing, run first-run setup per Section A.
 2. Read `~/.pmos/learnings.md` if it exists. Note entries under `## /artifact` and factor them into this session.
 3. Ensure `~/.pmos/artifacts/` exists. If not, create the empty tree:
    ```
@@ -88,7 +88,7 @@ If `tiers: [single]`, skip this step.
 
 ### 2.3 — Resolve feature folder
 
-Follow `../_shared/feature-folder.md` with:
+Follow `../_shared/pipeline-setup.md` Section B (feature-folder rules) with:
 - `skill_name=artifact`
 - `feature_arg=<value of --feature flag if any>`
 - `feature_hint=<short feature name from user input or current type>`

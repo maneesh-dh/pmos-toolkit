@@ -38,9 +38,7 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /simulate-s
 
 ## Phase 0: Load Workstream Context
 
-Before any other work, follow the context loading instructions in `product-context/context-loading.md` (relative to the skills directory). This determines `{docs_path}` and loads workstream context if available. Use workstream context to inform critique — product constraints and tech-stack decisions shape what counts as a gap. Also note any entries under `## /simulate-spec` in `~/.pmos/learnings.md` and factor them into your approach for this session.
-
-**Resolve feature folder.** Follow `../_shared/feature-folder.md` with `skill_name=simulate-spec`, `feature_arg=<--feature value or empty>`, and `feature_hint=<spec slug or topic>`. Use the returned folder path as `{feature_folder}`. This skill consumes `02_spec.md` (via resolve-input.md) and writes traces under `{feature_folder}/simulate-spec/`.
+Before any other work, follow `_shared/pipeline-setup.md` Section 0 (canonical inline block) to read `.pmos/settings.yaml`, resolve `{docs_path}`, load workstream context, and resolve `{feature_folder}` (with `skill_name=simulate-spec`, `feature_arg=<--feature value or empty>`, `feature_hint=<spec slug or topic>`). Use workstream context to inform critique — product constraints and tech-stack decisions shape what counts as a gap. Also note any entries under `## /simulate-spec` in `~/.pmos/learnings.md` and factor them into your approach for this session. This skill consumes `02_spec.md` (via resolve-input.md) and writes traces under `{feature_folder}/simulate-spec/`.
 
 ---
 
@@ -419,7 +417,7 @@ If user requests another loop, run it. The single-loop default is the floor, not
 
 ## Phase 10: Workstream Enrichment
 
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow the enrichment instructions in `product-context/context-loading.md` Step 4. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow `_shared/pipeline-setup.md` Section C. For this skill, the signals to look for are:
 
 - Recurring gap categories across simulations → workstream `## Constraints & Scars`
 - Tech-stack-specific failure modes encountered → workstream `## Tech Stack`

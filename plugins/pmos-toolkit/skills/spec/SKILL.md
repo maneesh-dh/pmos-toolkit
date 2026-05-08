@@ -546,7 +546,7 @@ For every loop that produces findings (structural or design-critique):
      - **Fix as proposed** — agent applies the stated change via `Edit`
      - **Modify** — user edits the proposal (free-form reply expected next turn)
      - **Skip** — not an issue; drop it (note briefly in Review Log)
-     - **Defer** — log in Open Questions with rationale
+     - **Defer** — log in the Review Log with rationale; must be resolved (decided OR split into a follow-up spec) before exit, since Open Questions are forbidden in the published spec
 3. **Batch up to 4 questions per `AskUserQuestion` call.** If there are more findings, issue multiple calls sequentially, one category per call.
 4. **Skip `AskUserQuestion` only for findings that need open-ended input** (e.g., "what retry policy should the worker use?"). For those, ask inline as a normal follow-up after the batch — do not shoehorn into options.
 5. **After dispositions arrive,** apply them in order, update the Review Log row to cite dispositions, then ask the user if they see additional gaps before declaring the loop complete.

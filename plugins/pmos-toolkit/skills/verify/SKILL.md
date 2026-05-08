@@ -170,10 +170,11 @@ END { emit_pending() }
 
 ### Invocation Mode: Phase-Scoped (called from /execute)
 
-When invoked with `--scope phase --feature <slug> --phase <N>`, /verify runs the full checklist (Phases 2–7) but with two changes:
+When invoked with `--scope phase --feature <slug> --phase <N>`, /verify runs the full checklist (Phases 2–7) but with three changes:
 
 1. **Changed-files set is restricted to files touched by tasks in the named phase only.** Read `{feature_folder}/execute/task-NN.md` for each `T<N>` listed in the plan's `## Phase <N>` group; union their `files_touched` frontmatter lists.
 2. **Evidence path is `{feature_folder}/verify/<YYYY-MM-DD>-phase-<N>/`** (not the default `{feature_folder}/verify/<YYYY-MM-DD>/`). Multiple phase-verify runs on the same day are namespaced by phase number, so they do not collide.
+3. **Phase 4 Entry Gate uses the markdown table in `review.md` as the structural enforcement** instead of `TodoWrite`. Per-task logs under `{feature_folder}/execute/task-NN.md` already carry evidence-typed FR coverage tables for this phase, so re-creating one `TodoWrite` task per FR-ID would duplicate that contract. The `review.md` table — with one row per FR-ID, the same outcome+evidence triple, and a `Status` column drawn from the three-state outcome model — IS the gate. `TodoWrite`-as-gate is reserved for standalone feature-scope invocations (where there is no upstream per-task log to consume).
 
 On completion, return a structured pass/fail result to the calling skill (/execute Phase 2.5):
 - `ok: true|false`
@@ -294,6 +295,8 @@ For each issue scoring 75+:
 
 Before running any Phase 4 sub-step, enumerate every upstream requirement that has a runtime surface and create one `TodoWrite` task per item. This list is the gate — Phase 4 is not complete until every todo is closed with evidence or explicitly resolved to `Unverified — action required` with a named blocker. A plain bullet list in prose does not substitute for `TodoWrite` todos; the todos are the structural enforcement.
 
+> **Phase-scoped exception:** When invoked with `--scope phase --feature <slug> --phase <N>` (see "Invocation Mode: Phase-Scoped" above, change #3), the markdown table in the phase's `review.md` IS the gate. Do not create `TodoWrite` tasks per FR-ID for phase-scoped runs — the per-task logs already carry the same outcome+evidence contract.
+
 **How to build the list:**
 
 1. Read the spec's FR-IDs and edge cases. For each, classify the runtime surface:
@@ -312,7 +315,7 @@ Before running any Phase 4 sub-step, enumerate every upstream requirement that h
 | 3a. Database Migrations | Migration command output + DB schema query confirming the new shape |
 | 3b. Docker Deployment | Service health check output + startup log snippet showing no errors |
 | 3c. API Smoke Tests | `curl` response body compared row-by-row to the spec's API contract |
-| 3d. Frontend Verification | Playwright MCP screenshot, `browser_evaluate` DOM assertion, or a specific test file covering the rendered output |
+| 3d. Frontend Verification | Playwright MCP screenshot, `browser_evaluate` DOM assertion, or a specific test file covering the rendered output. **Synthesized `KeyboardEvent`s must use `bubbles: true` to reach document-level listeners; otherwise the listener won't fire and you'll log a false negative.** |
 | 3e. Interactive Spot Checks | Playwright MCP interaction trace covering a user journey end-to-end, including at least one error/edge path |
 | 3f. UX Polish & Wireframe Consistency | Per-page checklist results (see 3f) AND, if wireframes exist, a wireframe-vs-implementation diff note per affected screen classifying each delta as `intentional` or `regression` |
 
@@ -464,6 +467,19 @@ Read `{feature_folder}/02_spec.md` (resolved in Phase 1). For every FR-ID and ed
 | FR-01 | [From spec] | Verified / NA / Unverified | [Per the three-state model — e.g., `test_orders.py::test_checkout_flow`, or `screenshots/fr-01-checkout.png`, or `Unverified — Stripe webhook endpoint requires live deploy`] |
 | FR-02 | ... | ... | ... |
 | E1 | [Edge case] | Verified / NA / Unverified | [Evidence for the edge case specifically, not the happy path] |
+
+**Copy-pasteable template (use this verbatim — do not freelance the `Outcome` column):**
+
+```markdown
+| ID | Requirement | Outcome | Evidence |
+|----|-------------|---------|----------|
+| FR-01 | <one-line restatement of the FR from the spec> | Verified | <test file::function, screenshot path, curl excerpt, DB query, or commit SHA> |
+| FR-02 | <one-line restatement> | NA — alt-evidence | <named alternative — e.g., `test_pricing.py::test_discount_applied`, OR specific reason tied to FR text> |
+| FR-03 | <one-line restatement> | Unverified — action required | <specific blocker + user action — e.g., `Playwright MCP unavailable; user must install; re-run 3d after`> |
+| E1 | <edge case from spec> | Verified | <evidence for the edge case, not the happy path> |
+```
+
+Allowed `Outcome` values are exactly `Verified`, `NA — alt-evidence`, and `Unverified — action required`. Bare `Pass`, `Fail`, `Complete`, `Partial`, `✓`, or `❌` are not valid — they collapse into the three above. Every `Unverified — action required` row also appears in the Phase 8 final report as an open item.
 
 ### 4c. Plan Compliance
 

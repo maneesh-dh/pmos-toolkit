@@ -53,6 +53,7 @@ pmos-toolkit/
 | `/pmos-toolkit:msf-wf` | Grounded MSF + PSYCH analysis on a wireframes folder; `--apply-edits` to apply HTML edits inline (typically invoked from /wireframes Phase 6) |
 | `/pmos-toolkit:creativity` | Structured creativity techniques for non-obvious improvements |
 | `/pmos-toolkit:grill` | Adversarially interview a plan, spec, or design to surface unresolved decisions and shaky assumptions |
+| `/pmos-toolkit:update-skills` | Ingest feedback (raw text or `/retro` paste-back), triage proposed changes per skill with user approval, then run the requirements -> spec -> (grill) -> plan -> execute -> verify pipeline (auto-tiered per skill) sequentially. Use when you want retro/feedback turned into shipped changes end-to-end |
 
 ### Artifacts & docs
 
@@ -89,7 +90,7 @@ pmos-toolkit/
                    optional bridges (UI features)    optional enhancers                  optional validator
 ```
 
-`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/diagram`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
+`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/update-skills`, `/diagram`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
 
 ## Install
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## pmos-toolkit 2.24.0 — 2026-05-08
+
+### Added
+
+- **`/update-skills`** — new pipeline enhancer that turns skill feedback (raw text or `/retro` paste-back) into shipped changes end-to-end. Parses findings, critiques each against the current skill source, gets per-finding keep/drop approval via the Findings Protocol, then runs `/requirements -> /spec -> [/grill] -> /plan -> /execute -> /verify` per affected skill (auto-tiered, sequential, halt-on-failure, resume-from-triage-doc).
+
+### References
+
+- `docs/pmos/features/2026-05-08_update-skills-skill/02_spec.md`
+- `plugins/pmos-toolkit/skills/update-skills/SKILL.md`
+
+## pmos-toolkit 2.23.0 — 2026-05-08
+
+### Added
+
+- **`/complete-dev`** — new 19-phase end-of-development orchestrator that follows `/verify`. Merges feature work into main, cleans up worktrees, detects deploy norms (CLAUDE.md / package.json / Makefile / CI / plugin manifest), captures diff-scoped learnings, refreshes the README skill inventory, runs `/changelog`, bumps paired plugin manifests, tags the release, and pushes sequentially to every configured remote with halt-on-origin-failure recovery. Supersedes the legacy `/push` skill. Terminal stage of the `requirements -> spec -> plan -> execute -> verify -> complete-dev` pipeline.
+
+### References
+
+- `plugins/pmos-toolkit/skills/complete-dev/SKILL.md`
+
 ## pmos-toolkit 2.22.0 — 2026-05-08
 
 ### Breaking changes

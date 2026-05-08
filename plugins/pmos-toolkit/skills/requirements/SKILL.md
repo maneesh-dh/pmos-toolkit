@@ -23,7 +23,7 @@ A requirements doc answers "What are we building and why?" — it contains ZERO 
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
+- **No interactive prompt tool:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
 - **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, announce phase transitions verbally.
@@ -156,11 +156,13 @@ The user's input can take several forms. Handle each via mode-specific phase rou
 |------------|-----------------|---------------|
 | **Raw thoughts** | Rough observations, problem statement, or scattered ideas | Full flow (Phase 2 research → Phase 3 brainstorm → Phase 4 write) |
 | **Existing doc update** | Path to existing `01_requirements.md` + new observations | **Skip Phase 2 full research**; read prior Research Sources and refresh only delta-relevant areas (Phase 2 update-path). Phase 3 brainstorm runs on the delta only. |
+<!-- defer-only: ambiguous -->
 | **Multiple text inputs** | Several pasted texts, screenshots, or references | **Add Phase 1.5 synthesis step**: synthesize all inputs into a coherent problem statement; confirm understanding via `AskUserQuestion`; then proceed to Phase 2 |
 | **Spec or detailed brief** | Already well-formed requirements that need shaping | **Skip Phase 3 brainstorm**; structure inputs into the template; Phase 5 review applies a gap-analysis lens specifically |
 
 ### Steps
 
+<!-- defer-only: ambiguous -->
 1. **Read the user's input.** If the argument is unclear about which product/service/surface the requirements concern, use `AskUserQuestion` to clarify upfront — do not guess.
 2. **Scope decomposition check.** Decompose into separate per-feature pipelines **only when ALL three** of the following hold:
    - The input describes work targeting **different primary user roles**, AND
@@ -169,6 +171,7 @@ The user's input can take several forms. Handle each via mode-specific phase rou
    If all three hold → propose N feature slugs, ask which to start with, run `/requirements` once per folder. **If any one fails** → treat as a single Tier 3 feature with multiple journeys; do not decompose.
 3. **Check for existing requirements.** Look in `{feature_folder}/01_requirements.md` for an existing file covering this feature.
    - If found: read it, summarize what's there, ask the user if this is an update or fresh start.
+   <!-- defer-only: ambiguous -->
    - **If found AND `02_spec.md` or `03_plan.md` also exist in the folder:** issue a downstream-drift warning via `AskUserQuestion` BEFORE any further work:
      > Updating requirements will desync `02_spec.md` and/or `03_plan.md`. Continue / cancel / run /verify after?
 4. **Detect the tier** based on these explicit signals. Pick the **highest-tier signal that fires**:
@@ -185,6 +188,7 @@ The user's input can take several forms. Handle each via mode-specific phase rou
 | **Tier 2** | Problem, Why Now, Goals (with measured-by), Non-Goals, Solution Direction, User Journeys, Design Decisions, Open Questions | ~1–2 pages |
 | **Tier 3** | All Tier 2 sections + UX Analysis (Motivation/Friction/Satisfaction), Success Metrics table, Research Sources, alternate + error journeys | ~2–4 pages |
 
+<!-- defer-only: ambiguous -->
 5. **Announce + confirm tier.** Echo: `This looks like a Tier N requirement ([type]). Using the [tier name] template. Override?` Use `AskUserQuestion` if ambiguous. **Confirm before creating tasks** (next step) — overriding tier after task creation forces a clean-and-recreate.
 
 6. **Create phase tasks** using your available task tracking tool, scaled to the **confirmed** tier:
@@ -220,6 +224,7 @@ The parent agent merges by section without re-summarization. If summaries overla
 
 Goal: avoid inventing in a vacuum. Learn from how others have solved this problem before locking in a direction.
 
+<!-- defer-only: ambiguous -->
 **Pick competitors from the user's actual domain** — derive from workstream context, repo description, or ask the user via `AskUserQuestion`. Do NOT default to generic B2B-SaaS tools (Linear/Stripe/Notion/etc.) unless they're genuinely in-domain for this product. A fintech app, a creator tool, a developer infra project, or a consumer product needs domain-relevant peers, not the most-familiar names.
 
 Investigate, with named examples:
@@ -252,10 +257,12 @@ Summarize findings before asking questions. Ground the conversation in what alre
 
 ## Phase 3: Collaborative Brainstorming
 
+<!-- defer-only: ambiguous -->
 Act as a **product director** and **senior analyst**. Ask questions via `AskUserQuestion`.
 
 ### Question batching rule
 
+<!-- defer-only: ambiguous -->
 **One question per topic.** Use `AskUserQuestion`'s multi-question form (up to 4 questions per call) ONLY when the questions are genuinely related and the user can answer all in one pass without context switching. Don't batch unrelated questions for throughput; don't serialize related questions for caution.
 
 ### Coverage checklist (NOT a script)
@@ -555,6 +562,7 @@ A doc is unambiguous if **all** of the following hold:
 For every loop that produces findings:
 
 1. **Group findings by category** (e.g., "Missing journeys", "Unstated rationale", "Ambiguous language"). Small categories can be merged; never present more than 4 findings in a single batch.
+<!-- defer-only: ambiguous -->
 2. **One question per finding** via `AskUserQuestion`. Use this shape:
    - `question`: one-sentence restatement of the finding + the proposed fix (concrete, not "tighten section 3")
    - `options` (up to 4):
@@ -562,11 +570,11 @@ For every loop that produces findings:
      - **Modify** — user edits the proposal (free-form reply expected next turn)
      - **Skip** — not an issue; drop it (note briefly in Review Log)
      - **Defer** — log in Open Questions with rationale
-3. **Batch up to 4 questions per `AskUserQuestion` call.** If there are more findings, issue multiple calls sequentially, one category per call.
-4. **Skip `AskUserQuestion` only for findings that need open-ended input** (e.g., "what's the right retention window?"). For those, ask inline as a normal follow-up after the batch — do not shoehorn into options.
+3. **Batch up to 4 questions per interactive-prompt call.** If there are more findings, issue multiple calls sequentially, one category per call.
+4. **Skip the interactive prompt only for findings that need open-ended input** (e.g., "what's the right retention window?"). For those, ask inline as a normal follow-up after the batch — do not shoehorn into options.
 5. **After dispositions arrive,** apply them in order, update the Review Log row to cite dispositions, then ask the user if they see additional gaps before declaring the loop complete.
 
-**Platform fallback (no `AskUserQuestion`):** list findings as a numbered table with columns [Finding | Proposed Fix | Options: Fix/Modify/Skip/Defer]; ask the user to reply with the disposition numbers. Do NOT silently self-fix.
+**Platform fallback (no interactive prompt tool):** list findings as a numbered table with columns [Finding | Proposed Fix | Options: Fix/Modify/Skip/Defer]; ask the user to reply with the disposition numbers. Do NOT silently self-fix.
 
 **Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
@@ -592,10 +600,10 @@ git commit -m "docs: requirements review loop N for <feature>"
 
 1. **Both lenses ran** in the most-recent loop (structural + product-critique). For the loop you intend to be terminal, the polish lens also ran.
 2. **Findings logged** — either listed under each lens, or explicitly noted as "no findings under lens X".
-3. **Dispositions captured** for every finding via `AskUserQuestion` (Fix/Modify/Skip/Defer).
+3. **Dispositions captured** for every finding via the interactive prompt tool (Fix/Modify/Skip/Defer).
 4. **User explicitly confirmed** they have no further concerns. (Single yes/no — do NOT infer from silence or "looks good".)
 5. **Decision coverage:** every non-trivial design choice from research/brainstorm appears as a Decision row OR an Open Question. (Tier 2 needs ≥1; Tier 3 typically ≥3 but not a hard floor.)
-6. **Zero open clarifications** addressed to the user (no inline `[TODO]`, `[??]`, or open `AskUserQuestion`s waiting for reply).
+6. **Zero open clarifications** addressed to the user (no inline `[TODO]`, `[??]`, or open interactive prompts waiting for reply).
 
 If any gate is unmet, run another loop. Do not self-declare exit.
 
@@ -647,7 +655,7 @@ If `--backlog <id>` was set and the doc + commit succeeded, invoke `/backlog set
 ## Anti-Patterns (DO NOT)
 
 - Do NOT skip the research phase (Tier 2-3) — it grounds the brainstorm in reality.
-- Do NOT batch unrelated questions into a single `AskUserQuestion` for throughput.
+- Do NOT batch unrelated questions into a single interactive-prompt call for throughput.
 - Do NOT include implementation details (DB schemas, API routes, code) — that's the spec's job.
 - Do NOT create a new document file in each review loop — update the original.
 - Do NOT self-declare the 6-gate exit — gate 4 requires explicit user confirmation.

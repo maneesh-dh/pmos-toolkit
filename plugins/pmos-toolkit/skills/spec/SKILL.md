@@ -651,15 +651,20 @@ For this skill, evaluate whether anything from this session is worth writing bac
 
 ## Anti-Patterns (DO NOT)
 
-- Do NOT skip the multi-role interview for Tier 2-3 — each role catches different gaps
+- Do NOT skip the multi-role interview for Tier 2-3 — each role catches different gaps. Roles with no questions go in the silent-roles summary block, not omitted.
 - Do NOT write API contracts without response shapes and error responses
 - Do NOT write DB schemas as prose — show actual SQL
 - Do NOT write "add tests" without specifying what to test and how
-- Do NOT treat verification as an afterthought — it's a core section
+- Do NOT treat verification as an afterthought — Phase 4 emits a sketch in chat before the spec is written
 - Do NOT create a new spec file in each review loop — update the original
-- Do NOT stop after 1 review loop for Tier 2-3 — minimum is 2
+- Do NOT promote status to "Ready for Plan" before user confirmation
+- Do NOT ship a spec with non-empty Open Questions — resolve or split scope
+- Do NOT self-declare loop completion — the user gates exit
 - Do NOT write decision entries without "Options Considered" and "Rationale"
 - Do NOT ask questions for the sake of asking — only ask what genuinely helps
 - Do NOT skip sequence diagrams for multi-component interactions (Tier 3)
 - Do NOT over-specify internal implementation details — prescribe the interface, leave the internals to engineering judgment
 - Do NOT combine multiple scenarios into one sequence diagram — one diagram per flow
+- Do NOT force-fit a structural finding into the inline-edit flow — use the Phase 6 escape hatch
+- Do NOT batch findings without `[Blocker]/[Should-fix]/[Nit]` severity tags
+- Do NOT run industry research at Tier 2 unless the design has a non-obvious architectural choice

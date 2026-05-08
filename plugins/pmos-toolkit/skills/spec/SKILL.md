@@ -76,7 +76,14 @@ Use workstream context (loaded by step 3 below) to inform technical decisions �
 
 **Announce:** "This looks like a Tier N spec. Using the [tier name] template." (When the tier was carried forward from a tagged requirements doc, no confirmation question is needed — just announce.)
 
-**Gate:** Do not proceed until you have confirmed understanding of the requirements and (where required) the user has confirmed the tier.
+5. **Detect the `type:`.** Set the spec's `type` frontmatter (per the templates) using this precedence (FR-05, FR-112):
+   - **`--backlog <id>` was passed** → read the backlog item's `type:` field and map to a spec `type`: `bug → bugfix`, `feature → feature`, `enhancement → enhancement`, `chore → enhancement`, `docs → enhancement`, `spike → feature`. Carry forward without asking.
+   - **Requirements doc has a `type:` tag** in frontmatter → carry forward without asking.
+   - **Otherwise** → confirm with the user via `AskUserQuestion` with options `bugfix` / `enhancement` / `feature` (recommend the option implied by the tier: Tier 1 → bugfix, Tier 2 → enhancement, Tier 3 → feature).
+
+   Persist `type` into the spec frontmatter (per the Tier N Template above). /plan FR-104a permits per-task TDD overrides keyed off this `type` and logs them as decisions.
+
+**Gate:** Do not proceed until you have confirmed understanding of the requirements and (where required) the user has confirmed the tier and `type`.
 
 ---
 
@@ -501,6 +508,31 @@ CREATE TABLE ... (
 | [path or URL] | Existing code / External | [What we learned] |
 ```
 
+### Anchor Emission Rule
+
+Specs emit stable kebab-case anchors on every H2 and H3 so downstream artifacts (`/plan` Phase 4 broken-ref hard-fail per FR-31a, requirements traceability tools) can deep-link without brittle line numbers.
+
+**Auto-derivation (resolves spec Open Question #1; recorded in /plan plan §Decision Log P3):**
+
+1. Lowercase the heading text after the `## ` or `### ` marker.
+2. Replace any run of non-alphanumeric characters with a single hyphen.
+3. Strip leading/trailing hyphens.
+4. **Collision dedupe** — if the derived slug already appeared earlier in the same document, append `-2`, `-3`, ... in document order. The first occurrence keeps the bare slug.
+
+Emit the anchor as a trailing `{#kebab-anchor}` token on the heading line.
+
+Example:
+
+```markdown
+## Decision Log {#decision-log}
+## Edge Cases {#edge-cases}
+### Edge Cases {#edge-cases-2}    ← second "Edge Cases" anywhere in the doc
+```
+
+**Why:** `/plan` v2 Phase 4 hard-fails on broken `02_spec.md#anchor` refs (FR-31a). Heading renames remain a known break — surface them by re-running /plan or via the FR-31a check, not by silently letting refs rot.
+
+---
+
 ### Document Guidelines (all tiers)
 - Use numbered FR-XX IDs for functional requirements — they're referenced in the plan
 - Sequence diagrams are REQUIRED (Tier 3) when 3+ components interact — one diagram per flow
@@ -605,6 +637,7 @@ All items below must be `pass` or `N/A` (with a stated reason for N/A). Loop unt
 | 8 | Frontend design specifies hierarchy + state + interactions | No frontend changes |
 | 9 | Rollout strategy documented (flags, migration order, rollback) | Tier 1-2 with no deploy-time risk |
 | 10 | **Open Questions section is empty (no unresolved items)** | Never N/A — see below |
+| 10b | Frontmatter contract complete: tier, type, feature, date, status, requirements all present and non-empty | Never N/A |
 | 11 | Last loop produced only `[Nit]` findings or none | Never N/A |
 | 12 | User has explicitly confirmed no further concerns | Never N/A — do not self-declare exit |
 
@@ -626,7 +659,9 @@ Phase 6 already covered structural completeness and design soundness. Phase 7 is
 
 **On user confirmation that the spec is complete:**
 
-1. Promote the status field in the spec doc using `Edit` with `old_string="**Status:** Draft"` and `new_string="**Status:** Ready for Plan"`.
+**Frontmatter validation gate** — before promoting status, re-read the spec frontmatter. Verify keys `tier`, `type`, `feature`, `date`, `requirements` are present and non-empty. If any required key is missing or empty, halt with a platform-aware error sourced via `_shared/platform-strings.md` (e.g., `[/spec] Cannot promote — frontmatter missing required key: <key>. Add the key and re-run the exit step.`). Do NOT promote.
+
+1. Promote the status field in the spec doc using `Edit` with `old_string="status: Draft"` and `new_string="status: Ready for Plan"` (frontmatter contract per the Tier N Template — replaces the legacy prose `**Status:** Draft` line).
 
 2. Commit:
 

@@ -1,5 +1,31 @@
 # Changelog
 
+## pmos-toolkit 2.25.0 — 2026-05-08
+
+### What's new
+
+- **`/plan` v2** — tier-aware plan generation. Tier-1 bug-fixes ship as ≥1 task with reduced TN (no Decision-Log floor); Tier-3 features get mandatory Risks, ≥3 Decision-Log entries, and 2–4 review loops capped at 4 (FR-40). Plan documents now emit a YAML frontmatter contract (`tier`, `type`, `feature`, `spec_ref`, `requirements_ref`, `date`, `status`, `commit_cadence`, `contract_version`) so `/execute` can read them deterministically.
+- **Stack-aware verification** — new `_shared/stacks/{npm,pnpm,yarn-classic,yarn-berry,bun,python,rails,go,static}.md` library. `/plan` v2 detects stack signals from manifest files and inlines the stack's lint / test / API-smoke commands into per-task verification steps (FR-10, FR-13). The 5 JS-stack files share a `## Common Preamble` enforced byte-equivalent by `tools/lint-js-stack-preambles.sh`.
+- **Platform-neutral templates** — new `_shared/platform-strings.md` provides per-platform phrasing (claude-code, gemini, copilot, codex) for closing offers and skill-invocation refs.
+- **Per-task contract fields** — every plan task now emits `**Depends on:**`, `**Idempotent:**`, `**Requires state from:**`, `**TDD:** yes — new-feature|yes — bug-fix|no — <reason>`, `**Data:**` alongside the existing `**Goal:**`/`**Spec refs:**`/`**Files:**`/`**Steps:**`. `/execute` v2 consumes them; missing optional fields trigger per-task `WARN:` lines on stderr (back-compat shim per FR-110).
+- **Convergent review loops** — `/plan` v2 caps review at 4 loops; Loop 2 dispatches a fresh blind subagent (5-minute timeout, nested-subagent guard via `PMOS_NESTED=1`). Findings are auto-classified low-risk vs high-risk (default ambiguous → high-risk). Skip List persists across runs at `03_plan_skip-list.md` with hash-keyed entries.
+- **Sidecar contracts** — review log accumulates at `03_plan_review.md`; non-interactive runs write `03_plan_auto.md` and on halt `03_plan_blocked.md`. All sidecar writes use same-directory-tempfile + `mv` rename for atomicity.
+- **Defect handoff (E10)** — `/execute` v2 writes `03_plan_defect_<task-id>.md` on a planning defect; `/plan --fix-from <task-id>` consumes it; `/execute` deletes the defect file when the previously-defective task succeeds.
+- **Spec frontmatter contract** — `/spec` Tier 1/2/3 templates emit `tier`/`type`/`feature`/`date`/`status`/`requirements`. Auto-derived kebab-case anchors at H2/H3 (collision dedupe via `-2/-3/...` suffix) so `/plan` Phase 4 can hard-fail on broken `02_spec.md#anchor` refs (FR-31a) and detect spec drift (FR-31b).
+- **`/backlog` `type` enum extended** — adds `enhancement`, `chore`, `docs`, `spike` to the existing `feature`/`bug`/`tech-debt`/`idea`. Inference heuristics extended with keyword tables for the new values.
+- **Operational modes** — `/plan` v2 supports Edit / Replan / Append modes plus `--non-interactive` (FR-61, FR-61a halt protocol with exit code 2 + `03_plan_blocked.md`).
+
+### Breaking changes
+
+- **None at runtime.** Back-compat shim in `/execute` v2 warns on missing optional task fields rather than failing (decision P5 / FR-110). `/plan` v1 plans still execute.
+- The `/spec` Phase 7 promotion now `Edit`s the frontmatter `status: Draft` line (was the prose `**Status:** Draft` line). Specs written by /spec v1 need their `**Status:** Draft` line manually moved into frontmatter on next /spec re-run.
+
+### Migration
+
+- No code migration required. First run of /plan v2 against a /spec v1 spec emits a frontmatter-validation refusal — re-run /spec to re-emit with v2 frontmatter, then /plan.
+
+---
+
 ## pmos-toolkit 2.24.0 — 2026-05-08
 
 ### Added

@@ -80,33 +80,33 @@ Use workstream context (loaded by step 3 below) to inform technical decisions �
 
 ---
 
-## Phase 2: Research (Parallel Subagents)
+## Phase 2: Research
 
 **Tier 1:** Read the specific files/functions involved in the bug. No broader research needed.
 
-**Tier 2-3:** Dispatch subagents to explore:
+**Tier 2-3: Dispatch up to 2 subagents in parallel.** Each has an explicit return contract:
 
-### 1a. Existing Implementation & Patterns
-- Read the codebase areas that will be impacted
-- Note current architecture patterns, data models, API conventions
-- Read test patterns used in adjacent features
-- Identify reusable components, utilities, and infrastructure
+### Subagent A — Existing Implementation & Patterns
+**Always run for Tier 2-3.** Returns:
+- File paths + 1-line summaries of code areas the spec will impact
+- Current architecture patterns, data models, API conventions in use
+- Test patterns from adjacent features (file paths)
+- Reusable components/utilities/infrastructure already available
 
-### 1b. Industry Research (Tier 2+)
+### Subagent B — Industry Research & Alternatives
+**Tier 3: always run.** **Tier 2: run only when the design has a non-obvious architectural choice** (e.g., queue vs. webhook vs. polling; relational vs. document; sync vs. async; new infrastructure component). Skip for routine UX overhauls and additive enhancements on an established stack — state explicitly in the spec why you skipped.
 
-Goal: the technical design should be informed by how comparable systems are actually built, not just by what's already in this repo.
+Returns:
+- **Comparables table:** 2–4 (T3) or 2 (T2) named examples — products, OSS projects, engineering blog posts. Architecture used + documented trade-offs.
+- **Alternatives table:** 3+ (T3) or 2 (T2) materially different design shapes with trade-offs (complexity, latency, cost, failure modes, operational burden).
+- Established patterns / frameworks / standards that apply, with a build-vs-adopt recommendation.
+- Known failure modes / anti-patterns from comparable systems (scaling cliffs, consistency bugs, migration pain).
+- For Tier 3: explicit recommendation + rejected-alternatives section.
 
-Investigate, with named examples:
-- **How comparable systems implement this:** 2–4 concrete examples (products, OSS projects, engineering blog posts). What architecture do they use? What trade-offs did they document?
-- **Alternative technical approaches:** At least 2–3 materially different design shapes (e.g., queue vs. webhook vs. polling; relational vs. document; server-rendered vs. client-rendered). Capture tradeoffs: complexity, latency, cost, failure modes, operational burden.
-- **Established patterns, frameworks, libraries, standards** that apply — and whether adopting vs. building is the better call here.
-- **Known failure modes / anti-patterns:** scaling cliffs, consistency bugs, migration pain others have hit with these approaches.
+### Reconciliation
+After both subagents return, reconcile any conflicts (e.g., A says "we already have a queue" but B recommends webhooks) explicitly in the Decision Log of the spec — do not silently pick one.
 
-Depth: Tier 2 → 2 competitors/references, 2 alternatives, brief. Tier 3 → 3–4 references, 3+ alternatives, deeper writeup with explicit recommendation + rejected-alternatives section.
-
-Collect all sources for the Research Sources table.
-
-Track all sources in a Research Sources table.
+Track all sources in the Research Sources table of the spec.
 
 ---
 

@@ -2,7 +2,7 @@
 name: retro
 description: Generate a paste-back retrospective for every pmos-toolkit skill invoked in the current session. Reads the session transcript (not the skill's source) to identify what went wrong, where the user pushed back, what got skipped, and where friction surfaced — emits one markdown block per skill, severity-tagged (blocker / friction / nit), ready to paste to the skill author. Use when the user says "/retro", "what went wrong this session", "give feedback to the skill authors", "how did the pmos skills hold up", or "produce a session retro".
 user-invocable: true
-argument-hint: "[skill-name to filter, optional]"
+argument-hint: "[skill-name to filter, optional] [--non-interactive | --interactive]"
 ---
 
 # Retro
@@ -14,7 +14,7 @@ Produce a transcript-grounded retrospective on every `pmos-toolkit:*` skill that
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
+- **No interactive prompt tool:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform analysis sequentially as a single agent.
 - **No transcript access:** If you cannot find a session transcript file, fall back to the in-context conversation and note the limitation in the output header.
 
@@ -26,12 +26,98 @@ This skill has multiple phases. Create one task per phase using your agent's tas
 
 Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /retro` and factor them into your approach for this session.
 
+<!-- non-interactive-block:start -->
+1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
+   - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).
+   - `parent_marker` is set if the original prompt's first line matches `^\[mode: (interactive|non-interactive)\]$` (FR-06.1).
+   - `settings.default_mode` is `.pmos/settings.yaml :: default_mode` if present and one of `interactive`/`non-interactive`. Unknown values → warn on stderr `settings: invalid default_mode value '<v>'; ignoring` and fall through (FR-01.3).
+   - If `.pmos/settings.yaml` is malformed (not parseable as YAML, or missing `version`): print to stderr `settings.yaml malformed; fix and re-run` and exit 64 (FR-01.5).
+   - On Phase 0 entry, always print to stderr exactly: `mode: <mode> (source: <source>)` (FR-01.2).
+
+2. **Per-checkpoint classifier.** Before issuing any `AskUserQuestion` call, classify it (FR-02):
+   - Use the awk extractor below to find the line of this call's `question:` key in the live SKILL.md (FR-02.6).
+   - The defer-only tag, if present, is the literal previous non-empty line: `<!-- defer-only: <reason> -->` where `<reason>` ∈ {`destructive`, `free-form`, `ambiguous`} (FR-02.5).
+   - Decision (in order): tag adjacent → DEFER; multiSelect with 0 Recommended → DEFER; 0 options OR no option label ends in `(Recommended)` → DEFER; else AUTO-PICK the (Recommended) option (FR-02.2).
+
+3. **Buffer + flush.** Maintain an append-only OQ buffer in conversation memory. On each AUTO-PICK or DEFER classification, append one entry per the schema in spec §11.2. At end-of-skill (or in a caught error before exit), flush (FR-03):
+   - Primary artifact is single Markdown → append `## Open Questions (Non-Interactive Run)` section with one fenced YAML block per entry; update prose frontmatter (`**Mode:**`, `**Run Outcome:**`, `**Open Questions:** N` where N counts deferred only — see FR-03.4) (FR-03.1).
+   - Skill produces multiple artifacts → write a single `_open_questions.md` aggregator at the artifact directory root; primary artifact's frontmatter `**Open Questions:** N — see _open_questions.md` (FR-03.5).
+   - Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md` (FR-03.2).
+   - No persistent artifact (chat-only) → emit buffer to stderr at end-of-run as a single block prefixed `--- OPEN QUESTIONS ---` (FR-03.3).
+   - Mid-skill error → flush partial buffer under heading `## Open Questions (Non-Interactive Run — partial; skill errored)`; set `**Run Outcome:** error`; exit 1 (E13).
+
+4. **Subagent dispatch.** When dispatching a child skill via Task tool or inline invocation, prepend the literal first line: `[mode: <current-mode>]\n` to the child's prompt (FR-06).
+
+5. **Awk extractor.** The classifier and `tools/audit-recommended.sh` MUST both use the function below. Loaded at script init time; sourcing differs per consumer.
+
+<!-- awk-extractor:start -->
+```awk
+# Find AskUserQuestion call sites and their adjacent defer-only tags.
+# Input: a SKILL.md file (stdin or argv).
+# Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
+in_inlined { next }
+/^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
+  match($0, /defer-only:[[:space:]]*[a-z-]+/);
+  pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
+  sub(/^[[:space:]]+/, "", pending_tag);
+  pending_line = NR;
+  next;
+}
+/^[[:space:]]*$/ {
+  emit_pending();
+  pending_tag = "";
+  next;
+}
+/AskUserQuestion/ {
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
+  pending_tag = "";
+  next;
+}
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
+```
+<!-- awk-extractor:end -->
+
+6. **Refusal check.** If this SKILL.md contains a `<!-- non-interactive: refused; ... -->` marker (regex: `<!--[[:space:]]*non-interactive:[[:space:]]*refused`), and `mode` resolved to `non-interactive`: emit refusal per Section A and exit 64 (FR-07).
+
+7. **Pre-rollout BC.** If the `--non-interactive` argument is present BUT this SKILL.md does NOT contain the `<!-- non-interactive-block:start -->` marker (i.e., this skill hasn't been rolled out yet): emit `WARNING: --non-interactive not yet supported by /<skill>; falling back to interactive.` to stderr; continue in interactive mode (FR-08).
+
+8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
+<!-- non-interactive-block:end -->
+
 ## Phase 1: Locate the Session Transcript
 
 The transcript is the source of truth — read it directly rather than relying on summarized in-context history (compaction may have dropped detail).
 
 1. Resolve the project slug: replace `/` with `-` in the current working directory's absolute path (e.g., `/Users/maneeshdhabria/Desktop/Projects/agent-skills` → `-Users-maneeshdhabria-Desktop-Projects-agent-skills`).
 2. List `~/.claude/projects/<slug>/*.jsonl` (sorted by mtime, newest first). The newest file is almost always the current session.
+<!-- defer-only: ambiguous -->
 3. If multiple recent files exist or the slug doesn't resolve, ask the user via `AskUserQuestion` which file to use, or accept a path argument.
 4. **Fallback:** if no jsonl is found, use the in-context conversation as the corpus and put a note at the top of the output: `> Note: transcript file not found — analysis based on in-context conversation only; older turns may have been compacted.`
 
@@ -85,7 +171,7 @@ For each invoked skill, emit one markdown block in this exact shape, printed inl
 
 **Findings:**
 
-- **[blocker]** <one-line finding> — *Evidence:* "<short quote or paraphrased turn>" — *Proposed fix:* <concrete change to the skill, e.g., "add a Phase N that …", "tighten the description trigger phrase to …", "replace prose-dump review with AskUserQuestion batch …">
+- **[blocker]** <one-line finding> — *Evidence:* "<short quote or paraphrased turn>" — *Proposed fix:* <concrete change to the skill, e.g., "add a Phase N that …", "tighten the description trigger phrase to …", "replace prose-dump review with an interactive-prompt batch …">
 - **[friction]** <one-line finding> — *Evidence:* … — *Proposed fix:* …
 - **[nit]** <one-line finding> — *Evidence:* … — *Proposed fix:* …
 
@@ -111,7 +197,7 @@ After all blocks, print a one-paragraph **Session summary** that lists the skill
 
 - **Reading the skill body to form the critique.** The whole point of `/retro` is a black-box, transcript-grounded view. Reading SKILL.md will bias you toward rationalizing the existing design ("ah, the skill does X because phase 3 says Y") instead of noticing that X was missing from this session. Frontmatter only.
 - **Manufacturing findings to fill space.** A clean run is a valid outcome. Emit the one-line "clean run" block and move on. Pretending you found three nits per skill makes the paste-back useless.
-- **Vague proposed fixes.** "Improve clarity" is not a fix. "Replace the prose dump in Phase 4 with an `AskUserQuestion` batch using Fix / Modify / Skip / Defer options" is a fix.
+- **Vague proposed fixes.** "Improve clarity" is not a fix. "Replace the prose dump in Phase 4 with an interactive-prompt batch using Fix / Modify / Skip / Defer options" is a fix.
 - **Treating every user message as a correction.** A clarifying question or a "looks good" is not pushback. Only count turns that re-direct, reject, or repeat instruction.
 - **Severity inflation.** A surprising default is a *friction*, not a *blocker*. Reserve **blocker** for things that broke the skill's claimed contract.
 - **Writing to disk.** Output is inline markdown for paste-back. No retro file unless the user explicitly asks.

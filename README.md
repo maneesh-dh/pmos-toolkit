@@ -31,7 +31,7 @@ pmos-toolkit/
 
 ## Skills
 
-### Pipeline (requirements → spec → plan → execute → verify)
+### Pipeline (requirements → spec → plan → execute → verify → complete-dev)
 
 | Skill | Description |
 |-------|-------------|
@@ -43,6 +43,7 @@ pmos-toolkit/
 | `/pmos-toolkit:plan` | Execution plan from a spec — third pipeline stage |
 | `/pmos-toolkit:execute` | Implement a plan end-to-end with TDD and verification |
 | `/pmos-toolkit:verify` | Post-implementation verification gate — lint, test, multi-agent code review, interactive QA |
+| `/pmos-toolkit:complete-dev` | End-of-dev orchestrator — merge, deploy per repo norms, capture learnings, /changelog, version bump, commit, tag, push to all remotes. Supersedes legacy /push (which remains available this release; will be removed next release) |
 
 ### Pipeline enhancers (optional)
 

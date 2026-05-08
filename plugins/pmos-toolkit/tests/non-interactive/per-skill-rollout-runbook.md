@@ -148,3 +148,25 @@ The `T<N>` prefix is required by `/execute`'s resume resolver.
 1. **Plan estimate "≤4 defer-only tags after manual review"** assumed most calls would already have `(Recommended)` in the SKILL.md prose. None of /artifact's 18 real calls do — the skill describes calls semantically. Realistic per-skill estimate: most skills will need `defer-only:*` for the majority of calls, with `(Recommended)`-add rewrites reserved for skills that already enumerate their option lists inline (e.g., `/spec`, `/plan`, `/verify` recovery prompts). T16–T39 should expect higher tag counts than originally projected.
 2. **Anchor B is the common case (17 of 26 skills)**, not the exception. The plan's runbook step originally only mentioned Anchor A.
 3. **Step 5 prose rephrasing** was not in the plan — false-positive `AskUserQuestion` mentions in headings, parentheticals, and Platform Adaptation bullets must be rephrased to avoid polluting the runtime OQ buffer with phantom DEFERs. Adopted as a runbook step.
+
+---
+
+## Per-skill addendum: /diagram `--on-failure`
+
+`/diagram` extends the standard non-interactive contract with a `--on-failure {drop|ship-with-warning|exit-nonzero}` flag that gates Phase 6.5 (Terminal failure handler) disposition deterministically when `mode == non-interactive`. Interactive mode is unchanged — the existing `AskUserQuestion` (`Ship-with-warning / Try-alt / Abandon`) remains the source of truth.
+
+Exit-code contract (canonical source: `plugins/pmos-toolkit/skills/diagram/SKILL.md` Phase 6.5):
+
+| Exit | When |
+|---|---|
+| 0 | Success (incl. `ship-with-warning` path with leading XML warning comment) |
+| 2 | Environmental — renderer / theme / mode-combo |
+| 3 | Non-interactive `--on-failure drop` — caller dropped the slot |
+| 4 | Non-interactive `--on-failure exit-nonzero` (default) |
+| 64 | Argument error |
+
+Default when `mode == non-interactive` and the flag is absent: `exit-nonzero` (caller-decides — safest default for automated callers like `/rewrite`).
+
+Contract is locked in by `plugins/pmos-toolkit/tests/non-interactive/diagram-on-failure.bats` (7 grep-based assertions over SKILL.md). Future skills with deterministic-disposition flags should follow the same pattern: a separate `### Per-skill addendum: /<skill>` section here, plus a `<skill>-<flag>.bats` contract file.
+
+**Note for runbook step 5 (false-positive rephrasing):** when adding per-skill prose that *describes* the AUQ surface, avoid the literal token `AskUserQuestion` in non-tagged lines — use "interactive prompt" or "AUQ" instead. The audit script's awk extractor counts every literal-token line as a call site, so prose mentions inflate the unmarked-count. /diagram T2 hit this and was reworded inline.

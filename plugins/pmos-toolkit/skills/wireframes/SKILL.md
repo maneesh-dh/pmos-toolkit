@@ -22,7 +22,7 @@ Use this when the feature has meaningful UI surface and the team benefits from s
 
 ## `--bootstrap-design-only` mode
 
-Invoked as `/wireframes --bootstrap-design-only` (typically by `/prototype` Phase 1.5 when DESIGN.md is missing but wireframes already exist). In this mode the skill produces ONLY DESIGN.md and COMPONENTS.md — no wireframe HTML, no review loops, no PSYCH/MSF, no Phase 7 polish, no Phase 9–10 enrichment. The user's existing wireframes are not touched.
+Invoked as `/wireframes --bootstrap-design-only` (typically by `/prototype` Phase 1.5 when DESIGN.md is missing but wireframes already exist). In this mode the skill produces ONLY DESIGN.md and COMPONENTS.md — no wireframe HTML, no review loops, no Phase 6 delegation, no Phase 7 polish, no Phase 9–10 enrichment. The user's existing wireframes are not touched.
 
 **Phases that run in this mode:** Phase 0 (workstream context), Phase 2.5 (DESIGN.md, including 2.5c review gate — DO NOT skip the gate), Phase 2.6a (COMPONENTS.md load/create — including 2.6a accept/edit/skip gate). All other phases are skipped.
 
@@ -50,14 +50,14 @@ This skill has multiple phases. Create one task per phase using your agent's tas
 
 ## Rigor & Corner-Cut Protocol
 
-This skill is permissive — several phases have a "cheap option" (skip Phase 2.5, fewer Phase 4 loops, smaller PSYCH walkthrough). Permissiveness is fine; **silent downgrades are not**. The protocol below makes rigor visible.
+This skill is permissive — several phases have a "cheap option" (skip Phase 2.5, fewer Phase 4 loops). Permissiveness is fine; **silent downgrades are not**. The protocol below makes rigor visible.
 
 ### Rigor tiers
 
-Pick the tier that matches the work. The tier governs Phase 4 (review loops) and the default density of Phase 2 / Phase 6 prompts.
+Pick the tier that matches the work. The tier governs Phase 4 (review loops) and the default density of Phase 2 prompts. Phase 6 (MSF + PSYCH) is delegated to `/msf-wf` — its rigor is governed there, not here.
 
-- **High-rigor (default).** One reviewer subagent per file in parallel; full 2-loop protocol; full Phase 2.5 extraction; full Phase 6 walkthrough.
-- **Medium-rigor (recommended for ≤ 6 files OR a focused enhancement).** ONE cross-file reviewer subagent (single message, multi-file critique); apply fixes; no second loop. Phase 2.5 still runs in full. Phase 6 still mandatory for Tier 2/3 but may collapse to a single subagent.
+- **High-rigor (default).** One reviewer subagent per file in parallel; full 2-loop protocol; full Phase 2.5 extraction.
+- **Medium-rigor (recommended for ≤ 6 files OR a focused enhancement).** ONE cross-file reviewer subagent (single message, multi-file critique); apply fixes; no second loop. Phase 2.5 still runs in full.
 - **Low-rigor (personal-tool, single-user, time-bound only).** Inline grep + read-aloud spot-check against the rubric headings PLUS one mandatory cross-file reviewer subagent (200-word brief: aria coverage on icon-only buttons, focus-visible styles, contrast against dark/light surfaces, high-variance findings across files). The cross-file pass is non-negotiable — it's cheap (~30s) and catches what grep misses.
 
 The user can override the chosen tier at any phase boundary. Default is high-rigor; recommend medium for ≤ 6 files; recommend low only when the user has signaled time-pressure or personal-tool context.
@@ -74,7 +74,6 @@ The user gets one beat to redirect; if they don't, proceed. Phases that have che
 - **Phase 2.5** — when skipped despite a host frontend being present
 - **Phase 3.5 screenshot ingestion** — when skipped despite screenshots being attached
 - **Phase 4 review loops** — when running medium- or low-rigor instead of full
-- **Phase 6 PSYCH** — when fewer than the available journeys are walked, or single-subagent collapse is used
 
 Silently downgrading rigor is a small integrity leak that compounds across phases.
 
@@ -446,174 +445,31 @@ Always print BOTH the served URL (if any) AND the file path so the user has a fa
 
 ---
 
-## Phase 6: PSYCH Walkthrough
+## Phase 6: MSF + PSYCH (delegated to /msf-wf)
 
-After per-wireframe refinement (Phase 4) and the index (Phase 5), run a **journey-level** PSYCH pass to catch flow-level drops in user drive that component-level review can't see. Phase 4 asks "is this wireframe well-built?"; Phase 6 asks "does the user's drive to continue survive this flow?" Both are needed.
+Wireframes are now generated. Phase 6 hands off to `/msf-wf` for combined MSF + PSYCH analysis with inline edit application.
 
-### 6a. Tier detection
+**Invocation:**
+```
+/msf-wf {feature_folder}/wireframes --apply-edits
+```
 
-Read the tier tag from the requirements doc (carried forward from `/requirements`). If absent, ask via `AskUserQuestion`:
+**Behavior:**
+- `/msf-wf` runs persona alignment, MSF Pass A (grounded in wireframe DOM), and PSYCH Pass B (per-screen scoring with directional thresholds).
+- With `--apply-edits`, each finding is presented via `AskUserQuestion` for Fix / Modify / Skip / Defer disposition. Approved findings are applied as inline `Edit` calls to the relevant `.html` files.
+- Output: a single `msf-findings.md` co-located with the wireframes folder, containing both the MSF analysis matrix and the PSYCH scoring tables.
 
-- **Question**: "What tier is this feature?"
-- **Options**: **Tier 1: Bug fix / minor enhancement** / **Tier 2: Enhancement / UX overhaul (Recommended for most user-facing work)** / **Tier 3: New feature / new system**
-- One-line rule shown in option descriptions: "Tier 1 = isolated bug fix or small change; Tier 2 = improving existing surface; Tier 3 = new capability or major redesign."
+**Tier gating:**
+- **Tier 1**: skip Phase 6 entirely → jump to Phase 8 (Spec Handoff). Tier 1 wireframes are usually 1–2 screens; MSF/PSYCH overkill.
+- **Tier 2 / Tier 3**: Phase 6 is **mandatory**.
 
-**Tier gating for Phase 6:**
-- **Tier 1**: skip Phase 6 entirely → jump to Phase 8 (Spec Handoff). Tier 1 wireframes are usually 1–2 screens; PSYCH is overkill.
-- **Tier 2 / Tier 3**: PSYCH is **mandatory**. Continue.
+**Failure handling:**
+If `/msf-wf` returns a non-zero state or the user terminates it, this Phase aborts. /wireframes MUST NOT auto-continue to Phase 8. Surface the underlying error to the user; the user can re-run `/msf-wf` manually and then continue with `/spec`.
 
-### 6b. Select journeys
-
-Pull the user-journey list from the requirements doc. **Cap at 5 journeys per session** — more than 5 produces shallow output and review fatigue.
-
-**Always confirm the journey list with the user via `AskUserQuestion` (multiSelect, max 5 selections)** — even when the req doc has ≤ 5 explicit journeys, and even when you derived the list yourself. Many req docs contain *implicit* journeys (overflow-menu paths, recovery flows, error-state walks) that aren't numbered as such; the confirmation step is the only place those surface.
-
-- Recommended option: "the 3–5 journeys you derived, in priority order" (signup, first-value, primary daily flow, share/invite, recovery are the canonical stakeholder-visible set).
-- Always include "Other (specify)" so the user can name a journey you missed.
-- **Bias toward including any journey that walks through a wireframe with a verified bug or a known-broken state** — those are exactly the journeys most worth pressure-testing.
-
-Platform fallback: present the list as a numbered list and ask for confirmation in free text.
-
-For each selected journey:
-- Identify the wireframes that participate (by component slug from the inventory matrix)
-- Note the order: step 1 → step 2 → ... → completion
-- Default the **entry-context starting score to Medium (40)** silently per /msf's PSYCH rubric. Document the assumption at the top of `psych-findings.md`. The user can override later by editing the doc and re-running.
-
-### 6c. PSYCH scoring rubric (matches /msf format for artifact compatibility)
-
-This rubric is the same shape as `/msf` Pass B so artifacts are interchangeable.
-
-**Starting score per journey**: Medium-intent = 40 (default; see 6b for context).
-
-**Score every notable element on each screen** at +1 to +10 (positives) or -1 to -10 (negatives). Skip neutral / expected elements — do NOT pad scores by inventing positives just to balance the sheet. Collapse like-kind elements into one row (e.g., "5 nav links — minor, -5 total") rather than enumerating identical items.
-
-**+Psych drivers (canonical palette):**
-- Positive emotions: attractive visuals, social proof, credibility signals
-- Motivational boosts: urgency, progress indicators, value previews, completion cues
-- Rewards: immediate value delivery, clear outcomes, "aha" moments
-
-**-Psych drivers (canonical palette):**
-- Physical effort: form fields, data entry, clicks, scrolling, waiting
-- Decisions to make: choices, configurations, ambiguous options, unfamiliar terminology
-- Questions to figure out: unclear UI, unknown costs, jargon, missing feedback
-
-**Thresholds (matches /msf):**
-- Cumulative score `< 20` → **danger zone** (high severity)
-- Cumulative score `< 0` → **bounce risk** (critical severity)
-- Single-screen Δ drop `> 20` → **flagged regardless of cumulative** (something on this screen pushes the user off a cliff even if the running total is healthy)
-
-### 6d. Walkthrough protocol
-
-For each journey:
-
-1. **Trace the steps in order**. Print the trace before scoring so the user can see the path being evaluated:
-   ```
-   Journey: New user creates first project   (start: 40, Medium-intent)
-     Step 1 → 03_signup-form_desktop-web.html
-     Step 2 → 05_email-verify_desktop-web.html
-     Step 3 → 09_workspace-empty_desktop-web.html
-     Step 4 → 11_create-project-modal_desktop-web.html
-     Step 5 → 12_project-detail_desktop-web.html
-   ```
-2. **Walk each screen left-to-right, top-to-bottom**, scoring every notable element. Sum element scores → screen Δ. Update running total: `cumulative = previous + Δ`.
-3. **If subagents are available**: dispatch one subagent per journey in parallel. Each subagent receives the journey's wireframe files (read from disk), the journey description from the req doc, the canonical driver palette above, and the threshold rules. Returns:
-   - Per-element rows (for the audit table)
-   - Per-screen rollup (for the stakeholder table)
-   - List of flagged screens (those crossing thresholds)
-4. **If subagents unavailable**: walk sequentially in the main agent.
-
-### 6e. Output: dual-table `psych-findings.md`
-
-Save to `{feature_folder}/wireframes/psych-findings.md`. Format details — header, per-journey block, dual tables (element + screen rollup), driver palette, severity assignment, sparkline, applied-changes log, unsurfaced-findings log — are specified in `reference/psych-output-format.md`. Follow that format exactly so artifacts are interchangeable with `/msf` Pass B output.
-
-### 6f. Findings Presentation Protocol
-
-Surface findings via `AskUserQuestion`. Group by target:
-
-1. **Wireframe-target findings**: each question states finding + proposed wireframe edit. Options: **Apply edit** / **Modify** / **Skip** / **Defer to spec stage**.
-2. **Req-doc-target findings** (journey gap, wrong ordering, missing step): options: **Update req doc** / **Modify** / **Skip** / **Defer to spec stage**.
-3. **Batch ≤ 4 per call**; sequential calls for more. **Cap total findings surfaced at 12** — prioritize highest severity (bounce risk → danger → single-screen-Δ-drop). Rest log to `psych-findings.md` under "Unsurfaced findings" for later review.
-
-**Platform fallback (no `AskUserQuestion`):** present a numbered table grouped by target with disposition column. Do NOT silently self-fix.
-
-**Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." Always structure the ask.
-
-**Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
-
-### 6g. Apply dispositions
-
-- **Wireframe edits**: apply via `Edit` to the affected file. **Inline spot-check** the edited file against `reference/eval-rubric.md` heuristics — confirm no regression. Do NOT trigger another Phase 4 review-loop pass.
-- **Req-doc edits**: apply to the requirements doc directly. Propagates to `/spec` and to /msf if Phase 7 runs.
-- Log every applied change in `psych-findings.md` under "Applied changes" with: journey, screen, finding, fix, status.
-
-### 6h. Exit criteria
-
-- All bounce-risk and danger findings have explicit dispositions
-- `psych-findings.md` written and committed alongside the wireframes folder
-- User confirms ready to proceed to Phase 7
-
-**Hard caps:** max 5 journeys per session, max 12 findings surfaced via AskUserQuestion, max 1 application pass (no re-walking — defer follow-ups to next session).
-
----
-
-## Phase 7: MSF Analysis (inline /msf invocation)
-
-PSYCH (Phase 6) measures the running drive curve. MSF asks the persona-conditional question PSYCH can't: "for THIS persona in THIS scenario, where does motivation/friction/satisfaction land?" A PSYCH dip might be fatal for the new-user persona but irrelevant for the power-user persona — only MSF distinguishes those.
-
-### 7a. Tier gating
-
-- **Tier 1**: skip Phase 7 → jump to Phase 8.
-- **Tier 2**: optional. Gate via `AskUserQuestion`:
-  - **Question**: "Run MSF analysis now? It layers persona-conditional motivation/friction/satisfaction analysis on top of PSYCH and applies edits inline (with per-finding approval). Optional for Tier 2. Takes ~10 min."
-  - **Options**: **Run MSF now (Recommended for user-facing surface)** / **Skip — proceed to spec handoff**
-  - Platform fallback: state assumption "Skipping MSF for Tier 2 unless you ask for it" and proceed.
-- **Tier 3**: mandatory. Announce: "Tier 3 detected — MSF analysis is mandatory. Running /msf inline now."
-
-### 7b. Inline /msf invocation
-
-Invoke `/msf` as a sub-procedure rather than handing off. Skills stay independent at the SKILL level (`/msf` remains its own skill with its own command), but at runtime /wireframes delegates to /msf's procedure to avoid duplicating logic.
-
-**Steps:**
-
-1. **Announce the boundary**: "Entering /pmos-toolkit:msf for MSF analysis. Returning to /wireframes Phase 8 when /msf completes."
-2. **Read** `../msf/SKILL.md` (relative to the skills directory).
-3. **Construct arguments**:
-   - `<requirements-doc>`: the path resolved in /wireframes Phase 1
-   - `--wireframes {feature_folder}/wireframes`: the folder created in Phase 3
-   - `--skip-psych`: Phase 6 already produced `psych-findings.md`; /msf Pass B references it, doesn't re-score
-   - `--default-scope=both`: pre-recommends "update both req doc and wireframes" in /msf Phase 5 (user can still override)
-4. **Execute /msf's phases inline** with these arguments:
-   - /msf "Locate Requirements" → already resolved, pass through
-   - /msf "Locate Wireframes" → resolves the `--wireframes` folder, reads `.html` files and `psych-findings.md`
-   - /msf Phase 1 (Personas) → /msf's standard AskUserQuestion-driven persona alignment
-   - /msf Phase 2 (Journeys) → confirm journeys (likely the same set as /wireframes Phase 6, but /msf may add scenarios per persona)
-   - /msf Phase 3 (Analyze) → Pass A only (`--skip-psych` skips Pass B). Wireframes are first-class input — analysis cites specific screens / steps / elements.
-   - /msf Phase 4 (Prioritize) → Must / Should / Nice-to-have grouping with per-recommendation user approval
-   - /msf Phase 5 (Apply changes) → edits both req doc AND wireframes inline (user approves per recommendation; `--default-scope=both` is the default answer)
-   - /msf Phase 6 (Consistency Pass) → cross-check applied changes against revised requirements
-   - /msf "Save Analysis" → writes `docs/msf/YYYY-MM-DD-<feature>-msf-analysis.md` (canonical) AND `{feature_folder}/wireframes/msf-findings.md` (copy with header pointing to canonical)
-   - /msf Phase 7 (Capture Learnings) → /msf logs its own learnings; /wireframes Phase 10 logs its separately
-5. **Announce completion**: "Exited /pmos-toolkit:msf. Resuming /wireframes Phase 8 (Spec Handoff)."
-
-**Note:** /msf's edits to wireframes follow the same approval flow /msf uses standalone (its Phase 4 prioritization + Phase 5 scope check). /wireframes does NOT add a separate approval gate — that would double-prompt the user.
-
-### 7c. Post-/msf verification
-
-After /msf returns:
-
-1. **Spot-check edited wireframes** against `reference/eval-rubric.md` (same as Phase 6 post-edit check). Do NOT trigger Phase 4 review-loops.
-2. Confirm both artifacts exist:
-   - `docs/msf/YYYY-MM-DD-<feature>-msf-analysis.md`
-   - `{feature_folder}/wireframes/msf-findings.md` (copy)
-3. Confirm any wireframes /msf modified now reference the same `./wireframe.css` (they should — Edit doesn't touch the link).
-
-### 7d. Exit criteria
-
-- /msf completed all its phases (1–7)
-- All high-severity MSF findings have explicit dispositions (handled inside /msf)
-- Both `psych-findings.md` and `msf-findings.md` exist in the wireframes folder
-- Edited wireframes pass eval-rubric.md spot-check
-- User confirms ready for spec handoff
+**Post-delegation verification:**
+After /msf-wf returns:
+1. Spot-check any wireframes modified during /msf-wf's apply-edits phase against `reference/eval-rubric.md` — do NOT trigger another Phase 4 review-loop.
+2. Confirm `{feature_folder}/wireframes/msf-findings.md` exists.
 
 ---
 
@@ -627,8 +483,7 @@ Append a `## Wireframes` section to the requirements doc:
 Generated: {YYYY-MM-DD}
 Folder: `{relative_path_to_folder}`
 Index: `{relative_path}/index.html`
-PSYCH walkthrough: `{relative_path}/psych-findings.md` (if Phase 6 ran)
-MSF analysis: `{relative_path}/msf-findings.md` (if Phase 7 ran; canonical at `docs/msf/...md`)
+MSF + PSYCH: `{relative_path}/msf-findings.md` (if Phase 6 ran)
 
 | # | Component | Devices | States | File |
 |---|-----------|---------|--------|------|
@@ -644,7 +499,7 @@ git add docs/msf/*-msf-analysis.md 2>/dev/null || true
 git commit -m "docs: add wireframes for <feature>"
 ```
 
-Tell the user: "Wireframes are ready. Open `{served_url_or_file_path}` to review. When you're satisfied, run `/pmos-toolkit:spec` — it will pick up the wireframes, PSYCH findings, and (if it ran) MSF findings from the requirements doc automatically."
+Tell the user: "Wireframes are ready. Open `{served_url_or_file_path}` to review. When you're satisfied, run `/pmos-toolkit:spec` — it will pick up the wireframes and (if Phase 6 ran) the MSF + PSYCH findings from the requirements doc automatically."
 
 ---
 
@@ -675,7 +530,7 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 
 ## Phase 10: Capture Learnings
 
-**This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Reflect on whether this session surfaced anything worth capturing — surprising behaviors, repeated corrections, non-obvious decisions (e.g., a heuristic that fired repeatedly, a Tailwind pattern that broke on iOS Safari, a device the user always wants but never declares upfront, a PSYCH driver pattern that recurred across journeys, an MSF persona-conditional finding that PSYCH alone missed). Proposing zero learnings is a valid outcome for a smooth session; the gate is that the reflection happens, not that an entry is written.
+**This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Reflect on whether this session surfaced anything worth capturing — surprising behaviors, repeated corrections, non-obvious decisions (e.g., a heuristic that fired repeatedly, a Tailwind pattern that broke on iOS Safari, a device the user always wants but never declares upfront). Proposing zero learnings is a valid outcome for a smooth session; the gate is that the reflection happens, not that an entry is written.
 
 ---
 
@@ -691,12 +546,8 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT skip `index.html` even for a single-component feature — it documents the artifact set
 - Do NOT generate wireframes for non-user-facing features (cron jobs, internal APIs) — recommend skipping the skill
 - Do NOT commit half-finished wireframes — finish all phases before the git commit in Phase 8
-- Do NOT run PSYCH (Phase 6) on more than 5 journeys in one session — past 5, output gets shallow and reviewer fatigue sets in
-- Do NOT run PSYCH per-wireframe (it's flow-level; per-wireframe is what Phase 4 does)
-- Do NOT trigger a second Phase 4 review-loop pass to verify PSYCH or MSF edits — just spot-check the edits against `eval-rubric.md` inline
-- Do NOT skip Phase 6 on Tier 2 or Tier 3 — PSYCH is mandatory for both (Tier 1 only is exempt)
-- Do NOT skip Phase 7 on Tier 3 — MSF is mandatory; Tier 2 is gated, Tier 1 is exempt
-- Do NOT pad PSYCH scores by inventing positive elements to balance negatives — score only what's notable, leave the column empty if the screen is genuinely neutral
+- Do NOT skip Phase 6 on Tier 2 or Tier 3 — Phase 6 (delegated to /msf-wf) is mandatory for both (Tier 1 only is exempt)
+- Do NOT auto-continue to Phase 8 if /msf-wf returned non-zero in Phase 6 — surface the error and let the user re-run /msf-wf manually
 - Do NOT enumerate identical elements separately (5 nav links each at -1) — collapse to one row ("Nav links (5), -5 total")
 - Do NOT default the entry-context to High (60) or Low (25) silently — Medium (40) is the unbiased default unless the req doc declares otherwise
 - Do NOT add a separate /wireframes approval gate around /msf's edits in Phase 7 — /msf already has its own per-recommendation approval flow (its Phase 4 + Phase 5); double-prompting confuses the user
@@ -704,7 +555,7 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT blend tokens from multiple host frontends in Phase 2.5 — pick one (user-selected) so wireframes have a coherent visual language
 - Do NOT use screenshots as the sole journey source — they augment the requirements doc, they don't replace it; trigger /requirements first if no req doc exists
 - Do NOT redesign IA away from an anchored screenshot without explicit user direction — generators may improve states, a11y, and copy, but moving primary actions or restructuring sections needs the user to ask for it
-- Do NOT silently downgrade rigor at any phase — the Rigor & Corner-Cut Protocol mandates announcement-with-rationale before choosing a lighter option (skipping subagents, fewer review loops, smaller PSYCH walkthrough). Silent downgrades compound across phases and erode user trust in the artifact
+- Do NOT silently downgrade rigor at any phase — the Rigor & Corner-Cut Protocol mandates announcement-with-rationale before choosing a lighter option (skipping subagents, fewer review loops). Silent downgrades compound across phases and erode user trust in the artifact
 - Do NOT skip Phase 2.5 (Resolve DESIGN.md) — even if you "know" the tokens. DESIGN.md is the durable artifact other tools (Stitch, Cursor, /verify) consume; not having it is technical debt. Cost is ~1 minute when the file exists; ~5 minutes on first creation
 - Do NOT write brand colors, typography, or component patterns into the workstream — those live in DESIGN.md / COMPONENTS.md. The workstream stores only the four navigation fields (`target_app`, `design_md_path`, `components_md_path`, `last_extraction_sha`)
 - Do NOT bypass COMPONENTS.md by inventing button/input/card/modal variants — Phase 3 generators must prefer existing variants and flag novel ones explicitly in the file footer

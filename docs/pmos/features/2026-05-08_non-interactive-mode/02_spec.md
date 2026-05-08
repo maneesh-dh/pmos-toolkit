@@ -11,7 +11,7 @@
 
 Every pmos-toolkit skill pauses at multiple `AskUserQuestion` checkpoints during a run — ~188 across 23 skills. Users running skills unattended (CI, pipelines, parent-skill orchestration, repeat tasks) cannot do so today, and the platform-adaptation fallback that handles non-Claude environments silently assumes defaults with no audit trail. A cross-cutting `--non-interactive` flag must let skills make best-guess decisions when confidence is high, defer everything else to a structured Open Questions block, and never silently auto-apply destructive operations.
 
-**Primary success metric:** at least 22 of 23 skills run end-to-end with zero `AskUserQuestion` calls firing under `--non-interactive`, with every deferred decision surfaced in a machine-parseable `## Open Questions (Non-Interactive Run)` block. The 23rd skill (`/msf-req`) explicitly refuses the flag with a documented design reason.
+**Primary success metric:** every one of the 23 skills either runs end-to-end with zero `AskUserQuestion` calls firing under `--non-interactive` and surfaces deferred decisions in a machine-parseable `## Open Questions (Non-Interactive Run)` block, OR explicitly refuses the flag via the documented refusal marker (FR-07). At least one skill (`/msf-req`, by current design) is expected to refuse; others may refuse if their authors document a structural reason.
 
 ---
 
@@ -19,7 +19,7 @@ Every pmos-toolkit skill pauses at multiple `AskUserQuestion` checkpoints during
 
 | # | Goal | Success Metric |
 |---|---|---|
-| G1 | Cross-skill flag coverage | 22/23 supported skills emit zero `AskUserQuestion` events under `--non-interactive`; `/msf-req` refuses with documented reason. Verified by per-skill bats integration test (FR-02). |
+| G1 | Cross-skill flag coverage | 23/23 skills are either declared "supported" (zero `AskUserQuestion` events under `--non-interactive`) or "refused" (refusal marker per FR-07 + exit 64). Zero "silently partial" skills. Verified by per-skill bats integration test (FR-02) for supported skills + audit-script exemption check for refused skills. |
 | G2 | Deferred decisions are auditable | Every artifact produced under `--non-interactive` contains a `## Open Questions (Non-Interactive Run)` block whose entry count equals frontmatter `**Open Questions:** N`. Verified by FR-03. |
 | G3 | Destructive ops never silent | Zero data-loss incidents in 30 days post-launch; every destructive checkpoint has a `<!-- defer-only: destructive -->` adjacent tag. Verified by FR-04 + audit script. |
 | G4 | Mode resolution is deterministic | Resolver returns correct `(mode, source)` for all 9 precedence/conflict cases (FR-01). |
@@ -524,7 +524,7 @@ The "frontend" here is the markdown artifact a user reads. Component hierarchy b
 Each fenced YAML block:
 
 ```yaml
-id: OQ(-<child-skill>)?-NNN   # required; pattern `OQ-NNN` for own, `OQ-<skill>-NNN` for merged-from-child. Monotonic within run; NOT stable across re-runs (FR-03.6).
+id: OQ-001                    # required. Pattern: `OQ-NNN` for own entries, `OQ-<child-skill>-NNN` for entries merged from a dispatched child (e.g. `OQ-verify-001`). Monotonic within run; NOT stable across re-runs (FR-03.6).
 severity: Blocker | Should-fix | Auto
 prompt: "<verbatim question or its first 200 chars if longer>"
 context_anchor: "#<heading-slug>"   # markdown heading anchor where the prompt fired; PRIMARY tracking key for re-run stability
@@ -755,3 +755,4 @@ Single revert of the feature branch's merge commit reverts all 23 skills + new s
 | Loop | Findings | Changes Made |
 |------|----------|-------------|
 | 1 | F1 OQ id stability across re-runs unspecified; F2 subagent id format inconsistent between §7.6 and §11.2; F3 "5-line adjacency window" arbitrary and not justified; **F4 [Blocker] no FR for multi-artifact skills** (e.g. /wireframes); F5 settings.yaml malformed-entirely behavior unspecified; F6 D11 abort criteria for big-bang absent; F7 source_line consistency between runtime and audit; F8 env-var non-goal not in §3; F9 OQ count semantics ambiguous on `[Auto]` inclusion. | F1 → FR-03.6 ids regenerate per run; track by prompt+anchor. F2 → FR-06.2 + §11.2 schema updated to `OQ(-<child>)?-NNN` pattern. F3 → FR-02.5 strict adjacency (literal previous non-empty line) + FR-02.6 shared awk extractor mandate. **F4 → FR-03.5 multi-artifact aggregator at `_open_questions.md`; primary artifact carries frontmatter pointing at it.** F5 → FR-01.5 refuse-and-exit-64 on malformed settings.yaml. F6 → §15.2.1 abort criteria added. F7 → FR-02.6 + §11.2 schema clarifies extractor and tracking key. F8 → §3 env-var non-goal added. F9 → FR-03.4 + D9 referenced; N counts deferred only; OQ block heading shows "N deferred, M auto-picked". |
+| 2 (polish) | N1 G1 phrased "22/23" inconsistent with "every skill either supports or refuses" framing; N2 §1 hardcoded /msf-req as THE refuser; N3 §11.2 schema id field used regex syntax as the example value (confusing). | N1 → G1 reworded to "23/23 either supported or refused". N2 → §1 reframed: at least one skill expected to refuse, others may. N3 → schema example uses concrete `OQ-001` as value, with the regex pattern in the inline comment. |

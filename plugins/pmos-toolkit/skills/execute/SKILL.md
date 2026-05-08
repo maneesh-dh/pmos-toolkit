@@ -2,7 +2,7 @@
 name: execute
 description: Execute an implementation plan end-to-end — task-by-task TDD implementation with deploy verification, frontend testing, and manual spot checks. Supports git worktree isolation. Use when the user says "implement the plan", "start building", "execute this", "code this up", or has a plan doc ready for implementation.
 user-invocable: true
-argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>] [--resume | --restart | --from T<N>] [--non-interactive | --interactive]"
+argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>] [--resume | --restart | --from T<N>] [--no-halt] [--non-interactive | --interactive]"
 ---
 
 # Plan Executor
@@ -297,7 +297,20 @@ Skip this phase entirely if the plan has no `## Phase N` headings (flat plan). O
 4. **If verify failed:** do NOT compact, do NOT continue. Escalate to the user with the failure summary. The phase-N.md log is left with `verify_status: failed` so the next session's resolver can pick up at the failed task.
 5. **If verify passed:** emit the `HALT_FOR_COMPACT` message ("Phase N verified green. Run `/compact` to clear context, then re-invoke `/execute --resume` to continue with phase N+1.") and end the /execute turn. The resolver in the next session sees the sealed phase log and picks up at the next phase's first task.
 
-This is a hard-stop on green by design (spec O1 default). The user can re-invoke immediately if they want to skip the compact.
+   **Halt suppression — opt-out semantics.** Skip the HALT message AND continue directly into Phase N+1's first task when EITHER of the following is true:
+
+   - `--no-halt` was passed at this /execute invocation (per-invocation; does NOT persist across runs).
+   - The session-sticky `continue_through_phases` flag was set earlier in this conversation. The flag is set when the user emits an unambiguous continuation directive — recognized forms (case-insensitive, imperative context):
+     - The literal escape token `[continue_through_phases]` anywhere in a user message.
+     - Plain-language patterns: "continue without compacting", "no halts", "skip compacts", "skip the compact", "don't halt at phase boundaries".
+
+     The flag is per-session (it resets when the conversation ends; it is NOT persisted to settings or session-state files). When the directive's interpretation is ambiguous (descriptive prose vs. imperative directive), the executing agent confirms via a single `AskUserQuestion` before flipping the flag rather than silently assuming.
+
+   When halt is suppressed, log a one-line summary instead: `Phase N verified green; --no-halt set (or session-sticky continuation directive honored), continuing to Phase N+1.`
+
+   **Failure escalation is unaffected by either opt-out.** If verify fails, escalate per step 4 regardless of `--no-halt` or the session flag — neither suppresses the failure path.
+
+This is a hard-stop on green by default (spec O1 default). The opt-outs above let the user trade context-cache freshness for end-to-end throughput when they explicitly choose to.
 
 ### Verify-Fix Loop (per task)
 

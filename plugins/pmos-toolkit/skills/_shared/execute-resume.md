@@ -171,6 +171,35 @@ Recommended resume point: T4 (re-validate, then continue).
 
 Fill `Phase` column with `P<N>` when the task belongs to a plan phase, or `—` for flat plans. Fill `Notes` with a brief human-readable explanation whenever the state is not `done`, `done-sealed`, or `not-started`.
 
+### In-flight task body tail
+
+When the report contains at least one task classified as `in-flight` or `in-flight-with-commits`, append a "Last 5 lines from in-flight task body" section beneath the table, with one sub-block per in-flight task in T# order.
+
+**Example rendering:**
+
+```markdown
+**Last 5 lines from T17 in-flight body:**
+
+- Wrote failing test for FR-22 (test_orders.py::test_partial_refund)
+- Confirmed test fails with current orders.py implementation
+- Reading checkout flow to find the right injection point
+- About to wire fixtures via tests/fixtures/orders.json
+- DEVIATION: plan assumes orders.fee_cents; actual model has fee_amount (decimal)
+```
+
+**Tail extraction protocol:**
+
+1. Read `task-NN.md` for the in-flight task.
+2. Locate the second `---` line (the YAML frontmatter terminator); the body is everything after it.
+3. Strip leading and trailing blank lines from the body.
+4. Take the **last 5 non-blank lines** (in original order). If fewer than 5 non-blank lines exist, render whatever exists.
+5. Render as a markdown bullet list (one bullet per source line) under a `**Last 5 lines from T<N> in-flight body:**` sub-heading.
+6. **If the body has zero non-blank lines after frontmatter:** render the sub-heading and a single bullet `- (no body content recorded)`. Do not omit the sub-heading when the task is in-flight — its absence is itself a signal worth surfacing.
+
+**Omit the entire tail section** (sub-heading + bullets) when no task in the report is `in-flight` or `in-flight-with-commits` (clean fresh-start, all-done resume, or only `not-started` / `done` / `done-sealed` / `done-but-drifted` states present).
+
+The tail is a literal trace, not a summary — a `DEVIATION:` line in the last 5 may be stale if its resolution appeared earlier in the body. The resuming agent reads the full body when deciding how to proceed; the tail is a prompt, not a substitute.
+
 ### AskUserQuestion option list
 
 After rendering the table, issue a single `AskUserQuestion` with these options (adapt T# to the actual `resume_task_index`):

@@ -493,9 +493,7 @@ MSF + PSYCH: `{relative_path}/msf-findings.md` (if Phase 6 ran)
 Commit:
 
 ```bash
-git add {feature_folder}/wireframes/ {requirements_doc_path}
-# If Phase 7 ran, also stage the canonical /msf doc:
-git add docs/msf/*-msf-analysis.md 2>/dev/null || true
+git add {feature_folder}/wireframes/ {feature_folder}/msf-findings.md {requirements_doc_path}
 git commit -m "docs: add wireframes for <feature>"
 ```
 
@@ -549,9 +547,7 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT skip Phase 6 on Tier 2 or Tier 3 — Phase 6 (delegated to /msf-wf) is mandatory for both (Tier 1 only is exempt)
 - Do NOT auto-continue to Phase 8 if /msf-wf returned non-zero in Phase 6 — surface the error and let the user re-run /msf-wf manually
 - Do NOT enumerate identical elements separately (5 nav links each at -1) — collapse to one row ("Nav links (5), -5 total")
-- Do NOT default the entry-context to High (60) or Low (25) silently — Medium (40) is the unbiased default unless the req doc declares otherwise
-- Do NOT add a separate /wireframes approval gate around /msf's edits in Phase 7 — /msf already has its own per-recommendation approval flow (its Phase 4 + Phase 5); double-prompting confuses the user
-- Do NOT auto-invoke /msf in Phase 7 without announcing the boundary — print "Entering /msf" and "Exiting /msf" so the user can follow the flow
+- Do NOT default the entry-context to High (60) or Low (25) silently — Medium (40) is the unbiased default unless the req doc declares otherwise (this default lives in /msf-wf; if you find yourself overriding it from /wireframes, surface it as user-visible)
 - Do NOT blend tokens from multiple host frontends in Phase 2.5 — pick one (user-selected) so wireframes have a coherent visual language
 - Do NOT use screenshots as the sole journey source — they augment the requirements doc, they don't replace it; trigger /requirements first if no req doc exists
 - Do NOT redesign IA away from an anchored screenshot without explicit user direction — generators may improve states, a11y, and copy, but moving primary actions or restructuring sections needs the user to ask for it

@@ -57,15 +57,33 @@ Use workstream context (loaded by step 3 below) to inform task design — tech s
 6. Read `~/.pmos/learnings.md` if present; note entries under `## /<this-skill-name>` and factor them into approach (skill body wins on conflict; surface conflicts to user before applying).
 <!-- pipeline-setup-block:end -->
 
+### Phase 0 — additional /plan steps (after the canonical block above)
+
+7. **Acquire `.plan.lock`** (FR-66). Write `{feature_folder}/.plan.lock` with `pid + ISO timestamp + skill_version`. If the file already exists, refuse with a platform-aware error sourced via `_shared/platform-strings.md` citing the existing pid (e.g., `[/plan] Another plan run is in progress (pid=<n>, started <time>). Re-run with --force-lock if you are sure no other plan run is active.`). Release the lock on completion or on any fatal error. The `--force-lock` flag clears a stale lock without prompting.
+
+8. **Back up existing plan** (FR-67). If `{feature_folder}/03_plan.md` exists, copy it to `{feature_folder}/03_plan_pre-cap-abandon_<ISO>.md`. The backup is removed on successful exit; restored to `03_plan.md` on the Cap-Hit Abandon disposition (FR-40).
+
+9. **Validate spec frontmatter** (FR-50, FR-50a, E1):
+   - **Spec missing** (FR-50) → refuse with platform-aware error: `No spec found at {feature_folder}/02_spec.md. Run /spec first.`
+   - **Frontmatter parse** (FR-50a, *deviation per Decision Log P9*): parse via regex — extract YAML between leading `---` markers, line-by-line `^([a-z_]+):\s*(.*)$`. On a malformed line refuse with: `Spec frontmatter parse error at line N: <observed-token>. Fix YAML syntax and re-run.` (Wording differs from spec FR-50a's `<yaml-lib message>` because skills have no YAML library; refuse-on-malformed behavior is preserved.)
+   - **Missing `tier`** (E1) → refuse with: `Spec at {feature_folder}/02_spec.md missing required tier: frontmatter — re-run /spec to add it.`
+
 ---
 
 ## Phase 1: Intake
 
 1. **Locate the spec.** Follow `../.shared/resolve-input.md` with `phase=spec`, `label="spec"`.
 2. **Read the spec end-to-end.** Summarize it back in 3-5 bullets and confirm understanding with the user via AskUserQuestion.
-3. **Check for an existing plan.** Look for `{feature_folder}/03_plan.md`.
+3. **Read tier and type from spec frontmatter** (FR-01). Re-use the parse from Phase 0 step 9; set `{tier}` and `{type}` for downstream phases. Tier-N gating in Phase 3 / Phase 4 keys off `{tier}`; per-task TDD precedence (FR-104a) keys off `{type}`.
+4. **Surface simulate-spec findings** (FR-51). Glob `{feature_folder}/02_simulate-spec_*.md`. If a file exists with unresolved findings, run a §8.6 batched `AskUserQuestion` per finding before proceeding — options: **Update spec to address before planning** / **Treat as Open Question in plan** / **Accept as risk** / **Skip — already resolved upstream**.
+5. **Check for an existing plan.** Look for `{feature_folder}/03_plan.md`.
    - If found: read it, ask if this is an update or fresh start.
    - If not found: proceed.
+6. **`--fix-from <task-id>` branch** (FR-56, FR-67a, FR-67b, E10). When `--fix-from <task-id>` is passed:
+   - Read `{feature_folder}/03_plan_defect_<task-id>.md` per spec §7.5. If the defect file does not exist, refuse with platform-aware error: `No defect file found at {path}. /execute writes this file on planning defect; nothing to fix from.`
+   - `--widen-to <upstream-task-id>` (FR-67a) widens the rewrite scope to start at the upstream task.
+   - `--cross-phase-downstream` (FR-67b) extends the rewrite into downstream phases when the defect changes a contract that downstream tasks depend on.
+   - Enter Edit mode (FR-60) scoped per the flags; do not regenerate untouched tasks.
 
 **Scope check:** If the spec covers multiple independent subsystems, suggest breaking this into separate plans — one per subsystem. Each plan should produce working, testable software on its own.
 
@@ -92,7 +110,23 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
    - **NOT authoritative for:** visual style, color, typography, spacing, iconography, component library. Tasks should adapt the wireframe to the host app's existing design system and conventions — never copy visual treatment verbatim when it conflicts with the host app.
 
    Every UI task in Phase 3 must cite the wireframe(s) it implements via a `**Wireframe refs:**` field — same discipline as `**Spec refs:**`. This preserves the wireframe→implementation→verification chain for /verify Phase 4 sub-step 3f. If the host app has established patterns (Tailwind tokens, component library, layout conventions) that differ from the wireframe's visual treatment, the task should explicitly say "follow host-app convention X" rather than "match wireframe."
-7. **Summarize findings** in a "Code Study Notes" section for the plan.
+7. **Detect stack signals** (FR-10). Glob host-repo root for manifest files: `package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`. Compute file-count weight per stack. Log signals to a "Stack signals" subsection of Code Study Notes (FR-100).
+
+   **JS-stack lockfile disambiguation** (FR-10a): map lockfile presence → stack: `package-lock.json` → npm; `pnpm-lock.yaml` → pnpm; `yarn.lock` + no `.yarnrc.yml` → yarn-classic; `yarn.lock` + `.yarnrc.yml` → yarn-berry; `bun.lockb` → bun. When `package.json` is present with no lockfile, default to npm and surface as a low-risk Phase 4 finding.
+
+   **Tiebreak** (FR-14a): equal weights → alphabetical. In `--non-interactive` mode the tiebreak is logged to `03_plan_auto.md`.
+
+   **Stack-ambiguity prompt** (§8.4) — interactive mode only: if signals are mixed (e.g., monorepo with both npm and python), surface via `AskUserQuestion`: `Detected mixed stack signals. Pick the primary for plan generation:` with options `<stack-1>` / `<stack-2>` / `Mono-repo: pick all` / `Other` (FR-14).
+
+   **Greenfield substitute** (FR-91, E2). When no signals are observed, do NOT skip the gate — choose a reference system (the closest existing system the planner can cite) and record the choice in Code Study Notes. **Phase 2 gate:** structural choices must be justified against ≥1 reference system; absence of stack signals is not a license to invent.
+
+8. **Peer-plan conflict scan** (FR-54, FR-54a). Glob `{docs_path}/features/*/03_plan.md` (excluding the current feature folder). Filter by frontmatter `status` ∈ {`Draft`, `Planned`, `Executing`}. Grep each peer plan for impacted file paths from step 1. On match, add a Risks-table row + an Open Question.
+
+9. **Wireframe coverage** (FR-16, FR-16a). If `{feature_folder}/wireframes/` exists, every `*.html` file under it must be referenced by ≥1 task's `**Wireframe refs:**` field OR listed in a `## Wireframes Out of Scope` subsection of the plan. **Vestigial wireframes** (FR-16a): when no UI signal is detected (no UI tasks in the spec) but the wireframes folder exists, auto-emit `## Wireframes Out of Scope` with all wireframes listed.
+
+10. **Spec re-open during planning** (§8.7, E13). When Phase 2 code study contradicts a spec decision (e.g., spec says "use Postgres" but `docker-compose.yml` shows MySQL), halt via `AskUserQuestion`: `Spec decision conflicts with repo standard. {Spec text} vs {observed standard}. How to resolve?` Options: **Halt /plan and update spec** (terminates this run; user re-runs /spec then /plan) / **Document override in spec via Decision Log entry** (open spec, add Decision Log entry citing the divergence with rationale, save, continue planning) / **Accept spec as-is despite divergence** (record decision in plan's Decision Log; proceed with spec's choice) / **Skip — not actually a conflict** (spec was correct; observation was misread). In `--non-interactive` mode this is a high-risk decision with no Recommended option → trigger FR-61a halt protocol (exit code 2 + write `03_plan_blocked.md`).
+
+11. **Summarize findings** in a "Code Study Notes" section for the plan.
 
 **Gate:** You must have read every impacted file before writing a single line of the plan.
 

@@ -2,7 +2,7 @@
 name: artifact
 description: Generate, refine, and update structured PM/eng artifacts (PRD, Experiment Design Doc, Engineering Design Doc, Discovery Doc) from existing context plus targeted gap-filling questions. Each artifact passes through a reviewer-subagent + auto-apply loop (max 2 iters) governed by per-section eval criteria. Ships with 4 built-in templates and 4 writing-style presets (Concise, Tabular, Narrative, Executive); users can author their own at ~/.pmos/artifacts/. Use when the user says "draft a PRD", "create an experiment design", "write a design doc", "generate a discovery doc", "/artifact", or names an artifact type to produce.
 user-invocable: true
-argument-hint: "[ | <type> [--tier lite|full] [--preset <slug>] | create <type> [...] | refine <path> | update <path> | template add|list|remove [<slug>] | preset add|list|remove [<slug>]]"
+argument-hint: "[ | <type> [--tier lite|full] [--preset <slug>] | create <type> [...] | refine <path> | update <path> | template add|list|remove [<slug>] | preset add|list|remove [<slug>]] [--non-interactive | --interactive]"
 ---
 
 # /artifact
@@ -14,7 +14,7 @@ Generate, refine, and update structured PM/eng artifacts (PRD, Experiment Design
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** State your assumption inline, document it in the artifact's frontmatter as `assumed: <field>`, proceed. User reviews after.
+- **No interactive prompt tool:** State your assumption inline, document it in the artifact's frontmatter as `assumed: <field>`, proceed. User reviews after.
 - **No subagents:** Run the refinement reviewer inline as the same agent. Same eval.md; same output format.
 - **Task tracking:** Use whatever task tool exists (TaskCreate / update_plan / verbal phase announcements).
 
@@ -29,6 +29,91 @@ These instructions use Claude Code tool names. In other environments:
      presets/
    ```
 4. Determine the subcommand and route to the appropriate phase. Default subcommand is `create`.
+
+<!-- non-interactive-block:start -->
+1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
+   - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).
+   - `parent_marker` is set if the original prompt's first line matches `^\[mode: (interactive|non-interactive)\]$` (FR-06.1).
+   - `settings.default_mode` is `.pmos/settings.yaml :: default_mode` if present and one of `interactive`/`non-interactive`. Unknown values → warn on stderr `settings: invalid default_mode value '<v>'; ignoring` and fall through (FR-01.3).
+   - If `.pmos/settings.yaml` is malformed (not parseable as YAML, or missing `version`): print to stderr `settings.yaml malformed; fix and re-run` and exit 64 (FR-01.5).
+   - On Phase 0 entry, always print to stderr exactly: `mode: <mode> (source: <source>)` (FR-01.2).
+
+2. **Per-checkpoint classifier.** Before issuing any `AskUserQuestion` call, classify it (FR-02):
+   - Use the awk extractor below to find the line of this call's `question:` key in the live SKILL.md (FR-02.6).
+   - The defer-only tag, if present, is the literal previous non-empty line: `<!-- defer-only: <reason> -->` where `<reason>` ∈ {`destructive`, `free-form`, `ambiguous`} (FR-02.5).
+   - Decision (in order): tag adjacent → DEFER; multiSelect with 0 Recommended → DEFER; 0 options OR no option label ends in `(Recommended)` → DEFER; else AUTO-PICK the (Recommended) option (FR-02.2).
+
+3. **Buffer + flush.** Maintain an append-only OQ buffer in conversation memory. On each AUTO-PICK or DEFER classification, append one entry per the schema in spec §11.2. At end-of-skill (or in a caught error before exit), flush (FR-03):
+   - Primary artifact is single Markdown → append `## Open Questions (Non-Interactive Run)` section with one fenced YAML block per entry; update prose frontmatter (`**Mode:**`, `**Run Outcome:**`, `**Open Questions:** N` where N counts deferred only — see FR-03.4) (FR-03.1).
+   - Skill produces multiple artifacts → write a single `_open_questions.md` aggregator at the artifact directory root; primary artifact's frontmatter `**Open Questions:** N — see _open_questions.md` (FR-03.5).
+   - Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md` (FR-03.2).
+   - No persistent artifact (chat-only) → emit buffer to stderr at end-of-run as a single block prefixed `--- OPEN QUESTIONS ---` (FR-03.3).
+   - Mid-skill error → flush partial buffer under heading `## Open Questions (Non-Interactive Run — partial; skill errored)`; set `**Run Outcome:** error`; exit 1 (E13).
+
+4. **Subagent dispatch.** When dispatching a child skill via Task tool or inline invocation, prepend the literal first line: `[mode: <current-mode>]\n` to the child's prompt (FR-06).
+
+5. **Awk extractor.** The classifier and `tools/audit-recommended.sh` MUST both use the function below. Loaded at script init time; sourcing differs per consumer.
+
+<!-- awk-extractor:start -->
+```awk
+# Find AskUserQuestion call sites and their adjacent defer-only tags.
+# Input: a SKILL.md file (stdin or argv).
+# Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
+in_inlined { next }
+/^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
+  match($0, /defer-only:[[:space:]]*[a-z-]+/);
+  pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
+  sub(/^[[:space:]]+/, "", pending_tag);
+  pending_line = NR;
+  next;
+}
+/^[[:space:]]*$/ {
+  emit_pending();
+  pending_tag = "";
+  next;
+}
+/AskUserQuestion/ {
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
+  pending_tag = "";
+  next;
+}
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
+```
+<!-- awk-extractor:end -->
+
+6. **Refusal check.** If this SKILL.md contains a `<!-- non-interactive: refused; ... -->` marker (regex: `<!--[[:space:]]*non-interactive:[[:space:]]*refused`), and `mode` resolved to `non-interactive`: emit refusal per Section A and exit 64 (FR-07).
+
+7. **Pre-rollout BC.** If the `--non-interactive` argument is present BUT this SKILL.md does NOT contain the `<!-- non-interactive-block:start -->` marker (i.e., this skill hasn't been rolled out yet): emit `WARNING: --non-interactive not yet supported by /<skill>; falling back to interactive.` to stderr; continue in interactive mode (FR-08).
+
+8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
+<!-- non-interactive-block:end -->
 
 ## Phase 1 — Subcommand Routing
 
@@ -58,6 +143,7 @@ The same 7-step flow applies to every artifact type — built-in or user-defined
 
 ### 2.0 — Type picker (only when invoked with no `<type>` argument)
 
+<!-- defer-only: free-form -->
 Use `AskUserQuestion` to ask which type to create. Build options dynamically by listing all templates from:
 - `templates/` in this skill dir (built-in)
 - `~/.pmos/artifacts/templates/` (user)
@@ -82,6 +168,7 @@ If `template.md` frontmatter `tiers: [lite, full]`:
    - Requirements doc richness: word count of `01_requirements*.md` if present (>1500 → suggest Full; <500 → suggest Lite).
    - User input length and tone (>200 chars with strategic terms like "OKR", "rollout", "stakeholders" → Full).
    - Default to Full when ambiguous.
+<!-- defer-only: ambiguous -->
 3. Confirm with user via `AskUserQuestion` (preview shows the section list per tier).
 
 If `tiers: [single]`, skip this step.
@@ -110,6 +197,7 @@ Concatenate all read content into a `gathered_context` block, tagged by source l
 2. For each precondition item, do a semantic check: does anything in `gathered_context` satisfy the item's `check`?
    - Use LLM judgment, not regex. Be generous — if the evidence is plausibly present, mark it satisfied.
 3. For UNSATISFIED items only, queue the item's `gap_question`.
+<!-- defer-only: free-form -->
 4. Batch queued questions ≤4 per `AskUserQuestion` call. Use multiple sequential calls if >4.
 5. Append answers to `gathered_context` tagged `gap_answer:<criterion_id>`.
 
@@ -117,6 +205,7 @@ Concatenate all read content into a `gathered_context` block, tagged by source l
 
 1. If `--preset <slug>` flag, use it.
 2. Otherwise read `template.md` frontmatter `default_preset`.
+<!-- defer-only: ambiguous -->
 3. Confirm with the user via `AskUserQuestion` showing the 4 built-in presets + any user presets, with `default_preset` marked `(default)`.
 
 Load the chosen preset's rendering rules and voice notes for use in 2.7.
@@ -172,6 +261,7 @@ Mirrors `/wireframes` Phase 4 pattern.
 After loop 2 (or loop 1 if no high remain):
 
 - Surface any `high` still remaining + all `medium` from loop 2 + any `low` deemed worth raising via the **Findings Presentation Protocol**:
+  <!-- defer-only: ambiguous -->
   - Batch ≤4 findings per `AskUserQuestion` call.
   - Per finding, options: **Apply as proposed** / **Modify** / **Skip** / **Defer**.
   - Apply user-confirmed fixes via `Edit`. "Defer" appends the finding to a `## Deferred Improvements` section at the end of the artifact.
@@ -205,6 +295,7 @@ If a workstream was loaded in Phase 0:
    - Metrics with baselines / targets
    - Strategic decisions / OKR links
    - Stakeholders / teams not previously listed
+<!-- defer-only: ambiguous -->
 2. Surface each candidate addition via `AskUserQuestion` (Apply / Modify / Skip), batched ≤4 per call.
 3. Apply approved additions to `~/.pmos/workstreams/{workstream}.md`.
 
@@ -218,8 +309,10 @@ Read `../learnings/learnings-capture.md` (relative to this skill dir) and follow
 
 Re-run the eval-loop judge on an existing artifact. **Internal QA only — does NOT accept new external feedback.**
 
+<!-- defer-only: ambiguous -->
 1. Read the artifact at `<path>`. Parse its frontmatter to determine `type`. If frontmatter is missing or `type` cannot be inferred, ask the user via `AskUserQuestion`.
 2. Resolve the template (same 2.1 logic) and load `eval.md`.
+<!-- defer-only: destructive -->
 3. Ask the user: "Overwrite `<path>` or write to `<path>.refined.md`?" via `AskUserQuestion`. Default = `.refined.md` (safer).
 4. Run Phase 3 refinement loop against the artifact (or its `.refined.md` copy).
 5. Run Phase 4 save & confirm — point at the chosen output path.
@@ -232,6 +325,7 @@ Apply stakeholder feedback to an existing artifact. **Distinct from refine — t
 
 ### Phase U.1 — Accept feedback input
 
+<!-- defer-only: free-form -->
 Ask the user via `AskUserQuestion`:
 - **Paste comments** — user pastes block of feedback inline.
 - **File path** — user provides path to a feedback file (Notion export, email dump, .md notes).
@@ -249,12 +343,14 @@ Extract each feedback item into the shape:
 }
 ```
 
+<!-- defer-only: free-form -->
 For ambiguous items (no clear section, or unclear intent), batch clarifying questions via `AskUserQuestion` (≤4 per call).
 
 For un-mappable items (don't fit any section), append them to a `## General Feedback` section in the artifact and continue.
 
 ### Phase U.3 — Apply via Findings Presentation Protocol
 
+<!-- defer-only: ambiguous -->
 Per parsed item, batch ≤4 per `AskUserQuestion`. Options: **Apply as proposed** / **Modify** / **Skip** / **Defer**. Apply approvals via `Edit`. "Defer" appends to `## Deferred Improvements`.
 
 ### Phase U.4 — Append Comment Resolution Log
@@ -270,6 +366,7 @@ At the bottom of the artifact, append (or extend) a `## Comment Resolution Log` 
 
 ### Phase U.5 — Optional re-run of refinement loop
 
+<!-- defer-only: ambiguous -->
 Ask: "Run the eval loop on the updated artifact?" via `AskUserQuestion`. If yes, run Phase 3.
 
 ### Phase U.6 — Save, then Phase 6 learnings capture (terminal gate)
@@ -284,6 +381,7 @@ Same as Phase 4 + Phase 6 from the create flow.
 
 #### T.1 — Intake
 
+<!-- defer-only: free-form -->
 Ask via `AskUserQuestion` (one batch ≤4):
 - Template **name** + **slug** (slug must not collide with built-in templates: `prd`, `experiment-design`, `eng-design`, `discovery`. Validate at capture time and reject collisions before continuing.)
 - **Purpose / when used** (1-2 sentences)
@@ -291,7 +389,7 @@ Ask via `AskUserQuestion` (one batch ≤4):
 - **Examples** — links or pasted reference docs (optional)
 - **Inspirations / frameworks** to ground in (optional)
 
-#### T.2 — Research subagent (skip if `--quick` or user opts out via AskUserQuestion)
+#### T.2 — Research subagent (skip if `--quick` or user opts out interactively)
 
 Dispatch a `general-purpose` subagent. Foreground call. Prompt:
 
@@ -312,6 +410,7 @@ Do NOT write any files. Output a single markdown report ~600-900 words.
 
 #### T.3 — Section-by-section alignment
 
+<!-- defer-only: ambiguous -->
 For each proposed section in the research report, ask via `AskUserQuestion` with options:
 - **Approve** (preview shows section purpose + eval items)
 - **Tweak** (free-text follow-up)
@@ -322,6 +421,7 @@ Capture decisions per section. Track which eval items survived.
 
 #### T.4 — Frontmatter authoring
 
+<!-- defer-only: free-form -->
 Confirm via `AskUserQuestion` (one batch):
 - `tiers`: `[single]` / `[lite, full]`
 - `default_preset`: pick from 4 built-in (or "user-defined" if applicable)
@@ -341,6 +441,7 @@ Validate on write:
 
 #### T.6 — Optional dry-run
 
+<!-- defer-only: ambiguous -->
 Ask: "Run a dry-run by creating one artifact with this template?" via `AskUserQuestion`. If yes, prompt for a feature folder (or use the most recent), then execute Phase 2 with the new template. User can iterate on sections/evals based on what the dry-run produces.
 
 ### `/artifact template list`
@@ -362,6 +463,7 @@ Read-only.
 ### `/artifact template remove <slug>`
 
 1. If `<slug>` is a built-in: refuse with message "Built-in templates cannot be removed."
+<!-- defer-only: destructive -->
 2. If `<slug>` is a user template: confirm via `AskUserQuestion` (Yes/No), then `rm -rf ~/.pmos/artifacts/templates/<slug>/`. Show the path that was removed.
 3. If `<slug>` doesn't exist: list available user templates.
 
@@ -369,7 +471,7 @@ Read-only.
 
 ### `/artifact preset add`
 
-#### P.1 — Intake (one AskUserQuestion batch)
+#### P.1 — Intake (one interactive batch)
 
 - **Slug** (validate against built-in: `concise`, `tabular`, `narrative`, `executive` — reject collisions)
 - **Description** (1-line)
@@ -377,6 +479,7 @@ Read-only.
 
 #### P.2 — Rendering rules per section type
 
+<!-- defer-only: free-form -->
 Walk through 4 section types, asking the user for the rule per type via `AskUserQuestion` (4 questions batched in 2 calls of 2):
 
 1. **Lists of objects** (metrics, variants, scope items, stories) — table / nested bullets / prose?
@@ -386,7 +489,7 @@ Walk through 4 section types, asking the user for the rule per type via `AskUser
 
 #### P.3 — Voice and tone
 
-Ask: 3-5 voice rules (active vs passive, sentence length cap, hedging, etc.). Free-text or AskUserQuestion preset list.
+Ask: 3-5 voice rules (active vs passive, sentence length cap, hedging, etc.). Free-text or preset list.
 
 #### P.4 — Generate file
 

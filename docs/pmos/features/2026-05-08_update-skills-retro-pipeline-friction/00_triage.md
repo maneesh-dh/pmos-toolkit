@@ -90,5 +90,5 @@ No Tier 3 → no `/grill` step.
 | verify | requirements | pending | — | — |
 | complete-dev | requirements | pending | — | — |
 | changelog | requirements | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/changelog/01_requirements.md | 2026-05-08 |
-| changelog | execute | in-progress | — | 2026-05-08 |
-| changelog | verify | pending | — | — |
+| changelog | execute | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/changelog/execute/task-01.md | 2026-05-08 |
+| changelog | verify | in-progress | — | 2026-05-08 |

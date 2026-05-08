@@ -632,13 +632,14 @@ The user's explicit confirmation is required before promoting status. Do not sel
 
 ## Phase 8: Workstream Enrichment
 
-**Skip if no workstream was loaded in Phase 0.** Otherwise, follow `_shared/pipeline-setup.md` Section C. For this skill, the signals to look for are:
+**Skip if no workstream was loaded in Phase 0.** Otherwise, follow `_shared/pipeline-setup.md` Section C.
 
+For this skill, evaluate whether anything from this session is worth writing back to the workstream. Signals to look for:
 - Tech stack decisions → workstream `## Tech Stack`
 - Architectural constraints → workstream `## Constraints & Scars`
 - Key design decisions → workstream `## Key Decisions`
 
-This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it just because the core deliverable is complete.
+**The reflection is mandatory; writing entries is not.** If the spec produced no workstream-level signal (typical for small Tier 2 specs that operate within established constraints), explicitly state "No workstream-level signals from this session" and exit. Forced enrichment produces noise; zero entries is a valid outcome.
 
 ---
 

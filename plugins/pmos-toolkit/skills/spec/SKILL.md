@@ -66,17 +66,17 @@ Use workstream context (loaded by step 3 below) to inform technical decisions â€
 3. **Check for existing spec.** Look at `{feature_folder}/02_spec.md` for an existing file.
    - If found: read it, ask the user if this is an update or fresh start.
    - If not found: proceed.
-4. **Detect the tier** from the requirements doc (carry forward the same tier if tagged, otherwise assess):
+4. **Detect the tier.** If the requirements doc has a `Tier:` tag in its frontmatter or header, **carry it forward without asking**. If it is untagged, OR the user entered the pipeline at `/spec` without a requirements doc, assess the tier from the table below and **confirm with the user via `AskUserQuestion`** before proceeding (recommend the assessed tier as option 1).
 
 | Tier | Scope | Sections | Length |
 |------|-------|----------|--------|
-| **Tier 1: Bug Fix / Minor Enhancement** | Isolated fix or small change | Problem, Root Cause Analysis, Fix Approach, Edge Cases, Testing Strategy | ~1-2 pages |
+| **Tier 1: Bug Fix / Minor Enhancement** | Isolated fix or small change | Problem, Root Cause Analysis, Fix Approach, Decision Log (lightweight), Edge Cases, Testing Strategy | ~1-2 pages |
 | **Tier 2: Enhancement / UX Overhaul** | Improving existing behavior, adding to existing surface | Problem, Goals, Decision Log, Relevant FR tables, API changes (if any), Frontend Design (if any), Edge Cases, Testing Strategy | ~3-6 pages |
 | **Tier 3: Feature / New System** | New capability, new surface, major redesign | ALL sections mandatory including Architecture diagrams, Sequence diagrams, Full FR/NFR tables, API contracts, DB schema (SQL), Frontend design, Feature flags, Rollout strategy | ~6-15 pages |
 
-**Announce:** "This looks like a Tier N spec. Using the [tier name] template."
+**Announce:** "This looks like a Tier N spec. Using the [tier name] template." (When the tier was carried forward from a tagged requirements doc, no confirmation question is needed â€” just announce.)
 
-**Gate:** Do not proceed until you have confirmed understanding of the requirements and the tier.
+**Gate:** Do not proceed until you have confirmed understanding of the requirements and (where required) the user has confirmed the tier.
 
 ---
 

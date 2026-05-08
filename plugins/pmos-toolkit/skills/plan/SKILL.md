@@ -275,8 +275,8 @@ File-action verbs (FR-24): `Create`, `Modify`, `Delete`, `Move`, `Rename`, `Test
 
 ## Rollback
 
-- If TN fails after migration XXX: `alembic downgrade <previous>`
-- If seed data corrupted: `python scripts/seed_sop_db.py --reset`
+- If TN fails after migration XXX: `<downgrade-command-from-stack-file>`
+- If seed data corrupted: `<reset-script-or-stack-command>`
 - If deploy fails: `docker compose up -d <previous-image>`
 
 [Conditional: include only when the plan involves database migrations, deployments, or data mutations. Delete the section otherwise — do NOT leave a placeholder line decorated with a conditional caveat in the rendered plan.]
@@ -315,7 +315,7 @@ File-action verbs (FR-24): `Create`, `Modify`, `Delete`, `Move`, `Rename`, `Test
   [Tests are illustrative reference shape per FR-103, not literal. /execute may adapt fixture names / helper signatures to host conventions while preserving the same inputs/outputs/assertions.]
 
 - [ ] Step 2: Run test to verify it fails
-  Run: `pytest tests/path/test.py::test_name -v`
+  Run: `<test-command-from-stack-file> tests/path/test.py::test_name -v`
   Expected: FAIL with "function not defined"
 
 - [ ] Step 3: Write minimal implementation
@@ -325,7 +325,7 @@ File-action verbs (FR-24): `Create`, `Modify`, `Delete`, `Move`, `Rename`, `Test
   ```
 
 - [ ] Step 4: Run test to verify it passes
-  Run: `pytest tests/path/test.py::test_name -v`
+  Run: `<test-command-from-stack-file> tests/path/test.py::test_name -v`
   Expected: PASS
 
 - [ ] Step 5: Commit
@@ -343,7 +343,7 @@ File-action verbs (FR-24): `Create`, `Modify`, `Delete`, `Move`, `Rename`, `Test
 
 **Inline verification:**
 - `ruff check src/path/file.py` — no lint errors
-- `pytest tests/path/test.py -v` — N passed, 0 failed
+- `<test-command-from-stack-file> tests/path/test.py -v` — N passed, 0 failed
 
 ---
 
@@ -355,9 +355,9 @@ File-action verbs (FR-24): `Create`, `Modify`, `Delete`, `Move`, `Rename`, `Test
 - [ ] **Type check:** [project-appropriate type checker command from stack file]
 - [ ] **Unit tests:** [exact command per stack file] — expect N passes, 0 failures
 - [ ] **Full test suite:** [exact command per stack file] — expect no regressions
-- [ ] **Database migrations:** `alembic upgrade head` [emit only if migrations were added]
+- [ ] **Database migrations:** `<migration-up-command-from-stack-file>` [emit only if migrations were added]
 - [ ] **Docker deploy:** `docker compose build <services> && docker compose up -d <services>` [emit only if Docker is in scope]
-- [ ] **API smoke test:** [from detected stack file `## API Smoke Patterns` — never bake `curl | python -m json.tool` in by default; FR-13]
+- [ ] **API smoke test:** [emit verbatim from the detected stack file's `## API Smoke Patterns` section — do not hardcode language-specific defaults; FR-13]
 - [ ] **Frontend smoke test (Playwright MCP):**
   1. Authenticate first (if auth enabled)
   2. Navigate to the relevant page
@@ -462,7 +462,7 @@ A good task verification has two parts:
 | Task type | Structural (proves existence only) | Behavioral (proves correctness) |
 |-----------|-------------------------------|--------------------------------|
 | API endpoint | `assert status == 200` on empty DB | Seed/use real data, assert response body has correct fields, relationships populated, enums as strings |
-| DB migration | `alembic upgrade head` succeeds | Query tables, verify constraints reject bad data, verify seed data values (not just counts) |
+| DB migration | migration-up command succeeds | Query tables, verify constraints reject bad data, verify seed data values (not just counts) |
 | Frontend component | `npm run build` passes | Mount with realistic props and assert rendered output; or explicit manual step: "navigate to /path, verify X renders, click Y, verify Z" |
 | Infrastructure | `docker compose config` parses | Start service, verify it connects to dependencies, verify port binding with actual request |
 | CLI command | `--help` exits 0 | Run with real inputs, assert on output content |
@@ -723,7 +723,6 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 
 - Do NOT write the plan without reading impacted code first
 - Do NOT skip the decision log or write entries without rationale
-- Do NOT do only 1 review loop — minimum is 2
 - Do NOT create a new plan file in each review loop — update the original
 - Do NOT write verification steps without exact commands and expected output
 - Do NOT claim the plan is complete without sharing review findings with the user

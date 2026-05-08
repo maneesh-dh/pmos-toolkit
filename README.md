@@ -48,7 +48,8 @@ pmos-toolkit/
 
 | Skill | Description |
 |-------|-------------|
-| `/pmos-toolkit:msf` | Motivation, Satisfaction, Friction analysis with PSYCH scoring |
+| `/pmos-toolkit:msf-req` | Motivation/Satisfaction/Friction analysis on a requirements doc — recommendations-only |
+| `/pmos-toolkit:msf-wf` | Grounded MSF + PSYCH analysis on a wireframes folder; `--apply-edits` to apply HTML edits inline (typically invoked from /wireframes Phase 6) |
 | `/pmos-toolkit:creativity` | Structured creativity techniques for non-obvious improvements |
 | `/pmos-toolkit:grill` | Adversarially interview a plan, spec, or design to surface unresolved decisions and shaky assumptions |
 

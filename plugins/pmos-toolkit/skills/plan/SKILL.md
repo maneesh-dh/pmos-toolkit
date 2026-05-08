@@ -10,8 +10,8 @@ argument-hint: "<path-to-spec-doc> [--backlog <id>] [--feature <slug>]"
 Create a comprehensive, engineer-ready implementation plan from a spec. The plan must be good enough that a skilled developer with **zero codebase context** can execute it end-to-end without asking questions. This is the THIRD stage in a 3-stage pipeline:
 
 ```
-/requirements  →  [/msf, /creativity]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
-                   optional enhancers              optional validator     (this skill)
+/requirements  →  [/msf-req, /creativity]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
+                   optional enhancers                  optional validator     (this skill)
 ```
 
 The plan translates a spec into **bite-sized, TDD-driven tasks** with exact file paths, exact commands, and inline verification at every step. It inherits architecture decisions from the spec and adds implementation-specific decisions.

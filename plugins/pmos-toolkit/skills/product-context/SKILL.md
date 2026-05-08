@@ -10,7 +10,7 @@ argument-hint: "init | update [--add-charter 'name'] [docs/URLs] | show"
 Create and maintain persistent workstream context that enriches all pipeline skills (`/requirements`, `/spec`, `/plan`, `/execute`, `/verify`) across repos and sessions.
 
 ```
-/product-context  →  /requirements  →  [/msf, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
+/product-context  →  /requirements  →  [/msf-req, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
 (this skill)                     optional enhancers
 ```
 

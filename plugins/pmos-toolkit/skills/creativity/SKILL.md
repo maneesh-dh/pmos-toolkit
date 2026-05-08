@@ -9,11 +9,11 @@ argument-hint: "<path-to-requirements-doc>"
 
 Evaluate requirements and proposed solutions through structured creativity techniques to generate non-obvious improvement ideas. Quality over quantity — each technique should produce 0 or 1 strong idea per journey. Don't pad.
 
-Best applied to **Tier 3 requirements** (features / product launches) after `/requirements` and before `/spec`. Can be combined with `/msf`.
+Best applied to **Tier 3 requirements** (features / product launches) after `/requirements` and before `/spec`. Can be combined with `/msf-req`.
 
 ```
-/requirements  →  [/msf, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
-                         (this skill) ↑
+/requirements  →  [/msf-req, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
+                             (this skill) ↑
 ```
 
 **Announce at start:** "Using the creativity skill to evaluate improvement ideas for the requirements."

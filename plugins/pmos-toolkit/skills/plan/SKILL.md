@@ -485,7 +485,69 @@ Each entry MUST have "Options Considered" and "Rationale."
 
 ## Phase 4: Review Loops
 
-After writing the initial plan, run iterative review loops. Minimum 2 loops.
+After writing the initial plan, run iterative review loops with a **hard cap of 4 loops** (FR-40; replaces the legacy "minimum 2 loops" rule). Tier-2 plans typically converge in 1 loop; Tier-3 plans run 2–4. The cap exists to prevent indefinite churn.
+
+**Cap-hit interactive (FR-40):** when loop 4 still produces findings, surface via `AskUserQuestion`: `Review-loop cap reached (4 loops). Findings still open. How to proceed?` Options:
+- **Continue** — extend by 1 loop (single-shot override; cap effectively becomes 5).
+- **Accept and proceed** — fold remaining findings into Open Questions, ship the plan as-is.
+- **Abandon** — restore the pre-cap-abandon backup (FR-67), exit with no plan written.
+
+**Cap-hit non-interactive (FR-40a):** auto **Accept and proceed**, AND insert a `## Convergence Warning` section at the **TOP of `03_plan.md` body** (NOT in a sidecar — visibility to /verify and humans is the priority). The warning lists the open findings the cap dropped.
+
+### Auto-classification of findings (FR-41, FR-41a, FR-41b)
+
+Each finding is classified low-risk or high-risk before being surfaced to the user:
+
+**Low-risk classes (auto-applyable when interactive ergonomics allow it):**
+- (a) typos / grammar
+- (b) missing exact command in a verification step that already has expected output
+- (c) lint-style suggestions (whitespace, formatting)
+- (d) section-presence completions where the content already exists elsewhere in the plan
+- (e) wireframe-ref additions when the wireframe file is unambiguous
+- (f) cosmetic clarifications
+
+**High-risk classes (always escalate, never auto-apply):**
+- (a) task split or merge
+- (b) dependency-graph changes
+- (c) new sections
+- (d) decision-log reversals
+- (e) TN-scope changes
+- (f) tier-gated mandate shifts
+- (g) frontmatter-contract or cross-skill-handshake changes
+
+**Default for ambiguous findings: high-risk** (escalate). Never auto-apply when classification is uncertain.
+
+**FR-41b:** post-auto-apply re-validation is deferred to Loop N+1 (avoids infinite-loop risk within a single loop iteration).
+
+### Loop 2 — blind subagent dispatch (FR-42)
+
+Loop 1 is self-review (structural + design checklists below). Loop 2, if reached, dispatches a fresh subagent (Explore or general-purpose, no shared context) given **only** the plan + spec for blind-review findings. On platforms without subagents, Loop 2 falls back to a self-review with the prompt "review as if seeing this for the first time."
+
+**Timeout (FR-42a):** 5-minute wall-clock cap on the subagent dispatch. On timeout, skip subagent findings and emit a low-risk note in the Review Log: `Loop 2 subagent timed out; no blind-review findings consumed.`
+
+**Nested-subagent gating (FR-42b):** when /plan itself runs as a subagent (detection: env marker `PMOS_NESTED=1`), do NOT dispatch the Loop-2 blind-review subagent — fall back to self-review on Loop 2. Avoids unbounded subagent recursion.
+
+### Skip List sidecar (FR-43, FR-43a, FR-43b, FR-43c, FR-43d)
+
+When the user picks `Skip` or `Defer` on a finding, persist it to `{feature_folder}/03_plan_skip-list.md`. The Skip List is a sidecar (FR-45 family); it accumulates across runs (FR-44) and is not regenerated from scratch on `/plan` re-invocation.
+
+- **FR-43:** entries are keyed by a stable `finding_hash = sha256(finding_text + proposed_fix + classification)`. The plan itself does not embed Skip List content — it cites the sidecar.
+- **FR-43a (hash integrity):** on re-invocation, /plan recomputes the hash for each existing finding and reconciles against the sidecar; mismatches surface as a Phase 4 finding ("Skip List entry no longer matches current finding text").
+- **FR-43b (mode-aware preservation):** in Edit / Replan / Append modes (see "Operational Modes" below), Skip List entries are preserved unless the user explicitly removes them via `/plan --reset-skip-list`.
+- **FR-43c (atomic write):** sidecar writes use a same-directory tempfile + `mv` rename to keep the rename intra-device (R1 mitigation). The tempfile name is `03_plan_skip-list.md.tmp.<pid>` to avoid collision with concurrent runs.
+- **FR-43d (re-validation cadence):** at the start of each subsequent /plan run, re-validate Skip List entries against the current plan; entries whose underlying finding no longer applies are pruned with a note in the Review Log.
+
+### Sidecar review log (FR-45) and Phase 5 fold (FR-46)
+
+Detailed loop-by-loop findings live in a sidecar file `{feature_folder}/03_plan_review.md`. The plan body's `## Review Log` table is a summary index pointing at the sidecar. Sidecar entries follow the same `## Loop N` shape and accumulate across runs.
+
+**Phase 5 fold (FR-46):** the legacy Phase 5 ("Final Review") is **folded into Phase 4** as Loop N's exit checklist. There is no separate Phase 5 in v2 — the conciseness / spec-coverage / coherence pass that used to live there now runs inside the cap-of-4 loop budget. This avoids an unbounded "phase 5" review that previously sat outside the loop discipline.
+
+### Broken-ref and drift checks (FR-31a, FR-31b)
+
+**Broken-ref hard-fail (FR-31a):** Phase 4 hard-fails the loop if any task's `**Spec refs:**` cites a `02_spec.md#anchor` that does not resolve. Run an awk / grep extraction of `^## .* {#kebab}` and `^### .* {#kebab}` from the spec; cross-reference each `02_spec.md#anchor` cited in the plan; surface each unresolved anchor as a high-risk finding.
+
+**Drift detection (FR-31b):** Phase 4 detects spec-doc drift. Compute `sha256` of the spec frontmatter `date` + section count; compare to a stored value in `03_plan.md` frontmatter (`spec_hash` extension key). On drift, emit a high-risk finding `Spec has changed since plan was generated. Re-run /plan or accept divergence as a Decision Log entry.`
 
 ### Two Types of Review
 
@@ -554,33 +616,89 @@ For every loop that produces findings (structural or design-critique):
 
 ---
 
-## Phase 5: Final Review
+## Phase 5: (folded into Phase 4 per FR-46)
 
-Run one final improvement pass:
+Phase 5 in /plan v1 ran a separate "Final Review" pass *outside* the loop discipline. v2 folds this into Phase 4's last loop (FR-46) — the conciseness / spec-coverage / coherence pass runs as Loop N's exit checklist. This section is retained as a back-compat marker; no work happens here.
 
-1. **Spec coverage** — Re-read the spec. Is EVERYTHING mentioned covered? List gaps.
-2. **Conciseness** — Can sections be tightened without losing information?
-3. **Missing standard sections** — Prerequisites? File map? Decision log? Risks? Rollback? Review log?
-4. **Coherence** — Any conflicting tasks, circular dependencies, or steps that assume work not yet done?
-5. **Blind spots** — What would an engineer struggle with? What implicit knowledge does the plan assume?
+---
 
-**Share your analysis with the user BEFORE modifying anything.** Use the same `AskUserQuestion` batching as review loops (see Phase 4 Findings Presentation Protocol) — one question per final-review finding with Fix / Modify / Skip / Defer options, up to 4 per call. Do NOT declare the plan complete until the user confirms.
+## Operational Modes (FR-60, FR-60a, FR-61, FR-61a, FR-64)
 
-After final fixes, commit:
+/plan v2 supports four operational modes. Mode is auto-detected from CLI flags + existing-plan state:
+
+- **Fresh** — no existing `03_plan.md`. Generate from scratch.
+- **Edit (FR-60)** — `--edit` flag OR `--fix-from <task-id>`. Re-write a bounded scope (single task or task-range); preserve untouched tasks verbatim including their step bodies.
+- **Replan (FR-60)** — `--replan` flag. Discard existing tasks; preserve Decision Log + Risks unless `--reset-decisions` is also passed. Skip List preserved per FR-43b.
+- **Append (FR-60a)** — `--append` flag. Add new tasks at the bottom (TN+1, TN+2, …) without renumbering existing tasks. Existing TN moves to be the last new task; the old TN is renamed to its task-number identity. Useful for spec amendments mid-execution.
+
+### Non-interactive mode (FR-61, FR-61a)
+
+`--non-interactive` runs the entire skill without `AskUserQuestion`. Choices follow Recommended (Recommended option). For high-risk decisions with no Recommended option (FR-61a halt protocol):
+- **Halt** with exit code 2.
+- Write `{feature_folder}/03_plan_blocked.md` containing the question, options considered, and a one-line "what changed" hint.
+- The user resumes by re-running /plan interactively or with explicit `--decide <option>` flags.
+
+`--non-interactive` writes an audit sidecar `{feature_folder}/03_plan_auto.md` listing every Recommended pick the run made, so a human can audit the choices retrospectively.
+
+### Folder picker (FR-65)
+
+Per `_shared/pipeline-setup.md` Section B.4 cross-reference (FR-65): when no `--feature` is given and `settings.current_feature` is unset, present folder options via `AskUserQuestion`:
+- **Recently-modified feature** (most-recent mtime under `{docs_path}/features/`).
+- **Best slug-match** (closest existing folder by slug similarity to the user's argument, if any).
+- **Create new** (with the derived slug from `_shared/pipeline-setup.md` Section A.3).
+- **Other** — free-form path.
+
+### Learnings consumption (FR-64)
+
+`~/.pmos/learnings.md` entries under `## /plan` are loaded in Phase 0 step 6 (canonical block). When a learnings entry conflicts with this skill body, the skill body wins; surface the conflict to the user before applying the skill rule. In `--non-interactive` mode, the conflict is logged to `03_plan_auto.md` and the skill rule is applied without prompting.
+
+---
+
+## Closing Report (FR-71, FR-72, /backlog write-back)
+
+After the plan is written and reviewed:
+
+**Commit:**
+
 ```
-git add {feature_folder}/03_plan.md
+git add {feature_folder}/03_plan.md {feature_folder}/03_plan_review.md {feature_folder}/03_plan_skip-list.md
 git commit -m "docs: add implementation plan for <feature>"
 ```
 
-Report to user:
+(Sidecars are committed alongside the plan when present; the commit subject names the feature, not the task numbers.)
+
+**Report to user:**
+
 - Plan location
-- Task count
+- Task count + tier
 - Key decisions (top 3 from decision log)
 - Open risks flagged
+- Sidecar paths if non-empty (`03_plan_review.md`, `03_plan_skip-list.md`, `03_plan_auto.md`, `03_plan_blocked.md`)
 
-Then offer to execute:
+**/backlog write-back:** if the plan was generated with `--backlog <id>`, set the backlog item's status to `planned` and write `plan: <feature_folder>/03_plan.md` per `backlog/pipeline-bridge.md` (the bridge contract owns the write-back, /plan invokes it).
 
-> **"Plan complete and saved. Run `/pmos-toolkit:execute` to implement it, or review the plan first?"**
+**Closing offer (platform-aware via `_shared/platform-strings.md`):** read `execute_invocation` for the active platform and emit the offer with that string substituted. e.g.,
+
+> claude-code: `Plan complete and saved. Run /pmos-toolkit:execute to implement it, or review the plan first?`
+> gemini: `Plan complete and saved. Activate the execute skill to implement it, or review the plan first?`
+> codex: `Plan complete and saved. Run the execute skill to implement it, or review the plan first?`
+
+The offer wording is otherwise identical across platforms (FR-72).
+
+---
+
+## Sidecar Contracts (FR-43c, FR-45)
+
+/plan v2 writes up to four sidecar files in `{feature_folder}/`:
+
+| Sidecar | When written | Lifecycle |
+|---------|--------------|-----------|
+| `03_plan_review.md` | Always (per FR-45) | Accumulates across runs; never overwritten — appends `## Loop N` blocks |
+| `03_plan_skip-list.md` | When user picks Skip/Defer (per FR-43) | Accumulates across runs; reconciled by hash on re-invocation (FR-43a) |
+| `03_plan_auto.md` | `--non-interactive` only | Overwritten per run (audit of Recommended picks for THAT run) |
+| `03_plan_blocked.md` | `--non-interactive` halt (FR-61a) | Overwritten per run; deleted on next successful interactive resume |
+
+**Atomic-write contract (FR-43c):** all sidecar writes use a same-directory tempfile + `mv` rename to keep the rename intra-device (R1 mitigation). Tempfile naming: `<sidecar>.tmp.<pid>`. On crash mid-write, the tempfile is left behind; /plan removes stale tempfiles older than 1 hour at startup.
 
 ---
 

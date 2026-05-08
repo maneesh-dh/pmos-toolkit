@@ -48,7 +48,7 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
    - `--on-failure` validation:
      - Accepted values: `drop`, `ship-with-warning`, `exit-nonzero`. Unknown value → print `error: --on-failure must be one of {drop, ship-with-warning, exit-nonzero}` to stderr, exit 64.
      - Default when `mode == non-interactive` and flag absent: `exit-nonzero`.
-     - When `mode == interactive`, the flag is parsed but advisory only — Phase 6.5's `AskUserQuestion` remains the source of truth.
+     - When `mode == interactive`, the flag is parsed but advisory only — Phase 6.5's interactive prompt (the AUQ) remains the source of truth.
    - Derive `<slug>` = first 5–6 content words of the description, kebab-cased.
    - **Resolve `{docs_path}`**: read `.pmos/settings.yaml` in the current repo; if present, use its `docs_path` value (default in that file is `.pmos`). If `.pmos/settings.yaml` does not exist, fall back to `docs/pmos/` (create on demand).
    - Default `--out` = `{docs_path}/diagrams/<slug>.svg`. Create the `diagrams/` subdirectory if it doesn't exist.
@@ -350,8 +350,21 @@ For each refinement loop iteration:
 
 ## Phase 6.5 — Terminal failure handler (high / medium rigor only)
 
-Loops are exhausted and gating fails remain.
+Loops are exhausted and gating fails remain. Disposition depends on `mode`.
 
+### Non-interactive mode (`mode == non-interactive`)
+
+Dispatch on `--on-failure` (default: `exit-nonzero`). Do NOT issue an interactive prompt.
+
+| `--on-failure` | Behavior |
+|---|---|
+| `drop` | Do NOT write the SVG. Do NOT write the sidecar. Print `diagram dropped: <comma-joined hard_fails>` to stderr. **Exit 3.** |
+| `ship-with-warning` | Write the SVG with a leading `<!-- WARNING: <comma-joined hard_fails> -->` comment. Write the sidecar normally. **Exit 0.** |
+| `exit-nonzero` | Do NOT write the SVG. Do NOT write the sidecar. Print `diagram failed: <comma-joined hard_fails>` to stderr. **Exit 4.** |
+
+### Interactive mode (`mode == interactive`)
+
+<!-- non-interactive: handled-via on-failure-flag -->
 <!-- defer-only: ambiguous -->
 `AskUserQuestion`:
 
@@ -367,6 +380,16 @@ options:
 Prose-fallback: ship-with-warning by default.
 
 If user picks **alt framing** → restart at Phase 2 with the next brainstormed approach pre-selected; loop budget is fresh. If even the alternative fails its terminal handler, default to ship-with-warning.
+
+### Exit-Code contract (across all modes)
+
+| Exit code | Meaning |
+|---|---|
+| 0 | Success — SVG + sidecar written. May include a leading warning comment if `ship-with-warning` was selected. |
+| 2 | Environmental — renderer missing, theme schema invalid, mode/theme combo unsupported. |
+| 3 | Non-interactive `--on-failure drop` — caller dropped the diagram slot. |
+| 4 | Non-interactive `--on-failure exit-nonzero` (default) — caller decides. |
+| 64 | Argument error — unknown `--on-failure` value, malformed `settings.yaml`, etc. |
 
 ---
 

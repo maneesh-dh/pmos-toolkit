@@ -1,7 +1,7 @@
 # Non-Interactive Mode for pmos-toolkit Skills — Spec
 
 **Date:** 2026-05-08
-**Status:** Draft
+**Status:** Ready for Plan
 **Tier:** 3 — Feature
 **Requirements:** `docs/pmos/features/2026-05-08_non-interactive-mode/01_requirements.md`
 

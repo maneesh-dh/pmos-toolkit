@@ -147,7 +147,7 @@ Run roles in this order. Each role's decisions inform the next — architecture 
 4. **Verify each link exists** in the current codebase with a grep or file read — not assumption
 5. If any link is missing, flag it as a **gap to implement** in the spec
 
-**Trigger heuristic:** if the feature mentions search, index, sync, export, import, process, queue, cache, or aggregate — run the trace. Skip for purely CRUD or purely UI features.
+**Trigger (property-based):** Run the data flow trace whenever the feature has the property *"data persisted by one code path is consumed by a different code path."* This includes — but is not limited to — search/indexing, notifications, feeds, digests, audit logs, sync, export, import, queues, caches, aggregations, and report generation. Skip for purely CRUD-on-a-single-entity features or purely UI/UX changes that don't introduce new persistence-to-read flows. When in doubt, run the trace — it's cheap.
 
 **When to adjust:** If the project is primarily a frontend/UX change with minimal backend work, move Designer to position 2 (before DBA) — the UX may drive what data needs to be stored. State your reordering rationale when you announce the first role.
 
@@ -155,17 +155,24 @@ For Tier 2 (2-3 roles), pick from this list in order — don't jump to role 5 wh
 
 ### Role Protocol (MANDATORY for Tier 2-3)
 
-**Every applicable role MUST be announced to the user**, even when you have no questions. This ensures the user can verify that all perspectives were considered.
-
-For each role:
+For each role with **at least one genuine question or stated assumption**:
 1. **Announce:** "Speaking as [Role]:"
-2. **Either:**
-   - Ask 1-2 specific questions via AskUserQuestion (preferred when genuine gaps exist)
-   - **OR** state explicitly: "No questions from this role — [specific reason, citing which requirements sections already cover the role's concerns]"
-3. Note answers or stated assumptions as decisions for the spec
-4. **If the user picks a non-recommended option** in any AskUserQuestion you issued for this role, before moving to the next role ask: "Does this choice change any existing invariant or contract? If yes, capture it as a Decision-Log entry with the trade-off explicit." See `../_shared/structured-ask-edge-cases.md` §2 for the canonical form.
+2. Ask 1-2 specific questions via `AskUserQuestion` (batch up to 4 within the same role) OR state the assumption you're proceeding with as a Decision-Log entry.
+3. Note answers or stated assumptions as decisions for the spec.
+4. **If the user picks a non-recommended option** in any `AskUserQuestion` you issued for this role, before moving to the next role ask: "Does this choice change any existing invariant or contract? If yes, capture it as a Decision-Log entry with the trade-off explicit." See `../_shared/structured-ask-edge-cases.md` §2.
 
-**Anti-pattern:** Silently skipping a role because "the requirements are detailed enough" — this denies the user visibility into which perspectives were evaluated. The "Skip if..." column in the table above is the ONLY valid reason to skip a role entirely without announcement. If a role is applicable (not in the "Skip if" condition), you MUST announce it.
+For roles with **no genuine questions** — do NOT announce inline. Instead, at the end of Phase 3, emit a single **"Roles considered, no questions"** block:
+
+```text
+Silent roles considered:
+- DBA — no schema changes; covered by §X of requirements
+- DevOps — Tier 2, deployment unchanged
+- Senior Analyst — FR coverage already validated by Architect role
+```
+
+Each silent-role entry MUST cite the specific reason (which requirements section, or which earlier role's answer, makes this role's concerns moot). The user gets the same audit trail without per-role chat noise.
+
+**Anti-pattern:** Silently skipping a role with no entry in the silent-roles block. The "Skip if..." column in the role table is the ONLY valid reason to omit a role from BOTH the inline interview AND the silent-roles block.
 
 ---
 

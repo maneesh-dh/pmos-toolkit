@@ -43,9 +43,9 @@ Pick a tier from interview signals. Honor `--tier 1|2|3` if the user passed it.
 
 | Tier | Triggers | Workflow |
 |------|----------|----------|
-| **1** | One-shot utility; ≤ 2 phases; no `assets/`; no `reference/`; no eval rubric; no workstream awareness | Skip Phases 4-5. Implement directly from the interview using current Conventions. |
-| **2** | 3+ phases OR has `reference/` files OR has `assets/` OR uses workstream context OR has a structured output format | Run Phase 4 (write spec). Skip Phase 5. |
-| **3** | 5+ phases AND (has eval rubric OR has external integrations OR multi-source/multi-tier behavior OR pipeline integration) | Run Phase 4 + Phase 5 (grill). |
+| **1** | One-shot utility; ≤ 2 phases; no `assets/`; no `reference/`; no eval rubric; no workstream awareness | Skip Phases 4, 5, 6 (plan). Implement (Phase 7) directly from the interview. Run Phase 8 /verify mandatorily. |
+| **2** | 3+ phases OR has `reference/` files OR has `assets/` OR uses workstream context OR has a structured output format | Run Phases 4 (spec), 6 (plan), 7 (implement), 8 (/verify). Skip Phase 5 (grill). |
+| **3** | 5+ phases AND (has eval rubric OR has external integrations OR multi-source/multi-tier behavior OR pipeline integration) | Run Phases 4, 5 (grill), 6 (plan), 7 (implement), 8 (/verify). Full pipeline. |
 
 Surface the tier choice to the user via `AskUserQuestion` with the inferred tier as the recommended option and one-line rationale; allow override. Skip the question only if `--tier` was passed explicitly.
 
@@ -73,7 +73,7 @@ For Tier 1, this phase is shorter — skip the asset/reference/protocol question
 
 1. Resolve the spec path: `~/.pmos/skill-specs/<skill-name>/YYYY-MM-DD_<slug>.md`. If `<skill-name>` directory doesn't exist, create it. `<slug>` defaults to `initial`; bump to `v2`, `v3`, etc. on subsequent specs for the same skill.
 2. Read `reference/spec-template.md` and fill every section from the Phase 3 interview answers. Sections you can't fill go under §14 Open questions.
-3. Write the file. Set `Status: draft` in the spec header.
+3. Write the file. Set `Status: draft` in the spec header. Spec status lifecycle across the full pipeline: `draft → grilled (Tier 3, after Phase 5) → planned (Tier 2+, after Phase 6) → approved → implemented (after Phase 7) → verified (after Phase 8)`.
 4. Show the user the spec path and ask via `AskUserQuestion`:
 
 ```
@@ -85,7 +85,7 @@ options:
   - Cancel
 ```
 
-Do not proceed to Phase 5 or Phase 6 until status is `approved`.
+Do not proceed to Phase 5, Phase 6, or Phase 7 until status is `approved`.
 
 ---
 
@@ -108,9 +108,23 @@ If `/grill` is unavailable, fall back to the platform-adaptation note (skip with
 
 ---
 
-## Phase 6: Implement against the spec
+## Phase 6: Plan via /pmos-toolkit:plan (Tier 2+)
 
-This is where the actual SKILL.md, `reference/`, and `assets/` get written. Apply the **Conventions** section below as the implementation reference. The spec is the source of truth — every spec section maps to a part of SKILL.md:
+**Skip if Tier 1.** Otherwise:
+
+1. Resolve the spec path written in Phase 4.
+2. Invoke `/pmos-toolkit:plan <spec-path>`. Default-foreground.
+3. On success: spec status `approved → planned`. The user approves the plan doc as part of `/plan`'s own Phase 5 review — do not gate again here.
+4. On failure:
+   - **`/plan` skill missing:** log a one-paragraph warning to spec §14, then `AskUserQuestion`: **Continue (skip plan, log warning)** / **Abort**. Default Continue. (Mirrors how Phase 5 handles missing `/grill`.)
+   - **`/plan` cancelled or errored:** `AskUserQuestion`: **Retry** / **Abort**. Default Retry once; on second failure show the same dialog.
+5. Do not proceed to Phase 7 until plan status is `approved` (or the user explicitly chose Continue on missing).
+
+---
+
+## Phase 7: Implement against the spec
+
+This is where the actual SKILL.md, `reference/`, and `assets/` get written. Apply the **Conventions** section below as the implementation reference. If a plan was produced in Phase 6, implement against it; the plan is the source of truth, the spec is its parent. Every spec section maps to a part of SKILL.md:
 
 | Spec section | SKILL.md location |
 |--------------|-------------------|
@@ -128,21 +142,38 @@ For Tier 1 (no spec): use the Phase 3 interview answers directly as the implemen
 
 ---
 
-## Phase 7: Pre-save checklist
+## Phase 8: Verify via /pmos-toolkit:verify (mandatory all tiers)
 
-Walk the **Checklist Before Saving** section below. Every box must be checked or explicitly waived. If anything fails, return to Phase 6 and fix.
+**Mandatory at all tiers — no skip gate.**
+
+1. Resolve the spec path (or, for Tier 1 with no spec, the new SKILL.md path itself).
+2. Invoke `/pmos-toolkit:verify <spec-path>`. Default-foreground.
+3. The release-prereq items (README row, version bump) live as FRs in the spec — `/verify` Phase 5 4b reads the spec and grades each FR-ID, so no separate hint mechanism is needed.
+4. On success (no Critical findings): spec status `implemented → verified`.
+5. On unresolved blocker findings: spec status stays `implemented`. The skill is flagged as not-ready in the Phase 8 pipeline-status table. The user may re-invoke `/pmos-toolkit:verify <spec-path>` directly (it is idempotent) — `/create-skill` itself has no `--resume` flag.
+6. On `/verify` skill missing: HARD ERROR. `AskUserQuestion`: **Install/upgrade /verify** / **Accept-as-risk override** (logs a warning to spec §14 and sets status `unverified`) / **Abort**. Default Abort.
+7. After Phase 8 returns, emit a pipeline-status summary table to chat (mirror of `/update-skills` Phase 8):
+
+   | phase | status | artifact path | timestamp |
+   |---|---|---|---|
+   | requirements | completed/skipped/failed | <path or n/a> | <YYYY-MM-DD> |
+   | spec | … | … | … |
+   | grill | … | … | … |
+   | plan | … | … | … |
+   | implement | … | … | … |
+   | verify | … | … | … |
 
 ---
 
-## Phase 8: Capture Learnings
+## Phase 9: Capture Learnings
 
 **This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Reflect on whether this session surfaced anything worth capturing about `/create-skill` itself — tiering signals that misfired, spec sections that were chronically empty, grill questions that should be added to the default prompt. Proposing zero learnings is a valid outcome.
 
 ---
 
-## Conventions (implementation reference for Phase 6)
+## Conventions (implementation reference for Phase 7)
 
-The conventions below are the *content* of a well-formed SKILL.md. Phase 6 produces the SKILL.md by applying them; Phase 4 (spec) declares which conventions apply to this skill.
+The conventions below are the *content* of a well-formed SKILL.md. Phase 7 produces the SKILL.md by applying them; Phase 4 (spec) declares which conventions apply to this skill.
 
 ## Convention 1: Save Location
 
@@ -311,45 +342,14 @@ Rule of thumb: if a user reading the skill would benefit from seeing which phase
 
 ---
 
-## Checklist Before Saving
-
-Before writing the final SKILL.md, verify:
-
-**Location & wiring**
-
-- [ ] Saved to `~/Desktop/Projects/agent-skills/plugins/pmos-toolkit/skills/<name>/SKILL.md` (NOT root `skills/`)
-- [ ] Sibling reference paths (`learnings/`, `product-context/`) resolve from the saved location
-- [ ] Restarted session or ran `/reload-plugins` to pick up the new skill
-
-**Content**
-
-- [ ] Platform Adaptation section present
-- [ ] Description includes natural trigger phrases
-- [ ] No hard dependency on external plugins (fully self-contained)
-- [ ] No hard dependency on `AskUserQuestion` (assumption fallback exists)
-- [ ] No hard dependency on MCP tools (noted as manual step if unavailable)
-- [ ] Pipeline diagram included if the skill fits the pipeline
-- [ ] Under 500 lines (extract to `reference/` files if needed)
-- [ ] If the skill has review/refinement loops: each loop has a "Findings Presentation Protocol" that uses `AskUserQuestion` with Fix / Modify / Skip / Defer options (or domain equivalents), batched ≤4 per call, with a prose-fallback path
-- [ ] Anti-patterns section present
-- [ ] Learning read at startup (Phase 0 or standalone Load Learnings section)
-- [ ] Capture Learnings is a **numbered phase** (not a trailing unnumbered section) with terminal-gate language ("this skill is not complete until learnings are captured")
-- [ ] Workstream Enrichment is a **numbered phase** (if the skill loads workstream context in Phase 0) with skip-gate language
-- [ ] Progress tracking instruction included if skill has ≥3 phases/gates
-
-**Release prerequisites** — required so the skill ships in the next plugin version. `/push` enforces these at push time, but flag them here so the user isn't surprised:
-
-- [ ] Added a row to `README.md` under the appropriate Skills section (Pipeline / Pipeline enhancers / Artifacts & docs / Tracking & context / Utilities) — paraphrase the SKILL.md `description` field. If the skill is standalone, also add it to the "standalone — invoke them at any point" line under the pipeline-flow diagram.
-- [ ] Plan a **minor** version bump (`X.Y+1.0`) in BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json`. The two versions MUST stay in sync — `/push` Phase 2 enforces this; the bump itself is performed during `/push`, but mention it now so the user knows what the next push will do.
-
----
-
 ## Anti-patterns
 
-- **Skipping the spec at Tier 2+ to save time.** The spec is the cheapest place to catch a design gap. Skipping it pushes the cost into Phase 6 rewrites or, worse, into the first real invocation.
+- **Skipping the spec at Tier 2+ to save time.** The spec is the cheapest place to catch a design gap. Skipping it pushes the cost into Phase 7 rewrites or, worse, into the first real invocation.
 - **Auto-tiering a Tier 3 skill as Tier 2 because the user wants to ship fast.** Tier 3 indicators (eval rubric, multi-source, pipeline integration) mean the failure modes are non-obvious — `/grill` exists precisely to find them before code lands. Surface the tier choice; let the user override knowingly.
 - **Reading the spec template once and then improvising.** Phase 4 must walk every section of `reference/spec-template.md`. Sections you genuinely can't fill go under §14 Open questions, not silently omitted.
-- **Approving a spec with §14 Open questions still populated at Tier 2.** Tier 3 routes them through `/grill`; Tier 2 has no such gate, so the user must explicitly resolve them or accept the risk in writing before Phase 6.
-- **Implementing before status is `approved`.** Phase 6 is gated by user approval. "Approve and continue" is one click; skipping it loses the audit trail and the rollback point.
-- **Writing the SKILL.md without referring back to the spec.** Phase 6 implements *against* the spec, not from memory of the interview. Each spec section maps to a SKILL.md location (table in Phase 6) — use it.
-- **Treating the conventions as a checklist instead of an implementation guide.** The Conventions section below is what a well-formed SKILL.md *contains*; the spec declares which conventions apply; Phase 6 produces the SKILL.md by composing them. Skipping the spec turns conventions into post-hoc compliance.
+- **Approving a spec with §14 Open questions still populated at Tier 2.** Tier 3 routes them through `/grill`; Tier 2 has no such gate, so the user must explicitly resolve them or accept the risk in writing before Phase 6 (/plan).
+- **Implementing before status is `approved`.** Phase 7 is gated by approved spec status (and, at Tier 2+, an approved plan from Phase 6). "Approve and continue" is one click; skipping it loses the audit trail and the rollback point.
+- **Writing the SKILL.md without referring back to the spec.** Phase 7 implements *against* the spec (and the Phase 6 plan, when present), not from memory of the interview. Each spec section maps to a SKILL.md location (table in Phase 7) — use it.
+- **Treating the conventions as a checklist instead of an implementation guide.** The Conventions section below is what a well-formed SKILL.md *contains*; the spec declares which conventions apply; Phase 7 produces the SKILL.md by composing them. Skipping the spec turns conventions into post-hoc compliance.
+- **Skipping the /plan phase at Tier 2+.** Plan is the cheapest place to map the spec to TDD-friendly tasks before code lands. Without it, Phase 7 implements from the spec directly and the implementor reverse-engineers task ordering.
+- **Skipping /verify because /execute looked clean.** /verify is non-skippable per the per-skill pipeline contract; no opt-out at any tier. Visual confidence after implement is not evidence — /verify Phase 2 lint, Phase 3 multi-agent review, and Phase 5 spec compliance are the contract.

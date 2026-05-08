@@ -241,22 +241,18 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
   ## claude-code
   - `execute_invocation`: `/pmos-toolkit:execute`
   - `skill_reference`: `/pmos-toolkit:<skill>`
-  - `error_prefix`: `[/plan]`
 
   ## gemini
   - `execute_invocation`: activate the execute skill
   - `skill_reference`: activate the <skill> skill
-  - `error_prefix`: [plan]
 
   ## copilot
   - `execute_invocation`: use the execute skill
   - `skill_reference`: use the <skill> skill
-  - `error_prefix`: plan:
 
   ## codex
   - `execute_invocation`: run the execute skill
   - `skill_reference`: run the <skill> skill
-  - `error_prefix`: [plan]
   ```
 
 - [ ] Step 4: Re-run the test — expected: PASS
@@ -1097,7 +1093,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Steps:**
 
-- [ ] Step 1: Write `/tmp/check_plan_phase1.sh` asserting Phase 1 mentions `tier` (read from frontmatter), `02_simulate-spec_`, `--fix-from`, `--widen-to`, `--cross-phase-downstream`, and `03_plan_defect_`.
+- [ ] Step 1: Write `/tmp/check_plan_phase1.sh` asserting Phase 1 mentions `tier` (read from frontmatter), `02_simulate-spec_`, `--fix-from`, `--widen-to`, `--cross-phase-downstream`, `03_plan_defect_`, AND the §8.6 simulate-spec findings AskUserQuestion shape with the 4 disposition options "Update spec to address before planning" / "Treat as Open Question in plan" / "Accept as risk" / "Skip — already resolved upstream".
 - [ ] Step 2: Run — expected FAIL.
 - [ ] Step 3: Rewrite Phase 1. Add a step to parse the spec frontmatter (re-using state from Phase 0 step 9), set `{tier}` and `{type}` variables for downstream phases. Add a step to glob `{feature_folder}/02_simulate-spec_*.md`; if present with unresolved findings, run §8.6 batched AskUserQuestion before proceeding. Add a `--fix-from <task-id>` branch: read `{feature_folder}/03_plan_defect_<task-id>.md` per §7.5; respect `--widen-to <upstream-task-id>` (FR-67a) and `--cross-phase-downstream` (FR-67b); enter Edit mode (FR-60) scoped per the flags.
 - [ ] Step 4: Re-run — expected PASS.
@@ -1118,7 +1114,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Steps:**
 
-- [ ] Step 1: Write `/tmp/check_plan_phase2.sh` asserting Phase 2 mentions stack-signal globs (manifest files: `package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`), JS-stack lockfile disambiguation (`package-lock.json`, `yarn.lock`, `.yarnrc.yml`, `pnpm-lock.yaml`, `bun.lockb`), peer-plan glob with status filter (`Draft`, `Planned`, `Executing`), wireframe coverage rules (FR-16, FR-16a), AND the §8.7 spec-re-open AskUserQuestion shape with the literal options "Halt /plan and update spec" / "Document override in spec via Decision Log entry" / "Accept spec as-is despite divergence" / "Skip — not actually a conflict".
+- [ ] Step 1: Write `/tmp/check_plan_phase2.sh` asserting Phase 2 mentions stack-signal globs (manifest files: `package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`), JS-stack lockfile disambiguation (`package-lock.json`, `yarn.lock`, `.yarnrc.yml`, `pnpm-lock.yaml`, `bun.lockb`), peer-plan glob with status filter (`Draft`, `Planned`, `Executing`), wireframe coverage rules (FR-16, FR-16a), the §8.7 spec-re-open AskUserQuestion shape with the literal options "Halt /plan and update spec" / "Document override in spec via Decision Log entry" / "Accept spec as-is despite divergence" / "Skip — not actually a conflict", AND the §8.4 stack-ambiguity AskUserQuestion shape including a "Mono-repo: pick all" option AND an "Other" option (FR-14). **FR-91 gate assertion:** grep for both "reference system" AND ("structural choices" OR "Phase 2 gate") — verifies FR-91's gate language ("structural choices justified against ≥1 reference") is documented, not just the greenfield-substitute prose.
 - [ ] Step 2: Run — expected FAIL.
 - [ ] Step 3: Rewrite Phase 2. Insert new sub-step "Detect stack signals" (FR-10): glob manifest files, compute file-count weight per stack, log to "Stack signals" subsection of Code Study Notes (FR-100). Insert "JS lockfile disambiguation" sub-rule (FR-10a): map lockfile presence to npm/pnpm/yarn-classic/yarn-berry/bun; default npm + low-risk finding when no lockfile. Insert "Tiebreak" rule (FR-14a): equal weights → alphabetical; logged to `03_plan_auto.md` if `--non-interactive`. Insert "Greenfield substitute" (FR-91): when no signals, choose reference system; record in Code Study Notes. Insert "Peer-plan conflict scan" (FR-54): glob `{docs_path}/features/*/03_plan.md` (excluding current), filter by frontmatter status ∈ {Draft, Planned, Executing}, grep for impacted file paths; conflicts → Risks-table row + Open Question. Insert "Wireframe coverage" (FR-16): if `wireframes/` exists, every HTML file must be referenced by ≥1 task's Wireframe refs OR listed in `## Wireframes Out of Scope`. Insert "Vestigial wireframes" (FR-16a): no UI signal but folder exists → auto-emit Out-of-Scope subsection. Insert **"Spec re-open during planning" (§8.7, E13)**: when Phase 2 code study contradicts a spec decision (e.g., spec says "use Postgres" but `docker-compose.yml` shows MySQL), halt via `AskUserQuestion`: "Spec decision conflicts with repo standard. {Spec text} vs {observed standard}. How to resolve?" Options: **Halt /plan and update spec** (terminates this run; user re-runs /spec then /plan) / **Document override in spec via Decision Log entry** (open spec, add Decision Log entry citing the divergence with rationale, save, continue planning) / **Accept spec as-is despite divergence** (record decision in plan's Decision Log; proceed with spec's choice) / **Skip — not actually a conflict** (spec was correct; observation was misread). In `--non-interactive` mode this is a high-risk decision with no Recommended option → trigger FR-61a halt protocol (exit code 2 + write `03_plan_blocked.md`).
 - [ ] Step 4: Re-run — expected PASS.
@@ -1139,7 +1135,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Steps:**
 
-- [ ] Step 1: Write `/tmp/check_plan_template_frontmatter.sh` asserting the plan template (between the example fenced block markers) starts with a YAML frontmatter block including all FR-20 keys: `tier`, `type`, `feature`, `spec_ref`, `requirements_ref`, `date`, `status`, `commit_cadence`, `contract_version`. Assert tier gates documented: `Tier 1` mentions reduced TN; `Tier 3` mentions full Risks. Assert Done-when rule: "lower bounds" mention + "Done-when walkthrough" mention.
+- [ ] Step 1: Write `/tmp/check_plan_template_frontmatter.sh` asserting (a) the plan template (extracted by awk between ` ```markdown` start and matching ` ``` ` end) starts with a YAML frontmatter block (lines 1-2 are `---`); (b) the FR-20 keys appear inside that extracted template region (NOT just anywhere in SKILL.md): `tier`, `type`, `feature`, `spec_ref`, `requirements_ref`, `date`, `status`, `commit_cadence`, `contract_version`; (c) `Tier 1` paragraph asserts reduced TN AND skip Decision-Log floor (FR-02); `Tier 3` paragraph asserts mandatory Risks AND ≥3 Decision-Log entries (FR-04); (d) `Done-when walkthrough` mention is present; (e) **OLD-rule absence:** `! grep -qE 'Date:.*YYYY-MM-DD$|^\*\*Spec:\*\* `' against the extracted template (i.e., the legacy prose header is NOT in the template region — confirms the rewrite happened, not just an additive mention).
 - [ ] Step 2: Run — expected FAIL.
 - [ ] Step 3: Replace the template's old `**Date:** / **Spec:** / **Requirements:**` prose header with a frontmatter block matching FR-20 keys exactly. Add a "Tier gates" subsection above the template that defines per-tier rules (FR-02/03/04): T1 = 1 task floor, no Decision-Log floor, no Phase 5, reduced TN (T0 + lint + test + Done-when walkthrough); T2 = ≥1 Decision Log entry, 1 review loop, optional Risks/Rollback, full TN; T3 = ≥3 Decision Log, 2-4 review loops, mandatory Risks, conditional Rollback, full TN. Add Done-when rules: lower-bounds + qualitative gates only (FR-22); ≥1 quantitative or executable assertion (FR-22a); "Done-when walkthrough" required at ALL tiers (FR-22b) — replaces the legacy "Manual spot check" line.
 - [ ] Step 4: Re-run — expected PASS.
@@ -1153,7 +1149,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Goal:** Document Code Study Notes 4-subsection mandate (FR-100), readability promise (FR-101), glossary inheritance (FR-102), tests-illustrative rule (FR-103).
 **Spec refs:** FR-100, FR-101, FR-102, FR-103
-**Depends on:** T26ba
+**Depends on:** T26a
 **Idempotent:** yes
 **TDD:** yes — new-feature
 **Files:** Modify `plan/SKILL.md` Phase 3 — Code Study Notes section + readability/glossary/tests-illustrative rules
@@ -1192,7 +1188,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Steps:**
 
-- [ ] Step 1: Write `/tmp/check_plan_task_fields.sh` asserting the task template includes the literal field labels: `**Goal:**`, `**Spec refs:**`, `**Wireframe refs:**`, `**Files:**`, `**Depends on:**`, `**Idempotent:**`, `**Requires state from:**`, `**TDD:**`, `**Data:**`, `**Steps:**`. Also assert template mentions T0 prereq, mandatory at all tiers (FR-12a), and bug-fix TDD 4-step shape (FR-104).
+- [ ] Step 1: Write `/tmp/check_plan_task_fields.sh` asserting (a) the field labels appear inside the **per-task template region** (extracted by awk between `### T1: [Task Name]` and the next `---` separator inside the fenced markdown block), NOT just anywhere in SKILL.md: `**Goal:**`, `**Spec refs:**`, `**Wireframe refs:**`, `**Files:**`, `**Depends on:**`, `**Idempotent:**`, `**Requires state from:**`, `**TDD:**`, `**Data:**`, `**Steps:**`; (b) T0 prereq mandatory-at-all-tiers (FR-12a) — grep `T0.*all tiers|mandatory at all tiers`; (c) bug-fix TDD 4-step shape (FR-104) — grep for "regression test reproducing bug", "fails on pre-fix HEAD", "test passes" all present; (d) **OLD-rule absence:** `! grep -qF '**TDD:** yes — for new code'` (legacy 2-state rule replaced by FR-37's three-valued enum new-feature/bug-fix/no-with-reason).
 - [ ] Step 2: Run — expected FAIL on at least `**Depends on:**` and `**Idempotent:**`.
 - [ ] Step 3: Rewrite the task template. Add the new field labels in the order documented in spec §6.4. Document `**Idempotent:**` validation (FR-35: non-idempotent → recovery substep required, Phase 4 hard-fail otherwise). Add T0 (Prerequisite Check) auto-generation rule (FR-12, FR-12a): T0 reads from detected `_shared/stacks/<stack>.md`; mandatory at all tiers; T1 reduced TN = "T0 + lint + test + Done-when walkthrough". Document FR-13: TN's API smoke step is generated from stack file, never `curl | json.tool` baked in. Document bug-fix TDD shape (FR-104): step 1 writes regression test reproducing bug, step 2 confirms test fails on pre-fix HEAD, step 3 implements fix, step 4 confirms test passes. Document three-signal precedence (FR-104a): per-task `**TDD:**` override → spec frontmatter `type:` → /backlog item `type=`; on override, emit Decision-Log entry. Document TDD-optional types (FR-105): pure refactors, config/IaC, CSS-only, prototype spikes, file moves — author states reason; Phase 4 reviews justification.
 - [ ] Step 4: Re-run — expected PASS.
@@ -1213,7 +1209,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Steps:**
 
-- [ ] Step 1: Write `/tmp/check_plan_structural.sh` asserting Risks columns (Likelihood, Impact, Severity, Mitigation, Mitigation in:), Severity formula (FR-80), High-severity citation hard-fail (FR-81), File Map "generated index" language (FR-23), file-action verbs Create/Modify/Delete/Move/Rename/Test (FR-24), Move/Rename source-AND-destination rule, Mermaid auto-render rule (FR-25), phase-boundary /verify trigger (FR-26a), 30k-token soft cap (FR-90), AND TN Cleanup trigger-based emission (FR-92): rule body must mention all 4 triggers (files outside `src/`/`tests/` → temp-file cleanup; `--worktree` → container shutdown; feature flag added → flip line; user-facing change → docs-update line) AND the explicit "no `[only if applicable]` decoration" rule.
+- [ ] Step 1: Write `/tmp/check_plan_structural.sh` asserting Risks columns (Likelihood, Impact, Severity, Mitigation, Mitigation in:), Severity formula (FR-80), High-severity citation hard-fail (FR-81), File Map "generated index" language (FR-23), file-action verbs Create/Modify/Delete/Move/Rename/Test (FR-24), Move/Rename source-AND-destination rule, Mermaid auto-render rule (FR-25), phase-boundary /verify trigger (FR-26a), 30k-token soft cap (FR-90), AND TN Cleanup trigger-based emission (FR-92): rule body must mention all 4 triggers (files outside `src/`/`tests/` → temp-file cleanup; `--worktree` → container shutdown; feature flag added → flip line; user-facing change → docs-update line) AND the explicit "no `[only if applicable]` decoration" rule. **OLD-rule absence:** `! grep -qF '[only if applicable]' plugins/pmos-toolkit/skills/plan/SKILL.md` (legacy decoration removed) AND `! grep -qE 'Risks?\s*\|\s*Likelihood\s*\|\s*Mitigation\s*\|$'` (3-column legacy Risks header gone — must be 5 columns now).
 - [ ] Step 2: Run — expected FAIL.
 - [ ] Step 3: Rewrite Risks/Rollback/File Map sections. For Risks: 5-column table including Severity = derived; Severity formula `any-H + no-L → High; any-H + any-L → Medium; both M → Medium; M + L → Low; both L → Low`; FR-81 hard-fails uncited High-severity at Phase 4. For File Map: "generated index pointing back to per-task `**Files:**` sections — tasks are source of truth (D12)"; verbs Create/Modify/Delete/Move/Rename/Test; Move/Rename rows show source AND destination. For Mermaid: ` ```mermaid ` fenced block auto-rendered from per-task `**Depends on:**` lines; emitted inline; rendered natively by GitHub. For phases: "deployable slices" rule (FR-27); phase-boundary /verify per FR-26a (intermediate boundaries each get /verify; last phase's verify IS the TN per FR-26); 30k-token soft cap per phase (FR-90). **For TN Cleanup (FR-92):** items are emitted only when their trigger fires. Triggers: any task creates files outside `src/`/`tests/` → emit "Remove temporary files and debug logging" line; `--worktree` flag was used during /execute → emit "Stop worktree containers if running: `docker compose -f docker-compose.worktree.yml -p <project> down`" line; any task adds a feature flag → emit "Flip feature flags if applicable" line; any user-facing change (UI signal per S4 OR docs files modified) → emit "Update documentation files (CLAUDE.md, changelogs, etc.)" line. Document the rule explicitly: NO `[only if applicable]` decoration in the rendered TN — if the trigger doesn't fire, omit the line entirely. Phase 4 structural check #11 (already in plan/SKILL.md) verifies trigger-correct emission.
 - [ ] Step 4: Re-run — expected PASS.
@@ -1239,10 +1235,16 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
   set -e
   F=plugins/pmos-toolkit/skills/plan/SKILL.md
   awk '/^## Phase 4:/{f=1} /^## Phase 5:|^## Anti-Patterns/{f=0} f' "$F" > /tmp/p4.txt
-  grep -qE 'cap.*4|hard cap of 4' /tmp/p4.txt || { echo "FAIL: hard cap 4 missing"; exit 1; }
+  grep -qE 'hard cap of 4|cap.*4 (loops|iterations|review)' /tmp/p4.txt || { echo "FAIL: hard cap 4 missing"; exit 1; }
   grep -qE 'Convergence Warning' /tmp/p4.txt || { echo "FAIL: Convergence Warning rule (FR-40a) missing"; exit 1; }
-  grep -qE 'low-risk|high-risk' /tmp/p4.txt || { echo "FAIL: auto-classify rule missing"; exit 1; }
+  grep -qE 'low-risk' /tmp/p4.txt && grep -qE 'high-risk' /tmp/p4.txt || { echo "FAIL: auto-classify rule missing"; exit 1; }
   grep -qE 'default.*high-risk|ambiguous.*high-risk' /tmp/p4.txt || { echo "FAIL: ambiguous default rule (FR-41a) missing"; exit 1; }
+  # OLD-rule absence: minimum-2-loops mandate must be removed (replaced by hard cap of 4)
+  ! grep -qE 'minimum.*2.*loops?|loops?.*minimum.*2|at least 2 loops?' /tmp/p4.txt || { echo "FAIL: legacy 'minimum 2 loops' rule still present — must be replaced by hard cap of 4"; exit 1; }
+  # §8.2 Findings batch: 4 dispositions present
+  for opt in 'Fix as proposed' 'Modify' 'Skip' 'Defer'; do
+    grep -qF "$opt" /tmp/p4.txt || { echo "FAIL: §8.2 finding-disposition option missing: $opt"; exit 1; }
+  done
   echo PASS
   ```
 - [ ] Step 2: Run — expected FAIL.
@@ -1258,7 +1260,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Goal:** Document Loop 2 blind subagent (FR-42), 5-minute timeout (FR-42a), and nested-subagent skip rule (FR-42b).
 **Spec refs:** FR-42, FR-42a, FR-42b
-**Depends on:** T29ca
+**Depends on:** T29a
 **Idempotent:** yes
 **TDD:** yes — new-feature
 **Files:** Modify `plan/SKILL.md` Phase 4
@@ -1288,7 +1290,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Goal:** Document Skip List with hash integrity (FR-43, FR-43a-d), mode-aware preservation (FR-44), sidecar review log (FR-45), Phase 5 fold into Phase 4 (FR-46).
 **Spec refs:** FR-43, FR-43a, FR-43b, FR-43c, FR-43d, FR-44, FR-45, FR-46
-**Depends on:** T29cb
+**Depends on:** T29b
 **Idempotent:** yes
 **TDD:** yes — new-feature
 **Files:** Modify `plan/SKILL.md` Phase 4 + remove (or fold) Phase 5
@@ -1357,6 +1359,8 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
   done
   grep -qE 'fresh.*ID|no.*reuse|never reuse' "$F" || { echo "FAIL: Append fresh-ID rule (FR-60a) missing"; exit 1; }
   grep -qE 'Supersedes.*03_plan_pre-replan' "$F" || { echo "FAIL: Replan Supersedes header missing"; exit 1; }
+  # §8.1 Update-mode picker: 4 options including Cancel
+  grep -qE 'Cancel' "$F" || { echo "FAIL: §8.1 Cancel option missing from update-mode picker"; exit 1; }
   echo PASS
   ```
 - [ ] Step 2: Run — expected FAIL.
@@ -1372,7 +1376,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Goal:** Document `--non-interactive` flag (FR-61, FR-61a), folder picker (FR-65), learnings layering (FR-64).
 **Spec refs:** FR-61, FR-61a, FR-64, FR-65
-**Depends on:** T31ba
+**Depends on:** T31a
 **Idempotent:** yes
 **TDD:** yes — new-feature
 **Files:** Modify `plan/SKILL.md` — extend the Operational Modes subsection + Phase 0 / Phase 1 picker logic
@@ -1407,13 +1411,13 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 **Depends on:** T31b
 **Idempotent:** yes
 **TDD:** yes — new-feature
-**Files:** Modify `plan/SKILL.md` Phase 5 (closing offer) + Phase 3 plan template's TN section + Backlog Bridge subsection
+**Files:** Modify `plan/SKILL.md` — closing offer block at the **tail of Phase 4** (since T29c folds Phase 5 into Phase 4 per FR-46) + Phase 3 plan template's TN section + Backlog Bridge subsection. Coordinated with T29c: T29c removes the standalone `## Phase 5` heading and absorbs Conciseness/Blind-spots into Phase 4's design-critique checklist; T32 places the "Spec complete. Run …" closing offer at the END of Phase 4 (after the loop-cap rules and the post-loop status-promotion ritual). No `## Phase 5` heading is recreated.
 
 **Steps:**
 
 - [ ] Step 1: Write `/tmp/check_plan_closing_tn.sh` asserting: closing offer cites `_shared/platform-strings.md`, names three next steps (/execute, /grill, /simulate-spec) per FR-72; TN frontend smoke uses platform-neutral verbs (no unconditional Playwright outside CC-flavored block); UX polish + wireframe diff conditional on UI signal (FR-73); /backlog write-back retry up to 3 times with exponential backoff 1s/2s/4s (FR-52a); deferred-work auto-capture targets out-of-scope notices in `## Notices` section (FR-53).
 - [ ] Step 2: Run — expected FAIL.
-- [ ] Step 3: Update closing offer (Phase 5): source phrasing from `_shared/platform-strings.md`. Required output shape: "Spec complete. Run **{execute_invocation}** to implement, **/grill 03_plan.md** to stress-test the plan adversarially before executing, or **/simulate-spec** to re-validate the upstream spec against scenarios. Each next-step is independent — pick zero, one, or several." Update TN's frontend smoke to platform-neutral verbs (FR-70): "navigate to X, hard-reload, force error path Y, capture evidence". CC-only Playwright commands appear only in a CC-flavored fenced block. UX polish + wireframe diff (FR-73) emit only when `S4` UI-signal is true. Update Backlog Bridge subsection: write-back retry (FR-52a) — try `/backlog set` up to 3 times, exponential backoff 1s/2s/4s; on final failure, low-risk warning + "Re-run `/backlog set BG-X plan_doc=03_plan.md status=planned` manually". Deferred-work auto-capture (FR-53) targets out-of-scope notices in `## Notices` section, NOT deferred spec items (those remain Phase 4 hard-fail). FR-55: when `--backlog <id>` passed, Phase 4 checks every backlog AC maps to a task, TN line, OR `## Backlog Out-of-Scope` subsection.
+- [ ] Step 3: Update closing offer at the **tail of Phase 4** (NOT a recreated Phase 5 — T29c folded Phase 5 per FR-46): source phrasing from `_shared/platform-strings.md`. Required output shape: "Spec complete. Run **{execute_invocation}** to implement, **/grill 03_plan.md** to stress-test the plan adversarially before executing, or **/simulate-spec** to re-validate the upstream spec against scenarios. Each next-step is independent — pick zero, one, or several." Update TN's frontend smoke to platform-neutral verbs (FR-70): "navigate to X, hard-reload, force error path Y, capture evidence". CC-only Playwright commands appear only in a CC-flavored fenced block. UX polish + wireframe diff (FR-73) emit only when `S4` UI-signal is true. Update Backlog Bridge subsection: write-back retry (FR-52a) — try `/backlog set` up to 3 times, exponential backoff 1s/2s/4s; on final failure, low-risk warning + "Re-run `/backlog set BG-X plan_doc=03_plan.md status=planned` manually". Deferred-work auto-capture (FR-53) targets out-of-scope notices in `## Notices` section, NOT deferred spec items (those remain Phase 4 hard-fail). FR-55: when `--backlog <id>` passed, Phase 4 checks every backlog AC maps to a task, TN line, OR `## Backlog Out-of-Scope` subsection.
 - [ ] Step 4: Re-run — expected PASS.
 - [ ] Step 5: Commit `git commit -m "feat(T32): /plan platform-neutral closing/TN + backlog write-back retry"`.
 
@@ -1474,7 +1478,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Steps:**
 
-- [ ] Step 1: Write `/tmp/check_execute_phase2_fields.sh` asserting Phase 2 mentions: `Depends on`, `Idempotent`, `Requires state from`, `Data` field consumption; back-compat shim per-task `WARN:` lines on stderr (P5); FR-110 fail-fast on cycles or missing required fields.
+- [ ] Step 1: Write `/tmp/check_execute_phase2_fields.sh` asserting (a) inside the Phase 2 region (extracted between `## Phase 2:` and `## Phase 3:`) the literal field-consumption rules appear: `Depends on` (with "ordering" or "block" verb nearby), `Idempotent` (with "recovery" or "prompt" verb), `Requires state from` (with "re-run" or "ensure" verb), `Data` (with "informational" or "audit" verb); (b) back-compat shim wording: `WARN:` literal AND "stderr" mention AND "per-task" wording (S8/P5); (c) FR-110 fail-fast: "dependency cycle" mention AND "halt" verb AND `/grill 03_plan.md` reference; (d) **OLD-rule absence:** `! grep -qF 'TODO: parse new fields'` and `! grep -qE 'placeholder|TBD'` against the Phase 2 region (no shim stubs left).
 - [ ] Step 2: Run — expected FAIL.
 - [ ] Step 3: Add to Phase 2 a sub-step "Read task contract fields" (after step 2 "Read the task"): parse `**Depends on:**` for ordering — block this task until all deps in {`done`, `done-sealed`} state; tasks with no shared upstream may run [P] when supported. Parse `**Idempotent:**` — if `no — <recovery>`, prompt user via AskUserQuestion before retrying after a failure ("Task is non-idempotent. Run recovery substep <ref> first?" Yes/No). Parse `**Requires state from:**` — before this task's verification step, re-run upstream tasks' setup if marker shows their post-state has been disturbed (e.g., container restart, DB drop). Parse `**Data:**` — informational only; log to per-task log frontmatter as `data_source: <value>` for audit. Add back-compat shim (S8): if any of these fields are absent on a task, emit `WARN: T<N> missing field <name>; assuming defaults (Depends on: implicit by order; Idempotent: yes; Requires state from: none; Data: unspecified)` per task on stderr — do NOT error. Add FR-110 fail-fast: dependency cycle (parse all `Depends on` into a graph; tarjan SCC > 1 → halt) OR a required field missing on a task that explicitly opts in (e.g., declares `Idempotent: no` but lacks recovery substep ref) → halt with "plan defect — run /grill 03_plan.md and re-plan", do NOT write defect-file (defect-file is for runtime-discovered planning gaps).
 - [ ] Step 4: Re-run — expected PASS.
@@ -1495,7 +1499,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Steps:**
 
-- [ ] Step 1: Write `/tmp/check_execute_defect.sh` asserting execute/SKILL.md mentions: defect file path `{feature_folder}/03_plan_defect_<task-id>.md`, frontmatter (`defect_task`, `generated_by_skill_version`, `generated_at`, `plan_ref`, `spec_ref`), 3 required body sections (Failure Context, Affected Artifacts, Suggested Fix Direction — last may be empty), instruction to user to run `/pmos-toolkit:plan --fix-from <task-id>`, deletion on successful resume past the defect task.
+- [ ] Step 1: Write `/tmp/check_execute_defect.sh` asserting (a) defect file path `03_plan_defect_<task-id>.md` mentioned with `{feature_folder}` interpolation context; (b) all 5 frontmatter keys present in execute/SKILL.md: `defect_task:`, `generated_by_skill_version:`, `generated_at:`, `plan_ref:`, `spec_ref:`; (c) the 3 body section headings present as literals: `## Failure Context`, `## Affected Artifacts`, `## Suggested Fix Direction`; (d) "may be empty" or "advisory" wording on Suggested Fix Direction; (e) `--fix-from` invocation phrase present (mapped via platform-strings); (f) deletion-on-resume rule: grep for "delete" or "remove" with `git rm` or `rm -f` AND "successful resume" or "past the defect" wording (P7 lifecycle). **OLD-rule absence:** `! grep -qF '03_plan_defect.md'` (without task-id suffix — the legacy single-defect-file pattern is replaced by per-task defect files).
 - [ ] Step 2: Run — expected FAIL.
 - [ ] Step 3: Add to Phase 2 "Verify-Fix Loop" — when 3-attempt budget is exhausted AND root cause is a *planning defect* (i.e., the plan's assumption about the codebase is wrong, NOT just a flaky test or environment issue): write `{feature_folder}/03_plan_defect_<task-id>.md` per §7.5 frontmatter + 3-section body. Frontmatter requires `defect_task`, `generated_by_skill_version: pmos-toolkit/<semver>`, `generated_at: <ISO 8601>`, `plan_ref`, `spec_ref`. Body: `## Failure Context` (what happened, exit code if applicable, last-output excerpt ≤50 lines redacted of secrets, reproduction steps); `## Affected Artifacts` (files modified, db state changes, services touched, env side-effects); `## Suggested Fix Direction` (free-form hints; may be empty — /plan --fix-from reads frontmatter + sections 1-2 as authoritative). Instruct user via platform-aware closing message: "Run `{plan_invocation} --fix-from <task-id>` to repair the plan." Halt /execute (status: failed in per-task log). Add to Phase 0.5 / 1 lifecycle (resume): when /execute resumes past a previously-failed task and that task is now `done`, delete the corresponding `03_plan_defect_<task-id>.md` if present (P7 / FR-100b). Use `git rm` if the file is tracked, else `rm -f`.
 - [ ] Step 4: Re-run — expected PASS.
@@ -1505,26 +1509,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 ---
 
-### T37: Already covered by T34 — fold (no separate task)
-
-**Goal:** `contract_version` read + warn-on-mismatch is implemented as part of T34. This task is a placeholder that asserts T34 covered FR-111 fully.
-**Spec refs:** FR-111
-**Depends on:** T34
-**Idempotent:** yes
-**TDD:** no — verification only (covered by T34's test)
-**Files:** (none)
-
-**Steps:**
-
-- [ ] Step 1: Verify T34 covers FR-111: re-run `/tmp/check_execute_phase1.sh` (which asserts `contract_version` mention).
-- [ ] Step 2: If passing, this task is a no-op — skip Steps 3-5.
-- [ ] Step 3: If T34 is incomplete on `contract_version`, edit /execute Phase 1 to add the warn-on-mismatch behavior; commit `feat(T37): ...`.
-
-**Inline verification:** `/tmp/check_execute_phase1.sh` exits 0 (already verified at T34).
-
-*Decision-Log note:* T37 is intentionally folded into T34's scope — see Decision Log P5 rationale (single warning surface). The task ID is preserved for traceability against spec FR-111.
-
----
+> **FR-111 (`contract_version`) coverage:** folded into T34. The `/tmp/check_execute_phase1.sh` script asserts the `contract_version` warn-on-mismatch behavior. Decision Log P5 rationalizes the single-task scope. (Loop 2 Nit #2: removed standalone T37 placeholder — task IDs T34 → T38 are sequential without a T37.)
 
 ### T38: Test fixture sub-repos for stack detection
 
@@ -1565,8 +1550,8 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Goal:** Drive /plan v2 against `tests/fixtures/specs/tier1_bugfix.md` from inside `tests/fixtures/repos/python/`; assert the produced plan is tier-correct (1 task, no decision-log floor, reduced TN).
 **Spec refs:** §10.2 Tier-1 grep tests
-**Depends on:** T33 (/plan v2 complete), T36 (/execute v2 complete), T19 + T38 (fixtures), T43 (plugin version bump must be in place for the freshly-loaded skill)
-**Requires state from:** T33, T36, T38, T43
+**Depends on:** T33 (/plan v2 complete), T36 (/execute v2 complete), T19 + T38 (fixtures), T43a (staged version bump — fresh-session plugin loader keys on version)
+**Requires state from:** T33, T36, T38, T43a
 **Idempotent:** yes
 **TDD:** no — integration test
 **Files:**
@@ -1627,7 +1612,7 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 **Goal:** Drive /plan v2 against `tier3_feature.md` from inside `tests/fixtures/repos/node/`; assert mermaid diagram, per-task new fields, sidecar review file, no leaked python commands.
 **Spec refs:** §10.2 Tier-3 grep tests
-**Depends on:** T33, T36, T19, T38, T43
+**Depends on:** T33, T36, T19, T38, T43a
 **Requires state from:** T33, T36, T38, T43
 **Idempotent:** yes
 **TDD:** no — integration test
@@ -1733,36 +1718,80 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 
 ---
 
-### T43: Plugin version bump (atomic Phase 3 release)
+### T43a: Stage version bump (no commit)
 
-**Goal:** Bump plugin version from 2.23.0 → 2.24.0 in both `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` (synced per pre-push hook), and add a CHANGELOG entry.
-**Spec refs:** S3, FR-115
+**Goal:** Edit both manifests + CHANGELOG to 2.24.0 in the working tree, but do NOT commit. Lets T39–T41 run against the v2-staged content while keeping the release commit gated on integration green.
+**Spec refs:** S3, FR-115, R6 (this plan)
 **Depends on:** T21, T22, T23, T24, T25, T26a, T26b, T27, T28, T29a, T29b, T29c, T30, T31a, T31b, T32, T33, T34, T35, T36, T42
-**Requires state from:** ALL Phase 3 task changes must be committed
-**Idempotent:** yes
+**Idempotent:** yes (re-running re-stages the same diff)
 **TDD:** yes — new-feature
 **Files:**
-- Modify: `plugins/pmos-toolkit/.claude-plugin/plugin.json`
-- Modify: `plugins/pmos-toolkit/.codex-plugin/plugin.json`
-- Modify: `CHANGELOG.md`
+- Modify: `plugins/pmos-toolkit/.claude-plugin/plugin.json` (working tree only)
+- Modify: `plugins/pmos-toolkit/.codex-plugin/plugin.json` (working tree only)
+- Modify: `CHANGELOG.md` (working tree only)
 
 **Steps:**
 
-- [ ] Step 1: Write `/tmp/check_version_bump.sh`:
+- [ ] Step 1: Write `/tmp/check_version_staged.sh`:
   ```bash
   set -e
   for f in plugins/pmos-toolkit/.claude-plugin/plugin.json plugins/pmos-toolkit/.codex-plugin/plugin.json; do
     grep -q '"version": "2.24.0"' "$f" || { echo "FAIL: $f not at 2.24.0"; exit 1; }
   done
   grep -q '## 2.24.0' CHANGELOG.md || { echo "FAIL: CHANGELOG missing 2.24.0 entry"; exit 1; }
+  # Confirm changes are STAGED but NOT yet committed (working tree dirty)
+  git diff --quiet plugins/pmos-toolkit/.claude-plugin/plugin.json plugins/pmos-toolkit/.codex-plugin/plugin.json CHANGELOG.md && { echo "FAIL: expected uncommitted diff but tree is clean"; exit 1; }
   echo PASS
   ```
-- [ ] Step 2: Run — expected FAIL.
-- [ ] Step 3: Edit both manifests: `"version": "2.23.0"` → `"version": "2.24.0"`. Add CHANGELOG entry under `## 2.24.0` heading describing /plan v2 + /execute v2 + /backlog type-enum extension + new shared resources, with a "Breaking changes: none — backwards-compat shim warns on missing optional fields" note (S8).
-- [ ] Step 4: Re-run — expected PASS.
-- [ ] Step 5: Commit `git commit -m "feat(T43): bump pmos-toolkit to 2.24.0 (atomic Phase 3 release)"`.
+- [ ] Step 2: Run — expected FAIL (versions still 2.23.0).
+- [ ] Step 3: Edit both manifests `"version": "2.23.0"` → `"version": "2.24.0"`. Add CHANGELOG entry under `## 2.24.0` heading describing /plan v2 + /execute v2 + /backlog type-enum extension + new shared resources, with a "Breaking changes: none — backwards-compat shim warns on missing optional fields" note (S8). Do NOT `git add` and do NOT commit.
+- [ ] Step 4: Re-run — expected PASS (uncommitted diff present, version strings 2.24.0).
+- [ ] Step 5: Stash-or-keep guidance: leave the diff uncommitted in working tree until T43 (final release) lands. T39–T41 manual integration runs read the live SKILL.md files, so the v2 behavior is exercised even without the version bump being committed.
 
-**Inline verification:** `/tmp/check_version_bump.sh` exits 0.
+**Inline verification:** `/tmp/check_version_staged.sh` exits 0.
+
+---
+
+### T43: Atomic v2.24.0 release commit
+
+**Goal:** Commit the staged version bump from T43a only after T39–T41 pass green. This is the actual atomic-rollout-marker per FR-115.
+**Spec refs:** S3, FR-115
+**Depends on:** T43a, T39, T40, T41
+**Requires state from:** T43a (staged diff), T39–T41 (assert scripts exit 0)
+**Idempotent:** yes
+**TDD:** yes — new-feature
+**Files:**
+- Commit: the staged diff from T43a
+
+**Steps:**
+
+- [ ] Step 1: Pre-commit gate — re-run T39–T41 assert scripts:
+  ```bash
+  bash tests/scripts/assert_t39.sh && bash tests/scripts/assert_t40.sh && bash tests/scripts/assert_t41.sh
+  ```
+  Expected: each prints `PASS` and exits 0. If any fails, halt and route back to /plan v2 fixes (Edit mode); do NOT commit version bump.
+
+- [ ] Step 2: Re-run `/tmp/check_version_staged.sh` to confirm the staged diff is still present (T43a not lost):
+  Run: `bash /tmp/check_version_staged.sh`
+  Expected: PASS.
+
+- [ ] Step 3: Commit:
+  ```bash
+  git add plugins/pmos-toolkit/.claude-plugin/plugin.json plugins/pmos-toolkit/.codex-plugin/plugin.json CHANGELOG.md
+  git commit -m "feat(T43): bump pmos-toolkit to 2.24.0 (atomic Phase 3 release)"
+  ```
+
+- [ ] Step 4: Post-commit verification:
+  ```bash
+  set -e
+  for f in plugins/pmos-toolkit/.claude-plugin/plugin.json plugins/pmos-toolkit/.codex-plugin/plugin.json; do
+    grep -q '"version": "2.24.0"' "$f"
+  done
+  git log -1 --pretty=%s | grep -q 'T43.*2.24.0' || { echo "FAIL: head commit not the v2.24.0 release"; exit 1; }
+  echo "RELEASED: pmos-toolkit v2.24.0"
+  ```
+
+**Inline verification:** Step 1 (T39–T41 green), Step 4 (commit landed at HEAD). Per pre-push hook, push fails if manifests aren't synced — Step 4 catches that locally.
 
 ---
 
@@ -1866,5 +1895,5 @@ This plan creates new files (shared resources, lints, fixtures) and modifies ski
 | Loop | Findings | Changes Made |
 |------|----------|-------------|
 | 1    | **Structural (2 Blocker, 2 Should-fix):** F1 FR-92 TN cleanup triggers unmapped; F2 §8.7 spec-re-open AskUserQuestion shape (E13) unmapped; F3 T14/T15 used "same shape as T13" placeholder phrasing; F4 cross-skill defect with spec FR-50a "<yaml-lib message>" wording (skills have no YAML library). **Design (4 Should-fix):** F5 T26 covered 6 FRs (oversized); F6 T29 covered 13 FRs (oversized); F7 T31 covered 4 distinct concerns; F8 FR-16 positive case (UI signal + populated wireframes/) not exercised by integration tests. | All 8 dispositions = "Fix as proposed". F1: T28 extended with FR-92 trigger-based emission rule (4 triggers + no-decoration rule). F2: T25 extended with §8.7 AskUserQuestion shape + FR-61a non-interactive halt. F3: T14, T15 inlined full bash assertion shells. F4: Decision Log P9 added (regex-based parse + revised error wording); T23 wording revised to "Spec frontmatter parse error at line N: <observed-token>". F5: T26 split → T26a (frontmatter+tier gates+Done-when) + T26b (Code Study+readability+glossary+tests-illustrative). F6: T29 split → T29a (cap+classify) + T29b (blind subagent) + T29c (Skip List+Phase 5 fold). F7: T31 split → T31a (Edit/Replan/Append) + T31b (non-interactive+picker+learnings). F8: T19 extended with wireframes/01_dashboard.html + 02_settings.html stubs; T40 assert_t40.sh extended with bidirectional-coverage check. Downstream Depends-on chains (T27, T29a, T30, T32) and T43 dependency list updated to reference split sub-task IDs. File Map regenerated. |
-| 2    | (pending blind subagent loop) | (pending) |
+| 2    | **Blind subagent review** (general-purpose agent, fresh context, plan + spec only). 8 findings: **Blockers (3):** B1 four `Depends on:` lines cite non-existent IDs (T26ba/T29ca/T29cb/T31ba — `replace_all` artifact); B2 T32 modifies "Phase 5" while T29c folds Phase 5 per FR-46 (contradictory edits); B3 T43 lands version bump BEFORE manual integration tests T39–T41 run. **Should-fix (3):** S1 grep checks too lenient (stub mentions pass without functional wiring); S2 FR-91 Phase 2 gate ("structural choices justified against ≥1 reference") not asserted; S3 AskUserQuestion option-list shapes for §8.1/8.2/8.4/8.6 not asserted. **Nits (2):** N1 `error_prefix` shipped in T1 but not mandated by spec §10.1; N2 T37 is a no-op placeholder. | All 6 high-risk dispositions = "Fix as proposed" (or "Split T43 into stage+release"). 2 low-risk auto-applied. **B1:** 4 deps fixed (T26b→T26a, T29b→T29a, T29c→T29b, T31b→T31a). **B2:** T32 Files line + Step 3 updated to place closing offer at "tail of Phase 4" (NOT a recreated Phase 5); coordinated with T29c. **B3:** T43 split into T43a (stage version diff in working tree, no commit; T39–T41 depend on T43a) + T43 (final commit gated on T39–T41 green; depends on T43a, T39, T40, T41). **S1:** OLD-rule absence + region-scope assertions added across T26a (legacy prose-header check), T27 (per-task region awk-extract + 3-state TDD enum), T28 (`[only if applicable]` removal + 5-column Risks header), T29a (legacy "minimum 2 loops" absence), T35 (no TODO/TBD in shim region), T36 (single-defect-file pattern absent). **S2:** T25 check extended to grep "reference system" AND ("structural choices" OR "Phase 2 gate") for FR-91 gate language. **S3:** §8.1 Cancel asserted in T31a; §8.2 4 dispositions in T29a; §8.4 Mono-repo + Other in T25; §8.6 4 dispositions in T24. **N1 (auto-applied):** `error_prefix` removed from T1's platform-strings.md template. **N2 (auto-applied):** T37 placeholder removed; coverage note inlined as a blockquote between T36 and T38 (task IDs intentionally non-contiguous; T34 covers FR-111). |
 

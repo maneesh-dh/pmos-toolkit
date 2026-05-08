@@ -597,29 +597,36 @@ All items below must be `pass` or `N/A` (with a stated reason for N/A). Loop unt
 
 ---
 
-## Phase 7: Final Review
+## Phase 7: Final Review — Conciseness, Readability, Coherence
 
-Run one final improvement pass:
+Phase 6 already covered structural completeness and design soundness. Phase 7 is the **fresh-eyes prose pass** — what remains after the spec is structurally and architecturally sound:
 
-1. **Requirements coverage** — Re-read the requirements doc. Is EVERYTHING covered? List gaps.
-2. **Conciseness** — Can sections be tightened without losing essence?
-3. **Missing standard sections** — Any typical spec sections absent?
-4. **Coherence** — Any conflicting specifications?
-5. **Engineer readability** — Can a different engineer fully understand what to build, how to build it, and how to verify it?
+1. **Conciseness** — Can sections be tightened without losing essence? Flag verbose passages.
+2. **Engineer readability** — Read as a stranger to this feature. Can you build it from this doc alone? Where do you stumble?
+3. **Cross-section coherence** — Do §6 (architecture), §9 (APIs), §10 (schema), and §11 (frontend) tell one consistent story? Flag any place where two sections imply different shapes.
 
-**Share your analysis with the user BEFORE modifying anything.** Use the same `AskUserQuestion` batching as review loops (see Phase 6 Findings Presentation Protocol) — one question per final-review finding with Fix / Modify / Skip / Defer options, up to 4 per call. Do NOT declare the spec complete until the user confirms.
+(Requirements coverage and missing-section checks are owned by the Phase 6 universal exit checklist — do NOT re-run them here.)
 
-After final fixes, commit:
-```
+**Share findings via the same `AskUserQuestion` batching as Phase 6** — including the `[Blocker]/[Should-fix]/[Nit]` severity tags. Up to 4 per call. Apply dispositions inline.
+
+**On user confirmation that the spec is complete:**
+
+1. Promote the status field in the spec doc using `Edit` with `old_string="**Status:** Draft"` and `new_string="**Status:** Ready for Plan"`.
+
+2. Commit:
+
+```bash
 git add {feature_folder}/02_spec.md
-git commit -m "docs: add spec for <feature>"
+git commit -m "docs: spec ready for plan — <feature>"
 ```
 
-Ask the user: "I believe the spec is ready. Do you have any remaining concerns? Next options:
-- `/pmos-toolkit:simulate-spec` — pressure-test the design against scenarios and adversarial failure modes before planning (recommended for Tier 2-3)
-- `/pmos-toolkit:plan` — proceed directly to implementation planning"
+3. Ask the user:
 
-The user's confirmation is required before declaring completion.
+> "Spec is Ready for Plan. Next options:
+> - `/pmos-toolkit:simulate-spec` — pressure-test the design against scenarios and adversarial failure modes (recommended for Tier 2-3)
+> - `/pmos-toolkit:plan` — proceed directly to implementation planning"
+
+The user's explicit confirmation is required before promoting status. Do not self-declare completion.
 
 ---
 

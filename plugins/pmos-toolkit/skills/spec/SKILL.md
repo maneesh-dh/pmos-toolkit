@@ -206,7 +206,20 @@ Good verification patterns to draw from:
 
 ## Phase 5: Write the Spec
 
-Save to `{feature_folder}/02_spec.md`. Overwrite if it already exists.
+Save to `{feature_folder}/02_spec.md`.
+
+**Before overwriting an existing spec:** if `{feature_folder}/02_spec.md` exists AND has uncommitted changes (check `git status --porcelain "{feature_folder}/02_spec.md"`), commit it first:
+
+```bash
+git add "{feature_folder}/02_spec.md"
+git commit -m "docs: snapshot prior spec before /spec rewrite"
+```
+
+This makes git the backup; the rewrite then proceeds normally with `Write` (no `.bak` files needed). If the file exists but is already committed, no pre-commit is needed — just proceed.
+
+### Status Field Lifecycle
+
+All templates start at `**Status:** Draft`. The status is promoted to `**Status:** Ready for Plan` only on user confirmation in Phase 7 (see that phase). Downstream skills (`/simulate-spec`, `/plan`) check this field and warn the user if invoked against a `Draft` spec.
 
 ### Tier 1 Template: Bug Fix / Minor Enhancement
 
@@ -226,13 +239,20 @@ Save to `{feature_folder}/02_spec.md`. Overwrite if it already exists.
 ## 3. Fix Approach
 [What changes, why this approach over alternatives]
 
-## 4. Edge Cases
+## 4. Decision Log
+[Lightweight — 1–3 rows expected. Capture the fix-approach choice and any rejected alternatives. Skip the table entirely only if there was exactly one obvious fix with no alternatives considered.]
+
+| # | Decision | Options Considered | Rationale |
+|---|----------|-------------------|-----------|
+| D1 | [What was decided] | (a) ..., (b) ... | [Why] |
+
+## 5. Edge Cases
 
 | # | Scenario | Condition | Expected Behavior |
 |---|----------|-----------|-------------------|
 | E1 | [Name] | [Trigger] | [What happens] |
 
-## 5. Testing Strategy
+## 6. Testing Strategy
 [Exact tests to write, exact verification commands]
 ```
 
@@ -287,11 +307,6 @@ Save to `{feature_folder}/02_spec.md`. Overwrite if it already exists.
 
 ## 10. Testing & Verification Strategy
 [What to test, how, exact commands]
-
-## 11. Open Questions
-
-| # | Question | Owner | Needed By |
-|---|----------|-------|-----------|
 ```
 
 ### Tier 3 Template: Feature / New System
@@ -469,14 +484,6 @@ CREATE TABLE ... (
 | Source | Type | Key Takeaway |
 |--------|------|-------------|
 | [path or URL] | Existing code / External | [What we learned] |
-
----
-
-## 17. Open Questions
-
-| # | Question | Owner | Needed By |
-|---|----------|-------|-----------|
-| 1 | [Unresolved decision] | [name] | [date or "before plan"] |
 ```
 
 ### Document Guidelines (all tiers)

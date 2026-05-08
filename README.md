@@ -83,8 +83,8 @@ pmos-toolkit/
 **Pipeline flow:**
 
 ```
-/requirements  →  [/wireframes  →  /prototype]  →  [/msf, /creativity, /grill]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
-                   optional bridges (UI features)    optional enhancers              optional validator
+/requirements  →  [/wireframes  →  /prototype]  →  [/msf-req, /creativity, /grill]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
+                   optional bridges (UI features)    optional enhancers                  optional validator
 ```
 
 `/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/diagram`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.

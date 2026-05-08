@@ -12,9 +12,9 @@ Pressure-test a technical spec by walking realistic and adversarial scenarios th
 This is an OPTIONAL VALIDATOR in the pipeline — runs between `/spec` and `/plan`:
 
 ```
-/requirements  →  [/msf, /creativity]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
-                   optional enhancers              (this skill)
-                                                  optional validator
+/requirements  →  [/msf-req, /creativity]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
+                   optional enhancers                  (this skill)
+                                                      optional validator
 ```
 
 **Announce at start:** "Using the simulate-spec skill to pressure-test the design."

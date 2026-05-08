@@ -1,6 +1,6 @@
 # PSYCH Output Format
 
-The reference for `psych-findings.md` produced by `/wireframes` Phase 6. Output is two tables per journey plus an ASCII sparkline. Format is intentionally aligned with `/msf` Pass B so artifacts are interchangeable.
+The reference for the PSYCH section embedded in `msf-findings.md` produced by `/msf-wf` Phase 7 (Section B). Output is two tables per journey plus an ASCII sparkline. (Pre-2.22 the PSYCH artifact was a separate `psych-findings.md` produced by `/wireframes` Phase 6; the artifact was unified when PSYCH moved into `/msf-wf`.)
 
 ## File header
 

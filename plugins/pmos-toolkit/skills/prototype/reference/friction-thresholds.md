@@ -1,8 +1,8 @@
 # Interactive Friction Thresholds
 
-Used by Phase 7 (Interactive Friction Pass). PSYCH/MSF stay in `/wireframes` — this is a lighter pass that measures *operational cost* of completing each user journey through the running prototype.
+Used by Phase 7 (Interactive Friction Pass). MSF + PSYCH analysis lives in `/msf-wf` (which `/wireframes` Phase 6 delegates to) — this is a lighter pass that measures *operational cost* of completing each user journey through the running prototype.
 
-The friction subagent walks each journey end-to-end and counts measurable interactions. It does NOT score motivation or satisfaction — that's `/msf`'s job.
+The friction subagent walks each journey end-to-end and counts measurable interactions. It does NOT score motivation or satisfaction — that's `/msf-req` and `/msf-wf`'s job.
 
 ## Walk mode (live vs analytical)
 

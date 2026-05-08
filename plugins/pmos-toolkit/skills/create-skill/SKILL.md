@@ -238,7 +238,7 @@ The trigger phrases matter because skill descriptions are how the agent decides 
 If the new skill fits into the existing pipeline, include the full pipeline diagram:
 
 ```markdown
-/requirements  →  [/msf, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
+/requirements  →  [/msf-req, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
                    optional enhancers
 ```
 

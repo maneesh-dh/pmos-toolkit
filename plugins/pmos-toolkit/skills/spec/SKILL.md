@@ -10,7 +10,7 @@ argument-hint: "<path-to-requirements-doc or requirements text> [--feature <slug
 Create a comprehensive technical specification from a requirements document. The spec defines HOW we're building it — architecture, API contracts, database design, frontend components, and verification strategy. This is the SECOND stage in a 3-stage pipeline:
 
 ```
-/requirements  →  [/msf, /creativity]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
+/requirements  →  [/msf-req, /creativity]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
                    optional enhancers     (this skill)    optional validator
 ```
 

@@ -11,10 +11,10 @@ setup() {
   [ -x "$LINT_SCRIPT" ]
 }
 
-@test "lint passes when no skills have inlined block (initial state)" {
+@test "lint passes when all supported skills have inlined block" {
   run "$LINT_SCRIPT"
-  [ "$status" -eq 1 ]
-  [[ "$output" == *MISSING-BLOCK* ]]
+  [ "$status" -eq 0 ]
+  [[ "$output" == *PASS* ]]
 }
 
 @test "lint exits 2 on missing canonical file" {

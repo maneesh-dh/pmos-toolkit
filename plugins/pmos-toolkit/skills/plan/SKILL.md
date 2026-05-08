@@ -2,7 +2,7 @@
 name: plan
 description: Create an execution plan from a spec — deep code study, TDD tasks with inline verification, decision logging, risk assessment, and a concrete final verification checklist. Third stage in the requirements -> spec -> plan pipeline. Always full format. Use when the user says "break this into tasks", "create the implementation steps", "how do we implement this", or has a spec ready for task breakdown.
 user-invocable: true
-argument-hint: "<path-to-spec-doc> [--backlog <id>] [--feature <slug>]"
+argument-hint: "<path-to-spec-doc> [--backlog <id>] [--feature <slug>] [--non-interactive | --interactive]"
 ---
 
 # Implementation Plan Generator
@@ -21,7 +21,7 @@ The plan translates a spec into **bite-sized, TDD-driven tasks** with exact file
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
+- **No interactive prompt tool:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
 
@@ -36,6 +36,7 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 
 **At skill end (after writing the plan doc):**
 - If `<id>` was set, invoke `/backlog set {id} plan_doc={doc_path}`, then `/backlog set {id} status=planned`. On failure, warn and continue.
+<!-- defer-only: ambiguous -->
 - Run the auto-capture flow per `pipeline-bridge.md`: detect deferred-work bullets in the plan output, propose them as new backlog items via `AskUserQuestion`. On user confirmation, invoke `/backlog add` for each with `source:` pre-filled.
 
 ---
@@ -70,9 +71,95 @@ Use workstream context (loaded by step 3 below) to inform task design — tech s
 
 ---
 
+<!-- non-interactive-block:start -->
+1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
+   - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).
+   - `parent_marker` is set if the original prompt's first line matches `^\[mode: (interactive|non-interactive)\]$` (FR-06.1).
+   - `settings.default_mode` is `.pmos/settings.yaml :: default_mode` if present and one of `interactive`/`non-interactive`. Unknown values → warn on stderr `settings: invalid default_mode value '<v>'; ignoring` and fall through (FR-01.3).
+   - If `.pmos/settings.yaml` is malformed (not parseable as YAML, or missing `version`): print to stderr `settings.yaml malformed; fix and re-run` and exit 64 (FR-01.5).
+   - On Phase 0 entry, always print to stderr exactly: `mode: <mode> (source: <source>)` (FR-01.2).
+
+2. **Per-checkpoint classifier.** Before issuing any `AskUserQuestion` call, classify it (FR-02):
+   - Use the awk extractor below to find the line of this call's `question:` key in the live SKILL.md (FR-02.6).
+   - The defer-only tag, if present, is the literal previous non-empty line: `<!-- defer-only: <reason> -->` where `<reason>` ∈ {`destructive`, `free-form`, `ambiguous`} (FR-02.5).
+   - Decision (in order): tag adjacent → DEFER; multiSelect with 0 Recommended → DEFER; 0 options OR no option label ends in `(Recommended)` → DEFER; else AUTO-PICK the (Recommended) option (FR-02.2).
+
+3. **Buffer + flush.** Maintain an append-only OQ buffer in conversation memory. On each AUTO-PICK or DEFER classification, append one entry per the schema in spec §11.2. At end-of-skill (or in a caught error before exit), flush (FR-03):
+   - Primary artifact is single Markdown → append `## Open Questions (Non-Interactive Run)` section with one fenced YAML block per entry; update prose frontmatter (`**Mode:**`, `**Run Outcome:**`, `**Open Questions:** N` where N counts deferred only — see FR-03.4) (FR-03.1).
+   - Skill produces multiple artifacts → write a single `_open_questions.md` aggregator at the artifact directory root; primary artifact's frontmatter `**Open Questions:** N — see _open_questions.md` (FR-03.5).
+   - Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md` (FR-03.2).
+   - No persistent artifact (chat-only) → emit buffer to stderr at end-of-run as a single block prefixed `--- OPEN QUESTIONS ---` (FR-03.3).
+   - Mid-skill error → flush partial buffer under heading `## Open Questions (Non-Interactive Run — partial; skill errored)`; set `**Run Outcome:** error`; exit 1 (E13).
+
+4. **Subagent dispatch.** When dispatching a child skill via Task tool or inline invocation, prepend the literal first line: `[mode: <current-mode>]\n` to the child's prompt (FR-06).
+
+5. **Awk extractor.** The classifier and `tools/audit-recommended.sh` MUST both use the function below. Loaded at script init time; sourcing differs per consumer.
+
+<!-- awk-extractor:start -->
+```awk
+# Find AskUserQuestion call sites and their adjacent defer-only tags.
+# Input: a SKILL.md file (stdin or argv).
+# Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
+in_inlined { next }
+/^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
+  match($0, /defer-only:[[:space:]]*[a-z-]+/);
+  pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
+  sub(/^[[:space:]]+/, "", pending_tag);
+  pending_line = NR;
+  next;
+}
+/^[[:space:]]*$/ {
+  emit_pending();
+  pending_tag = "";
+  next;
+}
+/AskUserQuestion/ {
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
+  pending_tag = "";
+  next;
+}
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
+```
+<!-- awk-extractor:end -->
+
+6. **Refusal check.** If this SKILL.md contains a `<!-- non-interactive: refused; ... -->` marker (regex: `<!--[[:space:]]*non-interactive:[[:space:]]*refused`), and `mode` resolved to `non-interactive`: emit refusal per Section A and exit 64 (FR-07).
+
+7. **Pre-rollout BC.** If the `--non-interactive` argument is present BUT this SKILL.md does NOT contain the `<!-- non-interactive-block:start -->` marker (i.e., this skill hasn't been rolled out yet): emit `WARNING: --non-interactive not yet supported by /<skill>; falling back to interactive.` to stderr; continue in interactive mode (FR-08).
+
+8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
+<!-- non-interactive-block:end -->
+
 ## Phase 1: Intake
 
 1. **Locate the spec.** Follow `../.shared/resolve-input.md` with `phase=spec`, `label="spec"`.
+<!-- defer-only: ambiguous -->
 2. **Read the spec end-to-end.** Summarize it back in 3-5 bullets and confirm understanding with the user via AskUserQuestion.
 3. **Read tier and type from spec frontmatter** (FR-01). Re-use the parse from Phase 0 step 9; set `{tier}` and `{type}` for downstream phases. Tier-N gating in Phase 3 / Phase 4 keys off `{tier}`; per-task TDD precedence (FR-104a) keys off `{type}`.
 4. **Surface simulate-spec findings** (FR-51). Glob `{feature_folder}/02_simulate-spec_*.md`. If a file exists with unresolved findings, run a §8.6 batched `AskUserQuestion` per finding before proceeding — options: **Update spec to address before planning** / **Treat as Open Question in plan** / **Accept as risk** / **Skip — already resolved upstream**.
@@ -577,6 +664,7 @@ Each loop runs BOTH checks:
 
 1. Run BOTH checklists above
 2. Log findings in the Review Log table
+<!-- defer-only: ambiguous -->
 3. **Present findings via `AskUserQuestion` — do NOT dump them as prose.** Findings shown as text force the user to hand-write dispositions; batching them as structured questions is faster, clearer, and produces a reviewable audit trail. See "Findings Presentation Protocol" below.
 4. Apply the user's dispositions (Fix as proposed / Modify / Skip / Defer) — see protocol below
 5. Fix issues inline — do NOT create a new file
@@ -587,6 +675,7 @@ Each loop runs BOTH checks:
 For every loop that produces findings (structural or design-critique):
 
 1. **Group findings by category** (e.g., "Missing verification commands", "Oversized tasks", "Type inconsistencies across tasks"). Small categories can be merged; never present more than 4 findings in a single batch.
+<!-- defer-only: ambiguous -->
 2. **One question per finding** via `AskUserQuestion`. Use this shape:
    - `question`: one-sentence restatement of the finding + the proposed fix (concrete — e.g., "Split Task 4 (migration + backfill + flag flip) into three tasks" not "break up task 4")
    - `options` (up to 4):
@@ -594,11 +683,11 @@ For every loop that produces findings (structural or design-critique):
      - **Modify** — user edits the proposal (free-form reply expected next turn)
      - **Skip** — not an issue; drop it (note briefly in Review Log)
      - **Defer** — log in Open Questions with rationale
-3. **Batch up to 4 questions per `AskUserQuestion` call.** If there are more findings, issue multiple calls sequentially, one category per call.
-4. **Skip `AskUserQuestion` only for findings that need open-ended input** (e.g., "what's the right rollback trigger?"). For those, ask inline as a normal follow-up after the batch — do not shoehorn into options.
+3. **Batch up to 4 questions per interactive-prompt call.** If there are more findings, issue multiple calls sequentially, one category per call.
+4. **Skip the interactive prompt only for findings that need open-ended input** (e.g., "what's the right rollback trigger?"). For those, ask inline as a normal follow-up after the batch — do not shoehorn into options.
 5. **After dispositions arrive,** apply them in order, update the Review Log row to cite dispositions, then ask the user if they see additional gaps before declaring the loop complete.
 
-**Platform fallback (no `AskUserQuestion`):** list findings as a numbered table with columns [Finding | Proposed Fix | Options: Fix/Modify/Skip/Defer]; ask the user to reply with the disposition numbers. Do NOT silently self-fix.
+**Platform fallback (no interactive prompt tool):** list findings as a numbered table with columns [Finding | Proposed Fix | Options: Fix/Modify/Skip/Defer]; ask the user to reply with the disposition numbers. Do NOT silently self-fix.
 
 **Anti-pattern:** A wall of prose ending in "Let me know what you'd like to fix." This forces the user to re-state each finding in their reply. Always structure the ask.
 
@@ -639,6 +728,8 @@ Phase 5 in /plan v1 ran a separate "Final Review" pass *outside* the loop discip
 - The user resumes by re-running /plan interactively or with explicit `--decide <option>` flags.
 
 `--non-interactive` writes an audit sidecar `{feature_folder}/03_plan_auto.md` listing every Recommended pick the run made, so a human can audit the choices retrospectively.
+
+> **Cross-cutting non-interactive contract.** The Phase 0 `<!-- non-interactive-block -->` above (FR-01..FR-09 from the cross-cutting non-interactive-mode feature) is the canonical mode-resolver, classifier, and OQ-buffer protocol shared across all 26 user-invokable skills. /plan's FR-61/FR-61a halt-and-write-blocked-doc behavior layers on top of that contract: the cross-cutting block determines `mode` and routes calls; FR-61a defines /plan's per-domain halt response when a high-risk choice has no `(Recommended)` option.
 
 ### Folder picker (FR-65)
 

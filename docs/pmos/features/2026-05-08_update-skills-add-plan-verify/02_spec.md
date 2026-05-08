@@ -47,7 +47,7 @@ Primary success metric: 100% of Tier 2+ runs produce a plan artifact; 100% of al
 | D6 | `/plan` invoked with the spec doc path as first positional arg. | (a) Spec path; (b) wrapper. | Code recon: `plan/SKILL.md` argument-hint is `<path-to-spec-doc>`. Use directly. |
 | D7 | `/verify` invoked with the spec doc path as first positional arg, default scope. | (a) Spec path default; (b) `--scope phase`; (c) custom mode. | Code recon: `verify/SKILL.md` argument-hint accepts spec path; default mode covers static + multi-agent + spec compliance, which is what skill verification needs. No `--for-skill` mode exists. |
 | D8 | `/create-skill` emits a final pipeline-status table à la `/update-skills` Phase 8. | (a) Emit; (b) skip. | Author needs to see which phases ran (esp. when /plan or /verify fall back). Cheap to add; high audit value. |
-| D9 | Release prereqs (README row, version bump) survive — folded into the Phase 8 `/verify` seed brief. | (a) Pass via seed; (b) keep parallel checklist; (c) drop. | `/verify` doesn't auto-check README presence; seed brief carries the hint so /verify's spec-compliance phase flags a missing row. |
+| D9 | Release prereqs (README row, version bump) live as **FR rows in this spec** so `/verify` Phase 5 4b picks them up via normal spec-compliance. | (a) FR rows in spec; (b) seed-brief hints (rejected — /verify has no slot for free-form invocation hints); (c) drop, rely on /push hook. | Code recon: /verify Phase 5 4b reads the spec doc and grades each FR; this is the only mechanism that actually flows. Seed-brief hints would be invented integration. |
 | D10 | Renumber: implement = Phase 7, verify = Phase 8, learnings = Phase 9. | (a) Renumber; (b) decimal Phase 5.5 / 6.5. | Clean monotonic numbering matches doc readability and avoids "what runs first at T1" confusion. |
 
 ---
@@ -89,9 +89,7 @@ Spec status flow: `draft → grilled (T3) → planned (T2+) → approved → imp
 ```
 1. Mandatory all tiers (no skip gate).
 2. Invoke `/pmos-toolkit:verify <spec-path>`. Default-foreground.
-3. Pass these release-prereq HINTS in the invocation context (so /verify's spec-compliance phase can flag misses):
-   - "Confirm a row was added to README.md under appropriate Skills section."
-   - "Confirm minor version bump in plugins/pmos-toolkit/.claude-plugin/plugin.json AND .codex-plugin/plugin.json."
+3. (No "hints" mechanism — release prereqs live as FR-12 / FR-13 in this spec. /verify Phase 5 4b reads the spec doc and grades each FR; that is how the README row + version bump get verified. See D9.)
 4. On success: spec status implemented → verified.
 5. On blocker findings unresolved: status stays `implemented`; final pipeline-status table flags the skill as not-ready. User can re-run /create-skill from Phase 8 to retry verification.
 6. On /verify skill missing: HARD ERROR. AskUserQuestion: Install/upgrade /verify / Accept-as-risk override (logs warning to spec §14, sets status `unverified`) / Abort. Default Abort.
@@ -121,8 +119,10 @@ Spec status flow: `draft → grilled (T3) → planned (T2+) → approved → imp
 
 | ID | Requirement |
 |---|---|
-| FR-10 | `reference/spec-template.md` is unchanged by this spec. (Open question deferred — see §14 stub.) |
+| FR-10 | `reference/spec-template.md` is unchanged by this spec. |
 | FR-11 | No new files added under `plugins/pmos-toolkit/skills/create-skill/`. |
+| FR-12 | A row is added to `README.md` under the appropriate Skills section noting the updated /create-skill pipeline (or, if /create-skill already has a row, updating that row's description to reflect plan+verify). |
+| FR-13 | A **minor** version bump is applied in BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` AND `plugins/pmos-toolkit/.codex-plugin/plugin.json` (2.24.0 → 2.25.0). Versions MUST stay in sync; pre-push hook enforces. |
 
 ---
 
@@ -184,7 +184,7 @@ Per the existing Platform Adaptation section of `/create-skill`, plus new entrie
 | E1 | User passes `--tier 1` for what interview signals as Tier 2 | Tier override | Honor override per current Phase 2; skip Phase 4/5/6; still run Phase 8 /verify. |
 | E2 | User cancels `/plan` mid-flow | Phase 6 cancelled | AskUserQuestion Retry/Abort; default Retry once. |
 | E3 | `/plan` skill returns success but plan doc was not written | Pathological | Detect by: after /plan returns, check expected plan path exists. If missing → treat as failure, run E2 dialog. |
-| E4 | `/verify` blocker findings unresolved | User dispositions in /verify, blockers remain | `/create-skill` does NOT mark status verified; pipeline-status flags as not-ready. User can re-invoke `/create-skill --resume verify` (out of scope; document as future work). |
+| E4 | `/verify` blocker findings unresolved | User dispositions in /verify, blockers remain | `/create-skill` does NOT mark status verified; pipeline-status flags as not-ready. User re-invokes `/pmos-toolkit:verify <spec-path>` directly (idempotent) to resume — `/create-skill` itself has no `--resume` flag. |
 | E5 | User runs `/create-skill` against a spec that was approved before this version | Pre-existing approved spec, no `planned` status | Treat `approved` as eligible to enter Phase 6 directly; bump status to `planned` after /plan completes. |
 | E6 | Two consecutive `/plan` invocations (resume) | Plan doc already exists | `/plan` itself handles update vs. fresh; `/create-skill` passes the spec path; behavior inherited. |
 | E7 | New SKILL.md exceeds 500 lines after edits | NFR-01 breach | Refactor: extract the longer Convention 1 block into `reference/conventions-save-location.md`. (Triggered if measured > 500.) |

@@ -181,3 +181,13 @@ simulate_refusal_check() {
   return 64
 }
 export -f simulate_refusal_check
+
+# Source the parser snippet from _shared/non-interactive.md Section B at test-load time.
+# Side effect: defines parse_open_questions().
+load_parser_snippet() {
+  local body
+  body=$(awk '/<!-- parser-snippet:start -->/,/<!-- parser-snippet:end -->/' "$SHARED_FILE" \
+    | awk '/^```bash$/{flag=1;next}/^```$/{flag=0}flag')
+  eval "$body"
+}
+export -f load_parser_snippet

@@ -84,11 +84,13 @@ No Tier 3 → no `/grill` step.
 
 ## Pipeline status
 
+**Note on collapsed pipeline.** Per the user's "push through all 4 skills now" directive in Phase 8, Tier 2/3 sub-pipelines for `/complete-dev`, `/verify`, and `/execute` were collapsed: requirements doc + inline implementation + inline verify review. /spec, /plan, and (for /execute) /grill were skipped in favor of self-contained requirements docs that double as design contracts. Full ceremony deviation is logged per sub-pipeline.
+
 | Skill | Phase | Status | Artifact path | Timestamp |
 |---|---|---|---|---|
-| execute | requirements | pending | — | — |
-| verify | requirements | pending | — | — |
-| complete-dev | requirements | pending | — | — |
-| changelog | requirements | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/changelog/01_requirements.md | 2026-05-08 |
-| changelog | execute | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/changelog/execute/task-01.md | 2026-05-08 |
-| changelog | verify | in-progress | — | 2026-05-08 |
+| changelog (Tier 1) | requirements | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/changelog/01_requirements.md | 2026-05-08 |
+| changelog (Tier 1) | execute | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/changelog/execute/task-01.md | 2026-05-08 |
+| changelog (Tier 1) | verify | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/changelog/verify/review.md | 2026-05-08 |
+| complete-dev (Tier 2 collapsed) | requirements + execute + verify | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/complete-dev/{01_requirements.md, verify/review.md} | 2026-05-08 |
+| verify (Tier 2 collapsed) | requirements + execute + verify | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/verify/{01_requirements.md, verify/review.md} | 2026-05-08 |
+| execute (Tier 3 collapsed; /grill self-grilled) | requirements + execute + verify | completed | docs/pmos/features/2026-05-08_update-skills-retro-pipeline-friction/execute/{01_requirements.md, verify/review.md} | 2026-05-08 |

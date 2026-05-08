@@ -6,8 +6,12 @@ For `/backlog add <text>`, infer `type` by scanning the text (case-insensitive) 
 |------:|------|-----------------------------|
 | 1 | `bug` | `bug`, `broken`, `fails`, `failing`, `flaky`, `crash`, `error`, `regression`, `incorrect`, `wrong output`, `should not`, `doesn't work`, `not working`, `500`, `404` |
 | 2 | `tech-debt` | `refactor`, `cleanup`, `clean up`, `tech debt`, `technical debt`, `legacy`, `deprecated`, `tightly coupled`, `hardcoded`, `temporary`, `hack`, `TODO:`, `FIXME:` |
-| 3 | `feature` | `add`, `we should`, `let's build`, `support for`, `new`, `enable`, `expose`, `allow users to`, `implement`, `introduce` |
-| 4 | `idea` | (fallback — no match in 1-3) |
+| 3 | `chore` | `rename`, `reorganize`, `tidy`, `move file`, `housekeeping`, `bump version`, `pin dependency` |
+| 4 | `docs` | `doc`, `docs`, `documentation`, `readme`, `comment`, `document`, `explain in writing`, `update CLAUDE.md`, `changelog entry` |
+| 5 | `spike` | `spike`, `investigate`, `research`, `explore`, `prototype`, `proof of concept`, `POC`, `time-box` |
+| 6 | `enhancement` | `improve`, `polish`, `tune`, `extend`, `streamline`, `make smoother`, `make faster`, `make easier` |
+| 7 | `feature` | `add`, `we should`, `let's build`, `support for`, `new`, `enable`, `expose`, `allow users to`, `implement`, `introduce` |
+| 8 | `idea` | (fallback — no match in 1-7) |
 
 ## Rules
 

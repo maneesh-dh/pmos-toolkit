@@ -55,4 +55,5 @@ None.
 | /create-skill | spec | completed | docs/pmos/features/2026-05-08_update-skills-add-plan-verify/02_spec.md | 2026-05-08 |
 | /create-skill | grill | completed | inline grill report (3 questions, 2 spec edits) | 2026-05-08 |
 | /create-skill | plan | completed | docs/pmos/features/2026-05-08_update-skills-add-plan-verify/03_plan.md | 2026-05-08 |
-| /create-skill | execute | in-progress | (pending) | 2026-05-08 |
+| /create-skill | execute | completed | git HEAD (5 files, +56/-54) | 2026-05-08 |
+| /create-skill | verify | in-progress | (pending) | 2026-05-08 |

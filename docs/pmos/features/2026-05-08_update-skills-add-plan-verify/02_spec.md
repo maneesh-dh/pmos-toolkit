@@ -1,7 +1,7 @@
 # Add /plan and /verify to /create-skill — Spec
 
 **Date:** 2026-05-08
-**Status:** Ready for Plan
+**Status:** Verified
 **Requirements:** `docs/pmos/features/2026-05-08_update-skills-add-plan-verify/01_requirements.md`
 
 ---

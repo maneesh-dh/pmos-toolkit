@@ -90,12 +90,25 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 # Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
 # A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
 # (backtick mentions, prose instructions, multi-line invocation hints).
-# Lines inside the inlined `<!-- non-interactive-block:... -->` region are
-# canonical contract text and never count as call sites.
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
 /<!-- non-interactive-block:start -->/ { in_inlined=1; next }
 /<!-- non-interactive-block:end -->/   { in_inlined=0; next }
 in_inlined { next }
 /^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
   match($0, /defer-only:[[:space:]]*[a-z-]+/);
   pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
   sub(/^[[:space:]]+/, "", pending_tag);
@@ -103,16 +116,24 @@ in_inlined { next }
   next;
 }
 /^[[:space:]]*$/ {
-  # Whitespace-only line breaks adjacency (FR-02.5 strict).
+  emit_pending();
   pending_tag = "";
   next;
 }
 /AskUserQuestion/ {
-  has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
-  tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "-";
-  printf "%d\t%d\t%s\n", NR, has_recc, tag;
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
   pending_tag = "";
+  next;
 }
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
 ```
 <!-- awk-extractor:end -->
 

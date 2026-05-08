@@ -165,6 +165,7 @@ END { emit_pending() }
 5. **Detect the `type:`.** Set the spec's `type` frontmatter (per the templates) using this precedence (FR-05, FR-112):
    - **`--backlog <id>` was passed** → read the backlog item's `type:` field and map to a spec `type`: `bug → bugfix`, `feature → feature`, `enhancement → enhancement`, `chore → enhancement`, `docs → enhancement`, `spike → feature`. Carry forward without asking.
    - **Requirements doc has a `type:` tag** in frontmatter → carry forward without asking.
+   <!-- defer-only: ambiguous -->
    - **Otherwise** → confirm with the user via `AskUserQuestion` with options `bugfix` / `enhancement` / `feature` (recommend the option implied by the tier: Tier 1 → bugfix, Tier 2 → enhancement, Tier 3 → feature).
 
    Persist `type` into the spec frontmatter (per the Tier N Template above). /plan FR-104a permits per-task TDD overrides keyed off this `type` and logs them as decisions.

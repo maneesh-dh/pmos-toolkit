@@ -162,6 +162,7 @@ END { emit_pending() }
 <!-- defer-only: ambiguous -->
 2. **Read the spec end-to-end.** Summarize it back in 3-5 bullets and confirm understanding with the user via AskUserQuestion.
 3. **Read tier and type from spec frontmatter** (FR-01). Re-use the parse from Phase 0 step 9; set `{tier}` and `{type}` for downstream phases. Tier-N gating in Phase 3 / Phase 4 keys off `{tier}`; per-task TDD precedence (FR-104a) keys off `{type}`.
+<!-- defer-only: ambiguous -->
 4. **Surface simulate-spec findings** (FR-51). Glob `{feature_folder}/02_simulate-spec_*.md`. If a file exists with unresolved findings, run a §8.6 batched `AskUserQuestion` per finding before proceeding — options: **Update spec to address before planning** / **Treat as Open Question in plan** / **Accept as risk** / **Skip — already resolved upstream**.
 5. **Check for an existing plan.** Look for `{feature_folder}/03_plan.md`.
    - If found: read it, ask if this is an update or fresh start.
@@ -203,6 +204,7 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 
    **Tiebreak** (FR-14a): equal weights → alphabetical. In `--non-interactive` mode the tiebreak is logged to `03_plan_auto.md`.
 
+   <!-- defer-only: ambiguous -->
    **Stack-ambiguity prompt** (§8.4) — interactive mode only: if signals are mixed (e.g., monorepo with both npm and python), surface via `AskUserQuestion`: `Detected mixed stack signals. Pick the primary for plan generation:` with options `<stack-1>` / `<stack-2>` / `Mono-repo: pick all` / `Other` (FR-14).
 
    **Greenfield substitute** (FR-91, E2). When no signals are observed, do NOT skip the gate — choose a reference system (the closest existing system the planner can cite) and record the choice in Code Study Notes. **Phase 2 gate:** structural choices must be justified against ≥1 reference system; absence of stack signals is not a license to invent.
@@ -211,6 +213,7 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 
 9. **Wireframe coverage** (FR-16, FR-16a). If `{feature_folder}/wireframes/` exists, every `*.html` file under it must be referenced by ≥1 task's `**Wireframe refs:**` field OR listed in a `## Wireframes Out of Scope` subsection of the plan. **Vestigial wireframes** (FR-16a): when no UI signal is detected (no UI tasks in the spec) but the wireframes folder exists, auto-emit `## Wireframes Out of Scope` with all wireframes listed.
 
+<!-- defer-only: ambiguous -->
 10. **Spec re-open during planning** (§8.7, E13). When Phase 2 code study contradicts a spec decision (e.g., spec says "use Postgres" but `docker-compose.yml` shows MySQL), halt via `AskUserQuestion`: `Spec decision conflicts with repo standard. {Spec text} vs {observed standard}. How to resolve?` Options: **Halt /plan and update spec** (terminates this run; user re-runs /spec then /plan) / **Document override in spec via Decision Log entry** (open spec, add Decision Log entry citing the divergence with rationale, save, continue planning) / **Accept spec as-is despite divergence** (record decision in plan's Decision Log; proceed with spec's choice) / **Skip — not actually a conflict** (spec was correct; observation was misread). In `--non-interactive` mode this is a high-risk decision with no Recommended option → trigger FR-61a halt protocol (exit code 2 + write `03_plan_blocked.md`).
 
 11. **Summarize findings** in a "Code Study Notes" section for the plan.
@@ -574,6 +577,7 @@ Each entry MUST have "Options Considered" and "Rationale."
 
 After writing the initial plan, run iterative review loops with a **hard cap of 4 loops** (FR-40; replaces the legacy "minimum 2 loops" rule). Tier-2 plans typically converge in 1 loop; Tier-3 plans run 2–4. The cap exists to prevent indefinite churn.
 
+<!-- defer-only: ambiguous -->
 **Cap-hit interactive (FR-40):** when loop 4 still produces findings, surface via `AskUserQuestion`: `Review-loop cap reached (4 loops). Findings still open. How to proceed?` Options:
 - **Continue** — extend by 1 loop (single-shot override; cap effectively becomes 5).
 - **Accept and proceed** — fold remaining findings into Open Questions, ship the plan as-is.
@@ -722,6 +726,7 @@ Phase 5 in /plan v1 ran a separate "Final Review" pass *outside* the loop discip
 
 ### Non-interactive mode (FR-61, FR-61a)
 
+<!-- defer-only: ambiguous -->
 `--non-interactive` runs the entire skill without `AskUserQuestion`. Choices follow Recommended (Recommended option). For high-risk decisions with no Recommended option (FR-61a halt protocol):
 - **Halt** with exit code 2.
 - Write `{feature_folder}/03_plan_blocked.md` containing the question, options considered, and a one-line "what changed" hint.
@@ -733,6 +738,7 @@ Phase 5 in /plan v1 ran a separate "Final Review" pass *outside* the loop discip
 
 ### Folder picker (FR-65)
 
+<!-- defer-only: ambiguous -->
 Per `_shared/pipeline-setup.md` Section B.4 cross-reference (FR-65): when no `--feature` is given and `settings.current_feature` is unset, present folder options via `AskUserQuestion`:
 - **Recently-modified feature** (most-recent mtime under `{docs_path}/features/`).
 - **Best slug-match** (closest existing folder by slug similarity to the user's argument, if any).

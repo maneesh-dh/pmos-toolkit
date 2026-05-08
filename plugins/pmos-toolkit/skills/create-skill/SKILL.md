@@ -206,7 +206,9 @@ If `/grill` is unavailable, fall back to the platform-adaptation note (skip with
 2. Invoke `/pmos-toolkit:plan <spec-path>`. Default-foreground.
 3. On success: spec status `approved → planned`. The user approves the plan doc as part of `/plan`'s own Phase 5 review — do not gate again here.
 4. On failure:
+   <!-- defer-only: ambiguous -->
    - **`/plan` skill missing:** log a one-paragraph warning to spec §14, then `AskUserQuestion`: **Continue (skip plan, log warning)** / **Abort**. Default Continue. (Mirrors how Phase 5 handles missing `/grill`.)
+   <!-- defer-only: ambiguous -->
    - **`/plan` cancelled or errored:** `AskUserQuestion`: **Retry** / **Abort**. Default Retry once; on second failure show the same dialog.
 5. Do not proceed to Phase 7 until plan status is `approved` (or the user explicitly chose Continue on missing).
 
@@ -241,6 +243,7 @@ For Tier 1 (no spec): use the Phase 3 interview answers directly as the implemen
 3. The release-prereq items (README row, version bump) live as FRs in the spec — `/verify` Phase 5 4b reads the spec and grades each FR-ID, so no separate hint mechanism is needed.
 4. On success (no Critical findings): spec status `implemented → verified`.
 5. On unresolved blocker findings: spec status stays `implemented`. The skill is flagged as not-ready in the Phase 8 pipeline-status table. The user may re-invoke `/pmos-toolkit:verify <spec-path>` directly (it is idempotent) — `/create-skill` itself has no `--resume` flag.
+<!-- defer-only: ambiguous -->
 6. On `/verify` skill missing: HARD ERROR. `AskUserQuestion`: **Install/upgrade /verify** / **Accept-as-risk override** (logs a warning to spec §14 and sets status `unverified`) / **Abort**. Default Abort.
 7. After Phase 8 returns, emit a pipeline-status summary table to chat (mirror of `/update-skills` Phase 8):
 

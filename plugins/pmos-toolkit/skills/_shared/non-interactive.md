@@ -44,8 +44,13 @@ Supporting skills paste the block between the markers below into their own Phase
 # Find AskUserQuestion call sites and their adjacent defer-only tags.
 # Input: a SKILL.md file (stdin or argv).
 # Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
-# A "call site" is a line beginning with `AskUserQuestion` (case-sensitive)
-# or containing the verbatim invocation hint `AskUserQuestion(`.
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# Lines inside the inlined `<!-- non-interactive-block:... -->` region are
+# canonical contract text and never count as call sites.
+/<!-- non-interactive-block:start -->/ { in_inlined=1; next }
+/<!-- non-interactive-block:end -->/   { in_inlined=0; next }
+in_inlined { next }
 /^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
   match($0, /defer-only:[[:space:]]*[a-z-]+/);
   pending_tag = substr($0, RSTART + 12, RLENGTH - 12);

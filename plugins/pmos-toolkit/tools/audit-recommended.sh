@@ -63,7 +63,7 @@ for skill_file in "${TARGETS[@]}"; do
     continue
   fi
 
-  if grep -q '<!-- non-interactive: refused' "$skill_file"; then
+  if grep -qE '^[[:space:]]*<!-- non-interactive: refused' "$skill_file"; then
     echo "REFUSED: $(basename "$(dirname "$skill_file")")/SKILL.md (exempt)"
     continue
   fi

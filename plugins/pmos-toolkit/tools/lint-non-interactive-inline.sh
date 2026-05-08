@@ -31,7 +31,7 @@ for d in "${PLUGIN_ROOT}"/skills/*/; do
     name=$(basename "$d")
     [[ "$name" == "_shared" || "$name" == "learnings" ]] && continue
     [[ ! -f "$d/SKILL.md" ]] && continue
-    grep -q '<!-- non-interactive: refused' "$d/SKILL.md" && continue
+    grep -qE '^[[:space:]]*<!-- non-interactive: refused' "$d/SKILL.md" && continue
     SUPPORTED_SKILLS+=("$name")
 done
 

@@ -499,9 +499,7 @@ CREATE TABLE ... (
 
 ## Phase 6: Review Loops
 
-**Tier 1:** Run 1 review loop, then final review.
-
-**Tier 2-3:** Run minimum 2 loops, continue until exit criteria are met.
+**Loop count is emergent — there is no minimum or maximum.** Run review loops until the universal exit checklist (below) is satisfied: every applicable item is `pass` and the user has confirmed no further concerns. A single clean loop is a valid stopping point; a Tier 3 spec may need four. The exit criteria are the contract, not the loop count.
 
 ### Two Types of Review
 
@@ -543,7 +541,7 @@ For every loop that produces findings (structural or design-critique):
 
 1. **Group findings by category** (e.g., "Missing API error shapes", "Unclear component boundaries", "Undocumented decisions"). Small categories can be merged; never present more than 4 findings in a single batch.
 2. **One question per finding** via `AskUserQuestion`. Use this shape:
-   - `question`: one-sentence restatement of the finding + the proposed fix (concrete — e.g., "Add 409 response for duplicate email to POST /users" not "tighten error handling")
+   - `question`: **prefix with severity tag `[Blocker]`, `[Should-fix]`, or `[Nit]`**, then a one-sentence restatement of the finding + the proposed fix. Example: `[Blocker] Add 409 response for duplicate email to POST /users` or `[Nit] Rename §6.2 heading from 'DB' to 'Database Design' for consistency`. Severity definitions: **Blocker** = spec cannot ship without this fix (missing requirement coverage, broken contract); **Should-fix** = real defect, ship-blocker absent good reason to defer; **Nit** = cosmetic or stylistic.
    - `options` (up to 4):
      - **Fix as proposed** — agent applies the stated change via `Edit`
      - **Modify** — user edits the proposal (free-form reply expected next turn)
@@ -559,16 +557,43 @@ For every loop that produces findings (structural or design-critique):
 
 **Edge cases of structured asks:** when a user reply slips outside the offered options (free-form text, a non-recommended pick that may break an invariant, or leftover findings that don't share a category), follow `../_shared/structured-ask-edge-cases.md`.
 
-### Exit Criteria (ALL must be true)
+### Escape Hatch: Structural Findings
 
-- Every requirement from the requirements doc is covered
-- Decision log has entries with rationale for every non-trivial choice
-- API contracts complete with req/res/error shapes (Tier 2-3)
-- Edge cases have specific conditions and behaviors
-- Testing strategy has exact verification commands
-- No open clarifications from user
-- Last loop found only cosmetic issues
-- **User has confirmed they have no further concerns** (do not self-declare exit)
+A finding that requires re-architecting (not an inline fix) — e.g., "the whole event-driven approach is wrong, this should be transactional" — does NOT belong in the standard Fix/Modify/Skip/Defer flow. The "fix issues inline" rule of the Loop Protocol assumes local edits.
+
+**When you detect a structural finding:**
+1. Pause the loop immediately. Do not batch it with other findings.
+2. Surface it to the user with a dedicated `AskUserQuestion`:
+   - `question`: state the structural concern + the architectural shift it implies (one sentence each).
+   - Options:
+     - **Revise scope and re-enter Phase 3** — multi-role review with the new architectural direction; spec is rewritten substantially.
+     - **Defer** — log in the Review Log with rationale; ship the current architecture and revisit in a follow-up.
+     - **Accept trade-off** — keep the current architecture; document the rejected alternative in the Decision Log with the trade-off explicit.
+     - **Modify** — user proposes a different resolution path next turn.
+3. After the user picks, resume the loop: either back to Phase 3 (option 1), to applying remaining findings (options 2/3), or to a free-form discussion (option 4).
+
+A structural finding is one where the proposed fix would invalidate three or more existing spec sections. If you can fix it with a localized edit to one or two sections, it's not structural — handle it through the standard flow.
+
+### Universal Exit Checklist
+
+All items below must be `pass` or `N/A` (with a stated reason for N/A). Loop until satisfied.
+
+| # | Criterion | When N/A |
+|---|-----------|----------|
+| 1 | Every requirement from the requirements doc is covered by a numbered FR/NFR | Never N/A — if there is no requirements doc, this skill should not have started |
+| 2 | Decision Log has entries with Options Considered + Rationale for every non-trivial choice | Tier 1 with a single obvious fix and no alternatives |
+| 3 | API contracts complete with request + response + error shapes | No API surface introduced or changed |
+| 4 | DB schema is actual SQL with migration notes | No DB changes |
+| 5 | Sequence diagrams present (one per flow, error paths included) | Fewer than 3 components interact in any flow |
+| 6 | Edge cases have specific Conditions + Expected Behaviors | Never N/A — Tier 1 still requires this |
+| 7 | Verification Plan Sketch (from Phase 4) is reflected in §14 with exact commands | Never N/A |
+| 8 | Frontend design specifies hierarchy + state + interactions | No frontend changes |
+| 9 | Rollout strategy documented (flags, migration order, rollback) | Tier 1-2 with no deploy-time risk |
+| 10 | **Open Questions section is empty (no unresolved items)** | Never N/A — see below |
+| 11 | Last loop produced only `[Nit]` findings or none | Never N/A |
+| 12 | User has explicitly confirmed no further concerns | Never N/A — do not self-declare exit |
+
+**Open Questions are forbidden at exit.** The spec is the contract; if a decision is not made, the spec is not done. Resolve every open question before promoting status — either decide and log to the Decision Log, or split the unresolved scope into a follow-up spec and remove it from this one. The Review Log may carry deferred items DURING work, but the published spec must have none.
 
 ---
 

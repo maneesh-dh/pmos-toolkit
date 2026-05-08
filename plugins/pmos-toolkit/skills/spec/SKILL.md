@@ -176,11 +176,23 @@ Each silent-role entry MUST cite the specific reason (which requirements section
 
 ---
 
-## Phase 4: Think Hard About Verification
+## Phase 4: Verification Plan Sketch
 
-Before writing the spec, think creatively about how to verify the implementation. This is a CORE part of the spec, not an afterthought.
+Before writing the spec, sketch HOW each major requirement will be verified, and **emit the sketch in chat for the user to confirm or push back on**. This is a CORE part of the spec, not an afterthought — surfacing it as a chat artifact (rather than a thinking-only step) catches under-thought verification when it's still cheap to fix.
 
-Good verification patterns:
+Format:
+
+```markdown
+**Verification plan sketch (Phase 4):**
+
+| Requirement | Verification approach |
+|-------------|----------------------|
+| FR-01 | Unit test: assert X given Y; integration test: hit /endpoint and verify Z |
+| FR-02 | Playwright flow: log in → navigate → assert visible element |
+| NFR-01 (perf) | k6 script targeting /api/foo at 100 RPS; assert p95 < 200ms |
+```
+
+Good verification patterns to draw from:
 - Automated unit + integration tests with specific assertions
 - CLI scripts to verify APIs before building frontend
 - Playwright MCP for end-to-end frontend flow testing
@@ -188,7 +200,7 @@ Good verification patterns:
 - Synthetic data scenarios that exercise edge cases
 - Before/after comparison reports
 
-For each major feature area, define HOW it will be verified.
+**Gate:** Wait for user acknowledgment of the sketch before moving to Phase 5. If the user pushes back on an approach, revise inline; do not write the spec until the sketch is accepted.
 
 ---
 

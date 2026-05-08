@@ -2,7 +2,7 @@
 name: prototype
 description: Generate a high-fidelity, single-HTML-per-device interactive prototype (React via CDN + JSX, simulated API calls, domain-real LLM-generated mock data) that stitches all wireframe screens into walkable user journeys. Optional bridge between /wireframes and /spec in the requirements -> spec -> plan pipeline. Tier 1 skip; Tier 2 optional; Tier 3 mandatory. Inherits from wireframes (visual reference, IA, copy) and produces forms, CRUD, navigation, loading/error states without any backend or build step. Self-evaluates with a reviewer subagent (≤2 loops per device file) and runs an interactive friction pass measuring clicks/keystrokes/decisions per journey. Use when the user says "create a prototype", "make this clickable", "high-fi mockup", "stakeholder demo", "interactive prototype", "prototype this feature", or has wireframes ready and wants stakeholders to experience the flow before /spec.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--update-handoff]"
+argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--update-handoff] [--non-interactive | --interactive]"
 ---
 
 # Prototype Generator
@@ -23,7 +23,7 @@ Use this when stakeholders need to experience the flow end-to-end before committ
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** State your assumption (default devices = wireframes' device list; default scope = all wireframe screens; mock data = use as generated; layout anchor = first declared in DESIGN.md or none if none exist), document it in the output's `index.html`, and proceed. For Phase 1.5 staleness prompts, default to "Use as-is" and note the staleness in the index footer.
+- **No interactive prompt tool:** State your assumption (default devices = wireframes' device list; default scope = all wireframe screens; mock data = use as generated; layout anchor = first declared in DESIGN.md or none if none exist), document it in the output's `index.html`, and proceed. For Phase 1.5 staleness prompts, default to "Use as-is" and note the staleness in the index footer.
 - **No subagents:** Generate sequentially in the main agent; run review and friction passes inline.
 - **No background processes:** Skip the local server and print the absolute `file://` path to `index.html`.
 - **No Playwright MCP:** Phase 5d runtime smoke runs in degraded analytical-only mode, AND the prototype's landing `index.html` MUST display a "not runtime-smoked — verify in a real browser before sharing" banner. Phase 7 friction pass also runs in analytical-only mode.
@@ -53,6 +53,91 @@ Use workstream context (loaded by step 3 below) — brand voice, design tokens, 
 
 ---
 
+<!-- non-interactive-block:start -->
+1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
+   - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).
+   - `parent_marker` is set if the original prompt's first line matches `^\[mode: (interactive|non-interactive)\]$` (FR-06.1).
+   - `settings.default_mode` is `.pmos/settings.yaml :: default_mode` if present and one of `interactive`/`non-interactive`. Unknown values → warn on stderr `settings: invalid default_mode value '<v>'; ignoring` and fall through (FR-01.3).
+   - If `.pmos/settings.yaml` is malformed (not parseable as YAML, or missing `version`): print to stderr `settings.yaml malformed; fix and re-run` and exit 64 (FR-01.5).
+   - On Phase 0 entry, always print to stderr exactly: `mode: <mode> (source: <source>)` (FR-01.2).
+
+2. **Per-checkpoint classifier.** Before issuing any `AskUserQuestion` call, classify it (FR-02):
+   - Use the awk extractor below to find the line of this call's `question:` key in the live SKILL.md (FR-02.6).
+   - The defer-only tag, if present, is the literal previous non-empty line: `<!-- defer-only: <reason> -->` where `<reason>` ∈ {`destructive`, `free-form`, `ambiguous`} (FR-02.5).
+   - Decision (in order): tag adjacent → DEFER; multiSelect with 0 Recommended → DEFER; 0 options OR no option label ends in `(Recommended)` → DEFER; else AUTO-PICK the (Recommended) option (FR-02.2).
+
+3. **Buffer + flush.** Maintain an append-only OQ buffer in conversation memory. On each AUTO-PICK or DEFER classification, append one entry per the schema in spec §11.2. At end-of-skill (or in a caught error before exit), flush (FR-03):
+   - Primary artifact is single Markdown → append `## Open Questions (Non-Interactive Run)` section with one fenced YAML block per entry; update prose frontmatter (`**Mode:**`, `**Run Outcome:**`, `**Open Questions:** N` where N counts deferred only — see FR-03.4) (FR-03.1).
+   - Skill produces multiple artifacts → write a single `_open_questions.md` aggregator at the artifact directory root; primary artifact's frontmatter `**Open Questions:** N — see _open_questions.md` (FR-03.5).
+   - Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md` (FR-03.2).
+   - No persistent artifact (chat-only) → emit buffer to stderr at end-of-run as a single block prefixed `--- OPEN QUESTIONS ---` (FR-03.3).
+   - Mid-skill error → flush partial buffer under heading `## Open Questions (Non-Interactive Run — partial; skill errored)`; set `**Run Outcome:** error`; exit 1 (E13).
+
+4. **Subagent dispatch.** When dispatching a child skill via Task tool or inline invocation, prepend the literal first line: `[mode: <current-mode>]\n` to the child's prompt (FR-06).
+
+5. **Awk extractor.** The classifier and `tools/audit-recommended.sh` MUST both use the function below. Loaded at script init time; sourcing differs per consumer.
+
+<!-- awk-extractor:start -->
+```awk
+# Find AskUserQuestion call sites and their adjacent defer-only tags.
+# Input: a SKILL.md file (stdin or argv).
+# Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
+in_inlined { next }
+/^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
+  match($0, /defer-only:[[:space:]]*[a-z-]+/);
+  pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
+  sub(/^[[:space:]]+/, "", pending_tag);
+  pending_line = NR;
+  next;
+}
+/^[[:space:]]*$/ {
+  emit_pending();
+  pending_tag = "";
+  next;
+}
+/AskUserQuestion/ {
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
+  pending_tag = "";
+  next;
+}
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
+```
+<!-- awk-extractor:end -->
+
+6. **Refusal check.** If this SKILL.md contains a `<!-- non-interactive: refused; ... -->` marker (regex: `<!--[[:space:]]*non-interactive:[[:space:]]*refused`), and `mode` resolved to `non-interactive`: emit refusal per Section A and exit 64 (FR-07).
+
+7. **Pre-rollout BC.** If the `--non-interactive` argument is present BUT this SKILL.md does NOT contain the `<!-- non-interactive-block:start -->` marker (i.e., this skill hasn't been rolled out yet): emit `WARNING: --non-interactive not yet supported by /<skill>; falling back to interactive.` to stderr; continue in interactive mode (FR-08).
+
+8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
+<!-- non-interactive-block:end -->
+
 ## Phase 1: Locate Inputs
 
 1. **Find the requirements doc.** Follow `../.shared/resolve-input.md` with `phase=requirements`, `label="requirements doc"`. Accept either a path or inline feature description.
@@ -66,6 +151,7 @@ Use workstream context (loaded by step 3 below) — brand voice, design tokens, 
    - Req doc: extract user journeys, business rules, entity model, tier tag
    - Wireframes: read `index.html` for the inventory matrix; read each `NN_*.html` for layout, copy, visible fields, state list
    - `wireframes/assets/design-overlay.css` if present (reused as the prototype's CSS overlay in Phase 1.5; otherwise regenerated from DESIGN.md)
+<!-- defer-only: ambiguous -->
 6. **Confirm understanding.** Summarize the journeys to be made interactive and the device list. Ask via `AskUserQuestion` (≤4 batched). Platform fallback: numbered list + free-text confirmation.
 
 **Gate:** Do not proceed until the user confirms.
@@ -84,6 +170,7 @@ Detailed procedure: `reference/design-artifact-resolver.md`. Summary:
 
    **If no DESIGN.md is found:** check whether wireframes already exist for this feature at `{feature_folder}/wireframes/` (look for `index.html` + at least one `NN_*.html`).
 
+   <!-- defer-only: ambiguous -->
    - **Wireframes EXIST:** offer a targeted bootstrap via `AskUserQuestion`:
      > **Question:** "DESIGN.md is missing but wireframes already exist. How do you want to bootstrap the design system?"
      > **Options:**
@@ -115,6 +202,7 @@ Detailed procedure: `reference/design-artifact-resolver.md`. Summary:
 4. **Load COMPONENTS.md** from the same dir as DESIGN.md (warn if absent — `/verify` populates it on the next implementation pass).
 5. **Pick layout anchor** from `x-information-architecture.layouts`:
    - Inherit from `{feature_folder}/wireframes/.layout-anchor` marker file if present and still valid (announce: "Inheriting layout anchor `<name>` from /wireframes").
+   <!-- defer-only: ambiguous -->
    - Else AskUserQuestion (single-select). Persist choice to `{feature_folder}/prototype/.layout-anchor`.
 6. **Assemble decision context** by concatenating workstream `## Constraints & Scars` + DESIGN.md `## Anti-patterns` + `## Do's and Don'ts`.
 
@@ -122,6 +210,7 @@ Output: in-memory `merged_design_md`, `components_inventory`, `layout_anchor`, `
 
 **Subagents:** if available, dispatch one read-only subagent for DESIGN.md resolution + token generation. Otherwise inline.
 
+<!-- defer-only: ambiguous -->
 **Gate:** none for fresh DESIGN.md; user must respond to the staleness AskUserQuestion if the file is stale.
 
 ---
@@ -130,6 +219,7 @@ Output: in-memory `merged_design_md`, `components_inventory`, `layout_anchor`, `
 
 ### 2a. Tier detection
 
+<!-- defer-only: ambiguous -->
 Read tier from req doc. If absent, ask via `AskUserQuestion`:
 
 - **Question:** "What tier is this feature?"
@@ -138,6 +228,7 @@ Read tier from req doc. If absent, ask via `AskUserQuestion`:
 **Tier gating:**
 
 - **Tier 1:** Stop. Tell the user: "Tier 1 features rarely need a prototype. Recommend running `/spec` directly. Re-run with `--force` to override." Exit cleanly.
+<!-- defer-only: ambiguous -->
 - **Tier 2:** Ask via `AskUserQuestion`:
   - **Question:** "Tier 2 detected. Run /prototype now? Adds ~1 hr; produces interactive prototype for stakeholder review."
   - **Options:** **Run now (Recommended)** / **Skip — proceed to /spec**
@@ -153,6 +244,7 @@ Print the screen × device matrix:
 |---|--------|------|---------|------------------|
 ```
 
+<!-- defer-only: ambiguous -->
 Confirm via `AskUserQuestion` (batch ≤4):
 
 1. Device list (multiSelect; default = wireframes' devices)
@@ -191,6 +283,7 @@ Use `reference/mock-data-prompt.md` as the prompt template.
    - No Lorem ipsum (`grep -i 'lorem\|ipsum'`)
    - No `"User N"` / `"Item N"` patterns (`grep -E '"(User|Item|Test) [0-9]+"'`)
    - Spot-check 1–2 foreign-key relationships resolve
+<!-- defer-only: ambiguous -->
 4. **User review gate** via `AskUserQuestion`:
    - **Question:** "Approve mock data? {entities + counts + 3 sample records each}"
    - **Options:** **Use as generated (Recommended)** / **Edit before continuing** / **Regenerate**
@@ -396,6 +489,7 @@ For each per-device HTML file, run up to 2 refinement loops. Stop early when zer
 
 ## Phase 7: Interactive Friction Pass
 
+<!-- defer-only: ambiguous -->
 Use `reference/friction-thresholds.md`. Pull journey list from req doc (cap 5). If req doc has >5 journeys, ask via `AskUserQuestion` (multiSelect) — recommend the most stakeholder-visible ones (signup, first-value, primary daily flow, share/invite, recovery).
 
 **Walk mode resolution (do this first):**
@@ -421,6 +515,7 @@ For each journey:
 
 Aggregate Phase 6 unresolved + Phase 7 flags. Group by target (prototype / wireframe / req doc).
 
+<!-- defer-only: ambiguous -->
 `AskUserQuestion`, ≤4 per batch:
 - **question:** one-sentence finding + which file(s) + proposed fix
 - **options:** **Apply to prototype** / **Update wireframe** / **Update req doc** / **Defer to spec**
@@ -562,7 +657,7 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT exceed 5 journeys in the friction pass — diminishing returns and reviewer fatigue
 - Do NOT auto-edit upstream wireframes or req doc without explicit user disposition in Phase 8
 - Do NOT skip Phase 2 tier gate — Tier 1 features must be turned away politely with a `/spec` recommendation
-- Do NOT add a separate AskUserQuestion gate around per-finding fixes if Phase 8 already handled them
+- Do NOT add a separate interactive-prompt gate around per-finding fixes if Phase 8 already handled them
 - Do NOT use `@import url(...)` for fonts or any external resources — breaks `file://` portability
 - Do NOT use `console.log` / `console.error` / `console.warn` in generated screen code — debug logs are findings, not features
 - Do NOT bootstrap DESIGN.md from `/prototype` directly — when DESIGN.md is missing, Phase 1.5 either offers the targeted-bootstrap handoff to `/wireframes --bootstrap-design-only` (when wireframes exist) or aborts cleanly (when they don't). Bootstrap responsibility lives in `/wireframes` exclusively, but `/prototype` is allowed to invoke it via the codified handoff prompt

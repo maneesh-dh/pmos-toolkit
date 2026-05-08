@@ -224,11 +224,16 @@ All templates start at `**Status:** Draft`. The status is promoted to `**Status:
 ### Tier 1 Template: Bug Fix / Minor Enhancement
 
 ```markdown
-# <Bug/Fix Name> — Spec
+---
+tier: 1
+type: bugfix
+feature: <slug>
+date: YYYY-MM-DD
+status: Draft
+requirements: <path-to-01_requirements.md>
+---
 
-**Date:** YYYY-MM-DD
-**Status:** Draft
-**Requirements:** `<path>`
+# <Bug/Fix Name> — Spec
 
 ## 1. Problem Statement
 [What's broken, the impact, how to reproduce]
@@ -259,11 +264,16 @@ All templates start at `**Status:** Draft`. The status is promoted to `**Status:
 ### Tier 2 Template: Enhancement / UX Overhaul
 
 ```markdown
-# <Feature Name> — Spec
+---
+tier: 2
+type: enhancement
+feature: <slug>
+date: YYYY-MM-DD
+status: Draft
+requirements: <path-to-01_requirements.md>
+---
 
-**Date:** YYYY-MM-DD
-**Status:** Draft
-**Requirements:** `<path>`
+# <Feature Name> — Spec
 
 ## 1. Problem Statement
 [Restate from requirements + primary success metric]
@@ -312,11 +322,16 @@ All templates start at `**Status:** Draft`. The status is promoted to `**Status:
 ### Tier 3 Template: Feature / New System
 
 ```markdown
-# <Feature Name> — Spec
+---
+tier: 3
+type: feature
+feature: <slug>
+date: YYYY-MM-DD
+status: Draft
+requirements: <path-to-01_requirements.md>
+---
 
-**Date:** YYYY-MM-DD
-**Status:** Draft
-**Requirements:** `<path>`
+# <Feature Name> — Spec
 
 ---
 

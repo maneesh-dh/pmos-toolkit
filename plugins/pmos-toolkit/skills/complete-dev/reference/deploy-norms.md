@@ -50,14 +50,41 @@ If CI auto-deploys on push to main, the **recommendation should be to skip expli
 
 For repos with `plugins/<name>/.claude-plugin/plugin.json` (the agent-skills convention), deploy = push to remotes. No separate command. The recommendation is: skip explicit deploy; Phase 15 push handles it.
 
+### 6. pyproject.toml (PyPI publish via uv)
+
+For Python packages distributed to PyPI, probe `pyproject.toml` at root and at the common nested `backend/` location:
+
+```bash
+for f in pyproject.toml backend/pyproject.toml; do
+  [ -f "$f" ] || continue
+  python3 -c "
+import sys, tomllib
+with open('$f', 'rb') as fh:
+    d = tomllib.load(fh)
+proj = d.get('project') or {}
+if 'name' in proj:
+    print('$f', proj.get('name'), proj.get('version', '<dynamic>'))
+" 2>/dev/null
+done
+```
+
+A signal counts only when the `[project]` table is present with a `name` key — bare tooling-only `pyproject.toml` files (e.g., a repo using it just for `[tool.ruff]`) are NOT a PyPI signal.
+
+When the signal fires, the recommendation is `uv build && uv publish`. Show the package name and version (or `<dynamic>` placeholder) in the prompt so the user knows what they're shipping. Do NOT auto-run the publish command — gate it behind the user's selection of the "Build + publish to PyPI" option in the deploy menu.
+
+If both root `./pyproject.toml` and `./backend/pyproject.toml` carry `[project]` metadata, list both and ask the user which to ship — never silently pick one.
+
 ## Recommendation logic
 
 | Signals detected | Recommend |
 |------------------|-----------|
 | CI auto-deploy only | Skip explicit deploy (CI handles on push) |
 | CI auto-deploy + local script | Skip local; trust CI (or warn if user disagrees) |
+| CI auto-deploy + pyproject.toml | Skip local; trust CI (CI presumed to handle PyPI publish) |
 | Local script only (npm/make) | Run local deploy |
 | Plugin manifest only | Skip explicit deploy (push = deploy) |
+| pyproject.toml only | Build + publish to PyPI via `uv publish` |
+| pyproject.toml + plugin manifest | Multi-target: push (Phase 15) AND `uv publish` — ask user to confirm both |
 | Multiple local scripts (deploy + release) | Ask user which |
 | No signals detected | Skip explicit deploy; warn in summary |
 

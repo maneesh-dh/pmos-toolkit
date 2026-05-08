@@ -262,6 +262,7 @@ Probe and **enumerate ALL detected signals** (do not pick silently):
 3. `Makefile` targets named `deploy`, `release`, `publish`
 4. `.github/workflows/` files that trigger on `push` to `main` (CI auto-deploy)
 5. Plugin manifest at `plugins/pmos-toolkit/.claude-plugin/plugin.json` (this repo: deploy = push to remotes)
+6. `pyproject.toml` with `[project]` metadata at `./pyproject.toml` or `./backend/pyproject.toml` (PyPI publish via `uv publish`)
 
 See `reference/deploy-norms.md` for the full detection rubric.
 
@@ -279,6 +280,20 @@ options:
   - Skip explicit deploy (CI handles it) (Recommended)
   - Run npm run deploy locally
   - Run both (risk of double-deploy)
+  - Skip deploy entirely (--skip-deploy effect)
+```
+
+When signal #6 fires alone (no other deploy signals), present:
+
+```
+Detected deploy signals:
+  (1) pyproject.toml at ./pyproject.toml — package "<name>" v<version>
+
+Recommendation: build + publish to PyPI via `uv publish`.
+
+question: "Which deploy path?"
+options:
+  - Build + publish to PyPI via `uv publish` (Recommended)
   - Skip deploy entirely (--skip-deploy effect)
 ```
 

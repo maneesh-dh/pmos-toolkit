@@ -73,6 +73,8 @@ Derive `<derived-slug>` from the user's argument as follows:
 4. **Empty argument fallback** — if the argument has no extractable noun and isn't MVP-shaped, suggest `feature-v1` and require user override.
 5. Always present the suggested slug with edit-to-override; never silently default.
 
+*Cited by /plan v2 FR-63 — slug derivation is centralized here; pipeline skills MUST NOT re-implement.*
+
 ### A.4 Write settings.yaml
 
 After all three answers collected:
@@ -142,6 +144,8 @@ Used when the calling skill received `--feature <slug>` (Section 0 step 4):
 ### B.4 Folder creation
 
 When the calling skill needs to create a new feature folder:
+
+*Cited by /plan v2 FR-65 — folder picker offers (recently-modified | best slug-match | create-new | Other) per spec §8.5.*
 
 1. Show the derived (or typed) slug. Prompt: `Slug: <slug> [Enter to accept, edit to override]`. Accept the user's edited value if any.
 2. Validate against B.2 Slug Rules. On failure, show the violated rule and re-prompt.

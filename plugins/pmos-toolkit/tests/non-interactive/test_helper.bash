@@ -191,3 +191,33 @@ load_parser_snippet() {
   eval "$body"
 }
 export -f load_parser_snippet
+
+# Stand-in for child Phase 0's parent-marker scan.
+scan_parent_marker() {
+  local content=""
+  case "$1" in
+    --prompt-file) content=$(head -c 256 "$2");;
+    --prompt) content=$(printf '%s' "$2" | head -c 256);;
+    *) return 1;;
+  esac
+  local first_line
+  first_line=$(printf '%s' "$content" | head -1)
+  if [[ "$first_line" =~ ^\[mode:\ (interactive|non-interactive)\]$ ]]; then
+    echo "${BASH_REMATCH[1]}"
+  fi
+}
+export -f scan_parent_marker
+
+# Stand-in for child id-prefix when entries are merged from a child.
+format_child_oq_id() {
+  local skill="" n=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --child-skill) skill="$2"; shift 2;;
+      --counter) n="$2"; shift 2;;
+      *) shift;;
+    esac
+  done
+  printf 'OQ-%s-%03d\n' "$skill" "$n"
+}
+export -f format_child_oq_id

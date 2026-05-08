@@ -1,0 +1,215 @@
+---
+name: msf-wf
+description: Evaluate generated wireframes from the end-user perspective with grounded MSF analysis plus PSYCH scoring per screen. Recommendations-only by default; pass --apply-edits (typically when invoked from /wireframes Phase 6) to apply user-approved HTML edits inline. Use when the user says "evaluate the wireframes", "check friction in the UI", "PSYCH score these screens", or "wireframe UX evaluation".
+user-invocable: true
+argument-hint: "<path-to-wireframes-folder> [--apply-edits]"
+---
+
+# /msf-wf — MSF + PSYCH on a Wireframes Folder
+
+Evaluate a generated wireframes folder by walking each screen with persona-conditional MSF analysis and per-screen PSYCH scoring. Output is a single `msf-findings.md` with embedded PSYCH section. Standalone runs are recommendations-only; pass `--apply-edits` (typically when invoked from `/wireframes` Phase 6) to apply user-approved HTML edits inline.
+
+For requirements-doc-only analysis without wireframes, use `/msf-req` instead.
+
+```
+/wireframes  →  Phase 6 (delegated)  →  /msf-wf <folder> --apply-edits
+                                         (this skill, parent-invoked)
+
+/wireframes  →  ...   user runs ad-hoc:  /msf-wf <folder>
+                                         (this skill, recommendations-only)
+```
+
+**Announce at start:** "Using the /msf-wf skill to evaluate user motivation, friction, satisfaction, and PSYCH scoring on the wireframes."
+
+## Platform Adaptation
+
+These instructions use Claude Code tool names. In other environments:
+- **No `AskUserQuestion`:** state proposed personas/dispositions and proceed; user reviews after completion. With `--apply-edits`, defer all HTML edits until user confirms in a follow-up turn.
+- **No subagents:** sequential single-agent analysis (this skill never parallelizes journeys; see Anti-Patterns).
+
+---
+
+## Phase 0: Pipeline Setup (inline — do not skip)
+
+Use workstream context to inform analysis — product constraints and tech-stack conventions shape what counts as friction in the UI.
+
+<!-- pipeline-setup-block:start -->
+1. **Read `.pmos/settings.yaml`.**
+   - If missing → you MUST invoke the `Read` tool on `_shared/pipeline-setup.md` Section A and run first-run setup before proceeding.
+2. Set `{docs_path}` from `settings.docs_path`.
+3. If `settings.workstream` is non-null → load `~/.pmos/workstreams/{workstream}.md` as context preamble; if frontmatter `type` is `charter` or `feature` and a `product` field exists, also load `~/.pmos/workstreams/{product}.md` read-only.
+4. Resolve `{feature_folder}`:
+   - If the wireframes folder argument resolves to `{docs_path}/features/<slug>/wireframes/` → set `{feature_folder}` to the parent.
+   - If `--feature <slug>` was passed → glob `{docs_path}/features/*_<slug>/`.
+   - Else → ad-hoc invocation; `{feature_folder}` is unset.
+5. Read `~/.pmos/learnings.md` if present; note entries under `## /msf-wf` and factor them into approach.
+<!-- pipeline-setup-block:end -->
+
+---
+
+## Phase 1: Wrong-input Guard
+
+Before any other phase:
+
+- If the argument resolves to a single `.md` file → exit with: "Argument looks like a requirements doc. Use `/msf-req` instead." Do NOT continue.
+- If the argument resolves to a directory → continue.
+- If the argument is missing → continue to Phase 2 (resolve-input handles missing arg).
+
+This guard runs before persona alignment, learnings load, or any analysis.
+
+---
+
+## Phase 2: Locate Wireframes
+
+Resolve the wireframes folder argument. Required structure:
+
+1. Confirm the folder exists.
+2. Read **every** `.html` file in the folder, recursively (including subfolders like `wireframes/components/`). Each file represents a screen or component the user encounters.
+3. Read sibling `01_requirements.md` if present at `{feature_folder}/01_requirements.md` — this provides persona context to ground the analysis.
+4. If the folder is missing or contains zero `.html` files → exit with an error. Do NOT silently degrade to req-doc-only analysis.
+5. If `01_requirements.md` is missing → continue, but flag in the findings doc that persona alignment was inferred from wireframes only.
+
+---
+
+## Phase 3: Persona Alignment
+
+Follow `../_shared/msf-heuristics.md` "Persona Alignment" section. Behavior:
+
+- First, extract any personas explicitly named in the sibling `01_requirements.md` (if present), or in wireframe copy (header text, "for [user-type]" labels, etc.).
+- Propose those for confirmation.
+- If neither source names personas, propose 2–5 inferred personas (max 2 scenarios each) from the wireframe flow + workstream context.
+- Confirm via `AskUserQuestion`. **Mandatory in both standalone and parent-invoked modes** — never skipped, even when `--apply-edits` was passed.
+
+---
+
+## Phase 4: Journey Confirmation
+
+List user journeys based on the wireframe screen-flow (entry points, navigation, completion screens) plus the requirements doc if available. Confirm via `AskUserQuestion` before proceeding.
+
+---
+
+## Phase 5: MSF Pass A (grounded)
+
+For each persona × scenario × journey, walk the M / F / S consideration questions in `../_shared/msf-heuristics.md`.
+
+**Walk journeys sequentially**, not in parallel. The findings doc is a single shared file; concurrent subagent edits cause merge corruption. The original /msf parallelization was a recurring source of bugs — keep this serial. (See Anti-Patterns.)
+
+The analysis is **grounded**, not abstract:
+
+- Cite specific screens / steps when answering each consideration. Example: "On step 3 (`05_payment_desktop-web.html`), the user is asked for credit card before any value is delivered — kills motivation for the new-user persona."
+- Reference actual UI elements, copy, and flow ordering rather than abstract claims.
+- Ground every M / F / S finding in either a wireframe element or a req-doc claim, not author imagination.
+
+If a question isn't applicable for a given persona/scenario, say so briefly.
+
+---
+
+## Phase 6: PSYCH Pass B
+
+Walk through each screen following the user's attention path (left-to-right, top-to-bottom). Score notable UI elements as +Psych or −Psych. Scores are **directional indicators**, not scientific measurements — they point at where motivation rises or falls, not at exact values.
+
+**+Psych (adds motivation):**
+- Positive emotions: attractive visuals, social proof, credibility signals
+- Motivational boosts: urgency, progress indicators, value previews, completion cues
+- Rewards: immediate value delivery, clear outcomes, "aha" moments
+
+**−Psych (drains motivation):**
+- Physical effort: form fields, data entry, clicks, scrolling, waiting
+- Decisions to make: choices, configurations, ambiguous options, unfamiliar terminology
+- Questions to figure out: unclear UI, unknown costs, jargon, missing feedback
+
+**Starting Psych by entry context:**
+- High-intent (user chose to act): 60
+- Medium-intent (exploring): 40
+- Low-intent (casual/first-time): 25
+
+**Default entry context:** Medium (40). Document the assumption as a header line at the top of `msf-findings.md`:
+
+```
+Entry context: Medium (40, default). Override by editing this line and re-running.
+```
+
+The user can override by editing the line and re-running.
+
+Use +1 to +10 / −1 to −10 per element. Track a running total. Flag any screen dropping below 20 as a directional **danger zone** and below 0 as a directional **bounce risk**.
+
+Focus on elements that stand out as clearly positive or negative. Skip neutral / expected elements — padding the score table with forced insights is an anti-pattern.
+
+**Output format:** see `reference/psych-output-format.md` for the dual-table layout (per-screen scoring table + journey rollup).
+
+---
+
+## Phase 7: Save Findings
+
+Save a **single** consolidated findings doc.
+
+**Save path:**
+- If invoked inside a pipeline feature folder (`{feature_folder}` resolved in Phase 0) → `{feature_folder}/msf-findings.md`.
+- Else (ad-hoc) → `~/.pmos/msf/YYYY-MM-DD_<slug>.md`, where `<slug>` is derived from the wireframes folder name (lowercase, hyphenated).
+
+**File structure:**
+
+1. Header line: `Entry context: Medium (40, default). Override by editing this line and re-running.`
+2. **Section A — MSF Analysis:** persona × scenario × journey × consideration matrix from Phase 5.
+3. **Section B — PSYCH Scoring:** per-screen scoring tables and journey rollups per `reference/psych-output-format.md`. Includes "Unsurfaced findings" rollup if more than 12 findings were prioritized for the chat summary.
+4. **Section C — Recommendations:** prioritized Must / Should / Nice table per `../_shared/msf-heuristics.md`.
+5. **Section D — Applied changes** (only if `--apply-edits` ran in Phase 8): journey, screen, finding, fix, status.
+
+The findings doc has **no line cap**.
+
+**No actionable findings — terminal state.** When analysis surfaces nothing rated Must / Should / Nice, emit "no actionable findings" in chat and save the findings doc with empty recommendation tables. Do not pad with manufactured items.
+
+---
+
+## Phase 8: Apply Edits (conditional)
+
+**This phase runs only when `--apply-edits` was passed.** If absent, skip directly to Phase 9 with a followup message in chat:
+
+> To apply: re-run `/msf-wf <folder> --apply-edits`, or run `/wireframes <feature>` to regenerate.
+
+When `--apply-edits` is present:
+
+1. For each finding rated Must or Should (and Nice when explicitly requested), present via `AskUserQuestion` with options:
+   - **Fix as proposed** — agent applies the stated change via `Edit` to the relevant `.html` file
+   - **Modify** — user provides a refined fix in free-form next turn
+   - **Skip** — finding dispositioned away; logged in findings doc with disposition="Skip"
+   - **Defer** — logged under Open Questions in the findings doc
+
+2. Batch up to 4 findings per `AskUserQuestion` call. For more findings, issue multiple sequential calls.
+
+3. Apply approved edits inline using `Edit` against the wireframe HTML files in the resolved wireframes folder. Spot-check each edit against `../wireframes/reference/eval-rubric.md` after editing — do NOT trigger `/wireframes` Phase 4 review-loops.
+
+4. Log every applied change in the findings doc Section D ("Applied changes") with: journey, screen, finding, fix, disposition.
+
+When `--apply-edits` is **absent**, the skill MUST NOT call `Edit` or `Write` against any file in the wireframes folder. Findings doc remains the only output.
+
+---
+
+## Phase 9: Executive Summary in Chat
+
+Render the executive summary per `../_shared/msf-heuristics.md` "Executive Summary Template". Cap chat output at **200 lines**.
+
+**Summary Overrides (wf-mode):**
+
+- Include danger-zone screens (PSYCH < 20 directional) and bounce-risk screens (< 0 directional) in the summary's top-issues list.
+- Cap surfaced findings at 12; rest are logged in the findings doc under "Unsurfaced findings".
+- If `--apply-edits` ran: include a one-line summary of applied vs. deferred dispositions.
+
+---
+
+## Phase 10: Capture Learnings
+
+**This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Reflect on whether this session surfaced anything worth capturing under `## /msf-wf` in `~/.pmos/learnings.md` — recurring PSYCH driver patterns, persona-conditional findings PSYCH alone missed, wireframe heuristics that fired repeatedly. Proposing zero learnings is a valid outcome.
+
+---
+
+## Anti-Patterns (DO NOT)
+
+- Do NOT skip the persona-alignment confirmation step — analyzing without confirmed personas produces generic findings.
+- Do NOT pad PSYCH scores by inventing positive elements to balance negatives — score only what's notable, leave the column empty if a screen is genuinely neutral.
+- Do NOT walk journeys in parallel via subagents — the findings doc is a single shared file; concurrent edits cause merge corruption (this is a recurring sharp edge).
+- Do NOT call `Edit` or `Write` against any wireframe HTML file when `--apply-edits` is absent. Recommendations-only is the contract.
+- Do NOT accept the flags `--default-scope`, `--wireframes`, or `--skip-psych`. The only flag recognized is `--apply-edits`. The argument-hint advertises only `<path-to-wireframes-folder> [--apply-edits]`.
+- Do NOT trigger `/wireframes` Phase 4 review-loops after editing wireframes — spot-check inline against `../wireframes/reference/eval-rubric.md`.
+- Do NOT silently skip the wrong-input guard — a single `.md` argument means the user wanted `/msf-req`.
+- Do NOT pad recommendations to fill the Must / Should / Nice template — emit "no actionable findings" instead.

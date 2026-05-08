@@ -77,6 +77,7 @@ pmos-toolkit/
 |-------|-------------|
 | `/pmos-toolkit:create-skill` | Create a new skill with cross-platform conventions and project save paths |
 | `/pmos-toolkit:diagram` | Generate a single SVG vector diagram from a free-form description — brainstorms 2–3 framings, drafts, and self-evaluates against a hybrid SVG-metrics + vision rubric |
+| `/pmos-toolkit:design-crit` | Critique an application URL, wireframes, or prototype on overall UX — captures flow screenshots via packaged Playwright script, evaluates against a Nielsen + WCAG 2.2 + visual + Gestalt + journey-friction rubric, runs a PSYCH/MSF pass, and synthesises prioritized recommendations |
 | `/pmos-toolkit:mac-health` | Diagnose battery drain, orphaned processes, browser extension leaks, and cleanup opportunities |
 
 **Pipeline flow:**
@@ -86,7 +87,7 @@ pmos-toolkit/
                    optional bridges (UI features)    optional enhancers              optional validator
 ```
 
-`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/mac-health` are standalone — invoke them at any point.
+`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/diagram`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
 
 ## Install
 

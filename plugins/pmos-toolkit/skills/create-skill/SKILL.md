@@ -2,7 +2,7 @@
 name: create-skill
 description: Create a new skill in the user's agent-skills repo via a tiered workflow — interview, auto-tier, write spec to ~/.pmos/skill-specs/ (Tier 2+), adversarial review via /grill (Tier 3), then implement against the spec applying project conventions (save path, platform adaptation, description quality, findings protocol, release prereqs). Use when the user says "create a skill", "make a new skill", "turn this into a skill", "spec out a skill", or "I want a slash command for this".
 user-invocable: true
-argument-hint: "<what the skill should do> [--tier 1|2|3]"
+argument-hint: "<what the skill should do> [--tier 1|2|3] [--non-interactive | --interactive]"
 ---
 
 # Create Skill
@@ -15,7 +15,7 @@ Tiered skill-creation workflow: gather requirements, write a spec to disk (Tier 
 
 These instructions use Claude Code tool names. In other environments:
 
-- **No `AskUserQuestion`:** Conduct the interview as numbered free-form questions; record answers in the spec doc. Tier-pick falls back to "ask the user explicitly".
+- **No interactive prompt tool:** Conduct the interview as numbered free-form questions; record answers in the spec doc. Tier-pick falls back to "ask the user explicitly".
 - **No subagents:** Run `/grill` inline (sequential question-by-question) rather than dispatching it as a separate agent.
 - **No `/grill` available:** Skip Phase 5; emit a one-paragraph note in the spec under §14 Open questions warning the user that adversarial review was skipped.
 
@@ -29,8 +29,94 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /create-ski
 
 ---
 
+<!-- non-interactive-block:start -->
+1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
+   - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).
+   - `parent_marker` is set if the original prompt's first line matches `^\[mode: (interactive|non-interactive)\]$` (FR-06.1).
+   - `settings.default_mode` is `.pmos/settings.yaml :: default_mode` if present and one of `interactive`/`non-interactive`. Unknown values → warn on stderr `settings: invalid default_mode value '<v>'; ignoring` and fall through (FR-01.3).
+   - If `.pmos/settings.yaml` is malformed (not parseable as YAML, or missing `version`): print to stderr `settings.yaml malformed; fix and re-run` and exit 64 (FR-01.5).
+   - On Phase 0 entry, always print to stderr exactly: `mode: <mode> (source: <source>)` (FR-01.2).
+
+2. **Per-checkpoint classifier.** Before issuing any `AskUserQuestion` call, classify it (FR-02):
+   - Use the awk extractor below to find the line of this call's `question:` key in the live SKILL.md (FR-02.6).
+   - The defer-only tag, if present, is the literal previous non-empty line: `<!-- defer-only: <reason> -->` where `<reason>` ∈ {`destructive`, `free-form`, `ambiguous`} (FR-02.5).
+   - Decision (in order): tag adjacent → DEFER; multiSelect with 0 Recommended → DEFER; 0 options OR no option label ends in `(Recommended)` → DEFER; else AUTO-PICK the (Recommended) option (FR-02.2).
+
+3. **Buffer + flush.** Maintain an append-only OQ buffer in conversation memory. On each AUTO-PICK or DEFER classification, append one entry per the schema in spec §11.2. At end-of-skill (or in a caught error before exit), flush (FR-03):
+   - Primary artifact is single Markdown → append `## Open Questions (Non-Interactive Run)` section with one fenced YAML block per entry; update prose frontmatter (`**Mode:**`, `**Run Outcome:**`, `**Open Questions:** N` where N counts deferred only — see FR-03.4) (FR-03.1).
+   - Skill produces multiple artifacts → write a single `_open_questions.md` aggregator at the artifact directory root; primary artifact's frontmatter `**Open Questions:** N — see _open_questions.md` (FR-03.5).
+   - Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md` (FR-03.2).
+   - No persistent artifact (chat-only) → emit buffer to stderr at end-of-run as a single block prefixed `--- OPEN QUESTIONS ---` (FR-03.3).
+   - Mid-skill error → flush partial buffer under heading `## Open Questions (Non-Interactive Run — partial; skill errored)`; set `**Run Outcome:** error`; exit 1 (E13).
+
+4. **Subagent dispatch.** When dispatching a child skill via Task tool or inline invocation, prepend the literal first line: `[mode: <current-mode>]\n` to the child's prompt (FR-06).
+
+5. **Awk extractor.** The classifier and `tools/audit-recommended.sh` MUST both use the function below. Loaded at script init time; sourcing differs per consumer.
+
+<!-- awk-extractor:start -->
+```awk
+# Find AskUserQuestion call sites and their adjacent defer-only tags.
+# Input: a SKILL.md file (stdin or argv).
+# Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
+in_inlined { next }
+/^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
+  match($0, /defer-only:[[:space:]]*[a-z-]+/);
+  pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
+  sub(/^[[:space:]]+/, "", pending_tag);
+  pending_line = NR;
+  next;
+}
+/^[[:space:]]*$/ {
+  emit_pending();
+  pending_tag = "";
+  next;
+}
+/AskUserQuestion/ {
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
+  pending_tag = "";
+  next;
+}
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
+```
+<!-- awk-extractor:end -->
+
+6. **Refusal check.** If this SKILL.md contains a `<!-- non-interactive: refused; ... -->` marker (regex: `<!--[[:space:]]*non-interactive:[[:space:]]*refused`), and `mode` resolved to `non-interactive`: emit refusal per Section A and exit 64 (FR-07).
+
+7. **Pre-rollout BC.** If the `--non-interactive` argument is present BUT this SKILL.md does NOT contain the `<!-- non-interactive-block:start -->` marker (i.e., this skill hasn't been rolled out yet): emit `WARNING: --non-interactive not yet supported by /<skill>; falling back to interactive.` to stderr; continue in interactive mode (FR-08).
+
+8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
+<!-- non-interactive-block:end -->
+
 ## Phase 1: Intent capture
 
+<!-- defer-only: ambiguous -->
 Confirm what the user wants to build in 2-3 sentences. If the slash argument is vague ("a skill that does X"), ask one clarifying `AskUserQuestion` to nail down the core verb (generates / critiques / tracks / orchestrates / transforms).
 
 Defer detailed requirements to Phase 3 — Phase 1 is just enough signal to tier the work.
@@ -47,12 +133,14 @@ Pick a tier from interview signals. Honor `--tier 1|2|3` if the user passed it.
 | **2** | 3+ phases OR has `reference/` files OR has `assets/` OR uses workstream context OR has a structured output format | Run Phases 4 (spec), 6 (plan), 7 (implement), 8 (/verify). Skip Phase 5 (grill). |
 | **3** | 5+ phases AND (has eval rubric OR has external integrations OR multi-source/multi-tier behavior OR pipeline integration) | Run Phases 4, 5 (grill), 6 (plan), 7 (implement), 8 (/verify). Full pipeline. |
 
+<!-- defer-only: ambiguous -->
 Surface the tier choice to the user via `AskUserQuestion` with the inferred tier as the recommended option and one-line rationale; allow override. Skip the question only if `--tier` was passed explicitly.
 
 ---
 
 ## Phase 3: Requirements gathering
 
+<!-- defer-only: ambiguous -->
 Conduct a structured interview to populate every section of the spec template (`reference/spec-template.md`). Use `AskUserQuestion` batches of ≤ 4 per call. Cover at minimum:
 
 - Source / inputs (what does the skill consume?)
@@ -74,6 +162,7 @@ For Tier 1, this phase is shorter — skip the asset/reference/protocol question
 1. Resolve the spec path: `~/.pmos/skill-specs/<skill-name>/YYYY-MM-DD_<slug>.md`. If `<skill-name>` directory doesn't exist, create it. `<slug>` defaults to `initial`; bump to `v2`, `v3`, etc. on subsequent specs for the same skill.
 2. Read `reference/spec-template.md` and fill every section from the Phase 3 interview answers. Sections you can't fill go under §14 Open questions.
 3. Write the file. Set `Status: draft` in the spec header. Spec status lifecycle across the full pipeline: `draft → grilled (Tier 3, after Phase 5) → planned (Tier 2+, after Phase 6) → approved → implemented (after Phase 7) → verified (after Phase 8)`.
+<!-- defer-only: ambiguous -->
 4. Show the user the spec path and ask via `AskUserQuestion`:
 
 ```
@@ -101,6 +190,7 @@ Do not proceed to Phase 5, Phase 6, or Phase 7 until status is `approved`.
    - Description triggers: would a user typing X find this skill?
    - Release prereqs: is anything beyond README + version bump needed?
    - Convention checklist: any item that's vague enough to be silently skipped?
+<!-- defer-only: ambiguous -->
 3. Apply dispositions back to the spec via `AskUserQuestion`-batched updates (Apply / Modify / Skip / Defer pattern, ≤ 4 per call).
 4. Bump spec status to `grilled`, then to `approved` after a final user sign-off.
 
@@ -211,13 +301,13 @@ Every skill MUST include this section after the "Announce at start" line:
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** State your assumption, document it in the output, and proceed. The user reviews after completion.
+- **No interactive prompt tool:** State your assumption, document it in the output, and proceed. The user reviews after completion.
 - **No subagents:** Perform research and analysis sequentially as a single agent.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
 ```
 
 Additionally, when writing skill instructions:
-- Do NOT make `AskUserQuestion` the only way to get user input — always provide a "proceed with stated assumptions" fallback
+- Do NOT make the interactive prompt tool the only way to get user input — always provide a "proceed with stated assumptions" fallback
 - Do NOT delegate core logic to external plugins — include enough inline instructions that the skill works standalone
 - Do NOT assume MCP tools are available — treat them as optional enhancements
 - Do NOT assume subagent dispatch — write instructions that work sequentially too
@@ -228,19 +318,21 @@ Additionally, when writing skill instructions:
 - **Escalation policy** — when to stop and ask for help vs. proceeding with stated assumptions
 - **Evidence standards** — what constitutes proof that a step succeeded (command output, not "should work")
 
+<!-- defer-only: ambiguous -->
 ### Review loops MUST present findings via `AskUserQuestion`
 
 Any skill that includes a self-review or refinement loop (requirements, spec, plan, simulate-spec, etc. all do) **must not dump findings as prose and wait for a free-form reply**. Prose dumps force the user to hand-write dispositions for each finding and lose structure.
 
 Instead, every review loop in a new skill must include a "Findings Presentation Protocol" section that specifies:
 
-1. **Group findings by category** (max 4 per batch — respects the `AskUserQuestion` 4-question limit).
+1. **Group findings by category** (max 4 per batch — respects the 4-question limit).
+<!-- defer-only: ambiguous -->
 2. **One question per finding** via `AskUserQuestion`:
    - `question`: one-sentence finding + proposed fix (concrete, not vague)
    - `options`: **Fix as proposed** / **Modify** / **Skip** / **Defer** (adapt names to domain — e.g., simulate-spec uses "Apply patch / Modify patch / Accept as risk / Defer as open question")
 3. **Batch up to 4 questions per call**; issue multiple sequential calls for more findings.
 4. **Open-ended findings** (those needing numeric values, free-form text, or trade-off discussion) should be asked inline as a follow-up after the structured batch — never shoehorn into options.
-5. **Platform fallback** for environments without `AskUserQuestion`: present a numbered findings table with a disposition column; do NOT silently self-fix.
+5. **Platform fallback** for environments without an interactive prompt tool: present a numbered findings table with a disposition column; do NOT silently self-fix.
 6. **Anti-pattern to call out explicitly:** "A wall of prose ending in 'Let me know what you'd like to fix.' Always structure the ask."
 
 See the `requirements`, `spec`, `plan`, and `simulate-spec` skills for reference implementations of this protocol.
@@ -286,7 +378,7 @@ Every skill must have at minimum:
 name: <skill-name>
 description: <what + when — see Convention 3>
 user-invocable: true
-argument-hint: "<what to pass>"
+argument-hint: "<what to pass> [--non-interactive | --interactive]"
 ---
 ```
 

@@ -147,6 +147,8 @@ Save a **single** consolidated findings doc.
 - If invoked inside a pipeline feature folder (`{feature_folder}` resolved in Phase 0) → `{feature_folder}/msf-findings.md`.
 - Else (ad-hoc) → `~/.pmos/msf/YYYY-MM-DD_<slug>.md`, where `<slug>` is derived from the wireframes folder name (lowercase, hyphenated).
 
+**Overwrite protection (E4):** if a findings doc already exists at the save path, copy it to `<save_path>.bak` before overwriting. The `.bak` is preserved for one cycle (next run overwrites it). Skip the backup step if no prior file exists.
+
 **File structure:**
 
 1. Header line: `Entry context: Medium (40, default). Override by editing this line and re-running.`

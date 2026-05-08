@@ -60,6 +60,8 @@ This guard runs before persona alignment, learnings load, or any analysis.
 
 Follow `../_shared/resolve-input.md` with `phase=requirements`, `label="requirements doc"`. Read the resolved file end-to-end before Phase 3.
 
+**Tier check (E1):** if the requirements doc has a `Tier:` tag in frontmatter or header and the value is `Tier 1`, emit a one-line warning before continuing: `Note: MSF analysis is best-suited to Tier 3 features. This doc is tagged Tier 1 — proceeding anyway, but findings may be over-engineered for the scope.` Continue regardless of tier.
+
 ---
 
 ## Phase 3: Persona Alignment
@@ -99,6 +101,8 @@ Save the consolidated MSF analysis matrix.
 **Save path:**
 - If invoked inside a pipeline feature folder (`{feature_folder}` resolved in Phase 0 step 4) → `{feature_folder}/msf-findings.md`.
 - Else (ad-hoc) → `~/.pmos/msf/YYYY-MM-DD_<slug>.md`, where `<slug>` is derived from the argument's filename (lowercase, hyphenated).
+
+**Overwrite protection (E4):** if a findings doc already exists at the save path, copy it to `<save_path>.bak` before overwriting. The `.bak` is preserved for one cycle (next run overwrites it). Skip the backup step if no prior file exists.
 
 The findings doc has **no line cap**. Contains the full persona × scenario × journey × consideration matrix plus the prioritized Must / Should / Nice recommendations table per `../_shared/msf-heuristics.md` "Executive Summary Template".
 

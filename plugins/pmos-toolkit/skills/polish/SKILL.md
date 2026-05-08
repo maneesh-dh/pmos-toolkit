@@ -2,7 +2,7 @@
 name: polish
 description: Critique and refactor a single markdown document for clarity, concision, voice, and de-AI-slop — runs a binary pass/fail rubric of writing principles, auto-applies safe mechanical fixes, surfaces high-risk changes per-finding, and writes a polished version preserving author voice. Single-doc only; for batches, the caller is responsible for parallelization (subagents cannot invoke this skill). Use when the user says "polish this draft", "tighten this prose", "remove the AI slop", "make this more concise", "critique my writing", or wants to clean up a PRD/blog/README/email before sharing.
 user-invocable: true
-argument-hint: "<file-path | URL | 'inline text' | notion://<id>> [--preset <name>] [--dry-run] [--checks <path>]"
+argument-hint: "<file-path | URL | 'inline text' | notion://<id>> [--preset <name>] [--dry-run] [--checks <path>] [--non-interactive | --interactive]"
 ---
 
 # /polish
@@ -13,12 +13,12 @@ argument-hint: "<file-path | URL | 'inline text' | notion://<id>> [--preset <nam
 
 **This is the first action of the skill, before any other tool call.** Before you read any input, load any context, or run any phase, create one `TodoWrite` task for each of the 9 phases. Mark each task `in_progress` when you start it, `completed` when it finishes — never batch completions. Phase 4 (patch generation) gets one sub-task per surfaced finding so the user sees concrete progress.
 
-If you have already taken any other action (Read, Bash, AskUserQuestion, Write, Edit) before creating the 9 phase tasks, you have skipped this step. Stop, create the tasks now, and resume.
+If you have already taken any other action (Read, Bash, interactive prompts, Write, Edit) before creating the 9 phase tasks, you have skipped this step. Stop, create the tasks now, and resume.
 
 ## Platform Adaptation
 
 These instructions use Claude Code tool names. In other environments:
-- **No `AskUserQuestion`:** Print a numbered findings table with a disposition column. NEVER silently auto-apply high-risk fixes — they require explicit user input. For preset selection, state your assumption and proceed; the user reviews the polished output.
+- **No interactive prompt tool:** Print a numbered findings table with a disposition column. NEVER silently auto-apply high-risk fixes — they require explicit user input. For preset selection, state your assumption and proceed; the user reviews the polished output.
 - **No `TodoWrite`:** Print phase headers as you progress (`## Phase 3: Running rubric…`). Do not batch.
 - **No `WebFetch`:** Refuse URL input mode with a note; ask the user to paste the content.
 - **No Notion MCP:** Refuse `notion://` input with a note; ask the user to export the page first.
@@ -40,6 +40,91 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /polish` an
 4. Merge user threshold overrides on top of preset defaults from `reference/presets.md`.
 
 There is no workstream load. `/polish` operates on derivatives.
+
+<!-- non-interactive-block:start -->
+1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
+   - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).
+   - `parent_marker` is set if the original prompt's first line matches `^\[mode: (interactive|non-interactive)\]$` (FR-06.1).
+   - `settings.default_mode` is `.pmos/settings.yaml :: default_mode` if present and one of `interactive`/`non-interactive`. Unknown values → warn on stderr `settings: invalid default_mode value '<v>'; ignoring` and fall through (FR-01.3).
+   - If `.pmos/settings.yaml` is malformed (not parseable as YAML, or missing `version`): print to stderr `settings.yaml malformed; fix and re-run` and exit 64 (FR-01.5).
+   - On Phase 0 entry, always print to stderr exactly: `mode: <mode> (source: <source>)` (FR-01.2).
+
+2. **Per-checkpoint classifier.** Before issuing any `AskUserQuestion` call, classify it (FR-02):
+   - Use the awk extractor below to find the line of this call's `question:` key in the live SKILL.md (FR-02.6).
+   - The defer-only tag, if present, is the literal previous non-empty line: `<!-- defer-only: <reason> -->` where `<reason>` ∈ {`destructive`, `free-form`, `ambiguous`} (FR-02.5).
+   - Decision (in order): tag adjacent → DEFER; multiSelect with 0 Recommended → DEFER; 0 options OR no option label ends in `(Recommended)` → DEFER; else AUTO-PICK the (Recommended) option (FR-02.2).
+
+3. **Buffer + flush.** Maintain an append-only OQ buffer in conversation memory. On each AUTO-PICK or DEFER classification, append one entry per the schema in spec §11.2. At end-of-skill (or in a caught error before exit), flush (FR-03):
+   - Primary artifact is single Markdown → append `## Open Questions (Non-Interactive Run)` section with one fenced YAML block per entry; update prose frontmatter (`**Mode:**`, `**Run Outcome:**`, `**Open Questions:** N` where N counts deferred only — see FR-03.4) (FR-03.1).
+   - Skill produces multiple artifacts → write a single `_open_questions.md` aggregator at the artifact directory root; primary artifact's frontmatter `**Open Questions:** N — see _open_questions.md` (FR-03.5).
+   - Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md` (FR-03.2).
+   - No persistent artifact (chat-only) → emit buffer to stderr at end-of-run as a single block prefixed `--- OPEN QUESTIONS ---` (FR-03.3).
+   - Mid-skill error → flush partial buffer under heading `## Open Questions (Non-Interactive Run — partial; skill errored)`; set `**Run Outcome:** error`; exit 1 (E13).
+
+4. **Subagent dispatch.** When dispatching a child skill via Task tool or inline invocation, prepend the literal first line: `[mode: <current-mode>]\n` to the child's prompt (FR-06).
+
+5. **Awk extractor.** The classifier and `tools/audit-recommended.sh` MUST both use the function below. Loaded at script init time; sourcing differs per consumer.
+
+<!-- awk-extractor:start -->
+```awk
+# Find AskUserQuestion call sites and their adjacent defer-only tags.
+# Input: a SKILL.md file (stdin or argv).
+# Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
+in_inlined { next }
+/^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
+  match($0, /defer-only:[[:space:]]*[a-z-]+/);
+  pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
+  sub(/^[[:space:]]+/, "", pending_tag);
+  pending_line = NR;
+  next;
+}
+/^[[:space:]]*$/ {
+  emit_pending();
+  pending_tag = "";
+  next;
+}
+/AskUserQuestion/ {
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
+  pending_tag = "";
+  next;
+}
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
+```
+<!-- awk-extractor:end -->
+
+6. **Refusal check.** If this SKILL.md contains a `<!-- non-interactive: refused; ... -->` marker (regex: `<!--[[:space:]]*non-interactive:[[:space:]]*refused`), and `mode` resolved to `non-interactive`: emit refusal per Section A and exit 64 (FR-07).
+
+7. **Pre-rollout BC.** If the `--non-interactive` argument is present BUT this SKILL.md does NOT contain the `<!-- non-interactive-block:start -->` marker (i.e., this skill hasn't been rolled out yet): emit `WARNING: --non-interactive not yet supported by /<skill>; falling back to interactive.` to stderr; continue in interactive mode (FR-08).
+
+8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
+<!-- non-interactive-block:end -->
 
 ## Phase 1 — Ingest + classify
 
@@ -73,6 +158,7 @@ If a required tool isn't available, refuse the input mode with a one-line note.
 
 Skip if `--preset` was passed.
 
+<!-- defer-only: ambiguous -->
 Otherwise, surface preset options via `AskUserQuestion`. Preset semantics live in `reference/presets.md`. The recommended option is the classifier output; if classifier confidence <0.6, recommend **preserve voice**.
 
 ```
@@ -139,7 +225,7 @@ If `--dry-run`, stop here and print the rubric report. Do not generate patches.
 
 ## Phase 5 — Findings Presentation Protocol
 
-**Hard rule — Phase 5 is a write-gate.** Do NOT emit any `Write` or `Edit` to the polished file (or to `<original>.polished.md`) until at least one `AskUserQuestion` round on surfaced high-risk findings has been answered. The only exception: if the surfaced-findings list is empty (zero high-risk findings — all auto-apply category), proceed directly to Phase 6. A bulk-scope question ("Surgical / Comprehensive / Full") is **not** a substitute for per-finding surfacing — that's preset selection, not finding disposition.
+**Hard rule — Phase 5 is a write-gate.** Do NOT emit any `Write` or `Edit` to the polished file (or to `<original>.polished.md`) until at least one interactive-prompt round on surfaced high-risk findings has been answered. The only exception: if the surfaced-findings list is empty (zero high-risk findings — all auto-apply category), proceed directly to Phase 6. A bulk-scope question ("Surgical / Comprehensive / Full") is **not** a substitute for per-finding surfacing — that's preset selection, not finding disposition.
 
 Follow `reference/findings-protocol.md`. Summary:
 
@@ -222,8 +308,8 @@ Append new entries to `~/.pmos/learnings.md` under `## /polish`. Proposing zero 
 - Do NOT re-outline the document. Structural changes are limited to lede moves and adjacent-paragraph merges, always individually approved.
 - Do NOT write line numbers into defer comments — they go stale immediately.
 - Do NOT iterate beyond 2 polish iterations. The cap is hard.
-- Do NOT batch findings into prose dumps ending in "let me know what to fix." Use AskUserQuestion or the platform fallback table.
-- Do NOT emit any `Write` or `Edit` to the polished file before the Phase 5 AskUserQuestion round has completed (unless zero high-risk findings exist). A bulk-scope question is NOT a substitute for per-finding surfacing.
+- Do NOT batch findings into prose dumps ending in "let me know what to fix." Use the interactive prompt tool or the platform fallback table.
+- Do NOT emit any `Write` or `Edit` to the polished file before the Phase 5 interactive-prompt round has completed (unless zero high-risk findings exist). A bulk-scope question is NOT a substitute for per-finding surfacing.
 - Do NOT skip Phase 3's `rubric_results` YAML block. No structured rubric output → Phase 4 cannot start.
 - Do NOT attempt to polish multiple docs in one invocation. `/polish` is single-doc; subagents cannot invoke skills (SUBAGENT-STOP), so multi-doc parallelization is the caller's responsibility.
 - Do NOT begin Phase 0 (or any other phase) before creating the 9 per-phase `TodoWrite` tasks. Per-phase task tracking is the first action of the skill, not an afterthought.
@@ -242,6 +328,6 @@ Append new entries to `~/.pmos/learnings.md` under `## /polish`. Proposing zero 
 - `reference/voice-sampling.md` — voice marker extraction algorithm
 - `reference/chunking.md` — chunking algorithm + lock-zone rules + size buckets
 - `reference/patch-contract.md` — patch prompt template, conflict protocol, retry logic
-- `reference/findings-protocol.md` — categorization, AskUserQuestion shape, defer format
+- `reference/findings-protocol.md` — categorization, interactive-prompt shape, defer format
 - `tests/fixtures/` — 9 fixtures with paired `expected.yaml` contracts
 - `example/custom-checks.yaml` — example user can copy to `~/.pmos/polish/`

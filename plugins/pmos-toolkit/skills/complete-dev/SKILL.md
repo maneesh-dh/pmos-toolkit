@@ -176,20 +176,64 @@ If on `main` already: skip to Phase 5 (no merge needed; treat as direct-to-main 
 
 If on a feature branch:
 
-```
-question: "Land branch <name> into main how?"
-options:
-  - Merge into main (fast-forward if possible, else --no-ff merge commit) (Recommended)
-  - Rebase onto main, then fast-forward
-  - Stay on feature branch and push only this branch
-  - Cancel
+**Step A — Shared-branch guard.** Before showing the prompt, determine whether rebasing is safe:
+
+```bash
+upstream=$(git rev-parse --abbrev-ref --symbolic-full-name @{upstream} 2>/dev/null || true)
+if [ -z "$upstream" ]; then
+  guard=PASS  # no upstream → rebase-safe
+else
+  git fetch "${upstream%/*}" "${upstream#*/}" 2>/dev/null || true
+  if [ "$(git rev-parse HEAD)" = "$(git rev-parse "$upstream")" ]; then
+    guard=PASS
+  else
+    guard=FAIL  # remote tip diverged → rebase would rewrite SHAs others may have pulled
+  fi
+fi
 ```
 
-If merge chosen:
-1. Verify uncommitted state is clean (or surface to commit them first; ask user)
+**Step B — Show the prompt.** Annotation flips based on guard.
+
+- **Guard PASS** (default — solo branch or unpushed):
+
+  ```
+  question: "Land branch <name> into main how?"
+  options:
+    - Rebase onto main, then fast-forward (Recommended)
+    - Merge into main (fast-forward if possible, else --no-ff merge commit)
+    - Stay on feature branch and push only this branch
+    - Cancel
+  ```
+
+- **Guard FAIL** (branch shared, remote diverged):
+
+  ```
+  question: "Branch <name> has been pushed and remote tip differs from local — rebase would rewrite SHAs others may have. Land into main how?"
+  options:
+    - Merge into main (--no-ff if not fast-forward) (Recommended)
+    - Rebase onto main, then fast-forward (WARNING: rewrites SHAs)
+    - Stay on feature branch and push only this branch
+    - Cancel
+  ```
+
+**Step C — Execute the chosen option.**
+
+If **rebase** chosen, the explicit sequence:
+
+1. Verify uncommitted state is clean (or commit; ask user)
+2. `cd <root-main-path>` if currently in a worktree
+3. `git checkout main && git pull origin main`
+4. `git checkout <feature-branch>`
+5. `git rebase main` — **conflicts → STOP and ask user. Do NOT auto-resolve.**
+6. `git checkout main`
+7. `git merge --ff-only <feature-branch>` (guaranteed safe after step 5)
+
+If **merge** chosen, the existing sequence:
+
+1. Verify uncommitted state is clean
 2. `cd <root-main-path>` if currently in a worktree
 3. `git checkout main`
-4. `git pull origin main` (sync first)
+4. `git pull origin main`
 5. `git merge <feature-branch>` (fast-forward where possible; `--no-ff` if explicitly chosen)
 6. **Conflicts → STOP and ask user. Do NOT auto-resolve.**
 
@@ -302,12 +346,65 @@ options:
 
 If skill content changed (Phase 0 detected new/modified files under `plugins/pmos-toolkit/skills/` or `plugins/pmos-toolkit/agents/`), bump is **mandatory** — pre-push hook enforces.
 
-**Paired-manifest special case**: if BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` AND `plugins/pmos-toolkit/.codex-plugin/plugin.json` exist, treat as ONE logical version that bumps together. Pre-flight: read both; if versions differ, ask which to use as baseline (the pre-push hook rejects mismatch).
+**Paired-manifest special case**: if BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` AND `plugins/pmos-toolkit/.codex-plugin/plugin.json` exist, treat as ONE logical version that bumps together.
 
-For other monorepo cases: detect via multiple `package.json` files; only offer bumps for paths that actually changed (`git diff --name-only main..HEAD` mapped to package roots).
+**Step 1 — Pre-flight: sync main reference.**
+
+```bash
+git fetch origin main 2>&1   # NFR-01: 10s hard timeout via `timeout 10 git fetch origin main` if available
+```
+
+On non-zero exit, log `pre-flight skipped: could not fetch origin/main; pre-push hook will catch any version collision` and set `pre_flight_skipped=true`. Skip to Step 5.
+
+**Step 2 — Read main_v.**
+
+```bash
+main_v=$(git show origin/main:plugins/pmos-toolkit/.claude-plugin/plugin.json | jq -r .version)
+```
+
+On parse failure, treat as Step 1 failure (skip pre-flight, warn).
+
+**Step 3 — Read branch_point_v.**
+
+```bash
+merge_base=$(git merge-base HEAD origin/main)
+branch_point_v=$(git show "$merge_base":plugins/pmos-toolkit/.claude-plugin/plugin.json | jq -r .version || echo "$main_v")
+```
+
+If lookup fails, fall back to `branch_point_v=$main_v` (degraded 2-way mode; warn).
+
+**Step 4 — Read local_v + decide.**
+
+```bash
+local_v=$(jq -r .version plugins/pmos-toolkit/.claude-plugin/plugin.json)
+```
+
+Apply the decision table (semantic-version compare on each cell):
+
+| `local_v` vs `branch_point_v` | `main_v` vs `branch_point_v` | Verdict |
+|---|---|---|
+| equal (no local bump yet) | equal (no parallel ship) | **Clean**: bump baseline = `main_v` |
+| equal (no local bump yet) | greater (parallel ship happened) | **Clean-after-rebase**: bump baseline = `main_v` |
+| greater (local already bumped) | equal (no parallel ship) | **Fresh local bump**: proceed; baseline already advanced |
+| greater (local already bumped) | greater (parallel ship + local bump on stale base) | **Stale-bump**: trigger recovery prompt below |
+| less (impossible-ish) | any | **Anomaly**: warn user; ask whether Phase 3 succeeded; offer skip-or-cancel |
+
+**Step 4a — Stale-bump recovery prompt** (only on Stale-bump verdict):
 
 ```
-question: "Current version is X.Y.Z. What kind of bump?"
+question: "Stale version bump detected: feature branch has plugin.json at v<local_v>, branched from v<branch_point_v>, but main shipped v<main_v> since. What now?"
+options:
+  - Revert the speculative bump and re-bump from main (Recommended)
+  - Keep going anyway (will likely fail pre-push hook)
+  - Cancel — let me investigate manually
+```
+
+If "Revert and re-bump", run the recipe in `reference/version-bump-recovery.md`, then continue at Step 5 with the restored manifests.
+
+**Step 5 — Bump prompt.**
+
+```
+question: "Current version is <baseline_v>. What kind of bump?"
 options:
   - Patch (X.Y.Z+1) — bug fix, content tweak, doc-only
   - Minor (X.Y+1.0) — new skill, additive feature (Recommended for new skills)
@@ -315,7 +412,18 @@ options:
   - Skip version bump (only if no plugin content changed)
 ```
 
-Apply via `Edit`. Validate JSON parses: `python3 -c "import json; json.load(open('<path>'))"`.
+Where `<baseline_v>` is `main_v` (when pre-flight ran cleanly) or `local_v` with suffix `(pre-flight skipped — verify manually)` when `pre_flight_skipped=true`.
+
+Apply the bump to BOTH paired manifests (paired-manifest invariant). Validate JSON parses:
+
+```bash
+python3 -c "import json; json.load(open('plugins/pmos-toolkit/.claude-plugin/plugin.json'))"
+python3 -c "import json; json.load(open('plugins/pmos-toolkit/.codex-plugin/plugin.json'))"
+```
+
+**Stale-bump recovery:** see `reference/version-bump-recovery.md`.
+
+**For other monorepo cases**: detect via multiple `package.json` files; only offer bumps for paths that actually changed (`git diff --name-only main..HEAD` mapped to package roots).
 
 ## Phase 10 — JSON schema validation
 
@@ -529,3 +637,4 @@ Reflect on whether this session surfaced anything worth capturing under `## /com
 11. **Forgetting to bump BOTH `.claude-plugin` and `.codex-plugin` versions to match** — pre-push hook rejects mismatch. Treat paired manifests as one logical version.
 12. **Treating `--skip-deploy` as `--skip-everything-deploy-related`** — push, tag, dry-run summary all still happen. Only the deploy-method invocation is skipped.
 13. **Scanning the conversation transcript for learnings** — too noisy. Phase 6 is scoped to `git diff main..HEAD` + commit messages only.
+14. **Trusting the shared-branch guard's `local==remote SHA` test as proof no one has based work on this branch.** It's necessary-but-not-sufficient — a coworker who pulled before our last fixup could have based work, and we'd never know. The pre-push hook is the only authoritative line of defence; use the merge fallback for any branch you've shared for review.

@@ -54,11 +54,11 @@
 
 | Phase | Status | Artifact path | Timestamp |
 |-------|--------|---------------|-----------|
-| /requirements | pending |              |           |
-| /spec         | pending |              |           |
+| /requirements | completed | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/01_requirements.md | 2026-05-08 |
+| /spec         | completed | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/02_spec.md | 2026-05-08 |
 | /grill        | n/a (Tier <3) |        |           |
-| /plan         | pending |              |           |
-| /execute      | pending |              |           |
+| /plan         | completed | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/03_plan.md | 2026-05-08 |
+| /execute      | in-progress | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/execute/ | 2026-05-08 |
 | /verify       | pending |              |           |
 
 ## Failure log (Phase 8)

@@ -35,7 +35,7 @@ dependencies: []               # optional, list of item ids this item depends on
 
 | Field | Allowed values |
 |---|---|
-| `type` | `feature`, `bug`, `tech-debt`, `idea` |
+| `type` | one of: `feature` \| `enhancement` \| `bug` \| `tech-debt` \| `chore` \| `docs` \| `idea` \| `spike` |
 | `status` | `inbox`, `ready`, `spec'd`, `planned`, `in-progress`, `done`, `wontfix` |
 | `priority` | `must`, `should`, `could`, `maybe` |
 

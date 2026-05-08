@@ -88,6 +88,10 @@ Follow `../_shared/execute-resume.md` Phase 0.5 to:
 
 1. **Locate the plan.** Follow `../.shared/resolve-input.md` with `phase=plan`, `label="plan"`.
 2. **Read the plan and its upstream spec end-to-end.** Understand the "Done when" criteria and final verification task.
+
+   **Read plan frontmatter** (T34 — /plan v2 contract):
+   - `commit_cadence` — defaults to `per-task`. Other recognized values: `per-phase` (commit only at phase boundary), `manual` (defer commits to user). Honor whichever is set.
+   - `contract_version` (T37 — /plan v2): if absent OR < 1, the plan was written by /plan v1 — emit a per-run `WARN:` line on stderr: `[/execute] Plan contract_version missing or < 1 — running back-compat shim. Some new task fields will be ignored. Re-generate plan with /plan v2 to consume the full contract.` Continue execution; do not halt. If `contract_version` > the highest version this /execute knows, halt with platform-aware error: `[/execute] Plan contract_version=<n> is newer than this skill supports (max=<m>). Upgrade the pmos-toolkit plugin.`
 3. **Isolate the work:**
    - **Worktree (preferred):** Check for existing `.worktrees/` or `worktrees/` directory. If neither exists, create `.worktrees/`. Verify the directory is gitignored (`git check-ignore -q .worktrees`); if not, add it to `.gitignore` and commit. Then:
      ```bash
@@ -114,6 +118,45 @@ Follow `../_shared/execute-resume.md` Phase 0.5 to:
 ---
 
 ## Phase 2: Execute Tasks
+
+### Per-task fields consumed by /execute v2 (T35 — /plan v2 contract)
+
+/plan v2 emits per-task fields beyond the legacy `**Goal:** / **Spec refs:** / **Files:** / **Steps:**`. /execute reads them as follows; on missing-but-optional fields, emit a per-task `WARN:` line on stderr (back-compat shim per FR-110, decision P5) and continue:
+
+- `**Depends on:**` — task IDs whose completion gates this task. /execute refuses to start the task while any dependency is `not-started` / `in-flight` / `failed`. (If absent, /execute assumes sequential ordering by task index.)
+- `**Idempotent:**` — `yes` or `no — recovery: <substep>`. `no` without a recovery substep → halt with error citing FR-35.
+- `**Requires state from:**` — task IDs whose runtime artifacts (DB rows, generated files) this task consumes. /execute refuses to run the task if any cited task lacks a `done` log.
+- `**TDD:**` — three-valued `yes — new-feature` / `yes — bug-fix` / `no — <reason>`. Bug-fix path uses the FR-104 4-step shape (regression test → fail → fix → pass). The plan body's `**Bug-fix TDD shape**` paragraph is informational; /execute follows the per-task value.
+- `**Data:**` — fixtures / seed rows / mock payloads the task consumes; /execute surfaces these as part of the in-flight log's `body` section.
+- `**Wireframe refs:**` — UI screens this task implements; /execute uses them in the runtime-evidence step (Playwright navigation targets).
+
+**Suffixed task IDs** (decision P11): /plan v2 may emit suffixed IDs like `T26a`, `T29c`, `T43a` (split history from review loops). /execute v2 parses the regex `T([0-9]+)([a-z]?)` against task headings; per-task log files use `task-<N><suffix>.md` (e.g., `task-26a.md`); the frontmatter `task_number` accepts a string when a suffix is present and an integer otherwise.
+
+### Defect handoff (T36 — §7.5)
+
+When a task cannot be implemented because the plan itself is defective (e.g., file `Files:` references don't exist, prerequisite task produced a contract that this task can't consume), /execute v2 writes a defect file at `{feature_folder}/03_plan_defect_<task-id>.md` per spec §7.5. Defect file contents:
+
+```markdown
+---
+task_id: T<N>[<suffix>]
+detected_at: <ISO timestamp>
+detected_by: /execute (this run)
+---
+
+## Defect
+
+[One paragraph stating what the plan got wrong.]
+
+## Suggested fix
+
+[What /plan should do differently. Be specific — file paths, function signatures, the contract that needs to change.]
+
+## Reproducer
+
+[Bash command(s) that show the contradiction.]
+```
+
+The user resumes by running `/plan --fix-from <task-id>` (FR-56). /execute deletes the defect file (FR-100b lifecycle) when the previously-defective task succeeds in a subsequent /execute run — the deletion confirms the fix landed.
 
 Work through the plan's tasks in order. For each task:
 

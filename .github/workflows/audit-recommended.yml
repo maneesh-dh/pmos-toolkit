@@ -1,0 +1,19 @@
+name: Audit non-interactive markers
+
+on:
+  pull_request:
+    paths:
+      - 'plugins/pmos-toolkit/skills/**/SKILL.md'
+      - 'plugins/pmos-toolkit/skills/_shared/non-interactive.md'
+      - 'plugins/pmos-toolkit/tools/audit-recommended.sh'
+      - 'plugins/pmos-toolkit/tools/lint-non-interactive-inline.sh'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run audit-recommended
+        run: bash plugins/pmos-toolkit/tools/audit-recommended.sh
+      - name: Run lint-non-interactive-inline
+        run: bash plugins/pmos-toolkit/tools/lint-non-interactive-inline.sh

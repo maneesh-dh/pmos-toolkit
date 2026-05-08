@@ -63,7 +63,7 @@ No findings deferred to backlog.
 
 | skill | phase | status | artifact path | timestamp |
 |-------|-------|--------|---------------|-----------|
-| /diagram | requirements | pending | — | — |
-| /diagram | plan | pending | — | — |
-| /diagram | execute | pending | — | — |
+| /diagram | requirements | completed | docs/pmos/features/2026-05-08_update-skills-diagram-on-failure/01_requirements.md | 2026-05-08 |
+| /diagram | plan | completed | docs/pmos/features/2026-05-08_update-skills-diagram-on-failure/03_plan.md | 2026-05-08 |
+| /diagram | execute | in-progress | — | — |
 | /diagram | verify | pending | — | — |

@@ -10,7 +10,18 @@ Generate user-facing changelog entries, prepended (newest first).
 
 ## Determine docs_path
 
-Check for `.pmos/settings.yaml` in the current repo. If found, read `docs_path` from it. If not found, follow `_shared/pipeline-setup.md` Section A to run first-run setup (which writes settings.yaml and detects legacy `docs/` layout). Use `{docs_path}/changelog.md` as the output path.
+Check for `.pmos/settings.yaml` in the current repo. If found, read `docs_path` from it. If not found, follow `_shared/pipeline-setup.md` Section A to run first-run setup (which writes settings.yaml and detects legacy `docs/` layout).
+
+**Sibling-prefer probe (observed-convention override).** After resolving `docs_path` from settings, normalize it (strip trailing `/`) and probe `{repo_root}/docs/changelog.md`:
+
+- If `docs_path` (normalized) is **not** `docs` AND `{repo_root}/docs/changelog.md` exists → resolve `{changelog_path}` to `docs/changelog.md` (prefer the existing sibling) AND emit exactly one non-blocking advisory line to the user before any read or write:
+  ```
+  /changelog: settings.yaml says docs_path=<value> but docs/changelog.md already exists; preferring the sibling. Consider reconciling settings.yaml.
+  ```
+  Do NOT block on `AskUserQuestion`; do NOT auto-edit `settings.yaml`.
+- Otherwise → resolve `{changelog_path}` to `{docs_path}/changelog.md` (current behavior, no advisory).
+
+`{changelog_path}` MUST be used consistently for both the scope read (Process step 1) and the prepend write (Process step 5) within a single run.
 
 <!-- non-interactive-block:start -->
 1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
@@ -99,7 +110,7 @@ END { emit_pending() }
 
 ## Process
 
-1. **Determine scope** — Run `git log` to find commits since the last changelog entry date (read the top entry in `{docs_path}/changelog.md` for the last date). If no changelog exists, use all commits on main.
+1. **Determine scope** — Run `git log` to find commits since the last changelog entry date (read the top entry in `{changelog_path}` — resolved by the "Determine docs_path" section above — for the last date). If no changelog exists, use all commits on main.
 
 2. **Analyze changes** — Read the commit messages and diffs to understand what was added, changed, or fixed. Focus on *what the system can now do*, not implementation details.
 
@@ -117,7 +128,7 @@ No "Added/Changed/Fixed" prefixes required — use them only when they add clari
 
 4. **Show draft to user** — Present the entry and ask for confirmation or edits before writing.
 
-5. **Write** — Prepend the entry to `{docs_path}/changelog.md`. If the file doesn't exist, create it with a single H1 header `# Changelog` followed by the entry.
+5. **Write** — Prepend the entry to `{changelog_path}` (resolved by the "Determine docs_path" section above). If the file doesn't exist, create it with a single H1 header `# Changelog` followed by the entry.
 
 ## Rules
 

@@ -2,7 +2,7 @@
 name: diagram
 description: Generate a single SVG vector diagram from a free-form description (with optional source markdown) — architecture, flow, hierarchy, dependency, sequence, state, mental-model, etc. Brainstorms 2–3 structural framings from first principles, asks the user to pick, then drafts and self-evaluates against a hybrid rubric (deterministic SVG metrics with hard-fails + a 7-item binary vision rubric on a rendered raster) with up to 2 refinement loops. Applies a configurable theme (default `technical`; switch with `--theme editorial`) so every output is consistent. Standalone utility — does not load workstream context. Use when the user says "draw a diagram", "create an architecture diagram", "show how X flows", "make an SVG of this concept", "diagram this", or wants a vector visual of any system/flow/structure.
 user-invocable: true
-argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--theme technical|editorial] [--mode diagram|infographic] [--rigor high|medium|low] [--clear-cache] [--selftest]"
+argument-hint: "<free-form description> [--source <path>] [--out <path>] [--approach <free-text>] [--theme technical|editorial] [--mode diagram|infographic] [--rigor high|medium|low] [--clear-cache] [--selftest] [--non-interactive | --interactive]"
 ---
 
 # `/diagram` — SVG Diagram Generator
@@ -17,7 +17,7 @@ Produce one `.svg` file plus a `<slug>.diagram.json` sidecar that records the de
 
 These instructions use Claude Code tool names. In other environments:
 
-- **No `AskUserQuestion`:** state your assumption, document it in the sidecar, and proceed.
+- **No interactive prompt tool:** state your assumption, document it in the sidecar, and proceed.
   - Phase 1 collision: default to `suffix` (write `<slug>-2.svg`).
   - Phase 1 same-concept: default to `redraw`.
   - Phase 2 brainstorm: pick the first framing you'd recommend; record alternatives in the sidecar's `alternativesConsidered`.
@@ -77,20 +77,108 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /diagram` a
 
 ---
 
+<!-- non-interactive-block:start -->
+1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
+   - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).
+   - `parent_marker` is set if the original prompt's first line matches `^\[mode: (interactive|non-interactive)\]$` (FR-06.1).
+   - `settings.default_mode` is `.pmos/settings.yaml :: default_mode` if present and one of `interactive`/`non-interactive`. Unknown values → warn on stderr `settings: invalid default_mode value '<v>'; ignoring` and fall through (FR-01.3).
+   - If `.pmos/settings.yaml` is malformed (not parseable as YAML, or missing `version`): print to stderr `settings.yaml malformed; fix and re-run` and exit 64 (FR-01.5).
+   - On Phase 0 entry, always print to stderr exactly: `mode: <mode> (source: <source>)` (FR-01.2).
+
+2. **Per-checkpoint classifier.** Before issuing any `AskUserQuestion` call, classify it (FR-02):
+   - Use the awk extractor below to find the line of this call's `question:` key in the live SKILL.md (FR-02.6).
+   - The defer-only tag, if present, is the literal previous non-empty line: `<!-- defer-only: <reason> -->` where `<reason>` ∈ {`destructive`, `free-form`, `ambiguous`} (FR-02.5).
+   - Decision (in order): tag adjacent → DEFER; multiSelect with 0 Recommended → DEFER; 0 options OR no option label ends in `(Recommended)` → DEFER; else AUTO-PICK the (Recommended) option (FR-02.2).
+
+3. **Buffer + flush.** Maintain an append-only OQ buffer in conversation memory. On each AUTO-PICK or DEFER classification, append one entry per the schema in spec §11.2. At end-of-skill (or in a caught error before exit), flush (FR-03):
+   - Primary artifact is single Markdown → append `## Open Questions (Non-Interactive Run)` section with one fenced YAML block per entry; update prose frontmatter (`**Mode:**`, `**Run Outcome:**`, `**Open Questions:** N` where N counts deferred only — see FR-03.4) (FR-03.1).
+   - Skill produces multiple artifacts → write a single `_open_questions.md` aggregator at the artifact directory root; primary artifact's frontmatter `**Open Questions:** N — see _open_questions.md` (FR-03.5).
+   - Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md` (FR-03.2).
+   - No persistent artifact (chat-only) → emit buffer to stderr at end-of-run as a single block prefixed `--- OPEN QUESTIONS ---` (FR-03.3).
+   - Mid-skill error → flush partial buffer under heading `## Open Questions (Non-Interactive Run — partial; skill errored)`; set `**Run Outcome:** error`; exit 1 (E13).
+
+4. **Subagent dispatch.** When dispatching a child skill via Task tool or inline invocation, prepend the literal first line: `[mode: <current-mode>]\n` to the child's prompt (FR-06).
+
+5. **Awk extractor.** The classifier and `tools/audit-recommended.sh` MUST both use the function below. Loaded at script init time; sourcing differs per consumer.
+
+<!-- awk-extractor:start -->
+```awk
+# Find AskUserQuestion call sites and their adjacent defer-only tags.
+# Input: a SKILL.md file (stdin or argv).
+# Output (TSV): <line_no>\t<has_recommended:0|1>\t<defer_only_reason or "-">
+# A "call site" is a line referencing `AskUserQuestion` in the SKILL's own prose
+# (backtick mentions, prose instructions, multi-line invocation hints).
+# `(Recommended)` is detected on the call site line OR any subsequent non-blank
+# line (the option-list block) until a blank line, defer-only tag, or another
+# AskUserQuestion call closes the pending call. Lines inside the inlined
+# `<!-- non-interactive-block:... -->` region are canonical contract text and
+# never count as call sites.
+function emit_pending() {
+  if (pending_call > 0) {
+    out_tag = (pending_call_tag != "") ? pending_call_tag : "-";
+    printf "%d\t%d\t%s\n", pending_call, pending_has_recc, out_tag;
+    pending_call = 0;
+    pending_has_recc = 0;
+    pending_call_tag = "";
+  }
+}
+/^<!-- non-interactive-block:start -->$/ { in_inlined=1; next }
+/^<!-- non-interactive-block:end -->$/   { in_inlined=0; next }
+in_inlined { next }
+/^[[:space:]]*<!--[[:space:]]*defer-only:[[:space:]]*([a-z-]+)[[:space:]]*-->/ {
+  emit_pending();
+  match($0, /defer-only:[[:space:]]*[a-z-]+/);
+  pending_tag = substr($0, RSTART + 12, RLENGTH - 12);
+  sub(/^[[:space:]]+/, "", pending_tag);
+  pending_line = NR;
+  next;
+}
+/^[[:space:]]*$/ {
+  emit_pending();
+  pending_tag = "";
+  next;
+}
+/AskUserQuestion/ {
+  emit_pending();
+  pending_call = NR;
+  pending_has_recc = ($0 ~ /\(Recommended\)/) ? 1 : 0;
+  pending_call_tag = (pending_tag != "" && NR == pending_line + 1) ? pending_tag : "";
+  pending_tag = "";
+  next;
+}
+{
+  if (pending_call > 0 && $0 ~ /\(Recommended\)/) {
+    pending_has_recc = 1;
+  }
+}
+END { emit_pending() }
+```
+<!-- awk-extractor:end -->
+
+6. **Refusal check.** If this SKILL.md contains a `<!-- non-interactive: refused; ... -->` marker (regex: `<!--[[:space:]]*non-interactive:[[:space:]]*refused`), and `mode` resolved to `non-interactive`: emit refusal per Section A and exit 64 (FR-07).
+
+7. **Pre-rollout BC.** If the `--non-interactive` argument is present BUT this SKILL.md does NOT contain the `<!-- non-interactive-block:start -->` marker (i.e., this skill hasn't been rolled out yet): emit `WARNING: --non-interactive not yet supported by /<skill>; falling back to interactive.` to stderr; continue in interactive mode (FR-08).
+
+8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
+<!-- non-interactive-block:end -->
+
 ## Phase 1 — Comprehension + existing-output handling
 
+<!-- defer-only: ambiguous -->
 1. **Read `--source` if provided.** Extract entities, relationships, and any explicit hierarchy or order. If the doc is long, surface your extracted entity list to the user (via `AskUserQuestion` "is this the right entity set?" with options Confirm / Refine / Add missing) before brainstorming. Prose-fallback: print the extracted list and proceed assuming it is correct unless contradicted in the next message.
 
 2. **Existing-output check.** If `<out>.svg` already exists:
    - Look for sibling `<out>.diagram.json` sidecar; load via `read_sidecar()` (see `tests/run.py`). It returns `None` when the file is missing OR has a pre-v2 `schemaVersion` (v1 sidecars are intentionally ignored). It raises `ValueError` for any version newer than the current schema (refuse).
    - If `read_sidecar()` returned `None`, treat the sidecar as absent and skip directly to the **Different concept** branch below.
    - **Same concept** (sidecar `concept` field substantially matches current input — case-insensitive substring or ≥0.6 Jaccard on tokens):
+     <!-- defer-only: destructive -->
      - `AskUserQuestion`: "Existing diagram is for the same concept. Extend with the new instruction, or redraw from scratch?"
        Options: **Extend** / **Redraw** / **Cancel**.
      - On **Extend**: read the existing SVG. Treat sidecar `positions` and `colorAssignments` as fixed. **If the sidecar has `mode: "infographic"` and a populated `wrappedText`, also treat `wrappedText` as fixed** — Phase 6.6 will skip its copy-generation and user-review steps. Apply the new instruction as a minimal patch (e.g., recolor a single node, add a single connector, relabel a node). Skip Phase 2 (no new brainstorm). Proceed to Phase 4 with the patched SVG.
      - On **Redraw**: discard the existing SVG (don't delete yet — overwrite at Phase 7). Use the sidecar's `approach` as a starting hint to Phase 2 but allow new framings.
      - On **Cancel**: exit 0.
    - **Different concept** (or sidecar absent / unreadable):
+     <!-- defer-only: destructive -->
      - `AskUserQuestion`: "Output path collision. Overwrite, write to `<slug>-2.svg`, or cancel?"
        Options: **Overwrite** / **Suffix** / **Cancel**.
 
@@ -115,6 +203,7 @@ Otherwise, **brainstorm 2–3 structurally distinct framings from first principl
 - Synchronous vs asynchronous edges (sequence vs dataflow).
 - Nesting (containers around groups vs flat).
 
+<!-- defer-only: ambiguous -->
 For each framing, write one paragraph: what it emphasizes, what it de-emphasizes, who it's best for. Then issue `AskUserQuestion`:
 
 ```
@@ -186,6 +275,7 @@ print(json.dumps(run.evaluate('<out>.svg.tmp'), indent=2))
 
 - `hard_fails == []` AND `code_score >= 0.8` → proceed to Phase 5.
 - Any `hard_fails` OR `code_score < 0.8` →
+  <!-- defer-only: ambiguous -->
   - If node-count diagnostic is in [21, 30]: issue node-count split prompt now (`AskUserQuestion`: "This diagram has N nodes. Split into 2 diagrams or proceed?" — Split / Proceed-anyway / Cancel). Record any override in sidecar `userOverrides`.
   - Otherwise: enter Phase 6 with these findings as targets. Skip Phase 5 for now (vision review is wasted on a code-failing draft).
 
@@ -238,6 +328,7 @@ For each refinement loop iteration:
 1. **Aggregate findings** from Phase 4 hard_fails + Phase 5 reviewer items 1–6 fails.
 
 2. **Findings Presentation Protocol** (mandatory):
+   <!-- defer-only: ambiguous -->
    - Group by category. Max 4 questions per `AskUserQuestion` call. Issue multiple sequential calls for more findings.
    - Each question = one blocker. Options: **Apply fix as proposed** / **Modify fix** / **Skip** / **Defer to user notes**.
    - Open-ended findings ("rethink categorization") asked as a follow-up after the structured batch.
@@ -257,6 +348,7 @@ For each refinement loop iteration:
 
 Loops are exhausted and gating fails remain.
 
+<!-- defer-only: ambiguous -->
 `AskUserQuestion`:
 
 ```
@@ -282,12 +374,14 @@ Runs after Phase 6 produces a clean diagram. Skipped if `--mode diagram` or the 
 
 1. **Generate copy.** Assemble a single inline LLM prompt with: original description, `--source` markdown if provided, the entity model + relationships, the chosen Phase 2 framing, and the color-to-element assignments captured in the working sidecar. Returns JSON `{eyebrow, headline, lede, figLabel, captions[], footer}`. The prompt is short and structured; **run inline** rather than via subagent (D7).
 
+<!-- defer-only: ambiguous -->
 2. **User-review checkpoint.** `AskUserQuestion`: "Generated infographic copy — accept, edit a field, or regenerate?"
    - **Accept** → proceed to step 3.
+   <!-- defer-only: ambiguous -->
    - **Edit field** → present each field one at a time (one `AskUserQuestion` per field with current text shown in description; user picks Keep / Replace / Skip-this-field; "Other" lets them rewrite).
    - **Regenerate** → re-prompt the LLM once with whatever feedback the user types. Only one regen attempt; further iterations require manual edits.
 
-   Prose-fallback (no `AskUserQuestion`): print the JSON, accept by default, allow the user to reject in their next message.
+   Prose-fallback (no interactive prompt tool): print the JSON, accept by default, allow the user to reject in their next message.
 
 3. **Caption count clamp** (per spec D8). Apply via `wrapper.caption_grid.clamp_captions()`:
    - Length > 5 → drop weakest by body length until 5 remain. Sidecar `captionCountClamp.from/to` records the change.
@@ -351,7 +445,8 @@ If a generic `learnings-capture.md` is not found, append entries directly to `~/
 
 ## Anti-patterns (DO NOT)
 
-- Do NOT use `AskUserQuestion` to ask "should I proceed?" — only to gather decisions or surface findings. Each question must have a clear default fallback for non-AskUserQuestion environments.
+<!-- defer-only: ambiguous -->
+- Do NOT use `AskUserQuestion` to ask "should I proceed?" — only to gather decisions or surface findings. Each question must have a clear default fallback for environments without an interactive prompt tool.
 - Do NOT skip the renderer hard-gate. If no renderer is available, refuse to run; never silently downgrade to "code-only eval".
 - Do NOT brainstorm from a hardcoded list of diagram types ("flowchart vs hierarchy vs swimlane"). Always reason from the specific content's structure.
 - Do NOT copy the structure of any file in `themes/technical/atoms/` (or any theme's `atoms/` directory) — those are visual primitives, not templates. Re-derive layout each time.

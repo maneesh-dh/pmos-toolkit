@@ -144,3 +144,18 @@ flush_buffer() {
   esac
 }
 export -f flush_buffer
+
+# Stand-in for "destructive defer that stops the run" path.
+flush_and_exit_destructive() {
+  local cp="" reason=""
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --checkpoint-id) cp="$2"; shift 2;;
+      --reason) reason="$2"; shift 2;;
+      *) shift;;
+    esac
+  done
+  echo "Refused destructive operation at ${cp}: ${reason}. Re-run with --interactive to resolve." >&2
+  return 2
+}
+export -f flush_and_exit_destructive

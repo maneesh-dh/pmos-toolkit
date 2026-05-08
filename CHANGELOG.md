@@ -1,6 +1,6 @@
 # Changelog
 
-## pmos-toolkit 2.25.0 — 2026-05-08
+## pmos-toolkit 2.26.0 — 2026-05-08
 
 ### What's new
 

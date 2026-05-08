@@ -58,8 +58,8 @@
 | /spec         | completed | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/02_spec.md | 2026-05-08 |
 | /grill        | n/a (Tier <3) |        |           |
 | /plan         | completed | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/03_plan.md | 2026-05-08 |
-| /execute      | in-progress | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/execute/ | 2026-05-08 |
-| /verify       | pending |              |           |
+| /execute      | completed | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/execute/ | 2026-05-08 |
+| /verify       | completed | docs/pmos/features/2026-05-08_update-skills-complete-dev-merge/verify/2026-05-08-review.md | 2026-05-08 |
 
 ## Failure log (Phase 8)
 

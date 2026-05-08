@@ -89,7 +89,7 @@ for skill in "${SUPPORTED_SKILLS[@]}"; do
         echo "OK:      ${skill}/SKILL.md"
     else
         echo "DRIFT:   ${skill}/SKILL.md"
-        echo "  --- canonical (from ${CANONICAL_FILE#${PLUGIN_ROOT}/}) ---"
+        echo "  --- canonical (from ${CANONICAL_FILE#"${PLUGIN_ROOT}"/}) ---"
         echo "  +++ ${skill}/SKILL.md +++"
         diff <(printf '%s\n' "$CANONICAL") <(printf '%s\n' "$actual") \
             | sed 's/^/  /' || true

@@ -104,7 +104,7 @@ for skill_file in "${TARGETS[@]}"; do
     done <<< "$rows"
   fi
 
-  rel="${skill_file#${PLUGIN_ROOT}/}"
+  rel="${skill_file#"${PLUGIN_ROOT}"/}"
   echo "${rel}: ${n_calls} calls, ${n_recc} Recommended, ${n_defer} defer-only, ${n_unmarked} unmarked" >&2
   TOTAL_FAIL=$((TOTAL_FAIL + n_unmarked))
 done

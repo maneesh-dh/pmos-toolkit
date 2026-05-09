@@ -295,7 +295,11 @@ Skipped /grill: --non-interactive flag (Tier <N> normally requires it).
 
 Status table records `status: skipped-non-interactive`. Per FR-PHASE-TAGS (spec §15 G5) and Anti-pattern #7 (spec §12).
 
-Otherwise, invoke `/pmos-toolkit:grill` with `<feature_folder>/01_requirements.{html,md}` (resolved primary path) as the target.
+Otherwise, invoke `/pmos-toolkit:grill` per the **Reviewer-subagent contract (FR-50/51/52, T13a)** below.
+
+**Reviewer-subagent contract (FR-50/51/52, T13a):** before invoking /grill, chrome-strip the artifact via `Bash('node ${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js <feature_folder>/01_requirements.html > /tmp/grill-stripped.html')`. Pass the stripped HTML inline to the subagent prompt with the canonical FR-51 template: *"Read this HTML content (the document's `<main>` body — chrome already stripped). First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: \"<≥40-char verbatim from source>\"}`."*
+
+After the subagent returns, run FR-52 validation (hard-fail on any miss): (1) read `<feature_folder>/01_requirements.sections.json`; (2) assert `sections_found` set-equality with sections.json `ids[]` — any miss/extra → hard-fail with `[/feature-sdlc] reviewer grill returned sections_found that do not match 01_requirements.sections.json: missing=[...], extra=[...]`; (3) for each finding, substring-grep `quote` against the un-stripped source HTML — any miss → hard-fail with `[/feature-sdlc] reviewer grill returned quote not found in source: <quote-prefix-30char>...`; (4) "no findings" return is allowed only if `sections_found` matches AND the rubric explicitly permits it. On any FR-52 hard-fail, pause with `reference/failure-dialog.md` (soft-phase variant).
 
 After completion:
 
@@ -317,7 +321,9 @@ options:
 
 Recommended switches per `{tier}` (FR-TIER-SCOPE).
 
-On Run: invoke `/pmos-toolkit:msf-req` with the resolved primary `<feature_folder>/01_requirements.{html,md}`. On missing-skill platform error: missing-skill dialog (soft variant) from `reference/failure-dialog.md`.
+On Run: invoke `/pmos-toolkit:msf-req` per the **Reviewer-subagent contract (FR-50/51/52, T13a)** below. On missing-skill platform error: missing-skill dialog (soft variant) from `reference/failure-dialog.md`.
+
+**Reviewer-subagent contract (FR-50/51/52, T13a):** before invoking /msf-req, chrome-strip the artifact via `Bash('node ${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js <feature_folder>/01_requirements.html > /tmp/msf-req-stripped.html')`. Pass the stripped HTML inline with the canonical FR-51 template: *"Read this HTML content (the document's `<main>` body — chrome already stripped). First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: \"<≥40-char verbatim from source>\"}`."* After return, run FR-52 validation (hard-fail on miss): (1) read `<feature_folder>/01_requirements.sections.json`; (2) assert `sections_found` set-equality with sections.json `ids[]` — any miss/extra → hard-fail; (3) for each finding, substring-grep `quote` against the un-stripped source HTML — any miss → hard-fail; (4) "no findings" allowed only if `sections_found` matches AND the rubric permits it. On hard-fail, pause with `reference/failure-dialog.md` (soft-phase variant).
 
 ## Phase 4.b: /creativity gate (soft)
 
@@ -402,6 +408,8 @@ options:
 Recommended switches per `{tier}`.
 
 Before invoking, run the **compact checkpoint** — `/simulate-spec` is heavy (full scenario trace + pseudocode).
+
+**Reviewer-subagent contract (FR-50/51/52, T13a):** when /simulate-spec runs as a reviewer subagent, chrome-strip the spec artifact via `Bash('node ${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js <feature_folder>/02_spec.html > /tmp/simulate-spec-stripped.html')`. Pass the stripped HTML inline with the canonical FR-51 template: *"Read this HTML content (the document's `<main>` body — chrome already stripped). First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: \"<≥40-char verbatim from source>\"}`."* After return, run FR-52 validation (hard-fail on miss): (1) read `<feature_folder>/02_spec.sections.json`; (2) assert `sections_found` set-equality with sections.json `ids[]` — any miss/extra → hard-fail; (3) for each finding, substring-grep `quote` against the un-stripped source HTML — any miss → hard-fail; (4) "no findings" allowed only if `sections_found` matches AND the rubric permits it. On hard-fail, pause with `reference/failure-dialog.md` (soft-phase variant per Phase 6's tier-3-mandatory status).
 
 On missing-skill: soft-variant missing-skill dialog.
 

@@ -3,10 +3,10 @@ slug: html-artifacts
 tier: 3
 mode: interactive
 started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-09T19:14:00Z
+last_updated: 2026-05-09T19:55:00Z
 current_phase: execute
-paused_at: 2026-05-09T19:14:00Z
-paused_reason: compact-pending
+paused_at: null
+paused_reason: null
 worktree_path: null
 branch: feat/html-artifacts
 feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
@@ -17,6 +17,7 @@ notes:
   - "Resumed 2026-05-09T13:35Z. Ran /spec → /simulate-spec → /plan in one block. /spec produced 02_spec.md (Tier 3, 21 decisions, Ready for Plan). /simulate-spec produced simulate-spec/2026-05-09-trace.md (28 scenarios; 21 gaps; 14 patches applied to spec; 5 skipped; 2 deferred to OQ-DEFER-1/2 for /complete-dev). /plan produced 03_plan.md (Tier 3; 26 tasks in 5 phases; 5 decisions; 1 review loop with 4 fix findings; FR-coverage 62/62; status=Planned)."
   - "Paused 2026-05-09T17:05Z compact-pending before /execute. Heavy phase (TDD across 26 tasks). Resume via /feature-sdlc --resume after /compact. Next phase: execute. 3 Open Questions in plan: OQ-1 (/complete-dev MD re-author, deferred), OQ-2 (stale .md sidecars, deferred), OQ-3 (T18 per-skill harness shape, resolves during /execute)."
   - "Resumed 2026-05-09T18:50Z post-compact. Execute Phase 1 progress: T1, T2, T5, T6, T4 all done + committed (5/6). T3 (viewer.js, ≤30KB classic-script with JSDOM TDD across 11 surfaces) remaining; deferred to next post-compact session. Two deviations logged: (a) GFM plugin substituted to non-@joplin upstream because @joplin fork dropped UMD bundles; (b) html-to-md.js needs jsdom at runtime (vendored turndown is browser bundle; @mixmark-io/domino is 7.5MB and not vendorable) — clear-error path + HTML_TO_MD_JSDOM_PATH escape hatch in place. Paused 2026-05-09T19:14Z compact-pending before T3."
+  - "Resumed 2026-05-09T19:30Z post-compact. T3 complete: viewer.js authored (12984 bytes, ≤30720 budget); 11 surfaces; 3 JSDOM tests pass (file:// fallback FR-40, sessionStorage fallback FR-26, legacy-md shim FR-22); 0 ES module patterns (FR-05.1). Test bootstrap reuses T6 HTML_TO_MD_JSDOM_PATH escape hatch + /tmp/pmos-jsdom-boot auto-install. Phase 1 (T1–T6) now COMPLETE. Phase 2.5 boundary check next: invoke /verify --scope phase --feature 2026-05-09_html-artifacts --phase 1, OR pause for /compact (heavy phase boundary), OR continue to Phase 2 with --no-halt. Awaiting user choice."
 phases:
   - id: setup
     hardness: infra
@@ -98,6 +99,7 @@ phases:
     status: in_progress
     artifact_path: null
     started_at: 2026-05-09T18:50:00Z
+    notes: "Phase 1 (T1–T6) complete; T3 closed at 2026-05-09T19:55Z. Phase 2.5 boundary pending: /verify --scope phase 1."
   - id: verify
     hardness: hard
     status: pending

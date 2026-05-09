@@ -9,7 +9,9 @@
 
 ## Problem
 
-Every pmos-toolkit pipeline skill (`/requirements`, `/spec`, `/plan`, `/msf-req`, `/msf-wf`, `/simulate-spec`, `/grill`, `/artifact`, `/verify`, `/changelog`, `/session-log`, `/design-crit`) writes its primary artifact as **plain markdown**. **Markdown is the wrong primary format for these documents.**
+Every pmos-toolkit pipeline skill that writes into a feature folder (`/requirements`, `/spec`, `/plan`, `/msf-req`, `/msf-wf`, `/simulate-spec`, `/grill`, `/artifact`, `/verify`, `/design-crit`) writes its primary artifact as **plain markdown**. **Markdown is the wrong primary format for these documents.**
+
+(Global, non-feature-folder skills `/changelog` and `/session-log` are explicitly **not in scope this iteration** — see Non-Goals.)
 
 Three concrete pains:
 
@@ -37,6 +39,7 @@ Two converging triggers. **Trigger 1:** the user attempted to take a `/spec` out
 
 ### Goals
 
+- **A finished feature folder is shareable as a self-contained, navigable artifact set** — the user (or a teammate, or an LLM) can open the folder via `node serve.js` (or zip-and-share) and read every artifact in a single sidebar-navigated view without prior setup — measured by: a recipient with no pmos-toolkit installed can navigate a finished feature folder end-to-end in under a minute from cold.
 - **Skills generate HTML directly,** authoring semantic structure, inline SVG diagrams, embedded images, structured tables, and anchored cross-references — not by post-converting markdown — measured by: zero "md→html converter" code paths in the affected skills.
 - **Every feature folder ships with a unified, navigable viewer** (`index.html`) that shows all artifacts including nested wireframes/prototype/grill outputs in one place — measured by: opening `index.html` reveals every artifact in the folder via a sidebar TOC.
 - **Markdown remains available for clipboard/export** but only as a **derived** format from the HTML source — measured by: a "Copy Markdown" button per doc in the viewer that produces clean, structured markdown on demand.
@@ -45,10 +48,12 @@ Two converging triggers. **Trigger 1:** the user attempted to take a `/spec` out
 
 ### Non-Goals
 
+- **NOT migrating `/changelog` and `/session-log` to HTML in this iteration** — because they write **global** docs (`docs/changelog.md`, `docs/session-log.md`) outside any feature folder, and dragging them in expands scope to "design a repo-wide HTML docs viewer", which is its own decision. We address feature-folder asymmetry first; revisit global docs as a follow-up.
 - **NOT migrating existing artifacts** in old `{docs_path}/features/*` folders — because retroactive conversion is high risk for low value; old folders stay markdown-native.
 - **NOT supporting `output_format: markdown`-only** (HTML always written) — because the user explicitly rejected "markdown source of truth"; allowing markdown-only would re-introduce that path.
 - **NOT building a hosted viewer / web service** — because the viewer is local-only via `serve.js`; we ship a static folder, not a deployment.
 - **NOT supporting heavy HTML frameworks** (React, Vue, build steps) — because the viewer must run from a static folder with zero install; React-via-CDN (already used by `/prototype`) is acceptable, build pipelines are not.
+- **NOT adopting an existing static-site generator** (mdbook, MkDocs, Sphinx, Eleventy, docsify, etc.) — see D11 below.
 - **NOT making `/diagram` a pure programmatic API** in this iteration if it requires deep refactor — because the diagram-embed contract should work with `/diagram` as it stands; if it can't, the skill body inlines SVG directly via prompt as the fallback.
 - **NOT redesigning the artifact contents** — sections, content, and tone stay the same; only the rendering format changes.
 
@@ -111,10 +116,7 @@ User-observable behavior: skill prompts get **shorter and more directive** ("wri
 
 Each affected skill's "write the document" phase changes from "write markdown to `01_requirements.md`" to "write HTML to `01_requirements.html`, optionally also write derived `01_requirements.md` if `output_format: both`". The HTML is authored against the shared contract.
 
-Two-axis variability:
-
-- **Feature-folder primaries** (`01_requirements`, `02_spec`, `03_plan`, `msf-findings`, `simulate-spec/*`, `grills/*`, `verify/*`) — straightforward; write `.html` instead of `.md`.
-- **Global docs** (`docs/changelog.md`, `docs/session-log.md`) — these live OUTSIDE feature folders. Decision D7 below: do they get the same treatment, and if so, what's the index/viewer for the `docs/` directory itself?
+All affected outputs are **feature-folder primaries** (`01_requirements`, `02_spec`, `03_plan`, `msf-findings`, `simulate-spec/*`, `grills/*`, `verify/*`) — straightforward; write `.html` instead of `.md`. Global docs (`/changelog`, `/session-log`) are out of scope this iteration (see Non-Goals).
 
 ### 3. Index viewer — `{feature_folder}/index.html`
 
@@ -222,9 +224,8 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 | Browser blocks JS under `file://` | User opens `index.html` directly | Fallback mode: links open each artifact in a new tab |
 | Skill is run before HTML infra ships (this run) | This very requirements doc | Written in markdown — bootstrap. Future runs of the same pipeline write HTML. |
 | Existing `.html` and `.md` for the same artifact (post-migration partial state) | Mixed-state folder mid-migration | `.html` is canonical; `.md` shown as legacy entry |
-| `/changelog` global doc | Lives at `docs/changelog.md`, not in a feature folder | Decision D7 — same HTML treatment, separate `docs/index.html` viewer; OR exempt from this migration |
-| `/session-log` global doc | Same situation | Same as D7 |
 | `--format` flag and settings disagree | Flag wins | Documented; non-controversial |
+| `/changelog`, `/session-log` (global docs) | Out of scope this iteration | Stay markdown; revisit as follow-up |
 
 ---
 
@@ -238,10 +239,11 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 | **D4** | Markdown export: **client-side conversion at click time**, not pre-rendered sidecar (unless `output_format: both`). | (a) Pre-render `.md` always (sidecar). (b) Bundle a JS converter (e.g., turndown), run in browser at click. (c) Server endpoint that converts on demand. | (b) by default. (a) only when `output_format: both` (explicit opt-in). (c) overkill for a static folder. |
 | **D5** | Existing markdown artifacts stay; HTML coexists. Index viewer surfaces orphan `.md` as "legacy" entries. | (a) Migrate existing `.md` to `.html` retroactively. (b) Strict no-touch (this option). (c) Hide legacy entries from index. | (b). Migration is high risk for low value (per Non-Goals). Surfacing them as legacy entries beats hiding (transparency over clean look). |
 | **D6** | Index regeneration: each skill calls the index generator after writing its artifact. | (a) Each skill regenerates after write. (b) Standalone `/index` command, user invokes. (c) Generated by `serve.js` at request time. | (a) for write-time freshness. (c) considered for simplicity, but means index is always 1-step out of date until server runs — surprise-prone. (b) extra step, easy to forget. |
-| **D7** | Global docs (`/changelog`, `/session-log`): **migrate to HTML in same release**, with a separate `docs/index.html` viewer scoped to global docs. | (a) Migrate, separate `docs/index.html`. (b) Migrate, fold into one global viewer per repo. (c) Skip this iteration; only feature-folder skills migrate. | (a). Same migration mechanics. (b) muddles scoping (global vs per-feature). (c) leaves the asymmetry unsolved — a key motivator. |
+| **D7** | Global docs (`/changelog`, `/session-log`) are **excluded from this iteration**. | (a) Migrate, separate `docs/index.html`. (b) Migrate, fold into one global viewer per repo. (c) Skip this iteration; only feature-folder skills migrate. | (c). Migrating them is meaningful scope expansion — pulls in "design a repo-wide HTML docs viewer" as its own concern. Address feature-folder asymmetry first; revisit global docs as a follow-up once the feature-folder pattern is proven. |
 | **D8** | Settings field name: `output_format` with values `{html, both}`. Default `html` when unset. | (a) `output_format`, `{html, both}`. (b) `output_format`, `{html, markdown, both}`. (c) `artifact_format`. | (a). (b) re-introduces the markdown-only path the user explicitly rejected. (c) creates a synonym to existing `format` patterns; `output_format` is precise to "what the skill outputs". |
 | **D9** | Reviewer parser tech and html→md tech choice deferred to `/spec`/`/grill`. | n/a | Tech choices belong in `/spec`. Surfaced here so they're not surprises later. |
 | **D10** | The `_shared/html-authoring/` directory is a **new top-level shared component**, not a per-skill addition. | (a) Each skill owns its own template. (b) Centralized `_shared/html-authoring/`. | (b). Same reason `_shared/pipeline-setup.md` exists — uniform contract beats per-skill drift. |
+| **D11** | **NOT adopting an existing static-site generator** (mdbook, MkDocs, Sphinx, Eleventy, docsify, Hugo, Zola, etc.). Build the viewer ourselves as zero-deps static HTML + tiny JS, in the `/wireframes`+`/prototype` style. | (a) Adopt mdbook/MkDocs (markdown-source SSGs). (b) Adopt Eleventy/docsify (more flexible). (c) Build our own (this option). | (c). All major SSGs assume markdown source-of-truth — directly conflicts with D1 (HTML-native). Most require a build step (we ruled out: zero install). They bring opinionated theming, plugin systems, and config files that we'd have to fight to keep minimal. The viewer's footprint is small (sidebar + main pane + Copy-Markdown) and the existing `/wireframes`+`/prototype` pattern proves zero-deps static-HTML viewer-style works inside this pipeline. Adopting an SSG would be more code on net, not less. |
 
 ---
 
@@ -249,7 +251,7 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 
 | Metric | Baseline (today) | Target | Measurement |
 |---|---|---|---|
-| Affected skills emitting HTML primary | 0 of 12 | 12 of 12 | Grep affected SKILL.md for "write `.html`"; count post-/verify |
+| Affected skills emitting HTML primary | 0 of 10 | 10 of 10 | Grep affected SKILL.md for "write `.html`"; count post-/verify |
 | Reviewer subagents querying by `data-section` | 0 of 5 | 5 of 5 | Grep reviewer prompts for `data-section`; zero `^##` regex post-migration |
 | Time from "skill writes artifact" to "user can navigate it in browser" | Manual (open `.md` in IDE / paste-render) | < 30s (run `node serve.js`, click) | User flow timing during `/verify` |
 | Diagrams rendered as SVG (not ASCII) in `/spec` and `/plan` | 0% | ≥ 80% of diagram-worthy moments | Count `<figure data-section="diagram-*">` per spec/plan vs. ASCII boxes pre-migration |
@@ -266,7 +268,7 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 | `plugins/pmos-toolkit/skills/prototype/SKILL.md` (lines 363–394) | Existing code | Per-device `index.<device>.html`; React-via-CDN allowed; runtime smoke under `file://` is degraded. Confirms "no build pipeline" constraint is workable. |
 | `plugins/pmos-toolkit/skills/_shared/` | Existing code | Has `pipeline-setup.md`, `interactive-prompts.md`, `non-interactive.md`, `msf-heuristics.md`, etc. Net-new directory `html-authoring/` is consistent with this layout. |
 | `plugins/pmos-toolkit/skills/diagram/SKILL.md` | Existing code | `/diagram` is currently designed as user-invokable; inline-SVG-authoring referenced only as part of its own Phase 5 reviewer. Programmatic callability is the Open Question (OQ1). |
-| `plugins/pmos-toolkit/skills/{requirements,spec,plan,msf-req,msf-wf,simulate-spec,grill,artifact,verify,changelog,session-log,design-crit}/SKILL.md` | Existing code | Confirmed all 12 use `_shared/pipeline-setup.md` for path resolution. Output-path surface: feature-folder primaries (`01_*`, `02_*`, `03_*`), per-skill subfolders (`verify/`, `simulate-spec/`, `grills/`, `msf-findings.md`), global docs (`docs/changelog.md`, `docs/session-log.md`). |
+| `plugins/pmos-toolkit/skills/{requirements,spec,plan,msf-req,msf-wf,simulate-spec,grill,artifact,verify,design-crit}/SKILL.md` (the 10 in-scope skills) plus `{changelog,session-log}` (out-of-scope confirmation) | Existing code | Confirmed all 12 use `_shared/pipeline-setup.md` for path resolution. In-scope output-path surface: feature-folder primaries (`01_*`, `02_*`, `03_*`), per-skill subfolders (`verify/`, `simulate-spec/`, `grills/`, `msf-findings.md`). Out-of-scope (this iteration): `/changelog` writes `docs/changelog.md`, `/session-log` writes `docs/session-log.md` — both global, not under a feature folder. |
 | `plugins/pmos-toolkit/skills/_shared/non-interactive.md` (inlined non-interactive block) | Existing code | Schema already accommodates non-MD primary artifacts: "Primary artifact is non-MD (SVG, etc.) → write sidecar `<artifact>.open-questions.md`". HTML fits cleanly into existing OQ infra; no contract change needed there. |
 | `~/.pmos/learnings.md` `## /requirements` (none under that header) | Learning archive | No prior `/requirements` lessons specific to this work. |
 
@@ -281,9 +283,8 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 | OQ3 | html→md derivation tech: turndown.js bundled client-side vs. pre-rendered `.md` sidecar always vs. server endpoint. Bundle size, freshness, and zero-deps stance pull in different directions. **Resolve in `/spec`.** |
 | OQ4 | Index viewer's nested-folder rendering: should `wireframes/` and `prototype/` (already-HTML, with their own `index.html`) embed inline in the parent index or link out? **Resolve in `/wireframes` (Phase 4.c gate of this run) — concrete UI question.** |
 | OQ5 | Should the "Copy Markdown" button copy the full doc, or the section under cursor? Or both (toolbar + per-section)? **Resolve in `/wireframes`.** |
-| OQ6 | Global docs (`/changelog`, `/session-log`): repo gets one global `docs/index.html`, or fold into a per-folder `docs/` index? D7 picked separate viewer; the structure (one viewer or many) is the spec-level detail. **Resolve in `/spec`.** |
-| OQ7 | This requirements doc is itself written in markdown (bootstrap). When should we re-author it as HTML — at the end of the implementation, or leave as the historical artifact written in the old format? **Resolve in `/complete-dev`.** |
-| OQ8 | What happens to `/feature-sdlc`'s own `00_pipeline.md` and `00_open_questions_index.md`? They're orchestrator artifacts, not skill-pipeline artifacts. In scope or not? **Resolve in `/spec`.** |
+| OQ6 | This requirements doc is itself written in markdown (bootstrap). When should we re-author it as HTML — at the end of the implementation, or leave as the historical artifact written in the old format? **Resolve in `/complete-dev`.** |
+| OQ7 | What happens to `/feature-sdlc`'s own `00_pipeline.md` and `00_open_questions_index.md`? They're orchestrator artifacts, not skill-pipeline artifacts. In scope or not? **Resolve in `/spec`.** |
 
 ---
 

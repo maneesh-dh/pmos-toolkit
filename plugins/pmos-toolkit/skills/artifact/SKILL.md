@@ -2,7 +2,7 @@
 name: artifact
 description: Generate, refine, and update structured PM/eng artifacts (PRD, Experiment Design Doc, Engineering Design Doc, Discovery Doc) from existing context plus targeted gap-filling questions. Each artifact passes through a reviewer-subagent + auto-apply loop (max 2 iters) governed by per-section eval criteria. Ships with 4 built-in templates and 4 writing-style presets (Concise, Tabular, Narrative, Executive); users can author their own at ~/.pmos/artifacts/. Use when the user says "draft a PRD", "create an experiment design", "write a design doc", "generate a discovery doc", "/artifact", or names an artifact type to produce.
 user-invocable: true
-argument-hint: "[ | <type> [--tier lite|full] [--preset <slug>] | create <type> [...] | refine <path> | update <path> | template add|list|remove [<slug>] | preset add|list|remove [<slug>]] [--non-interactive | --interactive]"
+argument-hint: "[ | <type> [--tier lite|full] [--preset <slug>] | create <type> [...] | refine <path> | update <path> | template add|list|remove [<slug>] | preset add|list|remove [<slug>]] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # /artifact
@@ -29,6 +29,10 @@ These instructions use Claude Code tool names. In other environments:
      presets/
    ```
 4. Determine the subcommand and route to the appropriate phase. Default subcommand is `create`.
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+5. **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. Controls the **feature-folder write phase only**; the template store at `~/.pmos/artifacts/templates/<slug>/template.md` retains MD shape regardless of output_format (per runbook edge case row 4 — template-store carve-out).
 
 <!-- non-interactive-block:start -->
 1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
@@ -217,7 +221,23 @@ Generate the artifact section-by-section using:
 - The selected preset's rendering rules (per section type)
 - `gathered_context` (auto-read + gap answers)
 
-Write the draft to `{feature_folder}/{slug}.md` (e.g., `prd.md`, `experiment-design.md`). Include a frontmatter block in the artifact:
+Write the draft to `{feature_folder}/{slug}.html` (e.g., `prd.html`, `experiment-design.html`) per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`. The template store at `~/.pmos/artifacts/templates/<slug>/template.md` retains its MD shape and is rendered via the substrate at write time (per runbook edge case row 4).
+
+**Atomic write (FR-10.2):** write `{slug}.html` and the companion `{slug}.sections.json` via temp-then-rename — never serve a half-written file.
+
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
+
+**Asset prefix (FR-10.1):** `assets/` for top-level feature-folder writes.
+
+**Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML.
+
+**Heading IDs (FR-03.1, enforced by `/verify`):** every `<h2>` and `<h3>` carries a stable kebab-case `id` per `_shared/html-authoring/conventions.md` §3.
+
+**Index regeneration (FR-22, §9.1):** after the artifact write completes, regenerate `{feature_folder}/index.html` via `_shared/html-authoring/index-generator.md` (manifest inlined as `<script type="application/json" id="pmos-index">`, no on-disk `_index.json`, FR-41).
+
+**Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `{slug}.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js {slug}.html > {slug}.md`. The MD sidecar is read-only (FR-33).
+
+Include a frontmatter block in the artifact (HTML primary uses a leading `<script type="application/json" id="pmos-frontmatter">` block carrying the same fields):
 
 ```yaml
 ---
@@ -274,7 +294,7 @@ After loop 2 (or loop 1 if no high remain):
 
 ## Phase 4 — Save & Confirm
 
-1. The artifact file at `{feature_folder}/{slug}.md` already exists from Phase 2.7 and was edited in Phase 3.
+1. The artifact file at `{feature_folder}/{slug}.html` (plus `{slug}.sections.json` companion, plus `{slug}.md` sidecar when `output_format=both`) already exists from Phase 2.7 and was edited in Phase 3.
 2. Show the user a one-paragraph summary:
    - Artifact type + tier
    - Preset used

@@ -2,7 +2,7 @@
 name: spec
 description: Create a detailed technical specification from a requirements document — architecture, API contracts, DB schema, frontend design, testing strategy, verification plan. Second stage in the requirements -> spec -> plan pipeline. Auto-tiers by scope. Use when the user says "write the technical design", "design the system", "create the spec", "how should this work technically", or has a requirements doc ready for detailed design.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or requirements text> [--feature <slug>] [--backlog <id>] [--non-interactive | --interactive]"
+argument-hint: "<path-to-requirements-doc or requirements text> [--feature <slug>] [--backlog <id>] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # Technical Specification Generator
@@ -56,6 +56,10 @@ Use workstream context (loaded by step 3 below) to inform technical decisions �
 5. **Edge cases — you MUST `Read` `_shared/pipeline-setup.md` Section B before acting:** slug collision, slug validation failure, legacy date-less folder encountered, ambiguous `--feature` lookup, any folder creation.
 6. Read `~/.pmos/learnings.md` if present; note entries under `## /<this-skill-name>` and factor them into approach (skill body wins on conflict; surface conflicts to user before applying).
 <!-- pipeline-setup-block:end -->
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+7. **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. The numbering continues from the pipeline-setup-block above (which ends at step 6).
 
 ---
 
@@ -148,7 +152,7 @@ END { emit_pending() }
 
 1. **Locate the requirements.** Follow `../.shared/resolve-input.md` with `phase=requirements`, `label="requirements doc"`.
 2. **Read the requirements end-to-end.** Confirm understanding with the user — summarize the problem, goals, non-goals, and key decisions already made.
-3. **Check for existing spec.** Look at `{feature_folder}/02_spec.md` for an existing file.
+3. **Check for existing spec.** Use `_shared/resolve-input.md` with `phase=spec`, `label="prior spec"` to locate either `{feature_folder}/02_spec.html` (preferred) or `{feature_folder}/02_spec.md` (legacy fallback).
    - If found: read it, ask the user if this is an update or fresh start.
    - If not found: proceed.
 <!-- defer-only: ambiguous -->
@@ -303,20 +307,40 @@ Good verification patterns to draw from:
 
 ## Phase 5: Write the Spec
 
-Save to `{feature_folder}/02_spec.md`.
+Save to `{feature_folder}/02_spec.html` per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`.
 
-**Before overwriting an existing spec:** if `{feature_folder}/02_spec.md` exists AND has uncommitted changes (check `git status --porcelain "{feature_folder}/02_spec.md"`), commit it first:
+**Atomic write (FR-10.2):** write `02_spec.html` and the companion `02_spec.sections.json` via temp-then-rename — never serve a half-written file.
+
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically without per-skill prose updates. Idempotent — `cp -n` (no-clobber) or `rsync --update` skips identical files; on initial setup an unconditional `cp assets/* feature_folder/assets/` is fine.
+
+**Asset prefix (FR-10.1):** the per-folder relative asset prefix for top-level feature-folder artifacts is `assets/`.
+
+**Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML (the substrate `template.html` already does this for the loader pair; skill-emitted inline `<link>` / `<script>` references must follow suit).
+
+**Heading IDs (FR-03.1):** every `<h2>` and `<h3>` MUST carry a stable kebab-case `id`. See "Templates → Heading IDs" below.
+
+**Index regeneration (FR-22, §9.1):** after the artifact write completes, regenerate `{feature_folder}/index.html` by inlining the manifest per `_shared/html-authoring/index-generator.md` (no on-disk `_index.json` is written; the manifest is inlined as `<script type="application/json" id="pmos-index">`, FR-41). Honour the §9.1 phase-rank ordering policy.
+
+**Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `02_spec.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js 02_spec.html > 02_spec.md`. The MD sidecar is read-only — never the source of truth (FR-33).
+
+**Before overwriting an existing spec:** if `{feature_folder}/02_spec.html` (or legacy `02_spec.md`) exists AND has uncommitted changes (check `git status --porcelain "{feature_folder}/02_spec.{html,md}"`), commit it first:
 
 ```bash
-git add "{feature_folder}/02_spec.md"
+git add "{feature_folder}/02_spec.html" "{feature_folder}/02_spec.sections.json" "{feature_folder}/02_spec.md"
 git commit -m "docs: snapshot prior spec before /spec rewrite"
 ```
+
+(`git add` on a non-existent path is a no-op, so legacy MD-only folders still snapshot cleanly.)
 
 This makes git the backup; the rewrite then proceeds normally with `Write` (no `.bak` files needed). If the file exists but is already committed, no pre-commit is needed — just proceed.
 
 ### Status Field Lifecycle
 
 All templates start at `**Status:** Draft`. The status is promoted to `**Status:** Ready for Plan` only on user confirmation in Phase 7 (see that phase). Downstream skills (`/simulate-spec`, `/plan`) check this field and warn the user if invoked against a `Draft` spec.
+
+### Heading IDs
+
+**Heading IDs (FR-03.1, enforced by `/verify`).** Every `<h2>` and `<h3>` carries a stable kebab-case `id`. Compute via `_shared/html-authoring/conventions.md` §3 — lowercase the heading text, replace every non-alphanumeric run with a single `-`, trim leading/trailing `-`, dedupe collisions with `-2`/`-3`/... suffixes. Stable IDs let cross-doc anchors (`02_spec.html#fr-10`, `03_plan.html#t8`) resolve deterministically across regenerations. `assert_heading_ids.sh` (T22) blocks any artifact missing an id. The `<h1>` is emitted by `template.html` and never appears inside `{{content}}` — do not add an id to it. The Tier templates below render to HTML via the substrate; when output_format resolves to `html`, the `## ` markdown headings become `<h2 id="...">` per the algorithm above.
 
 ### Tier 1 Template: Bug Fix / Minor Enhancement
 
@@ -327,7 +351,7 @@ type: bugfix
 feature: <slug>
 date: YYYY-MM-DD
 status: Draft
-requirements: <path-to-01_requirements.md>
+requirements: <path-to-01_requirements.{html,md}>
 ---
 
 # <Bug/Fix Name> — Spec
@@ -367,7 +391,7 @@ type: enhancement
 feature: <slug>
 date: YYYY-MM-DD
 status: Draft
-requirements: <path-to-01_requirements.md>
+requirements: <path-to-01_requirements.{html,md}>
 ---
 
 # <Feature Name> — Spec
@@ -425,7 +449,7 @@ type: feature
 feature: <slug>
 date: YYYY-MM-DD
 status: Draft
-requirements: <path-to-01_requirements.md>
+requirements: <path-to-01_requirements.{html,md}>
 ---
 
 # <Feature Name> — Spec
@@ -619,7 +643,7 @@ Example:
 ### Edge Cases {#edge-cases-2}    ← second "Edge Cases" anywhere in the doc
 ```
 
-**Why:** `/plan` v2 Phase 4 hard-fails on broken `02_spec.md#anchor` refs (FR-31a). Heading renames remain a known break — surface them by re-running /plan or via the FR-31a check, not by silently letting refs rot.
+**Why:** `/plan` v2 Phase 4 hard-fails on broken `02_spec.{html,md}#anchor` refs (FR-31a). Heading renames remain a known break — surface them by re-running /plan or via the FR-31a check, not by silently letting refs rot.
 
 ---
 
@@ -760,7 +784,7 @@ Phase 6 already covered structural completeness and design soundness. Phase 7 is
 2. Commit:
 
 ```bash
-git add {feature_folder}/02_spec.md
+git add {feature_folder}/02_spec.html {feature_folder}/02_spec.sections.json {feature_folder}/02_spec.md {feature_folder}/index.html {feature_folder}/assets
 git commit -m "docs: spec ready for plan — <feature>"
 ```
 

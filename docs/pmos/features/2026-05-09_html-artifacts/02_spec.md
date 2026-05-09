@@ -41,6 +41,7 @@ Every pmos-toolkit pipeline skill that writes into a feature folder (10 skills t
 - Refactoring `/diagram` to add a render-only mode — out of scope; current invocation surface is sufficient via Task tool.
 - Redesigning artifact contents — sections, content, tone stay the same; only rendering format changes.
 - Cross-artifact search in v1 — see D15.
+- **Mobile / narrow-viewport rendering** of the index viewer — desktop-targeted (≥1024px); per-artifact HTML follows standard semantic flow and degrades gracefully on narrow viewports but the viewer chrome is not designed for mobile in v1. (G19)
 
 ---
 
@@ -252,16 +253,21 @@ Write→read pipeline (per the data-flow-trace property):
 | FR-01 | A new directory `plugins/pmos-toolkit/skills/_shared/html-authoring/` exists with: `README.md` (authoring contract), `template.html` (base HTML scaffold), `conventions.md` (semantic structure rules), and `assets/` subdirectory. |
 | FR-02 | `template.html` provides `<head>` (title slot, link to `./assets/style.css`, classic `<script src="./assets/viewer.js">`), `<body>` skeleton (`<header>` toolbar, `<main>` content slot, `<footer>` source-info). No ES modules. No external CDN at runtime — all scripts are local-relative. |
 | FR-03 | `conventions.md` documents: (a) `<section>` per logical area; (b) `<h1>` for doc title, `<h2>`/`<h3>` for sections/subsections; (c) every `<section>` and every heading carries a stable kebab-case `id` per the anchor-emission rule (lowercase, non-alnum→`-`, collision dedupe `-2`/`-3`); (d) `<figure>` with `<figcaption>` for diagrams; (e) `<dl>` for term/definition lists; (f) standard `<table>` for matrices. NO `data-section` taxonomy, NO mandatory class names beyond what `style.css` provides. |
+| FR-03.1 | **Per-skill enforcement.** Each affected skill's authoring section in SKILL.md MUST inline the rule: *"every `<h2>` and `<h3>` carries a stable kebab-case `id`; the skill is responsible for emitting them at write time."* `/verify` smoke (FR-72) hard-fails if any artifact's HTML contains an `<h2>` or `<h3>` without an `id`. (G6) |
 | FR-04 | `assets/style.css` is hand-authored, ≤30 KB. NO Tailwind CDN runtime (per Subagent B anti-pattern: 300 KB JIT mutates DOM, breaks reviewer parsing). Style targets vanilla semantic HTML; relies on element selectors + a small set of utility classes. |
-| FR-05 | `assets/viewer.js` is a single classic `<script>` (no `import`/`export`). Implements: protocol detection (file:// vs http://), sidebar TOC build from `_index.json`, iframe main-pane router, hash-based deep linking (`#<artifact>/<section-id>`), Copy-Markdown handlers (toolbar full-doc + per-section anchor icon), file:// fallback rendering (sidebar links → `target="_blank"`). Total bundle ≤30 KB minified. |
-| FR-06 | `assets/serve.js` is zero-deps Node `http.createServer`, serves the folder, prints URL. Mirrors the existing `/wireframes` pattern. Includes graceful "port in use → try next" loop. |
-| FR-07 | `assets/turndown.umd.js` and `assets/turndown-plugin-gfm.umd.js` are vendored copies of turndown 7.2.4 + the GFM plugin (license preserved). NO runtime CDN fetch. |
+| FR-05 | `assets/viewer.js` is a single classic `<script>` (no `import`/`export`). Implements: protocol detection (file:// vs http://), sidebar TOC build from `_index.json`, iframe main-pane router, hash-based deep linking (`#<artifact>/<section-id>`), Copy-Markdown handlers (toolbar full-doc + per-section anchor icon), file:// fallback rendering (sidebar links → `target="_blank"`), legacy-MD shim renderer (per FR-22). Total bundle ≤30 KB minified. |
+| FR-05.1 | **No-modules guard.** A pre-push hook (CI step) greps `viewer.js` and any `assets/*.js` for `^(import|export)\b|type=["']module["']` patterns; non-zero matches fail the push. Pattern enforced in `tools/audit-recommended.sh`-style script. (G12) |
+| FR-06 | `assets/serve.js` is zero-deps Node `http.createServer`, serves the folder, prints URL. Mirrors the existing `/wireframes` pattern. Includes graceful "port in use → try next" loop. **MIME map (explicit):** `.html→text/html; charset=utf-8`, `.css→text/css; charset=utf-8`, `.js→text/javascript; charset=utf-8`, `.json→application/json; charset=utf-8`, `.svg→image/svg+xml`, `.png/.jpg/.jpeg/.webp→image/*` (per extension), default `text/plain`. (G18) |
+| FR-07 | `assets/turndown.umd.js`, `assets/turndown-plugin-gfm.umd.js`, AND `assets/html-to-md.js` are vendored. Licenses preserved. NO runtime CDN fetch. (G15) |
 
 ### 7.2 Per-skill rewrites — 10 affected skills + 1 orchestrator {#fr-per-skill-rewrites}
 
 | ID | Requirement |
 |----|-------------|
 | FR-10 | Each affected skill's "write the document" phase changes from "write markdown to `<NN>_<artifact>.md`" to "write HTML to `<NN>_<artifact>.html`, write `<NN>_<artifact>.sections.json` companion, copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/`, regenerate `{feature_folder}/index.html` + `_index.json`". |
+| FR-10.1 | **Per-folder relative asset paths.** Each `<artifact>.html` computes its on-disk depth relative to `{feature_folder}/assets/`: root-level artifacts use `./assets/`; subfolder artifacts (`grills/<file>.html`, `verify/<file>.html`, `simulate-spec/<file>.html`) use `../assets/`; deeper paths use `../../assets/`, etc. Skills emit the correct prefix in every `<link>` and `<script>` tag at write time. (G14 — blocker) |
+| FR-10.2 | **Atomic write order.** Skill write phase: (1) author HTML in memory; (2) write `<artifact>.html` and `<artifact>.sections.json` via temp-then-rename (both must succeed or neither persists); (3) copy assets idempotently; (4) regenerate `index.html` + `_index.json`. On re-run, the skill detects orphan state (HTML present but sections.json missing or sections.json mtime older than HTML) and re-authors fully. No partial state survives a clean re-invocation. (G3) |
+| FR-10.3 | **Asset cache-busting.** Asset references in generated HTML use `?v=<plugin-version>` query-string (e.g., `./assets/style.css?v=2.33.0`). Plugin version is sourced from `${CLAUDE_PLUGIN_ROOT}/.claude-plugin/plugin.json` at write time. Deterministic across re-runs of the same plugin version; differs across plugin versions to invalidate browser cache. (G4) |
 | FR-11 | Affected skills (10): `/requirements`, `/spec`, `/plan`, `/msf-req`, `/msf-wf`, `/simulate-spec`, `/grill`, `/artifact`, `/verify`, `/design-crit`. Plus `/feature-sdlc` orchestrator artifacts (`00_pipeline.html`, `00_open_questions_index.html`) per D14. **`/artifact` scope clarification:** the skill's feature-folder output is HTML per this contract; its template store at `~/.pmos/artifacts/templates/<slug>/template.md` retains its existing MD shape (out of scope — it's a template substrate, not a user-facing artifact). |
 | FR-12 | When `output_format: both`, skill ALSO writes a derived `<NN>_<artifact>.md` sidecar at write time. Mechanism: skill invokes `Bash('node {feature_folder}/assets/html-to-md.js <artifact>.html > <artifact>.md')`. MD is regenerated on every HTML rewrite; never edit MD directly. |
 | FR-12.1 | `assets/html-to-md.js` is a tiny CLI shim (≤100 LOC) vendored alongside `turndown.umd.js`. It reads a path from argv, runs turndown + the GFM plugin (via local `require('./turndown.umd.js')` resolved through a small wrapper that exposes the UMD global to CommonJS), writes MD to stdout. Same library bundle that the browser uses; same MD output. |
@@ -275,11 +281,12 @@ Write→read pipeline (per the data-flow-trace property):
 |----|-------------|
 | FR-20 | `{feature_folder}/index.html` is a generated viewer. Layout: left sidebar (TOC) + main pane (iframe rendering selected artifact) + footer (source-info). Sidebar entries grouped by phase: "00 Pipeline", "01 Requirements", "02 Spec", "03 Plan", "MSF Findings", "Grills", "Wireframes", "Prototype", "Simulate-Spec", "Verify". |
 | FR-21 | Sidebar nav is built at viewer-load time from `_index.json` (no runtime fetch of artifact bodies). Each entry expanded to second-level nav using `<artifact>.sections.json` (already written next to each artifact). |
-| FR-22 | `_index.json` schema (see §9 for canonical shape): ordered list of artifact entries with `path`, `title`, `phase`, `format` (`html`/`md`-legacy), `sections_path`. |
+| FR-22 | `_index.json` schema (see §9 for canonical shape): ordered list of artifact entries with `path`, `title`, `phase`, `format` (`html`/`md`-legacy), `sections_path`. **Legacy MD entries** (`format: md`) are NOT iframe-loaded; the viewer reads the `.md` file (or, on file://, opens it in a new tab) and renders its source inside a `<pre class="pmos-legacy-md">` block within a synthesized minimal HTML wrapper, with toolbar message "Legacy markdown — not rendered, view source." Per D5 + G11. |
 | FR-23 | Main pane renders selected artifact via `<iframe src="<artifact>.html">`. Iframe is sandboxed with `allow-same-origin allow-scripts` (under serve.js). Hash route in URL bar: `index.html#<artifact-slug>/<section-id>`. |
 | FR-24 | `Copy Markdown` button has TWO surfaces: (a) global toolbar inside each artifact (top-right): copies the full artifact converted via turndown; (b) anchor-icon adjacent to each `<h2>`/`<h3>` (visible on hover): copies that section's MD subset (subtree from heading to next sibling heading of same level). Per D20. |
 | FR-25 | Per-doc toolbar inside each rendered artifact (NOT in the chrome): "Copy Markdown" button + "Copy section link" button (copies `index.html#<artifact>/<section>` to clipboard). |
-| FR-26 | Quickstart banner (W04) appears on first load per session; `sessionStorage.setItem('pmos.quickstart.seen', '1')` after dismissal. Per D16. |
+| FR-25.1 | **Clipboard fallback.** Copy operations attempt `navigator.clipboard.writeText()` first; on TypeError or DOMException (sandboxed iframe / older browser), fall back to `document.execCommand("copy")` with a temporary hidden `<textarea>`. Both paths show a unified "Copied" toast. Promotes E16 to FR. (G13) |
+| FR-26 | Quickstart banner (W04) appears on first load per session; `sessionStorage.setItem('pmos.quickstart.seen', '1')` after dismissal. All sessionStorage operations wrapped in `try/catch`; on QuotaExceededError or SecurityError (private mode), banner-state defaults to an in-memory variable (state lost on reload but functional within session). Per D16. (G7) |
 | FR-27 | NO search affordance. ⌘K is not bound; W01 wireframe is updated (per D15) to remove the ⌘K stub. |
 
 ### 7.4 file:// fallback {#fr-file-fallback}
@@ -303,8 +310,8 @@ Write→read pipeline (per the data-flow-trace property):
 
 | ID | Requirement |
 |----|-------------|
-| FR-50 | Reviewer subagent prompts in `/grill`, `/verify`, `/msf-req`, `/msf-wf`, `/simulate-spec` swap "expect markdown" → "expect HTML wholesale". The subagent receives the full HTML body inline (no DOM extraction, no regex, no jsdom). |
-| FR-51 | Reviewer prompt template (canonical): "Read this HTML artifact. **First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate** — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: "<≥40-char verbatim from source>"}`." |
+| FR-50 | Reviewer subagent prompts in `/grill`, `/verify`, `/msf-req`, `/msf-wf`, `/simulate-spec` swap "expect markdown" → "expect HTML content". The subagent receives the artifact's `<main>` element outerHTML plus the `<h1>` title (chrome-stripped) inline (no DOM extraction, no regex, no jsdom). The parent skill is responsible for the chrome-strip — implementation: a small node helper or regex slice that extracts `<main>...</main>` plus the leading `<h1>`. (G1) |
+| FR-51 | Reviewer prompt template (canonical): "Read this HTML content (the document's `<main>` body — chrome already stripped). **First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate** — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: "<≥40-char verbatim from source>"}`." |
 | FR-52 | Parent skill validates reviewer return: (a) `sections_found` set-equality with `<artifact>.sections.json` (any miss/extra is hard fail); (b) every `quote` substring-greps against the HTML body (any miss is hard fail); (c) "no findings" return is allowed only if `sections_found` matches AND the rubric explicitly permits it. |
 | FR-53 | Migration ships in a single release (no intermediate state); each affected reviewer's smoke test runs during `/verify` of THIS feature (per Goal G7). |
 
@@ -341,7 +348,8 @@ Write→read pipeline (per the data-flow-trace property):
 | ID | Requirement |
 |----|-------------|
 | FR-90 | Cross-doc affordances are plain `<a href="<other-artifact>.html#<section-id>">`. Section-id derivation per the kebab-anchor rule (lowercase, non-alnum→`-`, dedupe). Per D13. |
-| FR-91 | Skills MUST emit stable IDs on every `<section>` and every `<h2>`/`<h3>` so downstream cross-doc links don't break under renames. ID stability is the contract; if a heading is renamed, the old id is preserved as a redirect via `<section id="<new>" data-aliases="<old>">` (no, actually — keep simple: id changes when heading changes; broken cross-doc refs surfaced by `/verify` smoke as a hard fail). |
+| FR-91 | Skills MUST emit stable IDs on every `<section>` and every `<h2>`/`<h3>` so downstream cross-doc links don't break under renames. ID stability is the contract; id changes when heading changes; broken cross-doc refs are surfaced by FR-92 below. |
+| FR-92 | **Cross-doc broken-anchor scan.** `/verify` smoke greps every `<a href="<artifact>.html#<frag>">` across all HTML artifacts in the feature folder; for each, asserts the target's `<artifact>.sections.json` contains an entry with `id == frag`. Any miss is hard fail. Promotes E12 to FR. Verification command added to §14.5. (G10) |
 
 ---
 
@@ -366,7 +374,14 @@ Write→read pipeline (per the data-flow-trace property):
 
 This feature has no HTTP API. The "contracts" are the on-disk file shapes. SQL schema: N/A — no DB changes.
 
+### 9.0 Schema forward-compatibility {#schema-forward-compat}
+
+All on-disk JSON schemas (`_index.json`, `<artifact>.sections.json`, future) carry a `schema_version: <int>`. Readers MUST tolerate `schema_version` greater than they recognize by reading only the fields they understand and ignoring unknown fields. Readers MUST refuse `schema_version` less than 1 with a clear error. Writers MUST never decrement. (G17)
+
 ### 9.1 `_index.json` (per feature folder) {#schema-index-json}
+
+**Ordering policy (G5):** `artifacts[]` is ordered by (1) phase rank — `00 Pipeline` → `01 Requirements` → `02 Spec` → `03 Plan` → `MSF Findings` → `Wireframes` → `Prototype` → `Grills` → `Simulate-Spec` → `Verify` → `Legacy`; (2) within phase, by filename ascending (Unicode codepoint order). Generator is responsible for stable order; same inputs → byte-identical `_index.json` (NFR-07).
+
 
 ```json
 {
@@ -511,6 +526,7 @@ index.html (viewer chrome)
 ### 11.3 UI specifications — viewer chrome {#ui-viewer-chrome}
 
 - **Sidebar:** fixed width 280px, sticky, scroll independently. Per-phase groups collapse-to-summary (chevron). Active artifact (the one currently loaded in the iframe) highlighted. **Second-level section nav:** entries link to `<artifact>.html#<section-id>` and clicks navigate the iframe; the sidebar does NOT highlight which section is currently visible inside the iframe (would require cross-frame DOM access blocked on file://). Acceptable trade-off for file:// compat.
+- **Legacy MD entries (G11):** rendered via the FR-22 shim — viewer reads the `.md` file (under serve.js) or opens it in a new tab (file://). Inside the synthesized wrapper, source is wrapped in `<pre class="pmos-legacy-md">`; toolbar shows: "Legacy markdown — not rendered, view source." No Copy-Markdown affordance (it's already MD).
 - **Main pane:** iframe sized to fill remaining width; minimum height 100vh. Iframe `border: 0`, `sandbox="allow-same-origin allow-scripts"`.
 - **Quickstart banner (W04):** appears on first load per session above sidebar; dismissable; sets `sessionStorage.setItem('pmos.quickstart.seen', '1')`.
 - **file:// fallback banner (W02):** replaces iframe with a "links open in new tab" message + `target="_blank"` sidebar links. Banner copy: "Running from file://. For embedded viewer, run `node serve.js` from this folder."
@@ -603,6 +619,9 @@ bash tests/scripts/assert_sections_contract.sh tests/fixtures/repos/node/docs/pm
 bash tests/scripts/assert_format_flag.sh
 bash tests/scripts/assert_unsupported_format.sh
 bash tests/scripts/assert_no_md_to_html.sh plugins/pmos-toolkit/skills/
+bash tests/scripts/assert_no_es_modules_in_viewer.sh   # FR-05.1 (G12)
+bash tests/scripts/assert_heading_ids.sh tests/fixtures/repos/node/docs/pmos/features/2026-05-09_html-artifacts-fixture/   # FR-03.1 (G6)
+bash tests/scripts/assert_cross_doc_anchors.sh tests/fixtures/repos/node/docs/pmos/features/2026-05-09_html-artifacts-fixture/   # FR-92 (G10)
 
 # Plugin manifest sync
 bash tools/audit-recommended.sh   # existing

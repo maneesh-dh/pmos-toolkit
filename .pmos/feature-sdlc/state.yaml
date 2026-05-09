@@ -3,10 +3,10 @@ slug: html-artifacts
 tier: 3
 mode: interactive
 started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-10T01:45:00Z
+last_updated: 2026-05-10T02:35:00Z
 current_phase: execute
-paused_at: 2026-05-10T01:45:00Z
-paused_reason: compact-pending-pre-phase-4
+paused_at: 2026-05-10T02:35:00Z
+paused_reason: compact-pending-pre-phase-4-verify
 worktree_path: null
 branch: feat/html-artifacts
 feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
@@ -44,6 +44,9 @@ notes:
   - "Resumed 2026-05-10T01:30Z post-compact. Dispatching /verify --scope phase --feature 2026-05-09_html-artifacts --phase 3 with multi-agent reviewer fan-out. Mode: interactive."
   - "Paused 2026-05-10T01:45Z compact-pending-pre-phase-4 per user direction (Recommended). Same pattern as Phase-1/2/3 boundary pauses. Plan-Phase 4 covers T15-T23: 9 fixtures (canonical-feature seed) + 8 assert scripts (per-skill end-to-end runs against canonical fixture). Heavy phase — per-skill subagent dispatch + per-row inline-grep gate + holistic post-fanout verification. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Plan-Phase 4 T15 (fixture seed) or T15-equivalent fixture-task, depending on plan ordering."
   - "/verify --scope phase 3 PASSED at 2026-05-10T01:40Z. 6 multi-agent reviewers dispatched in parallel; 0 blocking findings. R1 (FR-50/50.1/51/52 contract): PASS 14 inline-checks. R2 (T14 /diagram FR-60..65 + D2): PASS 8 inline-checks. R3 (chrome-strip substrate): false-positive (looked under html-authoring/ subtree; substrate lives at top-level tests/ — fixtures + assert script tracked since 2416c7a, exit 0). R4 (cross-file consistency): PASS 7 checks (sections_found×10 + FR-52 callout×5 verbatim + chrome-strip.js path canonical across 4 dispatch sites). R5 (bug scan + git history): PASS 15 regions scanned (balanced-tag tracker correct; FR-50.1 placement correct verify:207-217 vs Phase-3 block 258-303; all FR-IDs resolve). R6 (CLAUDE.md): PASS 5 rules (canonical path, manifest sync 2.32.0, /complete-dev refs, comment compliance). 2 non-blocking advisories: A1 wireframes:562 pre-existing stale 'msf-findings.md' mention (pre-Phase-3); A2 feature-sdlc:469 legacy /push parenthetical (conf 35). 13 FRs Verified, 0 Unverified. Evidence: docs/pmos/features/2026-05-09_html-artifacts/verify/2026-05-10-phase-3/review.md. Phase 2.5 boundary CLOSED PASS. Plan-Phase 4 (T15-T23 fixtures + 8 assert scripts) unblocked."
+  - "Resumed 2026-05-10T01:55Z post-compact. Dispatching /execute to pick up at Plan-Phase 4 (T15-T23: 9 fixtures canonical-feature seed + 8 assert scripts per-skill end-to-end runs against canonical fixture). /execute does its own task-level resume detection from per-task logs under execute/. Mode: interactive."
+  - "Plan-Phase 4 (T15-T23) tasks done at 2026-05-10T02:30Z. 9 commits: T15 bf0398b (fixture seed, 19 files, +2422 lines), T16 (assert_resolve_input.sh + 4 sub-fixtures + harness), T17 (assert_sections_contract.sh), T18 (assert_format_flag.sh static-check, OQ-3 resolved), T19 (assert_unsupported_format.sh static-check, OQ-3 resolved), T20 (assert_no_md_to_html.sh G2 enforcement), T21 (lint-no-modules-in-viewer.sh + assert wrapper FR-05.1), T22 (assert_heading_ids.sh FR-03.1/72), T23 (assert_cross_doc_anchors.sh FR-92). Holistic green sweep: 8/8 assert scripts PASS. 2 advisories logged (non-blocking): ADV-T19 msf-req missing non-interactive-block (pre-existing); ADV-T21 lint not wired into multi-lint runner (no runner exists). OQ-3 resolution: T18+T19 use static-check harnesses (live runtime invocation impossible from bash); live coverage deferred to FR-72 smoke at T26. phase-4.md log written; verify_outcome=pending."
+  - "Paused 2026-05-10T02:35Z compact-pending-pre-phase-4-verify per user direction (Recommended). Same pattern as Phase-1/2/3 boundary pauses. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Phase 2.5 /verify --scope phase --feature 2026-05-09_html-artifacts --phase 4. Phase-4 changed-files set spans: tests/fixtures/repos/node/docs/pmos/features/2026-05-09_html-artifacts-fixture/* (19 files), tests/fixtures/resolve-input/* (5 files), tests/scripts/assert_{resolve_input,sections_contract,format_flag,unsupported_format,no_md_to_html,no_es_modules_in_viewer,heading_ids,cross_doc_anchors}.sh + tests/scripts/_resolve_input_harness.sh, plugins/pmos-toolkit/tools/lint-no-modules-in-viewer.sh."
 phases:
   - id: setup
     hardness: infra

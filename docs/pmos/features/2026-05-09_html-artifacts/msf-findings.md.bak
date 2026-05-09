@@ -1,0 +1,52 @@
+# MSF Findings — html-artifacts (requirements doc)
+
+**Date:** 2026-05-09
+**Mode:** /msf-req (recommendations-only)
+**Source:** `01_requirements.md`
+**Tier:** 3 — Feature
+**Personas evaluated:** Skill author / pipeline operator; Stakeholder / reader; Reviewer subagent
+**Journeys evaluated:** Primary Tier-3 pipeline; Reviewer reads HTML; Reader opens via `file://`; Mixed-state + `output_format` error paths
+
+> Recommendations only. The skill does not edit the requirements doc.
+
+---
+
+## Executive Summary
+
+The proposed solution lands the right pattern (HTML-native + per-folder viewer + `serve.js`, mirroring `/wireframes` + `/prototype`). Personas and journeys all have a credible happy path. The friction concentrates in three places:
+
+1. **Stakeholder cold-open is rougher than the goal claims.** The "navigable in under a minute from cold" benchmark presumes the recipient has Node installed, knows what `serve.js` is, and understands the `file://` fallback. None of those is documented inside the shared folder.
+2. **Skill-author cost of the migration is under-stated.** Authoring semantic HTML is "shorter and more directive" only if the LLM reliably emits the expected elements. There is no structural-output check; the only late safety net is the reviewer-subagent smoke pass during `/verify`.
+3. **Wall-clock cost of `/spec` and `/plan` will spike noticeably** once each diagram-worthy moment spawns a blocking `/diagram` subagent (30s–2min × multiple diagrams). The skill-author journey gives no progress signal during this window.
+
+Recommendation count: **3 Must**, **5 Should**, **3 Nice**. None of these block the design; all sharpen the user experience around the edges the doc's own goals already promise.
+
+---
+
+## Recommendations
+
+| ID | Severity | Recommendation | Affected | Effort |
+|----|----------|----------------|----------|--------|
+| R1 | **Must** | Validate `output_format` at `/feature-sdlc` Phase 0 (and at first downstream skill in standalone runs), not mid-skill. Mid-pipeline error after `/requirements` has already written its artifact wastes a long context-warm session. | All affected skills + `/feature-sdlc` Phase 0 | Low |
+| R2 | **Must** | Ship a recipient-facing quickstart inside every feature folder — either a top-of-folder `README.md` (3 lines: "run `node serve.js` then open the URL; or open `index.html` directly for read-only mode") or a banner inside `index.html` that's visible before any artifact is selected. The current goal claim ("recipient with no pmos-toolkit installed can navigate end-to-end in under a minute from cold") assumes shared knowledge that the recipient does not have. | Index viewer + shared authoring contract | Low |
+| R3 | **Must** | Expand the `/verify` smoke verification to also confirm: (a) every artifact's HTML parses (no malformed markup); (b) the sidebar TOC builder finds at least one heading per artifact; (c) the reviewer-subagent smoke run yields non-empty findings on every reviewer × artifact pair. The doc lists (c) as a metric but does not state (a) and (b) explicitly. Without (a)/(b), a malformed artifact silently degrades the viewer for everyone downstream. | `/verify` + Success Metrics table | Medium |
+| R4 | Should | Print per-diagram progress during `/spec` and `/plan` (`Diagram 2 of 4: rendering …`). With 3–5 diagrams × up to 2 min each, the skill can appear stuck for 10+ minutes. Today's reviewer-loop runs are visible; new subagent dispatch should match. | `/spec`, `/plan` skill bodies | Low |
+| R5 | Should | Add a round-trip "Copy Markdown → re-render" structural-fidelity check to the `/verify` smoke pass (the Success Metrics table mentions "Manual round-trip test" — make it explicit and automatable). Tables and nested lists are common turndown.js failure points; a silent fidelity loss makes Goal #4 ("markdown remains available for clipboard/export") false in practice. | `/verify` | Medium |
+| R6 | Should | Keep the HTML `<head>` minimal (link to one stylesheet, optional one script tag, no inline CSS, no inline JS beyond the smallest viewer hook). Reviewer subagents pass HTML wholesale to the LLM; bloated heads waste context budget on boilerplate that contributes nothing to section extraction. | Shared authoring contract | Low |
+| R7 | Should | Resolve OQ6 in favor of re-authoring this very requirements doc as HTML during `/complete-dev`. Otherwise the demo of "open `index.html` and see the whole feature" surfaces the originating doc as a "legacy markdown" entry — undermining the satisfaction signal at the moment the user is most likely to be showing the work to others. | `/complete-dev` of this feature | Low |
+| R8 | Should | Document explicitly what works and what doesn't under the `file://` fallback. Some browsers block `fetch()` from `file://`, which means the index viewer cannot inline-load artifacts and the "links in new tabs" mode is the only viable path. State this in the in-folder README so stakeholders who can't run Node know what to expect, rather than discovering it. | Shared contract + recipient README (R2) | Low |
+| R9 | Nice | Resolve OQ5 by shipping **both** "Copy whole doc as Markdown" (toolbar) and "Copy this section as Markdown" (per-section button). The full-doc path covers Slack-paste; per-section covers chatops snippets without context overflow. Picking one creates a future request for the other. | Index viewer | Low |
+| R10 | Nice | When `/feature-sdlc` finishes, surface a single chat line with the recipient-share quickstart as well as the local URL — e.g., `Folder is shareable; recipients zip the folder, extract, run \`node serve.js\` (or open index.html for read-only).` Currently the doc only promises "Run `node serve.js`" pointed at the author's own machine. | `/feature-sdlc` Phase 11 final summary | Low |
+| R11 | Nice | `/spec` should declare the wall-clock budget for `/diagram` subagents up-front in its plan (e.g., "this run will dispatch ~4 diagram subagents, ~6 min of wall clock") so the user can choose whether to wait or pause. Pairs with R4. | `/spec` | Low |
+
+---
+
+## Persona × Journey × M/F/S matrix
+
+(Detailed matrix preserved in this backup — the new consolidated `msf-findings.md` produced by `/msf-wf` cites this file as the prior pass and does not reproduce all rows verbatim. See git history if a fuller view is needed.)
+
+### Cross-cutting observations
+
+- **Bootstrap awkwardness (R7 / OQ6).** The single most likely place a stakeholder will see this work is the folder for *this* feature. Leaving `01_requirements.md` as markdown there means the demo undermines the pitch.
+- **Ten skills migrated lockstep.** Single-release decision (Q4 in grill report) avoids mixed-format intra-folder. Blast radius if a single skill ships with malformed-HTML output is the entire pipeline. **R3** is the only practical safety net at that scale.
+- **`output_format: both` cost.** Spec should describe the write-order (write `.html` first, derive `.md`, then atomic move) so a partial write doesn't leave a stale `.md` newer than the `.html`.

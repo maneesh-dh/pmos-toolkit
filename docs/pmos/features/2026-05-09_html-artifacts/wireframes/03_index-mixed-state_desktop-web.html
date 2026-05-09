@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Index viewer (mixed-state folder) — desktop-web — Wireframe</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/wireframe.css">
+  <style>
+    .doc-shell { display: grid; grid-template-columns: 280px 1fr; height: 600px; }
+    .sidebar { background: var(--wf-bg-2); border-right: 1px solid var(--wf-border); overflow-y: auto; }
+    .sidebar-section { padding: 8px 12px; }
+    .sidebar-group-h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--wf-fg-muted); margin: 12px 0 4px; }
+    .sidebar-item { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 6px 10px; border-radius: 4px; font-size: 13px; color: var(--wf-fg); cursor: pointer; }
+    .sidebar-item:hover { background: var(--wf-bg-3); }
+    .sidebar-item.is-active { background: var(--wf-accent-bg); color: var(--wf-accent); font-weight: 500; }
+    .sidebar-item.is-legacy { color: var(--wf-fg-muted); font-style: italic; }
+    .legacy-chip { font-size: 10px; background: var(--wf-bg-3); color: var(--wf-fg-muted); padding: 1px 5px; border-radius: 3px; font-style: normal; letter-spacing: 0.02em; }
+    .doc-toolbar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--wf-border); background: var(--wf-bg-1); font-size: 13px; }
+    .doc-toolbar .grow { flex: 1; }
+    .doc-pane { padding: 24px 32px; max-width: 880px; }
+    .legacy-callout { background: var(--wf-bg-2); border-left: 3px solid var(--wf-fg-muted); padding: 12px 16px; margin-bottom: 16px; font-size: 13px; }
+    .doc-h2 { font-size: 17px; font-weight: 600; margin: 20px 0 8px; }
+  </style>
+</head>
+<body data-annotations="on">
+  <header class="wf-chrome">
+    <div class="wf-chrome__inner">
+      <span class="wf-chrome__title">Index viewer (mixed-state folder)</span>
+      <span class="wf-chrome__device">desktop-web</span>
+      <nav class="wf-tabs" aria-label="State switcher">
+        <button class="wf-tab" aria-selected="true"  data-state="default">Mixed sidebar</button>
+        <button class="wf-tab" aria-selected="false" data-state="legacy-open">Legacy MD open</button>
+      </nav>
+      <button id="toggle-anno" class="wf-tab" aria-pressed="true" aria-label="Toggle annotations">Annotations</button>
+    </div>
+  </header>
+
+  <main class="wf-frame wf-frame--desktop-web">
+
+    <!-- STATE: default — mixed sidebar; legacy MD entries shown distinctly -->
+    <section class="wf-state active" data-state="default" aria-labelledby="state-mixed-h">
+      <h1 id="state-mixed-h" class="sr-only">Sidebar shows new HTML artifacts and legacy markdown side-by-side</h1>
+      <div class="doc-shell">
+        <aside class="sidebar" aria-label="Artifact navigation">
+          <div class="sidebar-section">
+            <div class="wf-row" style="padding: 6px 10px; gap: 8px; font-weight: 600;"><span style="font-size: 13px;">2026-04-12_pipeline-input-resolution</span></div>
+            <div class="sidebar-group-h">Phase artifacts</div>
+            <a class="sidebar-item is-legacy wf-anno" data-note="Legacy markdown from before the html-artifacts migration. D5: forward-only — old folders' .md files stay; new writes are .html. Italic + 'legacy' chip distinguishes them; clickable; no Copy Markdown toolbar (already markdown).">
+              <span>01 Requirements</span><span class="legacy-chip">legacy .md</span>
+            </a>
+            <a class="sidebar-item is-active">02 Spec</a>
+            <a class="sidebar-item is-legacy">
+              <span>03 Plan</span><span class="legacy-chip">legacy .md</span>
+            </a>
+            <div class="sidebar-group-h">Grills</div>
+            <a class="sidebar-item is-legacy">
+              <span>2026-04-13 — req review</span><span class="legacy-chip">legacy .md</span>
+            </a>
+            <div class="sidebar-group-h">Verify</div>
+            <a class="sidebar-item">2026-04-30 verify report</a>
+          </div>
+        </aside>
+        <div>
+          <div class="doc-toolbar">
+            <span class="wf-mono wf-muted">02_spec.html</span>
+            <span class="grow"></span>
+            <button class="mock-button">Copy Markdown</button>
+            <button class="mock-button" aria-label="Open in new tab">↗ Open</button>
+          </div>
+          <div class="doc-pane">
+            <div class="legacy-callout wf-anno" data-note="Banner shown only on the actively-loaded HTML artifact when the same folder contains legacy .md siblings. Helps reviewers understand mixed-state without clicking each one.">
+              <strong>Mixed-state folder.</strong> 3 of the artifacts in this folder are legacy markdown from before the HTML migration; they appear in the sidebar with a <span class="legacy-chip">legacy .md</span> tag and open as plain text in a new tab. New artifacts write as HTML going forward.
+            </div>
+            <h2 class="doc-h2">Spec — Pipeline input resolution</h2>
+            <p style="font-size: 13px;">(spec body — written post-migration as HTML…)</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATE: legacy-open — user clicked a legacy .md entry -->
+    <section class="wf-state" data-state="legacy-open" aria-labelledby="state-legacy-h">
+      <h1 id="state-legacy-h" class="sr-only">Legacy markdown opened in main pane</h1>
+      <div class="doc-shell">
+        <aside class="sidebar" aria-label="Artifact navigation">
+          <div class="sidebar-section">
+            <div class="wf-row" style="padding: 6px 10px; gap: 8px; font-weight: 600;"><span style="font-size: 13px;">2026-04-12_pipeline-input-resolution</span></div>
+            <div class="sidebar-group-h">Phase artifacts</div>
+            <a class="sidebar-item is-legacy is-active" style="color: var(--wf-accent); font-style: normal; font-weight: 500;">
+              <span>01 Requirements</span><span class="legacy-chip">legacy .md</span>
+            </a>
+            <a class="sidebar-item">02 Spec</a>
+          </div>
+        </aside>
+        <div>
+          <div class="doc-toolbar">
+            <span class="wf-mono wf-muted">01_requirements.md</span>
+            <span class="legacy-chip">legacy</span>
+            <span class="grow"></span>
+            <span class="wf-muted" style="font-size: 12px;">No Copy Markdown — already markdown</span>
+            <button class="mock-button" aria-label="Open in new tab">↗ Open</button>
+          </div>
+          <div class="doc-pane">
+            <p class="wf-muted" style="font-size: 12px; margin: 0 0 8px;">Artifact predates the HTML migration; rendered as the original markdown source. Re-run the relevant skill to upgrade the folder (the pre-write snapshot guard preserves this file).</p>
+            <pre class="wf-mono" style="background: var(--wf-bg-2); padding: 16px; border-radius: 4px; font-size: 12px; line-height: 1.5; overflow-x: auto; white-space: pre-wrap;"># Pipeline input resolution — Requirements
+
+**Date:** 2026-04-12
+**Tier:** 2
+
+## Problem
+
+Each pipeline skill resolves its upstream artifact via slightly different
+heuristics — `_shared/resolve-input.md` was added late and not all skills
+route through it…
+
+## Goals
+- Single source of truth for "find upstream artifact"
+- Format-aware (post-html-artifacts): try .html first, fall back to .md</pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="wf-footer">
+    <div class="wf-footer__inner">
+      <span>Index viewer (mixed-state folder)</span>
+      <span class="mock-pill">desktop-web</span>
+      <span>File 03 of 4</span>
+      <span>Generated 2026-05-09</span>
+      <a class="wf-grow" style="text-align:right;color:var(--wf-accent)" href="./index.html">Back to index</a>
+    </div>
+  </footer>
+
+  <script>
+    const tabs = document.querySelectorAll('.wf-tab[data-state]');
+    const states = document.querySelectorAll('.wf-state');
+    tabs.forEach(t => t.addEventListener('click', () => {
+      tabs.forEach(x => x.setAttribute('aria-selected', x === t));
+      states.forEach(s => s.classList.toggle('active', s.dataset.state === t.dataset.state));
+    }));
+    const annoBtn = document.getElementById('toggle-anno');
+    annoBtn.addEventListener('click', () => {
+      const on = document.body.dataset.annotations === 'on';
+      document.body.dataset.annotations = on ? 'off' : 'on';
+      annoBtn.setAttribute('aria-pressed', String(!on));
+    });
+  </script>
+</body>
+</html>

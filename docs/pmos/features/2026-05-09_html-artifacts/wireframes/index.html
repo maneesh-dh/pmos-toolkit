@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>html-artifacts — Wireframes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/wireframe.css">
+  <style>
+    body { padding: 24px 32px; }
+    .header { margin-bottom: 24px; }
+    .header h1 { font-size: 22px; font-weight: 600; margin: 0; }
+    .header-meta { color: var(--wf-fg-muted); font-size: 13px; margin-top: 4px; }
+    .header-meta a { color: var(--wf-accent); }
+    .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid var(--wf-border); }
+    .controls input[type="search"] { flex: 1; max-width: 320px; padding: 6px 10px; border: 1px solid var(--wf-border); border-radius: 4px; background: var(--wf-bg-1); font: inherit; font-size: 13px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+    .card { border: 1px solid var(--wf-border); border-radius: 6px; background: var(--wf-bg-1); overflow: hidden; transition: box-shadow 0.15s; }
+    .card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+    .card-thumb { aspect-ratio: 200/140; background: var(--wf-bg-2); border-bottom: 1px solid var(--wf-border); position: relative; overflow: hidden; }
+    .card-thumb iframe { width: 200%; height: 200%; border: 0; transform: scale(0.5); transform-origin: top left; pointer-events: none; }
+    .card-body { padding: 12px 14px; }
+    .card-title { font-size: 14px; font-weight: 600; margin: 0 0 4px; }
+    .card-meta { font-size: 11px; color: var(--wf-fg-muted); display: flex; gap: 8px; align-items: center; }
+    .card-link { color: inherit; text-decoration: none; display: block; }
+    .footer { margin-top: 32px; padding-top: 16px; border-top: 1px solid var(--wf-border); font-size: 12px; color: var(--wf-fg-muted); display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>html-artifacts — wireframes</h1>
+    <p class="header-meta">Generated 2026-05-09 · 4 wireframes · desktop-web · <a href="../01_requirements.md">↗ Requirements doc</a></p>
+  </header>
+
+  <div class="controls">
+    <input type="search" id="filter" placeholder="Filter by component name…" aria-label="Filter wireframes">
+    <span class="wf-muted" style="font-size: 12px;">All wireframes target desktop-web — device filter omitted (single-target feature).</span>
+  </div>
+
+  <div class="grid" id="grid">
+    <a class="card-link" href="./01_index-default_desktop-web.html">
+      <div class="card" data-name="index viewer default">
+        <div class="card-thumb"><iframe src="./01_index-default_desktop-web.html" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div>
+        <div class="card-body">
+          <h2 class="card-title">01 — Index viewer (default)</h2>
+          <div class="card-meta"><span class="mock-pill">desktop-web</span><span>4 states</span></div>
+        </div>
+      </div>
+    </a>
+    <a class="card-link" href="./02_index-file-fallback_desktop-web.html">
+      <div class="card" data-name="index viewer file fallback">
+        <div class="card-thumb"><iframe src="./02_index-file-fallback_desktop-web.html" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div>
+        <div class="card-body">
+          <h2 class="card-title">02 — Index viewer (file:// fallback)</h2>
+          <div class="card-meta"><span class="mock-pill">desktop-web</span><span>2 states</span></div>
+        </div>
+      </div>
+    </a>
+    <a class="card-link" href="./03_index-mixed-state_desktop-web.html">
+      <div class="card" data-name="index viewer mixed state">
+        <div class="card-thumb"><iframe src="./03_index-mixed-state_desktop-web.html" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div>
+        <div class="card-body">
+          <h2 class="card-title">03 — Index viewer (mixed-state folder)</h2>
+          <div class="card-meta"><span class="mock-pill">desktop-web</span><span>2 states</span></div>
+        </div>
+      </div>
+    </a>
+    <a class="card-link" href="./04_recipient-quickstart_desktop-web.html">
+      <div class="card" data-name="recipient quickstart banner">
+        <div class="card-thumb"><iframe src="./04_recipient-quickstart_desktop-web.html" loading="lazy" tabindex="-1" aria-hidden="true"></iframe></div>
+        <div class="card-body">
+          <h2 class="card-title">04 — Recipient quickstart banner</h2>
+          <div class="card-meta"><span class="mock-pill">desktop-web</span><span>2 states</span></div>
+        </div>
+      </div>
+    </a>
+  </div>
+
+  <footer class="footer">
+    <span>4 wireframes · all desktop-web · pmos-toolkit /wireframes 2026-05-09</span>
+    <span class="wf-mono">docs/pmos/features/2026-05-09_html-artifacts/wireframes/</span>
+  </footer>
+
+  <script>
+    const filter = document.getElementById('filter');
+    const cards = document.querySelectorAll('.card');
+    filter.addEventListener('input', () => {
+      const q = filter.value.trim().toLowerCase();
+      cards.forEach(c => {
+        const match = !q || c.dataset.name.includes(q);
+        c.parentElement.style.display = match ? '' : 'none';
+      });
+    });
+  </script>
+</body>
+</html>

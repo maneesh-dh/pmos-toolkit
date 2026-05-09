@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Index viewer (default) — desktop-web — Wireframe</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/wireframe.css">
+  <style>
+    /* per-file scoped extensions only — never duplicates of wireframe.css */
+    .doc-shell { display: grid; grid-template-columns: 280px 1fr; height: 640px; }
+    .sidebar { background: var(--wf-bg-2); border-right: 1px solid var(--wf-border); overflow-y: auto; }
+    .sidebar-section { padding: 8px 12px; }
+    .sidebar-group-h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--wf-fg-muted); margin: 12px 0 4px; }
+    .sidebar-item { display: block; padding: 6px 10px; border-radius: 4px; font-size: 13px; color: var(--wf-fg); text-decoration: none; cursor: pointer; }
+    .sidebar-item:hover { background: var(--wf-bg-3); }
+    .sidebar-item.is-active { background: var(--wf-accent-bg); color: var(--wf-accent); font-weight: 500; }
+    .sidebar-sub { padding-left: 22px; font-size: 12px; color: var(--wf-fg-muted); }
+    .sidebar-sub.is-active { color: var(--wf-accent); }
+    .doc-toolbar { display: flex; gap: 8px; align-items: center; padding: 10px 16px; border-bottom: 1px solid var(--wf-border); background: var(--wf-bg-1); }
+    .doc-toolbar .grow { flex: 1; }
+    .doc-pane { overflow-y: auto; padding: 24px 32px; max-width: 880px; }
+    .doc-h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
+    .doc-h2 { font-size: 17px; font-weight: 600; margin: 28px 0 10px; padding-top: 16px; border-top: 1px solid var(--wf-border); }
+    .doc-section { position: relative; }
+    .doc-section .section-copy { position: absolute; top: 18px; right: -2px; opacity: 0; transition: opacity 0.15s; font-size: 11px; padding: 3px 8px; }
+    .doc-section:hover .section-copy { opacity: 1; }
+    .doc-meta { font-size: 12px; color: var(--wf-fg-muted); margin-bottom: 8px; }
+    .doc-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; }
+    .doc-table th, .doc-table td { border: 1px solid var(--wf-border); padding: 6px 10px; text-align: left; vertical-align: top; }
+    .doc-table th { background: var(--wf-bg-2); font-weight: 600; }
+    .toast { position: absolute; bottom: 16px; right: 16px; background: var(--wf-fg); color: var(--wf-bg-1); font-size: 12px; padding: 8px 14px; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.18); }
+    .svg-figure { background: var(--wf-bg-2); border: 1px dashed var(--wf-border); padding: 12px; margin: 12px 0; }
+    .svg-figure svg { width: 100%; max-height: 180px; }
+    .svg-caption { font-size: 11px; color: var(--wf-fg-muted); margin-top: 6px; font-style: italic; }
+  </style>
+</head>
+<body data-annotations="on">
+  <!--
+    Review Log (auto-maintained by refinement loops)
+    Loop 1: pending
+  -->
+
+  <header class="wf-chrome">
+    <div class="wf-chrome__inner">
+      <span class="wf-chrome__title">Index viewer (default)</span>
+      <span class="wf-chrome__device">desktop-web</span>
+      <nav class="wf-tabs" aria-label="State switcher">
+        <button class="wf-tab" aria-selected="true"  data-state="default">Default</button>
+        <button class="wf-tab" aria-selected="false" data-state="artifact-loaded">Artifact loaded</button>
+        <button class="wf-tab" aria-selected="false" data-state="copy-toast">Copy-MD toast</button>
+        <button class="wf-tab" aria-selected="false" data-state="section-hover">Section hover</button>
+      </nav>
+      <button id="toggle-anno" class="wf-tab" aria-pressed="true" aria-label="Toggle annotations">Annotations</button>
+    </div>
+  </header>
+
+  <main class="wf-frame wf-frame--desktop-web">
+
+    <!-- STATE: default — fresh open, nothing selected, welcome pane -->
+    <section class="wf-state active" data-state="default" aria-labelledby="state-default-h">
+      <h1 id="state-default-h" class="sr-only">Default state — viewer just opened</h1>
+      <div class="doc-shell">
+        <aside class="sidebar" aria-label="Artifact navigation">
+          <div class="sidebar-section">
+            <div class="wf-row" style="padding: 6px 10px; gap: 8px; font-weight: 600;">
+              <span style="font-size: 13px;">2026-05-09_html-artifacts</span>
+            </div>
+            <div class="sidebar-group-h">Phase artifacts</div>
+            <a class="sidebar-item">01 Requirements</a>
+            <a class="sidebar-item">02 Spec</a>
+            <a class="sidebar-item">03 Plan</a>
+            <a class="sidebar-item">MSF findings</a>
+
+            <div class="sidebar-group-h">Grills</div>
+            <a class="sidebar-item">2026-05-09 — req review</a>
+
+            <div class="sidebar-group-h">Wireframes</div>
+            <a class="sidebar-item">01 Index default</a>
+            <a class="sidebar-item">02 file:// fallback</a>
+            <a class="sidebar-item">03 Mixed-state</a>
+            <a class="sidebar-item">04 Recipient quickstart</a>
+
+            <div class="sidebar-group-h">Verify</div>
+            <a class="sidebar-item wf-muted">— pending —</a>
+          </div>
+        </aside>
+        <div>
+          <div class="doc-toolbar">
+            <span class="wf-mono wf-muted">file://…/2026-05-09_html-artifacts/index.html</span>
+            <span class="grow"></span>
+            <button class="wf-anno mock-button" data-note="Placeholder for artifact-text search across the folder; behavior to be specified in /spec (see OQ — search scope, indexing strategy, ⌘K vs full-page modal)." aria-label="Search artifacts (placeholder for /spec)">Search ⌘K</button>
+          </div>
+          <div class="doc-pane">
+            <div class="wf-message">
+              <div class="wf-message__title">Pick an artifact from the sidebar</div>
+              <div class="wf-message__hint">Every phase artifact, grill report, wireframe, and verify report is listed on the left. Click any entry to render it inline. Anchors and cross-references work without page reloads.</div>
+            </div>
+            <p class="wf-muted" style="margin-top: 24px; font-size: 12px;">Tip: run <code class="wf-mono">node serve.js</code> from this folder if you opened it via <code class="wf-mono">file://</code> and the embedded view is degraded.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATE: artifact-loaded — 01_requirements selected -->
+    <section class="wf-state" data-state="artifact-loaded" aria-labelledby="state-loaded-h">
+      <h1 id="state-loaded-h" class="sr-only">Artifact loaded — 01 Requirements</h1>
+      <div class="doc-shell">
+        <aside class="sidebar" aria-label="Artifact navigation">
+          <div class="sidebar-section">
+            <div class="wf-row" style="padding: 6px 10px; gap: 8px; font-weight: 600;">
+              <span style="font-size: 13px;">2026-05-09_html-artifacts</span>
+            </div>
+            <div class="sidebar-group-h">Phase artifacts</div>
+            <a class="sidebar-item is-active">01 Requirements</a>
+            <a class="sidebar-sub is-active">↳ Problem</a>
+            <a class="sidebar-sub">↳ Goals & Non-Goals</a>
+            <a class="sidebar-sub">↳ Solution Direction</a>
+            <a class="sidebar-sub">↳ User Journeys</a>
+            <a class="sidebar-sub">↳ Design Decisions</a>
+            <a class="sidebar-item">02 Spec</a>
+            <a class="sidebar-item">03 Plan</a>
+            <a class="sidebar-item">MSF findings</a>
+
+            <div class="sidebar-group-h">Grills</div>
+            <a class="sidebar-item">2026-05-09 — req review</a>
+
+            <div class="sidebar-group-h">Wireframes</div>
+            <a class="sidebar-item">01 Index default</a>
+            <a class="sidebar-item">02 file:// fallback</a>
+            <a class="sidebar-item">03 Mixed-state</a>
+            <a class="sidebar-item">04 Recipient quickstart</a>
+          </div>
+        </aside>
+        <div>
+          <div class="doc-toolbar">
+            <span class="wf-mono wf-muted">01_requirements.html</span>
+            <span class="grow"></span>
+            <button class="wf-anno mock-button" data-note="Bundled turndown.js converts the loaded HTML to clean structured markdown at click time. Toast confirms.">Copy Markdown</button>
+            <button class="mock-button" aria-label="Open in new tab">↗ Open</button>
+            <button class="mock-button" aria-label="Copy section link">🔗 Section link</button>
+          </div>
+          <div class="doc-pane">
+            <div class="doc-meta">Phase artifact · Tier 3 · 2026-05-09</div>
+            <h2 class="doc-h1">HTML-native artifact generation across pmos-toolkit pipeline skills</h2>
+            <div class="doc-section">
+              <h3 class="doc-h2" id="problem">Problem</h3>
+              <p style="font-size: 13px;">Every pmos-toolkit pipeline skill that writes into a feature folder (<code class="wf-mono">/requirements</code>, <code class="wf-mono">/spec</code>, <code class="wf-mono">/plan</code>, …) writes its primary artifact as plain markdown. Markdown is the wrong primary format for these documents.</p>
+              <ol style="font-size: 13px; margin-left: 24px; line-height: 1.6;">
+                <li>Markdown can't express what the artifact wants to say (diagrams, decision trees, state matrices).</li>
+                <li>Pipeline output is invisible without effort — 8+ markdown files, no unified view.</li>
+                <li>Reviewer subagents parse markdown by heading regex — fragile.</li>
+              </ol>
+              <div class="svg-figure">
+                <svg viewBox="0 0 600 140" xmlns="http://www.w3.org/2000/svg">
+                  <rect x="20" y="50" width="120" height="40" fill="none" stroke="#3a3a3a" stroke-width="1.4"/>
+                  <text x="80" y="74" font-size="11" text-anchor="middle">/requirements</text>
+                  <rect x="180" y="50" width="120" height="40" fill="none" stroke="#3a3a3a" stroke-width="1.4"/>
+                  <text x="240" y="74" font-size="11" text-anchor="middle">/spec</text>
+                  <rect x="340" y="50" width="120" height="40" fill="none" stroke="#3a3a3a" stroke-width="1.4"/>
+                  <text x="400" y="74" font-size="11" text-anchor="middle">/plan</text>
+                  <rect x="490" y="50" width="100" height="40" fill="#444" stroke="#3a3a3a" stroke-width="1.4"/>
+                  <text x="540" y="74" font-size="11" text-anchor="middle" fill="#fff">index.html</text>
+                  <line x1="140" y1="70" x2="180" y2="70" stroke="#3a3a3a" stroke-width="1.4" marker-end="url(#a)"/>
+                  <line x1="300" y1="70" x2="340" y2="70" stroke="#3a3a3a" stroke-width="1.4" marker-end="url(#a)"/>
+                  <line x1="460" y1="70" x2="490" y2="70" stroke="#3a3a3a" stroke-width="1.4" marker-end="url(#a)"/>
+                  <defs><marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" fill="#3a3a3a"/></marker></defs>
+                </svg>
+                <div class="svg-caption">Pipeline: each phase writes HTML into the same folder; index.html is regenerated after every write.</div>
+              </div>
+              <button class="mock-button section-copy" aria-label="Copy this section as Markdown">Copy ⌃</button>
+            </div>
+            <div class="doc-section">
+              <h3 class="doc-h2" id="goals">Goals & Non-Goals</h3>
+              <table class="doc-table">
+                <thead><tr><th>Goal</th><th>Measured by</th></tr></thead>
+                <tbody>
+                  <tr><td>Folder is shareable as self-contained navigable set</td><td>Cold-open in &lt; 1 min via <code class="wf-mono">node serve.js</code></td></tr>
+                  <tr><td>Skills generate HTML directly</td><td>Zero md→html converter code paths</td></tr>
+                </tbody>
+              </table>
+              <button class="mock-button section-copy" aria-label="Copy this section as Markdown">Copy ⌃</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATE: copy-toast — Copy Markdown clicked -->
+    <section class="wf-state" data-state="copy-toast" aria-labelledby="state-toast-h">
+      <h1 id="state-toast-h" class="sr-only">Copy markdown toast confirmation</h1>
+      <div class="doc-shell" style="position: relative;">
+        <aside class="sidebar" aria-label="Artifact navigation">
+          <div class="sidebar-section">
+            <div class="wf-row" style="padding: 6px 10px; font-weight: 600;"><span style="font-size: 13px;">2026-05-09_html-artifacts</span></div>
+            <div class="sidebar-group-h">Phase artifacts</div>
+            <a class="sidebar-item is-active">01 Requirements</a>
+            <a class="sidebar-item">02 Spec</a>
+            <a class="sidebar-item">03 Plan</a>
+            <a class="sidebar-item">MSF findings</a>
+          </div>
+        </aside>
+        <div>
+          <div class="doc-toolbar">
+            <span class="wf-mono wf-muted">01_requirements.html</span>
+            <span class="grow"></span>
+            <button class="mock-button mock-button--primary">Copy Markdown ✓</button>
+            <button class="mock-button" aria-label="Open in new tab">↗ Open</button>
+          </div>
+          <div class="doc-pane">
+            <h2 class="doc-h1">HTML-native artifact generation…</h2>
+            <p class="wf-muted" style="font-size: 13px;">(document body)</p>
+          </div>
+          <div class="toast" role="status" aria-live="polite">Markdown copied — 4.2 KB · 7 sections preserved</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATE: section-hover — per-section Copy button revealed (R9 / OQ5) -->
+    <section class="wf-state" data-state="section-hover" aria-labelledby="state-hover-h">
+      <h1 id="state-hover-h" class="sr-only">Per-section copy button on hover</h1>
+      <div class="doc-shell">
+        <aside class="sidebar" aria-label="Artifact navigation">
+          <div class="sidebar-section">
+            <div class="wf-row" style="padding: 6px 10px; font-weight: 600;"><span style="font-size: 13px;">2026-05-09_html-artifacts</span></div>
+            <div class="sidebar-group-h">Phase artifacts</div>
+            <a class="sidebar-item is-active">01 Requirements</a>
+            <a class="sidebar-sub">↳ Problem</a>
+            <a class="sidebar-sub is-active">↳ Goals & Non-Goals</a>
+            <a class="sidebar-sub">↳ Solution Direction</a>
+          </div>
+        </aside>
+        <div>
+          <div class="doc-toolbar">
+            <span class="wf-mono wf-muted">01_requirements.html § goals</span>
+            <span class="grow"></span>
+            <button class="mock-button">Copy Markdown</button>
+          </div>
+          <div class="doc-pane">
+            <div class="doc-section" style="background: var(--wf-bg-2); border-radius: 4px; padding: 12px 16px;">
+              <h3 class="doc-h2" id="goals" style="border-top: 0; margin-top: 0; padding-top: 0;">Goals & Non-Goals</h3>
+              <p style="font-size: 13px;">A finished feature folder is shareable as a self-contained, navigable artifact set…</p>
+              <button class="wf-anno mock-button section-copy" data-note="Per-section Copy: copies just this <section> as markdown. Resolves OQ5 with both whole-doc + per-section." style="opacity: 1; position: static; margin-top: 8px;">Copy this section as Markdown ⌃</button>
+            </div>
+            <p class="wf-muted" style="font-size: 12px; margin-top: 16px;">Hover any section to reveal a per-section Copy. The toolbar's Copy Markdown still copies the whole doc.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="wf-footer">
+    <div class="wf-footer__inner">
+      <span>Index viewer (default)</span>
+      <span class="mock-pill">desktop-web</span>
+      <span>File 01 of 4</span>
+      <span>Generated 2026-05-09</span>
+      <a class="wf-grow" style="text-align:right;color:var(--wf-accent)" href="./index.html">Back to index</a>
+    </div>
+  </footer>
+
+  <script>
+    const tabs = document.querySelectorAll('.wf-tab[data-state]');
+    const states = document.querySelectorAll('.wf-state');
+    tabs.forEach(t => t.addEventListener('click', () => {
+      tabs.forEach(x => x.setAttribute('aria-selected', x === t));
+      states.forEach(s => s.classList.toggle('active', s.dataset.state === t.dataset.state));
+    }));
+    const annoBtn = document.getElementById('toggle-anno');
+    annoBtn.addEventListener('click', () => {
+      const on = document.body.dataset.annotations === 'on';
+      document.body.dataset.annotations = on ? 'off' : 'on';
+      annoBtn.setAttribute('aria-pressed', String(!on));
+    });
+  </script>
+</body>
+</html>

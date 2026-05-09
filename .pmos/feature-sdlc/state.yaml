@@ -3,8 +3,8 @@ slug: html-artifacts
 tier: 3
 mode: interactive
 started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-09T11:30:07Z
-current_phase: msf-req
+last_updated: 2026-05-09T13:30:00Z
+current_phase: prototype
 worktree_path: null
 branch: feat/html-artifacts
 feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
@@ -46,16 +46,23 @@ phases:
     notes: "6 questions standard depth + 1 user-driven rollback simplifying data-section/taxonomy/regression-suite design"
   - id: msf-req
     hardness: soft
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: msf-findings.md
+    started_at: 2026-05-09T12:00:00Z
+    completed_at: 2026-05-09T12:30:00Z
+    notes: "3 Must / 5 Should / 3 Nice; key threads = recipient cold-open friction (R2), HTML structural-validation gap (R3), /spec wall-clock spike from /diagram subagents (R4/R11)"
   - id: creativity
     hardness: soft
-    status: pending
+    status: skipped
     artifact_path: null
+    notes: "user skipped at gate (Recommended skip)"
   - id: wireframes
     hardness: soft
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: wireframes/
+    started_at: 2026-05-09T12:32:00Z
+    completed_at: 2026-05-09T13:30:00Z
+    notes: "4 wireframes (W01 default, W02 file:// fallback, W03 mixed-state, W04 quickstart) desktop-web; medium-rigor cross-file pass clean; /msf-wf delegated and applied 3 of 6 findings (W1, W2, W4); E4 collision recovered to msf-findings.md.bak; W3 deferred to /spec"
   - id: prototype
     hardness: soft
     status: pending

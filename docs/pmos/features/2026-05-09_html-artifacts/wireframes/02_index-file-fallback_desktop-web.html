@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Index viewer (file:// fallback) — desktop-web — Wireframe</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="./assets/wireframe.css">
+  <style>
+    .doc-shell { display: grid; grid-template-columns: 280px 1fr; height: 600px; }
+    .sidebar { background: var(--wf-bg-2); border-right: 1px solid var(--wf-border); overflow-y: auto; }
+    .sidebar-section { padding: 8px 12px; }
+    .sidebar-group-h { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--wf-fg-muted); margin: 12px 0 4px; }
+    .sidebar-item { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 4px; font-size: 13px; color: var(--wf-fg); text-decoration: none; cursor: pointer; }
+    .sidebar-item:hover { background: var(--wf-bg-3); }
+    .sidebar-item .ext-icon { color: var(--wf-fg-muted); font-size: 11px; }
+    .fallback-banner { background: #fff5d6; border-bottom: 1px solid #d9b455; padding: 10px 16px; display: flex; align-items: center; gap: 12px; font-size: 13px; }
+    .fallback-banner .badge { background: #d9b455; color: #2a2208; font-weight: 600; padding: 2px 8px; border-radius: 3px; font-size: 11px; }
+    .fallback-banner code { background: rgba(0,0,0,0.08); padding: 1px 5px; border-radius: 3px; font-family: var(--wf-mono); font-size: 12px; }
+    .fallback-banner .grow { flex: 1; }
+    .doc-pane { padding: 24px 32px; max-width: 880px; }
+    .doc-section h3 { font-size: 17px; font-weight: 600; margin: 0 0 12px; }
+    .what-works-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 8px; }
+    .what-works-table th, .what-works-table td { border: 1px solid var(--wf-border); padding: 6px 10px; text-align: left; }
+    .what-works-table th { background: var(--wf-bg-2); font-weight: 600; }
+    .ok-chip { display: inline-block; background: #e2f5e2; color: #2d6c2d; font-size: 11px; padding: 1px 6px; border-radius: 3px; }
+    .deg-chip { display: inline-block; background: #ffeae0; color: #a64a16; font-size: 11px; padding: 1px 6px; border-radius: 3px; }
+  </style>
+</head>
+<body data-annotations="on">
+  <header class="wf-chrome">
+    <div class="wf-chrome__inner">
+      <span class="wf-chrome__title">Index viewer (file:// fallback)</span>
+      <span class="wf-chrome__device">desktop-web</span>
+      <nav class="wf-tabs" aria-label="State switcher">
+        <button class="wf-tab" aria-selected="true"  data-state="banner">Banner visible</button>
+        <button class="wf-tab" aria-selected="false" data-state="links">Links mode</button>
+      </nav>
+      <button id="toggle-anno" class="wf-tab" aria-pressed="true" aria-label="Toggle annotations">Annotations</button>
+    </div>
+  </header>
+
+  <main class="wf-frame wf-frame--desktop-web">
+
+    <!-- STATE: banner — fallback banner explains degraded mode -->
+    <section class="wf-state active" data-state="banner" aria-labelledby="state-banner-h">
+      <h1 id="state-banner-h" class="sr-only">Fallback banner visible</h1>
+      <div class="fallback-banner wf-anno" data-note="Detected at runtime: fetch() blocked under file:// → switch to links-in-new-tabs mode automatically. Mirrors /wireframes' 'Node missing' pattern.">
+        <span class="badge">file://</span>
+        <span><strong>Embedded view limited.</strong> Some browsers block <code>fetch()</code> under file:// — artifacts open in new tabs instead of inline.</span>
+        <span class="grow"></span>
+        <span class="wf-mono wf-muted">For full inline view, run</span>
+        <code>node serve.js</code>
+        <button class="mock-button" aria-label="Dismiss banner" title="Dismiss">×</button>
+      </div>
+      <div class="doc-shell">
+        <aside class="sidebar" aria-label="Artifact navigation">
+          <div class="sidebar-section">
+            <div class="wf-row" style="padding: 6px 10px; gap: 8px; font-weight: 600;"><span style="font-size: 13px;">2026-05-09_html-artifacts</span></div>
+            <p class="wf-muted" style="font-size: 11px; padding: 4px 10px 8px; margin: 0;">All artifacts open in new tabs (file:// limitation).</p>
+            <div class="sidebar-group-h">Phase artifacts</div>
+            <a class="sidebar-item" title="Opens in a new tab">01 Requirements <span class="ext-icon" aria-hidden="true">↗</span></a>
+            <a class="sidebar-item" title="Opens in a new tab">02 Spec <span class="ext-icon" aria-hidden="true">↗</span></a>
+            <a class="sidebar-item" title="Opens in a new tab">03 Plan <span class="ext-icon" aria-hidden="true">↗</span></a>
+            <a class="sidebar-item" title="Opens in a new tab">MSF findings <span class="ext-icon" aria-hidden="true">↗</span></a>
+            <div class="sidebar-group-h">Wireframes</div>
+            <a class="sidebar-item">01 Index default <span class="ext-icon">↗</span></a>
+            <a class="sidebar-item">02 file:// fallback <span class="ext-icon">↗</span></a>
+            <a class="sidebar-item">03 Mixed-state <span class="ext-icon">↗</span></a>
+            <a class="sidebar-item">04 Recipient quickstart <span class="ext-icon">↗</span></a>
+          </div>
+        </aside>
+        <div class="doc-pane">
+          <div class="doc-section">
+            <h3>Limited view</h3>
+            <p style="font-size: 13px;">Click any artifact in the sidebar to <strong>open it in a new tab</strong>. Inline rendering and "Copy Markdown" require running the bundled local server — see banner above.</p>
+            <table class="what-works-table">
+              <thead><tr><th>Capability</th><th>Inline (server)</th><th>file:// fallback</th></tr></thead>
+              <tbody>
+                <tr><td>Read each artifact</td><td><span class="ok-chip">OK</span> inline</td><td><span class="ok-chip">OK</span> opens new tab</td></tr>
+                <tr><td>Sidebar nav anchors</td><td><span class="ok-chip">OK</span></td><td><span class="deg-chip">Degraded</span> per-tab only</td></tr>
+                <tr><td>Copy Markdown (whole doc)</td><td><span class="ok-chip">OK</span></td><td><span class="ok-chip">OK</span> per-tab toolbar</td></tr>
+                <tr><td>Per-section Copy</td><td><span class="ok-chip">OK</span></td><td><span class="ok-chip">OK</span> per-tab</td></tr>
+                <tr><td>Cross-doc anchored links</td><td><span class="ok-chip">OK</span></td><td><span class="deg-chip">Degraded</span></td></tr>
+                <tr><td>Wireframes &amp; prototype previews</td><td><span class="ok-chip">OK</span> inline</td><td><span class="ok-chip">OK</span> new tab</td></tr>
+              </tbody>
+            </table>
+            <p class="wf-muted" style="font-size: 12px; margin-top: 12px;">Browsers that block file://-loaded JS entirely (rare): the sidebar still works as a static link list; banner stays visible to explain.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATE: links — banner dismissed; pure links list -->
+    <section class="wf-state" data-state="links" aria-labelledby="state-links-h">
+      <h1 id="state-links-h" class="sr-only">Banner dismissed — pure links list mode</h1>
+      <div class="doc-shell">
+        <aside class="sidebar" aria-label="Artifact navigation">
+          <div class="sidebar-section">
+            <div class="wf-row" style="padding: 6px 10px; gap: 8px; font-weight: 600;"><span style="font-size: 13px;">2026-05-09_html-artifacts</span></div>
+            <div class="sidebar-group-h">Phase artifacts</div>
+            <a class="sidebar-item" title="Opens in a new tab">01 Requirements <span class="ext-icon" aria-hidden="true">↗</span></a>
+            <a class="sidebar-item" title="Opens in a new tab">02 Spec <span class="ext-icon" aria-hidden="true">↗</span></a>
+            <a class="sidebar-item" title="Opens in a new tab">03 Plan <span class="ext-icon" aria-hidden="true">↗</span></a>
+            <a class="sidebar-item" title="Opens in a new tab">MSF findings <span class="ext-icon" aria-hidden="true">↗</span></a>
+          </div>
+        </aside>
+        <div class="doc-pane">
+          <div class="wf-message">
+            <div class="wf-message__title">Pick an artifact from the sidebar — it opens in a new tab</div>
+            <div class="wf-message__hint">For inline rendering, run <code class="wf-mono">node serve.js</code> from this folder.</div>
+            <button class="mock-button">Show banner again</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="wf-footer">
+    <div class="wf-footer__inner">
+      <span>Index viewer (file:// fallback)</span>
+      <span class="mock-pill">desktop-web</span>
+      <span>File 02 of 4</span>
+      <span>Generated 2026-05-09</span>
+      <a class="wf-grow" style="text-align:right;color:var(--wf-accent)" href="./index.html">Back to index</a>
+    </div>
+  </footer>
+
+  <script>
+    const tabs = document.querySelectorAll('.wf-tab[data-state]');
+    const states = document.querySelectorAll('.wf-state');
+    tabs.forEach(t => t.addEventListener('click', () => {
+      tabs.forEach(x => x.setAttribute('aria-selected', x === t));
+      states.forEach(s => s.classList.toggle('active', s.dataset.state === t.dataset.state));
+    }));
+    const annoBtn = document.getElementById('toggle-anno');
+    annoBtn.addEventListener('click', () => {
+      const on = document.body.dataset.annotations === 'on';
+      document.body.dataset.annotations = on ? 'off' : 'on';
+      annoBtn.setAttribute('aria-pressed', String(!on));
+    });
+  </script>
+</body>
+</html>

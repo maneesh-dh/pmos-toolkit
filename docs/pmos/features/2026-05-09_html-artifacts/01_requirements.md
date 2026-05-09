@@ -298,3 +298,27 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 ---
 
 **For UX friction analysis on this requirements doc, run `/msf-req` after commit.**
+
+---
+
+## Wireframes
+
+Generated: 2026-05-09
+Folder: `wireframes/`
+Index: `wireframes/index.html`
+MSF + PSYCH: `msf-findings.md` (Section B PSYCH; Section A MSF; Section D applied changes)
+Backup of /msf-req findings: `msf-findings.md.bak`
+
+| # | Component | Devices | States | File |
+|---|-----------|---------|--------|------|
+| 01 | Index viewer (default) | desktop-web | default, artifact-loaded, copy-toast, section-hover | `wireframes/01_index-default_desktop-web.html` |
+| 02 | Index viewer (file:// fallback) | desktop-web | banner, links | `wireframes/02_index-file-fallback_desktop-web.html` |
+| 03 | Index viewer (mixed-state folder) | desktop-web | mixed-sidebar, legacy-open | `wireframes/03_index-mixed-state_desktop-web.html` |
+| 04 | Recipient quickstart banner | desktop-web | first-open, dismissed | `wireframes/04_recipient-quickstart_desktop-web.html` |
+
+**Open Questions for `/spec` introduced by wireframes:**
+
+- **W3** — quickstart-seen flag scoping (localStorage per-origin vs. folder-hash key) so the banner re-appears appropriately on cross-share.
+- **W5 / OQ4** — cross-doc affordance bridges (W02 banner → W04 step 2). Generalize, don't one-off.
+- **W4 / Search ⌘K** — artifact-text search scope, indexing strategy, ⌘K vs full-page-modal pattern.
+- The wireframe contract assumes a stable `<aside>` / `<section>` / `<button>` structure across LLM-authored artifacts. Reinforces /msf-req **R3**: HTML structural validation in `/verify` smoke is now load-bearing.

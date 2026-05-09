@@ -306,6 +306,8 @@ contract_version: 1
 
 [For plans with ≥ ~12 tasks, also include a Mermaid block (FR-25) auto-rendered from per-task `**Depends on:**` lines. GitHub renders ```mermaid blocks natively.]
 
+**Diagram emission via `/diagram` subagent (FR-60..FR-65, D2).** /plan rarely emits diagrams beyond the FR-25 dependency graph. When it does (rendering the dep-graph to SVG instead of inline Mermaid), follow the canonical pattern documented in `/spec/SKILL.md` § "Diagram Emission via `/diagram` Subagent": dispatch `/pmos-toolkit:diagram` as a **blocking Task subagent** with `--theme technical --rigor medium --out {docs_path}/diagrams/<slug>.svg --on-failure exit-nonzero`; per-call timeout 300s; up to 2 retries (3 attempts total); inline-SVG fallback after 3 failures; per-skill-run wall-clock cap 30 min via `diagram_subagent_state`; figcaption provenance per attempt or fallback. Inline Mermaid in markdown remains acceptable for the standard dep-graph (GitHub renders it natively); the subagent path applies only when the plan elects to emit pre-rendered SVG instead.
+
 ---
 
 ## Decision Log

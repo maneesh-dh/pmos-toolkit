@@ -342,6 +342,38 @@ All templates start at `**Status:** Draft`. The status is promoted to `**Status:
 
 **Heading IDs (FR-03.1, enforced by `/verify`).** Every `<h2>` and `<h3>` carries a stable kebab-case `id`. Compute via `_shared/html-authoring/conventions.md` §3 — lowercase the heading text, replace every non-alphanumeric run with a single `-`, trim leading/trailing `-`, dedupe collisions with `-2`/`-3`/... suffixes. Stable IDs let cross-doc anchors (`02_spec.html#fr-10`, `03_plan.html#t8`) resolve deterministically across regenerations. `assert_heading_ids.sh` (T22) blocks any artifact missing an id. The `<h1>` is emitted by `template.html` and never appears inside `{{content}}` — do not add an id to it. The Tier templates below render to HTML via the substrate; when output_format resolves to `html`, the `## ` markdown headings become `<h2 id="...">` per the algorithm above.
 
+### Diagram Emission via `/diagram` Subagent (FR-60..FR-65, D2)
+
+Architecture diagrams (§6.1) and sequence diagrams (§6.2) are emitted by dispatching `/pmos-toolkit:diagram` as a **blocking Task subagent** — never authored inline as a first attempt. The subagent renders Mermaid source to SVG via the upstream renderer and writes to `{docs_path}/diagrams/<slug>.svg`; the spec's HTML body references that SVG via `<img>` (or inlines it). This isolates rendering failure modes (network timeouts, mermaid-cli crashes) from the spec writer.
+
+**Per-diagram dispatch (FR-60, FR-61):**
+
+```
+Task tool dispatch:
+  skill: /pmos-toolkit:diagram
+  args:
+    --theme technical
+    --rigor medium
+    --out {docs_path}/diagrams/<slug>.svg
+    --on-failure exit-nonzero
+  blocking: true
+  per-call timeout: 300s
+```
+
+**Retry loop (FR-62):** up to 2 retries on per-call timeout or non-zero exit (3 attempts total per diagram). Each retry re-dispatches the same args; do not mutate the prompt between attempts.
+
+**Inline-SVG fallback (FR-63):** after 3 failed attempts on a single diagram, author the SVG inline via this skill's own prompt as a last resort. Mark the figcaption explicitly so reviewers know the provenance.
+
+**Wall-clock cap (FR-64):** maintain a per-skill-run accumulator `diagram_subagent_state` in skill state with fields `{elapsed_s: 0, attempts: {}, cap_hit: false}`. Increment `elapsed_s` after every dispatch (success or failure) by the wall-clock seconds spent. When `elapsed_s >= 1800` (30 min) the cap is hit: skip remaining diagrams' subagent dispatch and fall directly to inline-SVG for any remaining diagrams in the run. The accumulator resets per /spec invocation — never persist across runs.
+
+**Provenance (FR-65):** every emitted `<figure>` MUST carry a `<figcaption>` documenting how the SVG was authored:
+
+- Subagent success: `<figcaption>Authored via /diagram subagent (attempt N).</figcaption>` (N ∈ {1, 2, 3})
+- Inline fallback: `<figcaption>Diagram authored inline (subagent failed after 3 attempts).</figcaption>`
+- Cap-hit fallback: `<figcaption>Diagram authored inline (30-min subagent cap reached).</figcaption>`
+
+This pattern is canonical across `/spec` and `/plan`. Per spec D2 the blocking-subagent shape (vs. fire-and-forget) is required so the writer doesn't proceed past §6 with a missing diagram.
+
 ### Tier 1 Template: Bug Fix / Minor Enhancement
 
 ```markdown

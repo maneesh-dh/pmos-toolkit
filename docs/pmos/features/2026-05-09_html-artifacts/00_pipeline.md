@@ -8,8 +8,8 @@
 - **Branch:** feat/html-artifacts
 - **Feature folder:** /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
 - **Started:** 2026-05-09T10:53:49Z
-- **Last updated:** 2026-05-09T13:30:00Z
-- **Current phase:** prototype
+- **Last updated:** 2026-05-09T13:31:00Z
+- **Current phase:** spec
 
 ## Phases
 
@@ -23,7 +23,7 @@
 | 4a | msf-req | soft | completed | `msf-findings.md` | 2026-05-09T12:30:00Z | 3 Must / 5 Should / 3 Nice |
 | 4b | creativity | soft | skipped | — | 2026-05-09T12:31:00Z | user skip at gate |
 | 4c | wireframes | soft | completed | `wireframes/` | 2026-05-09T13:30:00Z | 4 screens; /msf-wf applied 3 of 6 findings; W3 deferred to /spec |
-| 4d | prototype | soft | pending | — | — | — |
+| 4d | prototype | soft | skipped | — | 2026-05-09T13:31:00Z | user skip at gate |
 | 5 | spec | hard | pending | — | — | — |
 | 6 | simulate-spec | soft | pending | — | — | — |
 | 7 | plan | hard | pending | — | — | — |

@@ -38,8 +38,14 @@
   function isQuickstartSeen() { return safeSessionGet('pmos.quickstart.seen') === '1'; }
   function markQuickstartSeen() { safeSessionSet('pmos.quickstart.seen', '1'); }
 
-  function slugify(s) {
-    return String(s == null ? '' : s).toLowerCase()
+  // Derive a sidebar/hash slug for a manifest entry. Prefers the entry's
+  // explicit `id` (canonical per spec §9.1) and falls back to a path-derived
+  // kebab. NOTE: distinct from conventions.md §3 heading-id rule — this is
+  // for manifest entry identity, not for `<h2>`/`<h3>` ids that skills emit.
+  function artifactSlug(entry) {
+    if (entry && typeof entry.id === 'string' && entry.id) return entry.id;
+    var s = (entry && (entry.path || entry.title)) || '';
+    return String(s).toLowerCase()
       .replace(/\.[a-z0-9]+$/, '')
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-+|-+$/g, '') || 'untitled';
@@ -72,7 +78,7 @@
       h.textContent = phase;
       g.appendChild(h);
       groups[phase].forEach(function (a) {
-        var slug = slugify(a.path || a.title);
+        var slug = artifactSlug(a);
         var link = document.createElement('a');
         link.className = 'pmos-sidebar-item';
         link.textContent = a.title || a.path;
@@ -110,7 +116,7 @@
     if (!manifest || !Array.isArray(manifest.artifacts)) return null;
     for (var i = 0; i < manifest.artifacts.length; i++) {
       var a = manifest.artifacts[i];
-      if (slugify(a.path || a.title) === slug) return a;
+      if (artifactSlug(a) === slug) return a;
     }
     return null;
   }
@@ -141,7 +147,7 @@
       var h = (location.hash || '').replace(/^#/, '');
       if (!h) {
         var first = (manifest && manifest.artifacts && manifest.artifacts[0]) || null;
-        if (first) activate(slugify(first.path || first.title));
+        if (first) activate(artifactSlug(first));
         return;
       }
       var parts = h.split('/');
@@ -318,7 +324,7 @@
     buildSidebar: buildSidebar,
     renderLegacyMdShim: renderLegacyMdShim,
     copyToClipboard: copyToClipboard,
-    slugify: slugify
+    artifactSlug: artifactSlug
   };
 
   if (document.readyState === 'loading') {

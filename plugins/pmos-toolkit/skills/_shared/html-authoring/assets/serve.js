@@ -47,9 +47,14 @@ function parseArgs(argv) {
 
 function safeJoin(root, reqPath) {
   // Decode + strip query/hash before path-join; reject traversal.
-  const decoded = decodeURIComponent(reqPath.split('?')[0].split('#')[0]);
+  // Boundary check requires path.sep — bare startsWith() lets `/tmp/feat`
+  // match `/tmp/feat-evil/...` after `%2E%2E/feat-evil/...` decodes through.
+  let decoded;
+  try { decoded = decodeURIComponent(reqPath.split('?')[0].split('#')[0]); }
+  catch (_) { return null; }
   const joined  = path.normalize(path.join(root, decoded));
-  if (!joined.startsWith(root)) return null;
+  const rootSep = root.endsWith(path.sep) ? root : root + path.sep;
+  if (joined !== root && !joined.startsWith(rootSep)) return null;
   return joined;
 }
 

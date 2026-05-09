@@ -429,7 +429,7 @@ figcaption {
 }
 
 /* ---- 10. file:// fallback banner ----------------------------------- */
-.pmos-file-fallback-banner {
+.pmos-fallback-banner {
   margin: 0;
   padding: var(--pmos-sp-3) var(--pmos-sp-4);
   background: #fff7ed;
@@ -438,12 +438,12 @@ figcaption {
   font-size: var(--pmos-fs-sm);
 }
 @media (prefers-color-scheme: dark) {
-  .pmos-file-fallback-banner {
+  .pmos-fallback-banner {
     background: #422006;
     color: #fdba74;
   }
 }
-.pmos-file-fallback-banner code {
+.pmos-fallback-banner code {
   background: rgba(0,0,0,0.06);
   color: inherit;
 }
@@ -522,7 +522,7 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
   .pmos-toolbar,
   .pmos-sidebar,
   .pmos-quickstart-banner,
-  .pmos-file-fallback-banner,
+  .pmos-fallback-banner,
   .pmos-toast,
   .pmos-section-anchor { display: none !important; }
   .pmos-viewer-shell { display: block; }

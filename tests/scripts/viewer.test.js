@@ -93,5 +93,19 @@ test('legacy-md shim renders <pre class="pmos-legacy-md"> (FR-22)', () => {
   assert(/legacy markdown/i.test(banner.textContent), `legacy-md banner text wrong: ${banner.textContent}`);
 });
 
+// ---- Test 4: manifest `id` field honored over path-derived slug -----------
+test('artifactSlug prefers manifest.id over derived path slug', () => {
+  const dom = makeDom({ url: 'http://localhost:8000/index.html' });
+  loadViewer(dom);
+  const api = dom.window.__pmosViewer;
+  assert(api && typeof api.artifactSlug === 'function', 'viewer must expose __pmosViewer.artifactSlug');
+  const withId = api.artifactSlug({ id: '01-requirements', path: '01_requirements.html', title: 'Requirements' });
+  assert(withId === '01-requirements', `expected '01-requirements' (manifest id), got '${withId}'`);
+  const noId   = api.artifactSlug({ path: '02_spec.html', title: 'Spec' });
+  assert(noId === '02-spec', `expected '02-spec' (path-derived), got '${noId}'`);
+  const empty  = api.artifactSlug({});
+  assert(empty === 'untitled', `expected 'untitled' (fallback), got '${empty}'`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);

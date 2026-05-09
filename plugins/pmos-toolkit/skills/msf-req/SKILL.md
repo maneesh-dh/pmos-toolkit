@@ -2,7 +2,7 @@
 name: msf-req
 description: Evaluate a requirements document from the end-user perspective using Motivation/Satisfaction/Friction analysis. Produces a recommendations-only findings doc; never edits the source. Use when the user says "evaluate UX of the requirements", "will the proposed solution work for users", "persona check on this PRD", or "friction analysis on requirements".
 user-invocable: true
-argument-hint: "<path-to-requirements-doc>"
+argument-hint: "<path-to-requirements-doc> [--format <html|md|both>]"
 ---
 
 # /msf-req — Motivation / Friction / Satisfaction on a Requirements Doc
@@ -44,6 +44,10 @@ Use workstream context (loaded by step 3 below) to inform analysis — product c
 5. Read `~/.pmos/learnings.md` if present; note entries under `## /msf-req` and factor them into approach (skill body wins on conflict).
 <!-- pipeline-setup-block:end -->
 
+### Phase 0 addendum: output_format resolution (FR-12)
+
+6. **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. The numbering continues from the pipeline-setup-block above (which ends at step 5 in this skill).
+
 ---
 
 ## Phase 1: Wrong-input Guard
@@ -51,7 +55,7 @@ Use workstream context (loaded by step 3 below) to inform analysis — product c
 Before any other phase, inspect the argument:
 
 - If the argument resolves to a **directory** → exit with: "Argument looks like a wireframes folder. Use `/msf-wf` instead." Do NOT continue.
-- If the argument resolves to a single `.md` file → continue.
+- If the argument resolves to a single `.html` or `.md` file → continue.
 - If the argument is missing → continue to Phase 2 (resolve-input handles missing arg).
 
 This guard runs before persona alignment, learnings load, or any analysis.
@@ -101,10 +105,24 @@ If a question isn't applicable for a given persona/scenario, say so briefly rath
 Save the consolidated MSF analysis matrix.
 
 **Save path:**
-- If invoked inside a pipeline feature folder (`{feature_folder}` resolved in Phase 0 step 4) → `{feature_folder}/msf-findings.md`.
-- Else (ad-hoc) → `~/.pmos/msf/YYYY-MM-DD_<slug>.md`, where `<slug>` is derived from the argument's filename (lowercase, hyphenated).
+- If invoked inside a pipeline feature folder (`{feature_folder}` resolved in Phase 0 step 4) → `{feature_folder}/msf-findings.html` per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`.
+- Else (ad-hoc) → `~/.pmos/msf/YYYY-MM-DD_<slug>.html`, where `<slug>` is derived from the argument's filename (lowercase, hyphenated).
 
-**Overwrite protection (E4):** if a findings doc already exists at the save path, copy it to `<save_path>.bak` before overwriting. The `.bak` is preserved for one cycle (next run overwrites it). Skip the backup step if no prior file exists.
+**Atomic write (FR-10.2):** write `msf-findings.html` and the companion `msf-findings.sections.json` via temp-then-rename — never serve a half-written file.
+
+**Asset substrate (FR-10):** when writing into a feature folder, copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files. Ad-hoc saves to `~/.pmos/msf/` write a self-contained HTML (substrate referenced via the `~/.pmos/msf/assets/` cache; first ad-hoc run seeds the cache).
+
+**Asset prefix (FR-10.1):** `assets/` for top-level feature-folder writes; `../assets/` if nested.
+
+**Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML.
+
+**Heading IDs (FR-03.1, enforced by `/verify`):** every `<h2>` and `<h3>` carries a stable kebab-case `id` per `_shared/html-authoring/conventions.md` §3 (lowercase, non-alphanumeric runs → `-`, trim, dedupe collisions with `-2`/`-3`/...). `assert_heading_ids.sh` (T22) blocks any artifact missing an id.
+
+**Index regeneration (FR-22, §9.1):** when writing into a feature folder, regenerate `{feature_folder}/index.html` via `_shared/html-authoring/index-generator.md` (manifest inlined as `<script type="application/json" id="pmos-index">`, no on-disk `_index.json`, FR-41).
+
+**Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `msf-findings.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js msf-findings.html > msf-findings.md` (or via the ad-hoc `~/.pmos/msf/assets/html-to-md.js`). The MD sidecar is read-only — never the source of truth (FR-33).
+
+**Overwrite protection (E4):** if a findings doc already exists at the save path (either `.html` or legacy `.md`), copy it to `<save_path>.bak` before overwriting. The `.bak` is preserved for one cycle (next run overwrites it). Skip the backup step if no prior file exists.
 
 The findings doc has **no line cap**. Contains the full persona × scenario × journey × consideration matrix plus the prioritized Must / Should / Nice recommendations table per `../_shared/msf-heuristics.md` "Executive Summary Template".
 
@@ -135,7 +153,7 @@ After saving and rendering the summary, the skill **terminates**. Do not edit th
 
 - Do NOT skip the persona-alignment confirmation step — analyzing without confirmed personas produces generic findings.
 - Do NOT modify the requirements doc, ever. /msf-req is recommendations-only.
-- Do NOT accept the flags `--apply-edits`, `--wireframes`, `--skip-psych`, or `--default-scope`. The argument-hint advertises only `<path-to-requirements-doc>`.
+- Do NOT accept the flags `--apply-edits`, `--wireframes`, `--skip-psych`, or `--default-scope`. The argument-hint advertises only `<path-to-requirements-doc>` and `--format <html|md|both>`.
 - Do NOT run PSYCH scoring — there is no UI to score. PSYCH lives in `/msf-wf`.
 - Do NOT silently skip the wrong-input guard — a directory argument means the user wanted `/msf-wf`.
 - Do NOT pad recommendations to fill the Must / Should / Nice template — emit "no actionable findings" instead.

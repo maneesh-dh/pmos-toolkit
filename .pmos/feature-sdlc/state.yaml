@@ -3,9 +3,9 @@ slug: html-artifacts
 tier: 3
 mode: interactive
 started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-09T13:32:00Z
-current_phase: spec
-paused_at: 2026-05-09T13:32:00Z
+last_updated: 2026-05-09T17:05:00Z
+current_phase: execute
+paused_at: 2026-05-09T17:05:00Z
 paused_reason: compact-pending
 worktree_path: null
 branch: feat/html-artifacts
@@ -14,6 +14,8 @@ notes:
   - "Worktree initially created at ../agent-skills-html-artifacts but removed due to Claude Code harness cwd-reset behavior. Pipeline runs on feat/html-artifacts branch in main repo cwd."
   - "Paused 2026-05-09T11:30Z by user for context-budget; resumed and ran /msf-req + /wireframes + /msf-wf in one block."
   - "Paused 2026-05-09T13:32Z compact-pending before /spec. Resume via /feature-sdlc --resume after /compact. Next phase: spec (Tier 3, expects /diagram subagent dispatch and reviewer loop). 4 OQs queued for /spec from /wireframes (W3 localStorage scoping, W5 cross-doc affordance bridges, W4 Search ⌘K behavior, plus /msf-req R3 reinforcement)."
+  - "Resumed 2026-05-09T13:35Z. Ran /spec → /simulate-spec → /plan in one block. /spec produced 02_spec.md (Tier 3, 21 decisions, Ready for Plan). /simulate-spec produced simulate-spec/2026-05-09-trace.md (28 scenarios; 21 gaps; 14 patches applied to spec; 5 skipped; 2 deferred to OQ-DEFER-1/2 for /complete-dev). /plan produced 03_plan.md (Tier 3; 26 tasks in 5 phases; 5 decisions; 1 review loop with 4 fix findings; FR-coverage 62/62; status=Planned)."
+  - "Paused 2026-05-09T17:05Z compact-pending before /execute. Heavy phase (TDD across 26 tasks). Resume via /feature-sdlc --resume after /compact. Next phase: execute. 3 Open Questions in plan: OQ-1 (/complete-dev MD re-author, deferred), OQ-2 (stale .md sidecars, deferred), OQ-3 (T18 per-skill harness shape, resolves during /execute)."
 phases:
   - id: setup
     hardness: infra
@@ -71,16 +73,25 @@ phases:
     notes: "user skipped at gate (Recommended skip — wireframes static-fidelity sufficient for /spec; viewer interaction model is straightforward)"
   - id: spec
     hardness: hard
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: 02_spec.md
+    started_at: 2026-05-09T13:35:00Z
+    completed_at: 2026-05-09T14:30:00Z
+    notes: "Tier 3 spec; 21 Decision Log entries (D1-D21); 9 FR sections + 10 NFRs; 17 edge cases; 4 sequence diagrams; 1 review loop (2 should-fix + 2 nit, all fixed); committed 02_spec.md as Ready for Plan; bootstrap markdown (per OQ6 deferred to /complete-dev)."
   - id: simulate-spec
     hardness: soft
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: simulate-spec/2026-05-09-trace.md
+    started_at: 2026-05-09T14:30:00Z
+    completed_at: 2026-05-09T15:30:00Z
+    notes: "28 scenarios; 21 gaps (1 blocker G14, 6 sig, 13 minor, 1 fwd-compat); 14 patches applied to 02_spec.md, 5 skipped, 2 deferred (OQ-DEFER-1: /complete-dev MD re-author; OQ-DEFER-2: stale .md sidecars on format flip). Spec patches: FR-03.1, FR-05.1, FR-10.1/.2/.3, FR-25.1, FR-50/51 chrome-strip, FR-26 try/catch, FR-22 legacy-md shim, FR-92 cross-doc anchor scan, §9.0 schema fwd-compat, §9.1 ordering, FR-06 MIME map, FR-07 html-to-md.js, Non-Goals + mobile."
   - id: plan
     hardness: hard
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: 03_plan.md
+    started_at: 2026-05-09T15:30:00Z
+    completed_at: 2026-05-09T17:00:00Z
+    notes: "Tier 3 plan; 26 tasks in 5 phases; 5 decisions (P1-P5); 1 review loop (4 findings, all Fix); FR-coverage gate clean (62/62); status=Planned. Open Questions: 2 inherited (OQ-1, OQ-2 → /complete-dev pre-2.34.0) + 1 planning (OQ-3 → resolves during /execute T18 harness wiring)."
   - id: execute
     hardness: hard
     status: pending

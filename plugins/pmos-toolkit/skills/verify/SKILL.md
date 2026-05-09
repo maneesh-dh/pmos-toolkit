@@ -2,7 +2,7 @@
 name: verify
 description: Post-implementation verification gate — ALWAYS run after /execute completes. Lint, test, deploy, spec compliance, multi-agent code review, interactive QA, and regression test hardening. Also run after manual coding or partial work. Works with git commits, no PR required. Use when the user says "check my work", "is this done", "verify the implementation", "did I miss anything", or "review and test everything".
 user-invocable: true
-argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted) [--feature <slug>] [--backlog <id>] [--skip-design-drift] [--scope phase --phase <N>] [--non-interactive | --interactive]"
+argument-hint: "<path-to-spec-doc> (optional — will search {docs_path}/specs/ if omitted) [--feature <slug>] [--backlog <id>] [--skip-design-drift] [--scope phase --phase <N>] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # Implementation Verification Gate
@@ -64,7 +64,7 @@ Mark each as in-progress when starting and completed when done. Skip tasks that 
 
 ## Phase 0: Pipeline Setup (inline — do not skip)
 
-Use workstream context (loaded by step 3 below) to verify that implementation aligns with product goals, not just spec compliance. This skill reads all prior artifacts (`01_requirements.md`, `02_spec.md`, `03_plan.md`, `execute/`) and writes review reports under `{feature_folder}/verify/`.
+Use workstream context (loaded by step 3 below) to verify that implementation aligns with product goals, not just spec compliance. This skill reads all prior artifacts (`01_requirements.{html,md}`, `02_spec.{html,md}`, `03_plan.{html,md}`, `execute/`) and writes review reports under `{feature_folder}/verify/`.
 
 <!-- pipeline-setup-block:start -->
 1. **Read `.pmos/settings.yaml`.**
@@ -78,6 +78,10 @@ Use workstream context (loaded by step 3 below) to verify that implementation al
 5. **Edge cases — you MUST `Read` `_shared/pipeline-setup.md` Section B before acting:** slug collision, slug validation failure, legacy date-less folder encountered, ambiguous `--feature` lookup, any folder creation.
 6. Read `~/.pmos/learnings.md` if present; note entries under `## /<this-skill-name>` and factor them into approach (skill body wins on conflict; surface conflicts to user before applying).
 <!-- pipeline-setup-block:end -->
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+7. **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. Controls the format of the **review-report write phase only** (Phase 8 step 2). Reading prior artifacts uses the resolver; the resolver returns whatever primary the upstream skill wrote, regardless of `output_format`.
 
 ---
 
@@ -174,7 +178,7 @@ When invoked with `--scope phase --feature <slug> --phase <N>`, /verify runs the
 
 1. **Changed-files set is restricted to files touched by tasks in the named phase only.** Read `{feature_folder}/execute/task-NN.md` for each `T<N>` listed in the plan's `## Phase <N>` group; union their `files_touched` frontmatter lists.
 2. **Evidence path is `{feature_folder}/verify/<YYYY-MM-DD>-phase-<N>/`** (not the default `{feature_folder}/verify/<YYYY-MM-DD>/`). Multiple phase-verify runs on the same day are namespaced by phase number, so they do not collide.
-3. **Phase 4 Entry Gate uses the markdown table in `review.md` as the structural enforcement** instead of `TodoWrite`. Per-task logs under `{feature_folder}/execute/task-NN.md` already carry evidence-typed FR coverage tables for this phase, so re-creating one `TodoWrite` task per FR-ID would duplicate that contract. The `review.md` table — with one row per FR-ID, the same outcome+evidence triple, and a `Status` column drawn from the three-state outcome model — IS the gate. `TodoWrite`-as-gate is reserved for standalone feature-scope invocations (where there is no upstream per-task log to consume).
+3. **Phase 4 Entry Gate uses the markdown table in `review.{html,md}` as the structural enforcement** instead of `TodoWrite`. Per-task logs under `{feature_folder}/execute/task-NN.md` already carry evidence-typed FR coverage tables for this phase, so re-creating one `TodoWrite` task per FR-ID would duplicate that contract. The `review.{html,md}` table — with one row per FR-ID, the same outcome+evidence triple, and a `Status` column drawn from the three-state outcome model — IS the gate. `TodoWrite`-as-gate is reserved for standalone feature-scope invocations (where there is no upstream per-task log to consume).
 
 On completion, return a structured pass/fail result to the calling skill (/execute Phase 2.5):
 - `ok: true|false`
@@ -295,7 +299,7 @@ For each issue scoring 75+:
 
 Before running any Phase 4 sub-step, enumerate every upstream requirement that has a runtime surface and create one `TodoWrite` task per item. This list is the gate — Phase 4 is not complete until every todo is closed with evidence or explicitly resolved to `Unverified — action required` with a named blocker. A plain bullet list in prose does not substitute for `TodoWrite` todos; the todos are the structural enforcement.
 
-> **Phase-scoped exception:** When invoked with `--scope phase --feature <slug> --phase <N>` (see "Invocation Mode: Phase-Scoped" above, change #3), the markdown table in the phase's `review.md` IS the gate. Do not create `TodoWrite` tasks per FR-ID for phase-scoped runs — the per-task logs already carry the same outcome+evidence contract.
+> **Phase-scoped exception:** When invoked with `--scope phase --feature <slug> --phase <N>` (see "Invocation Mode: Phase-Scoped" above, change #3), the markdown table in the phase's `review.{html,md}` IS the gate. Do not create `TodoWrite` tasks per FR-ID for phase-scoped runs — the per-task logs already carry the same outcome+evidence contract.
 
 **How to build the list:**
 
@@ -451,7 +455,7 @@ Every row also cross-references the todo it closed (or left open) from the Phase
 
 ### 4a. Requirements Compliance
 
-Read `{feature_folder}/01_requirements.md` (resolved in Phase 1). For every goal, user journey, and acceptance criterion:
+Read `{feature_folder}/01_requirements.{html,md}` (resolved in Phase 1 via the resolver). For every goal, user journey, and acceptance criterion:
 
 | # | Requirement | Outcome | Evidence |
 |---|-------------|---------|----------|
@@ -460,7 +464,7 @@ Read `{feature_folder}/01_requirements.md` (resolved in Phase 1). For every goal
 
 ### 4b. Spec Compliance
 
-Read `{feature_folder}/02_spec.md` (resolved in Phase 1). For every FR-ID and edge case:
+Read `{feature_folder}/02_spec.{html,md}` (resolved in Phase 1 via the resolver). For every FR-ID and edge case:
 
 | ID | Requirement | Outcome | Evidence |
 |----|-------------|---------|----------|
@@ -483,7 +487,7 @@ Allowed `Outcome` values are exactly `Verified`, `NA — alt-evidence`, and `Unv
 
 ### 4c. Plan Compliance
 
-Read `{feature_folder}/03_plan.md` (resolved in Phase 1). For every task:
+Read `{feature_folder}/03_plan.{html,md}` (resolved in Phase 1 via the resolver). For every task:
 
 | Task | Outcome | Evidence |
 |------|---------|----------|
@@ -588,7 +592,15 @@ This phase does NOT generate wireframes, regenerate `design-overlay.css`, auto-c
    ```
    If there are multiple logical changes, use multiple commits.
 
-2. **Write the review report** to `{feature_folder}/verify/{YYYY-MM-DD}-review.md`. If a report with that name already exists from an earlier run today, append `-2`, `-3`, etc. (e.g., `2026-04-30-review-2.md`). The report contains the same content delivered to the user in step 3.
+2. **Write the review report** to `{feature_folder}/verify/{YYYY-MM-DD}-review.html` per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`. If a report with that name already exists from an earlier run today, append `-2`, `-3`, etc. (e.g., `2026-04-30-review-2.html`). The report contains the same content delivered to the user in step 3. For phase-scoped invocations (Phase-Scoped Mode above), the path becomes `{feature_folder}/verify/{YYYY-MM-DD}-phase-<N>/review.html`.
+
+   - **Atomic write (FR-10.2):** write `<name>.html` and the companion `<name>.sections.json` via temp-then-rename.
+   - **Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
+   - **Asset prefix (FR-10.1):** `verify/` is one level below the feature folder, so the per-folder relative asset prefix is `../assets/`. Phase-scoped runs nest one further (`verify/<date>-phase-<N>/`), so the prefix is `../../assets/`.
+   - **Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML.
+   - **Heading IDs (FR-03.1, enforced by `/verify` itself — self-check):** every `<h2>` and `<h3>` carries a stable kebab-case `id` per `_shared/html-authoring/conventions.md` §3.
+   - **Index regeneration (FR-22, §9.1):** after the review write completes, regenerate `{feature_folder}/index.html` via `_shared/html-authoring/index-generator.md` (manifest inlined as `<script type="application/json" id="pmos-index">`, no on-disk `_index.json`, FR-41). Phase-scoped runs do NOT regenerate (the per-phase review is a sub-artifact of the parent verify dir).
+   - **Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `<name>.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js verify/<name>.html > verify/<name>.md`. The MD sidecar is read-only (FR-33).
 
 3. **Report to the user:**
    - Verification summary (which phases passed/failed)

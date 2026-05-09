@@ -3,9 +3,9 @@ slug: html-artifacts
 tier: 3
 mode: interactive
 started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-09T17:05:00Z
+last_updated: 2026-05-09T19:14:00Z
 current_phase: execute
-paused_at: 2026-05-09T17:05:00Z
+paused_at: 2026-05-09T19:14:00Z
 paused_reason: compact-pending
 worktree_path: null
 branch: feat/html-artifacts
@@ -16,6 +16,7 @@ notes:
   - "Paused 2026-05-09T13:32Z compact-pending before /spec. Resume via /feature-sdlc --resume after /compact. Next phase: spec (Tier 3, expects /diagram subagent dispatch and reviewer loop). 4 OQs queued for /spec from /wireframes (W3 localStorage scoping, W5 cross-doc affordance bridges, W4 Search ⌘K behavior, plus /msf-req R3 reinforcement)."
   - "Resumed 2026-05-09T13:35Z. Ran /spec → /simulate-spec → /plan in one block. /spec produced 02_spec.md (Tier 3, 21 decisions, Ready for Plan). /simulate-spec produced simulate-spec/2026-05-09-trace.md (28 scenarios; 21 gaps; 14 patches applied to spec; 5 skipped; 2 deferred to OQ-DEFER-1/2 for /complete-dev). /plan produced 03_plan.md (Tier 3; 26 tasks in 5 phases; 5 decisions; 1 review loop with 4 fix findings; FR-coverage 62/62; status=Planned)."
   - "Paused 2026-05-09T17:05Z compact-pending before /execute. Heavy phase (TDD across 26 tasks). Resume via /feature-sdlc --resume after /compact. Next phase: execute. 3 Open Questions in plan: OQ-1 (/complete-dev MD re-author, deferred), OQ-2 (stale .md sidecars, deferred), OQ-3 (T18 per-skill harness shape, resolves during /execute)."
+  - "Resumed 2026-05-09T18:50Z post-compact. Execute Phase 1 progress: T1, T2, T5, T6, T4 all done + committed (5/6). T3 (viewer.js, ≤30KB classic-script with JSDOM TDD across 11 surfaces) remaining; deferred to next post-compact session. Two deviations logged: (a) GFM plugin substituted to non-@joplin upstream because @joplin fork dropped UMD bundles; (b) html-to-md.js needs jsdom at runtime (vendored turndown is browser bundle; @mixmark-io/domino is 7.5MB and not vendorable) — clear-error path + HTML_TO_MD_JSDOM_PATH escape hatch in place. Paused 2026-05-09T19:14Z compact-pending before T3."
 phases:
   - id: setup
     hardness: infra
@@ -94,8 +95,9 @@ phases:
     notes: "Tier 3 plan; 26 tasks in 5 phases; 5 decisions (P1-P5); 1 review loop (4 findings, all Fix); FR-coverage gate clean (62/62); status=Planned. Open Questions: 2 inherited (OQ-1, OQ-2 → /complete-dev pre-2.34.0) + 1 planning (OQ-3 → resolves during /execute T18 harness wiring)."
   - id: execute
     hardness: hard
-    status: pending
+    status: in_progress
     artifact_path: null
+    started_at: 2026-05-09T18:50:00Z
   - id: verify
     hardness: hard
     status: pending

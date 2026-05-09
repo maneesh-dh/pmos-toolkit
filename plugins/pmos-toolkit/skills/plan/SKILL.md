@@ -2,7 +2,7 @@
 name: plan
 description: Create an execution plan from a spec — deep code study, TDD tasks with inline verification, decision logging, risk assessment, and a concrete final verification checklist. Third stage in the requirements -> spec -> plan pipeline. Always full format. Use when the user says "break this into tasks", "create the implementation steps", "how do we implement this", or has a spec ready for task breakdown.
 user-invocable: true
-argument-hint: "<path-to-spec-doc> [--backlog <id>] [--feature <slug>] [--non-interactive | --interactive]"
+argument-hint: "<path-to-spec-doc> [--backlog <id>] [--feature <slug>] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # Implementation Plan Generator
@@ -62,12 +62,14 @@ Use workstream context (loaded by step 3 below) to inform task design — tech s
 
 7. **Acquire `.plan.lock`** (FR-66). Write `{feature_folder}/.plan.lock` with `pid + ISO timestamp + skill_version`. If the file already exists, refuse with a platform-aware error sourced via `_shared/platform-strings.md` citing the existing pid (e.g., `[/plan] Another plan run is in progress (pid=<n>, started <time>). Re-run with --force-lock if you are sure no other plan run is active.`). Release the lock on completion or on any fatal error. The `--force-lock` flag clears a stale lock without prompting.
 
-8. **Back up existing plan** (FR-67). If `{feature_folder}/03_plan.md` exists, copy it to `{feature_folder}/03_plan_pre-cap-abandon_<ISO>.md`. The backup is removed on successful exit; restored to `03_plan.md` on the Cap-Hit Abandon disposition (FR-40).
+8. **Back up existing plan** (FR-67). If `{feature_folder}/03_plan.html` (or legacy `03_plan.md`) exists, copy it to `{feature_folder}/03_plan_pre-cap-abandon_<ISO>.<ext>` preserving the original extension. The backup is removed on successful exit; restored to its original path on the Cap-Hit Abandon disposition (FR-40).
 
-9. **Validate spec frontmatter** (FR-50, FR-50a, E1):
-   - **Spec missing** (FR-50) → refuse with platform-aware error: `No spec found at {feature_folder}/02_spec.md. Run /spec first.`
+9. **Validate spec frontmatter** (FR-50, FR-50a, E1). Locate the spec via `_shared/resolve-input.md` with `phase=spec`, `label="spec"`:
+   - **Spec missing** (FR-50) → resolver raises a platform-aware error with `Run /spec first.` appended.
    - **Frontmatter parse** (FR-50a, *deviation per Decision Log P9*): parse via regex — extract YAML between leading `---` markers, line-by-line `^([a-z_]+):\s*(.*)$`. On a malformed line refuse with: `Spec frontmatter parse error at line N: <observed-token>. Fix YAML syntax and re-run.` (Wording differs from spec FR-50a's `<yaml-lib message>` because skills have no YAML library; refuse-on-malformed behavior is preserved.)
-   - **Missing `tier`** (E1) → refuse with: `Spec at {feature_folder}/02_spec.md missing required tier: frontmatter — re-run /spec to add it.`
+   - **Missing `tier`** (E1) → refuse with: `Spec at {feature_folder}/02_spec.{html,md} missing required tier: frontmatter — re-run /spec to add it.`
+
+10. **Resolve `output_format`** (FR-12). Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. The numbering continues from the /plan addendum above (steps 7-9).
 
 ---
 
@@ -164,7 +166,7 @@ END { emit_pending() }
 3. **Read tier and type from spec frontmatter** (FR-01). Re-use the parse from Phase 0 step 9; set `{tier}` and `{type}` for downstream phases. Tier-N gating in Phase 3 / Phase 4 keys off `{tier}`; per-task TDD precedence (FR-104a) keys off `{type}`.
 <!-- defer-only: ambiguous -->
 4. **Surface simulate-spec findings** (FR-51). Glob `{feature_folder}/02_simulate-spec_*.md`. If a file exists with unresolved findings, run a §8.6 batched `AskUserQuestion` per finding before proceeding — options: **Update spec to address before planning** / **Treat as Open Question in plan** / **Accept as risk** / **Skip — already resolved upstream**.
-5. **Check for an existing plan.** Look for `{feature_folder}/03_plan.md`.
+5. **Check for an existing plan.** Use `_shared/resolve-input.md` with `phase=plan`, `label="prior plan"` to locate either `{feature_folder}/03_plan.html` (preferred) or `{feature_folder}/03_plan.md` (legacy fallback).
    - If found: read it, ask if this is an update or fresh start.
    - If not found: proceed.
 6. **`--fix-from <task-id>` branch** (FR-56, FR-67a, FR-67b, E10). When `--fix-from <task-id>` is passed:
@@ -209,7 +211,7 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 
    **Greenfield substitute** (FR-91, E2). When no signals are observed, do NOT skip the gate — choose a reference system (the closest existing system the planner can cite) and record the choice in Code Study Notes. **Phase 2 gate:** structural choices must be justified against ≥1 reference system; absence of stack signals is not a license to invent.
 
-8. **Peer-plan conflict scan** (FR-54, FR-54a). Glob `{docs_path}/features/*/03_plan.md` (excluding the current feature folder). Filter by frontmatter `status` ∈ {`Draft`, `Planned`, `Executing`}. Grep each peer plan for impacted file paths from step 1. On match, add a Risks-table row + an Open Question.
+8. **Peer-plan conflict scan** (FR-54, FR-54a). Glob `{docs_path}/features/*/03_plan.{html,md}` (excluding the current feature folder). Filter by frontmatter `status` ∈ {`Draft`, `Planned`, `Executing`}. Grep each peer plan for impacted file paths from step 1. On match, add a Risks-table row + an Open Question.
 
 9. **Wireframe coverage** (FR-16, FR-16a). If `{feature_folder}/wireframes/` exists, every `*.html` file under it must be referenced by ≥1 task's `**Wireframe refs:**` field OR listed in a `## Wireframes Out of Scope` subsection of the plan. **Vestigial wireframes** (FR-16a): when no UI signal is detected (no UI tasks in the spec) but the wireframes folder exists, auto-emit `## Wireframes Out of Scope` with all wireframes listed.
 
@@ -224,7 +226,21 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 
 ## Phase 3: Write the Plan
 
-Save to `{feature_folder}/03_plan.md`. Overwrite if it already exists.
+Save to `{feature_folder}/03_plan.html` per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`. Overwrite if it already exists.
+
+**Atomic write (FR-10.2):** write `03_plan.html` and the companion `03_plan.sections.json` via temp-then-rename — never serve a half-written file.
+
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically without per-skill prose updates. Idempotent — `cp -n` (no-clobber) or `rsync --update` skips identical files.
+
+**Asset prefix (FR-10.1):** the per-folder relative asset prefix for top-level feature-folder artifacts is `assets/`.
+
+**Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML (substrate `template.html` already does this for the loader pair; skill-emitted inline `<link>` / `<script>` references must follow suit).
+
+**Heading IDs (FR-03.1):** every `<h2>` and `<h3>` MUST carry a stable kebab-case `id`. Compute via `_shared/html-authoring/conventions.md` §3 — lowercase, replace non-alphanumeric runs with `-`, trim, dedupe collisions with `-2`/`-3`/... suffixes. Stable IDs let cross-doc anchors (`02_spec.html#fr-10`, `03_plan.html#t8`) resolve deterministically across regenerations. `assert_heading_ids.sh` (T22) blocks any artifact missing an id.
+
+**Index regeneration (FR-22, §9.1):** after the artifact write completes, regenerate `{feature_folder}/index.html` by inlining the manifest per `_shared/html-authoring/index-generator.md` (no on-disk `_index.json` is written; the manifest is inlined as `<script type="application/json" id="pmos-index">`, FR-41).
+
+**Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `03_plan.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js 03_plan.html > 03_plan.md`. The MD sidecar is read-only — never the source of truth (FR-33).
 
 ### Tier Gates (Phase 3 emission rules per `{tier}` from Phase 1)
 
@@ -251,7 +267,7 @@ The plan must be executable by a developer with the codebase open but no prior c
 
 ### Glossary inheritance (FR-102)
 
-The plan inherits its glossary from the spec via citation (`see 02_spec.md §X for glossary`); the plan introduces no new domain terms not already in the spec. Phase 4 review check: a novel domain term is a finding — low-risk if a re-word fits existing vocabulary; high-risk if the concept is genuinely new (route through spec, halt).
+The plan inherits its glossary from the spec via citation (`see 02_spec.{html,md} §X for glossary`); the plan introduces no new domain terms not already in the spec. Phase 4 review check: a novel domain term is a finding — low-risk if a re-word fits existing vocabulary; high-risk if the concept is genuinely new (route through spec, halt).
 
 ### Tests are illustrative (FR-103)
 
@@ -264,7 +280,7 @@ Plan-emitted tests are illustrative reference shape, not literal. /execute may a
 tier: 1|2|3
 type: bugfix|enhancement|feature
 feature: <slug>
-spec_ref: 02_spec.md
+spec_ref: 02_spec.{html,md}
 requirements_ref: ../requirements/01_requirements.md
 date: YYYY-MM-DD
 status: Draft
@@ -306,7 +322,7 @@ contract_version: 1
 
 ## Code Study Notes
 
-> Glossary inherited from spec — see 02_spec.md for domain terminology. The plan introduces no new domain terms.
+> Glossary inherited from spec — see 02_spec.{html,md} for domain terminology. The plan introduces no new domain terms.
 
 ### Patterns to follow
 
@@ -380,7 +396,7 @@ File-action verbs (FR-24): `Create`, `Modify`, `Delete`, `Move`, `Rename`, `Test
 ### T1: [Task Name]
 
 **Goal:** [One sentence]
-**Spec refs:** [Which spec sections/FR-IDs this implements; for spec headings cite `02_spec.md#kebab-anchor` per FR-31]
+**Spec refs:** [Which spec sections/FR-IDs this implements; for spec headings cite `02_spec.html#kebab-anchor` per FR-31 (or `02_spec.md#kebab-anchor` against legacy MD-primary specs)]
 **Wireframe refs:** [If wireframes exist and this task touches UI: which screens (e.g., `wireframes/01_dashboard.html`). Omit field for non-UI tasks.]
 
 **Depends on:** [Task IDs (e.g., `T2, T3`) or `none`]
@@ -583,7 +599,7 @@ After writing the initial plan, run iterative review loops with a **hard cap of 
 - **Accept and proceed** — fold remaining findings into Open Questions, ship the plan as-is.
 - **Abandon** — restore the pre-cap-abandon backup (FR-67), exit with no plan written.
 
-**Cap-hit non-interactive (FR-40a):** auto **Accept and proceed**, AND insert a `## Convergence Warning` section at the **TOP of `03_plan.md` body** (NOT in a sidecar — visibility to /verify and humans is the priority). The warning lists the open findings the cap dropped.
+**Cap-hit non-interactive (FR-40a):** auto **Accept and proceed**, AND insert a `## Convergence Warning` section at the **TOP of the `03_plan.{html,md}` body** (NOT in a sidecar — visibility to /verify and humans is the priority). The warning lists the open findings the cap dropped.
 
 ### Auto-classification of findings (FR-41, FR-41a, FR-41b)
 
@@ -636,9 +652,9 @@ Detailed loop-by-loop findings live in a sidecar file `{feature_folder}/03_plan_
 
 ### Broken-ref and drift checks (FR-31a, FR-31b)
 
-**Broken-ref hard-fail (FR-31a):** Phase 4 hard-fails the loop if any task's `**Spec refs:**` cites a `02_spec.md#anchor` that does not resolve. Run an awk / grep extraction of `^## .* {#kebab}` and `^### .* {#kebab}` from the spec; cross-reference each `02_spec.md#anchor` cited in the plan; surface each unresolved anchor as a high-risk finding.
+**Broken-ref hard-fail (FR-31a):** Phase 4 hard-fails the loop if any task's `**Spec refs:**` cites a `02_spec.{html,md}#anchor` that does not resolve. For HTML primary, extract `<h[23][^>]*\sid="([^"]+)"`; for legacy MD, extract `^## .* {#kebab}` and `^### .* {#kebab}`. Cross-reference each `02_spec.{html,md}#anchor` cited in the plan; surface each unresolved anchor as a high-risk finding.
 
-**Drift detection (FR-31b):** Phase 4 detects spec-doc drift. Compute `sha256` of the spec frontmatter `date` + section count; compare to a stored value in `03_plan.md` frontmatter (`spec_hash` extension key). On drift, emit a high-risk finding `Spec has changed since plan was generated. Re-run /plan or accept divergence as a Decision Log entry.`
+**Drift detection (FR-31b):** Phase 4 detects spec-doc drift. Compute `sha256` of the spec frontmatter `date` + section count; compare to a stored value in `03_plan.{html,md}` frontmatter (`spec_hash` extension key). On drift, emit a high-risk finding `Spec has changed since plan was generated. Re-run /plan or accept divergence as a Decision Log entry.`
 
 ### Two Types of Review
 
@@ -719,7 +735,7 @@ Phase 5 in /plan v1 ran a separate "Final Review" pass *outside* the loop discip
 
 /plan v2 supports four operational modes. Mode is auto-detected from CLI flags + existing-plan state:
 
-- **Fresh** — no existing `03_plan.md`. Generate from scratch.
+- **Fresh** — no existing `03_plan.{html,md}`. Generate from scratch.
 - **Edit (FR-60)** — `--edit` flag OR `--fix-from <task-id>`. Re-write a bounded scope (single task or task-range); preserve untouched tasks verbatim including their step bodies.
 - **Replan (FR-60)** — `--replan` flag. Discard existing tasks; preserve Decision Log + Risks unless `--reset-decisions` is also passed. Skip List preserved per FR-43b.
 - **Append (FR-60a)** — `--append` flag. Add new tasks at the bottom (TN+1, TN+2, …) without renumbering existing tasks. Existing TN moves to be the last new task; the old TN is renamed to its task-number identity. Useful for spec amendments mid-execution.
@@ -758,7 +774,7 @@ After the plan is written and reviewed:
 **Commit:**
 
 ```
-git add {feature_folder}/03_plan.md {feature_folder}/03_plan_review.md {feature_folder}/03_plan_skip-list.md
+git add {feature_folder}/03_plan.html {feature_folder}/03_plan.sections.json {feature_folder}/03_plan.md {feature_folder}/03_plan_review.md {feature_folder}/03_plan_skip-list.md {feature_folder}/index.html {feature_folder}/assets
 git commit -m "docs: add implementation plan for <feature>"
 ```
 
@@ -772,7 +788,7 @@ git commit -m "docs: add implementation plan for <feature>"
 - Open risks flagged
 - Sidecar paths if non-empty (`03_plan_review.md`, `03_plan_skip-list.md`, `03_plan_auto.md`, `03_plan_blocked.md`)
 
-**/backlog write-back:** if the plan was generated with `--backlog <id>`, set the backlog item's status to `planned` and write `plan: <feature_folder>/03_plan.md` per `backlog/pipeline-bridge.md` (the bridge contract owns the write-back, /plan invokes it).
+**/backlog write-back:** if the plan was generated with `--backlog <id>`, set the backlog item's status to `planned` and write `plan: <feature_folder>/03_plan.{html,md}` (whichever was the primary write) per `backlog/pipeline-bridge.md` (the bridge contract owns the write-back, /plan invokes it).
 
 **Closing offer (platform-aware via `_shared/platform-strings.md`):** read `execute_invocation` for the active platform and emit the offer with that string substituted. e.g.,
 

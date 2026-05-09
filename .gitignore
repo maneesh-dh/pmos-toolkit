@@ -9,3 +9,6 @@ __pycache__/
 
 # pmos-toolkit per-repo session pointer
 .pmos/current-feature
+
+# Playwright MCP scratch artifacts (snapshots/console logs from /verify runs)
+.playwright-mcp/

@@ -1,0 +1,40 @@
+=== 2a viewer JSDOM unit tests ===
+  ok  file:// protocol renders fallback banner (FR-40)
+  ok  sessionStorage failure falls through to in-memory state (FR-26)
+  ok  legacy-md shim renders <pre class="pmos-legacy-md"> (FR-22)
+
+3 passed, 0 failed
+
+=== 2b viewer.js size + ESM guard ===
+   12984 plugins/pmos-toolkit/skills/_shared/html-authoring/assets/viewer.js
+0
+
+=== 2c style.css size (FR-04 ≤30KB) ===
+   14175 plugins/pmos-toolkit/skills/_shared/html-authoring/assets/style.css
+
+=== 2d html-to-md.js LOC (FR-12.1 ≤100) + self-test ===
+      96 plugins/pmos-toolkit/skills/_shared/html-authoring/assets/html-to-md.js
+# Hi
+
+Body
+=== 2e serve.js MIME map + port fallback (FR-06) ===
+
+=== 2f GFM table round-trip via html-to-md (FR-12.1) ===
+| A | B |
+| --- | --- |
+| 1 | 2 |
+=== 2e serve.js MIME map (FR-06, retry with absolute paths) ===
+serve.js bound on port=8765
+[template.html] HTTP/1.1 200 OK
+Content-Type: text/html; charset=utf-8
+[assets/style.css] HTTP/1.1 200 OK
+Content-Type: text/css; charset=utf-8
+[assets/viewer.js] HTTP/1.1 200 OK
+Content-Type: text/javascript; charset=utf-8
+[assets/turndown.umd.js] HTTP/1.1 200 OK
+Content-Type: text/javascript; charset=utf-8
+[assets/serve.js] HTTP/1.1 200 OK
+Content-Type: text/javascript; charset=utf-8
+=== port-fallback (start two simultaneously) ===
+instance 1: 
+instance 2: 

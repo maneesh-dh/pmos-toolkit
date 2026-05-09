@@ -3,10 +3,10 @@ slug: html-artifacts
 tier: 3
 mode: interactive
 started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-09T19:58:00Z
+last_updated: 2026-05-09T20:40:00Z
 current_phase: execute
-paused_at: 2026-05-09T19:58:00Z
-paused_reason: compact-pending-phase-2-5-boundary
+paused_at: 2026-05-09T20:40:00Z
+paused_reason: compact-pending-post-verify-phase-1
 worktree_path: null
 branch: feat/html-artifacts
 feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
@@ -18,6 +18,7 @@ notes:
   - "Paused 2026-05-09T17:05Z compact-pending before /execute. Heavy phase (TDD across 26 tasks). Resume via /feature-sdlc --resume after /compact. Next phase: execute. 3 Open Questions in plan: OQ-1 (/complete-dev MD re-author, deferred), OQ-2 (stale .md sidecars, deferred), OQ-3 (T18 per-skill harness shape, resolves during /execute)."
   - "Resumed 2026-05-09T18:50Z post-compact. Execute Phase 1 progress: T1, T2, T5, T6, T4 all done + committed (5/6). T3 (viewer.js, ≤30KB classic-script with JSDOM TDD across 11 surfaces) remaining; deferred to next post-compact session. Two deviations logged: (a) GFM plugin substituted to non-@joplin upstream because @joplin fork dropped UMD bundles; (b) html-to-md.js needs jsdom at runtime (vendored turndown is browser bundle; @mixmark-io/domino is 7.5MB and not vendorable) — clear-error path + HTML_TO_MD_JSDOM_PATH escape hatch in place. Paused 2026-05-09T19:14Z compact-pending before T3."
   - "Resumed 2026-05-09T19:30Z post-compact. T3 complete: viewer.js authored (12984 bytes, ≤30720 budget); 11 surfaces; 3 JSDOM tests pass (file:// fallback FR-40, sessionStorage fallback FR-26, legacy-md shim FR-22); 0 ES module patterns (FR-05.1). Test bootstrap reuses T6 HTML_TO_MD_JSDOM_PATH escape hatch + /tmp/pmos-jsdom-boot auto-install. Phase 1 (T1–T6) now COMPLETE. Phase 2.5 boundary check next: invoke /verify --scope phase --feature 2026-05-09_html-artifacts --phase 1, OR pause for /compact (heavy phase boundary), OR continue to Phase 2 with --no-halt. Awaiting user choice."
+  - "/verify --scope phase 1 PASSED at 2026-05-09T20:35Z. 4 review-gate fixes landed: (1) serve.js safeJoin path-traversal (URL-encoded %2E%2E leaked sibling-dir content; conf 88, empirically reproduced + regression-tested); (2) style.css fallback-banner class rename (.pmos-file-fallback-banner → .pmos-fallback-banner; conf 90; banner was shipping unstyled); (3) viewer.js artifactSlug now prefers manifest.id over path-derived kebab (conf 80; spec §9.1 alignment); (4) slugify → artifactSlug rename to disambiguate from conventions.md §3 heading-id rule (conf 75). New regression test files: tests/scripts/serve.test.js + assert_serve_js_unit.sh. viewer test count: 3 → 4. All verify evidence at docs/pmos/features/2026-05-09_html-artifacts/verify/2026-05-09-phase-1/. 12 FRs Verified, 3 NA-alt-evidence, 0 Unverified. Pausing for /compact before Phase 2 (T7–T11)."
 phases:
   - id: setup
     hardness: infra
@@ -99,7 +100,7 @@ phases:
     status: in_progress
     artifact_path: null
     started_at: 2026-05-09T18:50:00Z
-    notes: "Phase 1 (T1–T6) complete; T3 closed at 2026-05-09T19:55Z. Phase 2.5 boundary pending: /verify --scope phase 1."
+    notes: "Phase 1 (T1–T6) complete + verified via /verify --scope phase 1 (passed, 4 review-gate fixes). Evidence: docs/pmos/features/2026-05-09_html-artifacts/verify/2026-05-09-phase-1/review.md. Phase 2 (T7–T11) next."
   - id: verify
     hardness: hard
     status: pending

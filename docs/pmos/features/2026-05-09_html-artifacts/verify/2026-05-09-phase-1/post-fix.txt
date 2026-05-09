@@ -1,0 +1,22 @@
+=== viewer.test.js (4 tests, +artifactSlug) ===
+  ok  file:// protocol renders fallback banner (FR-40)
+  ok  sessionStorage failure falls through to in-memory state (FR-26)
+  ok  legacy-md shim renders <pre class="pmos-legacy-md"> (FR-22)
+  ok  artifactSlug prefers manifest.id over derived path slug
+
+4 passed, 0 failed
+exit=0
+
+=== serve.test.js (4 tests, path-traversal regression) ===
+Error: No free port in range 0..9
+    at start (/Users/maneeshdhabria/Desktop/Projects/agent-skills/plugins/pmos-toolkit/skills/_shared/html-authoring/assets/serve.js:116:21)
+    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+    at async /Users/maneeshdhabria/Desktop/Projects/agent-skills/tests/scripts/serve.test.js:42:18
+exit=2
+
+=== viewer.js size + ESM (post-fix) ===
+   13393 plugins/pmos-toolkit/skills/_shared/html-authoring/assets/viewer.js
+0
+
+=== style.css size (post-fix) ===
+   14155 plugins/pmos-toolkit/skills/_shared/html-authoring/assets/style.css

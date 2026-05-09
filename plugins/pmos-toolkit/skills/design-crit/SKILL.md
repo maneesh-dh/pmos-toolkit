@@ -2,7 +2,7 @@
 name: design-crit
 description: Critique an existing application, wireframes, or prototype on overall user experience — identifies journeys, captures flow screenshots via packaged Playwright script, evaluates against a Nielsen + WCAG 2.2 + visual-hierarchy + Gestalt + journey-friction rubric, then runs a PSYCH/MSF pass and synthesises prioritized UX recommendations. Standalone utility — does not require the requirements→spec→plan pipeline. Use when the user says "critique this UI", "design review", "audit this app", "UX review", "review the wireframes", "evaluate this prototype", "what's wrong with this UX", or provides a URL/HTML files and asks for a design crit.
 user-invocable: true
-argument-hint: "<URL or path-to-wireframes-folder or path-to-prototype-folder> [--feature <slug>] [--journeys <id1,id2>] [--storage-state <path>] [--out <dir>] [--non-interactive | --interactive]"
+argument-hint: "<URL or path-to-wireframes-folder or path-to-prototype-folder> [--feature <slug>] [--journeys <id1,id2>] [--storage-state <path>] [--out <dir>] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # Design Crit
@@ -52,6 +52,10 @@ Fallback when no workstream is linked: write to `./docs/{YYYY-MM-DD}_{feature_sl
 
 <!-- defer-only: ambiguous -->
 If `--feature <slug>` is not provided, propose a slug from the source (URL hostname or folder name) and confirm with the user via `AskUserQuestion`.
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+**Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. Controls the format of all four artifacts written under `{out_dir}/`: `source.{ext}`, `journeys.{ext}`, `psych-msf.{ext}`, and the main `design-crit.{ext}` recommendations report. The `eval-findings-review.md` platform-fallback artifact (Phase 4) is read-back-and-edited by the user, so it stays MD regardless of `output_format`.
 
 ---
 
@@ -154,7 +158,7 @@ Validate access:
 - **URL mode:** `curl -sSI <url> | head -1` to confirm reachability. If 401/403, ask the user via `AskUserQuestion` for auth method (storage-state JSON / basic-auth / cookies). If unreachable, abort with a clear message.
 - **HTML mode:** confirm the folder exists and contains at least one HTML file. List the discovered files for the user.
 
-Save what you found to `{out_dir}/source.md`:
+Save what you found to `{out_dir}/source.{ext}` (extension follows `output_format`: `.html` when html/both, `.md` when md):
 
 ```markdown
 # Source
@@ -174,7 +178,7 @@ Identify candidate user journeys to critique. The strategy depends on source typ
 
 Run an exploratory crawl with `assets/capture.mjs --mode crawl --depth 1 --max 20` against the entry URL. Inspect the resulting `manifest.json` and dump the page titles + URL paths. If at least 5 distinct routes were captured AND no auth wall was hit, propose 3-5 candidate journeys grouped by intent (e.g., "browse → detail → action", "auth → onboarding → first task").
 
-If the crawl returns < 5 routes, hits a redirect loop to a login page, or lands on a single-page app where everything routes through `/`, **fall back** to asking the user to describe journeys plus any auth steps in plain language. Capture their description in `{out_dir}/journeys.md`.
+If the crawl returns < 5 routes, hits a redirect loop to a login page, or lands on a single-page app where everything routes through `/`, **fall back** to asking the user to describe journeys plus any auth steps in plain language. Capture their description in `{out_dir}/journeys.{ext}`.
 
 ### 2b. Wireframes / prototype mode — read the artifact
 
@@ -203,7 +207,7 @@ If `--journeys <id1,id2>` was passed, skip the question and use those.
 
 For each selected journey, define the step-by-step click path (URL or selector per step). For URL mode this becomes a journey-config JSON consumed by the capture script in Phase 3; for HTML mode it's just the ordered list of files.
 
-Save to `{out_dir}/journeys.md` with one section per chosen journey, including step path and entry context (cold visitor / signed-in user / error recovering).
+Save to `{out_dir}/journeys.{ext}` with one section per chosen journey, including step path and entry context (cold visitor / signed-in user / error recovering).
 
 ---
 
@@ -232,7 +236,7 @@ Repeat per device variant if multi-device crit is requested (default: desktop on
 ```
 node {skill_dir}/assets/capture.mjs \
   --mode files \
-  --files <comma-separated absolute paths from journeys.md> \
+  --files <comma-separated absolute paths from journeys.{html,md}> \
   --out {out_dir}/screenshots \
   --viewport 1440x900
 ```
@@ -317,13 +321,27 @@ For each journey, score on a 1-5 scale:
 - **Satisfaction** — does the journey deliver a clear payoff, with confirmation moments?
 - **Friction** — interaction (clicks/keystrokes), cognitive (decisions/jargon), emotional (interruptions/mode switches). Quote the click/keystroke totals from Phase 4's per-journey pass.
 
-Save both passes to `{out_dir}/psych-msf.md`. Apply Phase 4a's Findings Presentation Protocol to any "Watch", "Cliff", or score ≤ 2 finding.
+Save both passes to `{out_dir}/psych-msf.{ext}` (extension follows `output_format`). Apply Phase 4a's Findings Presentation Protocol to any "Watch", "Cliff", or score ≤ 2 finding.
 
 ---
 
 ## Phase 6: Synthesise the recommendations report
 
-Write `{out_dir}/design-crit.md` — the single-source report. Keep it concise; recommendations are the deliverable, raw findings are appendices.
+Write `{out_dir}/design-crit.html` per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/` — the single-source report. Keep it concise; recommendations are the deliverable, raw findings are appendices.
+
+**Atomic write (FR-10.2):** write `design-crit.html` and the companion `design-crit.sections.json` via temp-then-rename — never serve a half-written file.
+
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{out_dir}/assets/` (or `{feature_folder}/assets/` if `{out_dir}` resolves under a pipeline feature folder, sharing the substrate with sibling artifacts) if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
+
+**Asset prefix (FR-10.1):** when `{out_dir}` is a top-level feature-folder write, `assets/`; when nested under a feature folder (`{feature_folder}/design-crit/`), `../assets/`.
+
+**Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML.
+
+**Heading IDs (FR-03.1, enforced by `/verify`):** every `<h2>` and `<h3>` carries a stable kebab-case `id` per `_shared/html-authoring/conventions.md` §3.
+
+**Index regeneration (FR-22, §9.1):** when `{out_dir}` is a sub-folder of a pipeline feature folder, regenerate `{feature_folder}/index.html` via `_shared/html-authoring/index-generator.md` (manifest inlined as `<script type="application/json" id="pmos-index">`, no on-disk `_index.json`, FR-41). Standalone `--out` invocations outside the pipeline do NOT regenerate an index.
+
+**Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `design-crit.md` by piping the freshly-written HTML through `bash node {out_dir}/assets/html-to-md.js design-crit.html > design-crit.md`. The MD sidecar is read-only (FR-33).
 
 Structure:
 
@@ -365,7 +383,7 @@ Findings the user chose to defer; logged for future review.
 
 ## Appendix A — PSYCH journey scores
 
-(Tables from psych-msf.md)
+(Tables from psych-msf.{html,md})
 
 ## Appendix B — Raw findings
 

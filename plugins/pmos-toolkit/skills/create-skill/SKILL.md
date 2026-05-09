@@ -216,6 +216,14 @@ If `/grill` is unavailable, fall back to the platform-adaptation note (skip with
 
 ## Phase 7: Implement against the spec
 
+**Precondition: canonical-path enforcement.** Before writing any file, resolve the target path. The new skill MUST be written to `plugins/pmos-toolkit/skills/<skill-name>/SKILL.md` (per Convention 1). If the target resolves anywhere else (root `skills/`, under another plugin, in a feature folder), HALT and `AskUserQuestion`:
+
+- **Use canonical path** (Recommended) — rewrite target to `plugins/pmos-toolkit/skills/<skill-name>/` and continue.
+- **Override (accept-as-risk)** — proceed with the non-canonical path; the skill will not be picked up by the plugin manifest until manually relocated. Log a warning in the spec under §14.
+- **Abort** — stop /create-skill; user fixes the path themselves.
+
+Default Recommended. This precondition prevents the silent failure where a freshly created skill is invisible to the loader. The repo-root `CLAUDE.md` carries the same canonical-path invariant so manual moves/copies/renames are caught by Claude reading the rule on every session.
+
 This is where the actual SKILL.md, `reference/`, and `assets/` get written. Apply the **Conventions** section below as the implementation reference. If a plan was produced in Phase 6, implement against it; the plan is the source of truth, the spec is its parent. Every spec section maps to a part of SKILL.md:
 
 | Spec section | SKILL.md location |
@@ -255,10 +263,33 @@ For Tier 1 (no spec): use the Phase 3 interview answers directly as the implemen
    | plan | … | … | … |
    | implement | … | … | … |
    | verify | … | … | … |
+   | complete-dev | pending/completed/skipped/deferred | <branch or n/a> | <YYYY-MM-DD> |
 
 ---
 
-## Phase 9: Capture Learnings
+## Phase 9: Release via /complete-dev
+
+**Skip this phase if Phase 8 /verify did not reach `verified` status** — the user must resolve blocker findings first and re-run /verify before release.
+
+`AskUserQuestion`:
+
+```
+question: "/verify passed. Run /complete-dev now to merge, version-bump, deploy, and push?"
+options:
+  - Run /complete-dev now (Recommended)
+  - Batch with other work — I'll run /complete-dev later
+  - Skip — release manually outside this skill
+```
+
+- **Run now** → invoke `/pmos-toolkit:complete-dev` inline. On success, update the Phase 8 pipeline-status row for `complete-dev` to `completed`. On failure, leave the row at `failed` and surface the failure to the user; /create-skill itself does not retry.
+- **Batch** → mark `complete-dev` row `deferred` with note "user batching"; exit clean. The user runs /complete-dev manually when ready.
+- **Skip** → mark `complete-dev` row `skipped`; exit clean.
+
+This phase makes the `…→/verify→/complete-dev` pipeline edge real instead of aspirational. /create-skill becomes the canonical end-to-end skill-creation entry point.
+
+---
+
+## Phase 10: Capture Learnings
 
 **This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Reflect on whether this session surfaced anything worth capturing about `/create-skill` itself — tiering signals that misfired, spec sections that were chronically empty, grill questions that should be added to the default prompt. Proposing zero learnings is a valid outcome.
 
@@ -276,7 +307,7 @@ The `pmos-toolkit` plugin manifest at `plugins/pmos-toolkit/.claude-plugin/plugi
 ~/Desktop/Projects/agent-skills/plugins/pmos-toolkit/skills/<skill-name>/SKILL.md
 ```
 
-**Save new skills here.** Anywhere else (root `skills/`, anywhere under `plugins/<other-plugin>/`) will not be picked up by `pmos-toolkit` and will be flagged for relocation by `/push` Phase 1a.
+**Save new skills here.** Anywhere else (root `skills/`, anywhere under `plugins/<other-plugin>/`) will not be picked up by `pmos-toolkit` and should be relocated before invoking `/complete-dev`.
 
 The `<skill-name>` directory should be lowercase, hyphenated (e.g., `create-skill`, `msf`, `verify`). Check for name collisions:
 
@@ -347,7 +378,7 @@ See the `requirements`, `spec`, `plan`, and `simulate-spec` skills for reference
 The `description:` field in frontmatter must include:
 
 1. **What it does** (1 sentence)
-2. **Pipeline position** if it fits in the requirements→spec→plan→execute→verify pipeline
+2. **Pipeline position** if it fits in the requirements→spec→plan→execute→verify→complete-dev pipeline
 3. **Natural trigger phrases** — common things users say that should invoke this skill
 
 Example of a good description:
@@ -364,7 +395,7 @@ The trigger phrases matter because skill descriptions are how the agent decides 
 If the new skill fits into the existing pipeline, include the full pipeline diagram:
 
 ```markdown
-/requirements  →  [/msf-req, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify
+/requirements  →  [/msf-req, /creativity]  →  /spec  →  /plan  →  /execute  →  /verify  →  /complete-dev
                    optional enhancers
 ```
 

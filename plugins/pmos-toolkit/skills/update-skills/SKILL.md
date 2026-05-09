@@ -1,6 +1,6 @@
 ---
 name: update-skills
-description: Ingest feedback (raw text or /retro paste-back), summarize and critique proposed changes per affected pmos-toolkit skill, get user approval on the keep/drop set, then run the requirements -> spec -> plan -> execute -> verify pipeline (auto-tiered per skill) sequentially. Optional pipeline enhancer / orchestrator. Use when the user says "update these skills based on feedback", "process this retro output", "fix the issues from /retro", "run the pipeline on this skill feedback", "turn this feedback into changes", or pastes retro/feedback text and wants the updates implemented end-to-end.
+description: Ingest feedback (raw text or /retro paste-back), summarize and critique proposed changes per affected pmos-toolkit skill, get user approval on the keep/drop set, then run the requirements -> spec -> plan -> execute -> verify -> complete-dev pipeline (auto-tiered per skill, with /complete-dev invoked once for the batch) sequentially. Optional pipeline enhancer / orchestrator. Use when the user says "update these skills based on feedback", "process this retro output", "fix the issues from /retro", "run the pipeline on this skill feedback", "turn this feedback into changes", or pastes retro/feedback text and wants the updates implemented end-to-end.
 user-invocable: true
 argument-hint: "<feedback text | path to feedback file | path to existing triage doc> [--from-retro] [--skill <name>] [--non-interactive | --interactive]"
 ---
@@ -14,7 +14,7 @@ Take feedback about pmos-toolkit skills (free-form text or `/retro` paste-back),
 ## Pipeline position
 
 ```
-/retro  ->  /update-skills (this skill)  ->  /requirements -> /spec -> [/grill] -> /plan -> /execute -> /verify
+/retro  ->  /update-skills (this skill)  ->  /requirements -> /spec -> [/grill] -> /plan -> /execute -> /verify -> /complete-dev
                                               (per affected skill, sequential)
 ```
 
@@ -228,7 +228,9 @@ For each skill group, in order, invoke the pipeline:
 5. **`/execute`**.
 6. **`/verify`** — non-skippable per skill, regardless of how clean `/execute` looked.
 
-After **each phase**, `Edit` the pipeline-status table row for this skill: `phase | status (pending|in-progress|completed|failed) | artifact path | timestamp`.
+After all skill groups have passed `/verify`, run **`/complete-dev`** ONCE for the batch (not per-skill — version bump, changelog, deploy, and push are once-per-batch operations). If any skill failed `/verify`, prompt the user before invoking `/complete-dev` so failed skills can be excluded or retried first.
+
+After **each phase**, `Edit` the pipeline-status table row for this skill: `phase | status (pending|in-progress|completed|failed) | artifact path | timestamp`. Add a final batch-level row for `/complete-dev`.
 
 <!-- defer-only: ambiguous -->
 **On any failure**, halt and `AskUserQuestion`:
@@ -256,10 +258,10 @@ Per-skill feature folders: <list of paths>
 
 ## Release prerequisites
 
-(Surfaced here per Convention 13 so the next `/push` is not surprising.)
+(Surfaced here per Convention 13 so the next `/complete-dev` is not surprising.)
 
 - README row added under **Pipeline enhancers**; standalone line updated.
-- Next `/push` will require a **minor** version bump in BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json` (versions must stay in sync — pre-push hook enforces).
+- Next `/complete-dev` will require a **minor** version bump in BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json` (versions must stay in sync — pre-push hook enforces).
 - No new schemas, no learnings-file scaffolding, no plugin-manifest array changes required.
 
 ## Anti-Patterns

@@ -43,7 +43,7 @@ Two converging triggers. **Trigger 1:** the user attempted to take a `/spec` out
 - **Skills generate HTML directly,** authoring semantic structure, inline SVG diagrams, embedded images, structured tables, and anchored cross-references — not by post-converting markdown — measured by: zero "md→html converter" code paths in the affected skills.
 - **Every feature folder ships with a unified, navigable viewer** (`index.html`) that shows all artifacts including nested wireframes/prototype/grill outputs in one place — measured by: opening `index.html` reveals every artifact in the folder via a sidebar TOC.
 - **Markdown remains available for clipboard/export** but only as a **derived** format from the HTML source — measured by: a "Copy Markdown" button per doc in the viewer that produces clean, structured markdown on demand.
-- **Reviewer subagents parse HTML by stable structural anchors** (`data-section` attributes), not by heading regex — measured by: zero `^##` regex extractors in reviewer prompts post-migration.
+- **Reviewer subagents read HTML semantically** (the LLM is the parser; receive HTML wholesale, no DOM extraction or regex) — measured by: zero `^##` regex extractors AND zero `jsdom`/DOM-querying code paths in reviewer prompts post-migration.
 - **Output format is configurable** via `.pmos/settings.yaml :: output_format` ∈ `{html, both}` (default `html`) and per-invocation `--format` flag.
 
 ### Non-Goals
@@ -83,7 +83,7 @@ Two converging triggers. **Trigger 1:** the user attempted to take a `/spec` out
 | "I don't know how to author HTML inside a skill prompt" — skill author worries about whether the LLM can generate good HTML | Skills' authoring instructions are markdown-shaped today; rewriting them is the bulk of the work | Shared `_shared/html-authoring/` contract with a base template, structural-attribute conventions, and a per-skill section taxonomy — so skill prompts say "fill in the `<section data-section="problem">` block" rather than "design HTML from scratch" |
 | "I can't see the artifacts because nothing renders my HTML" — reader opens `01_requirements.html` directly in the file system and sees raw markup or unstyled output | Browsers render HTML but local CSS/JS may be blocked under `file://`; nested artifacts need the parent's CSS | Index viewer + `node serve.js` (zero-deps `http.createServer`) — already the pattern from `/wireframes` and `/prototype`. Print the URL clearly at end of every artifact-write phase. |
 | "I want the markdown for clipboard / chatops / pastebin" — reader has HTML but downstream tooling expects markdown | HTML is the source of truth post-migration | "Copy Markdown" button in the viewer, runs html→md client-side at click time. Always-fresh, no sidecar files to keep in sync. |
-| "Reviewer subagents miss findings because they can't find a section" — heading regex breaks silently when author uses a different level | Markdown's structural anchors are heuristic, not contractual | `data-section="<slug>"` attributes are part of the authoring contract; reviewer prompts query by attribute, not by heading text |
+| "Reviewer subagents miss findings because they can't find a section" — heading regex breaks silently when author uses a different level | Markdown's structural anchors are heuristic, not contractual | Reviewers read HTML wholesale and rely on the LLM to find sections semantically (the same way LLMs already read MD). HTML's natural semantics (`<section>`, `<h2>`, etc.) are richer than markdown's heading hierarchy, so semantic extraction is more robust, not less. |
 | "I write a doc, then re-run the skill, and now my pretty HTML is gone" — overwrite without snapshot | All affected skills today snapshot-commit before rewrite for the markdown case (per `/requirements` Phase 4 pre-write safety) | Same snapshot-commit guard applies to HTML; the safety doesn't depend on file format |
 | "/diagram doesn't compose into another skill cleanly" — diagrams need to land mid-document, but `/diagram` is currently a user-invokable standalone | `/diagram` was designed for direct user invocation, not as a callable from another skill's prompt | Open question (D2 below) — resolve in `/grill`. Fallback path: skills inline SVG directly in the prompt when `/diagram` proves uncallable. |
 
@@ -91,26 +91,26 @@ Two converging triggers. **Trigger 1:** the user attempted to take a `/spec` out
 
 - The user opens `index.html` for a finished feature folder, sees every artifact in one TOC, and shares the folder via screenshot or `serve.js` URL without needing to assemble anything.
 - The user reads a `/spec` output and the architecture diagram is **actually a diagram**, not ASCII boxes.
-- A reviewer subagent's findings cite section anchors (`data-section="error-handling"`) that the user can click and jump to.
+- A reviewer subagent's findings cite section names that match what the artifact author wrote, and link to in-doc anchors (`#error-handling`) the user can click to jump to.
 - The user doesn't think about format at all — `output_format: html` is the default, the doc is HTML, the viewer just works.
 
 ---
 
 ## Solution Direction
 
-Five components, sequenced so reviewer migration ships in lockstep with artifact format:
+Six components, sequenced so reviewer migration ships in lockstep with artifact format:
 
 ### 1. Shared HTML authoring contract — `plugins/pmos-toolkit/skills/_shared/html-authoring/`
 
 A new shared directory containing:
 
-- **Base HTML template** — head, link to shared CSS, optional script tag for the viewer's JS hooks.
-- **Structural-attribute convention** — every major content block carries `data-section="<slug>"`. Slugs are stable (defined per skill in a shared taxonomy file) and referenced by both the index sidebar generator and reviewer subagents.
-- **Diagram convention** — when a skill identifies a diagram-worthy moment, it inlines an SVG inside `<figure data-section="diagram-<slug>">`. The SVG source is one of: (a) returned from a `/diagram` call (preferred, if callable; see D2); (b) authored inline by the skill prompt (fallback).
-- **Image / asset handling** — skills write image and SVG sidecars to `{feature_folder}/assets/`; HTML references them with relative paths. Inline SVG is allowed (and preferred for small diagrams); large or reused assets go to `assets/`.
-- **Shared CSS** (`html-authoring/style.css`) — clean readable defaults, print-friendly, dark/light, no JS frameworks.
+- **Base HTML template** — head, link to a sibling `./assets/style.css`, optional script tag for `./assets/viewer.js` (Copy-Markdown, sidebar TOC builder).
+- **Semantic structure convention** — skills author standard semantic HTML (`<section>`, `<h2>`, `<table>`, `<figure>`, `<dl>`, etc.) using auto-generated `id` attributes on headings (`<h2 id="problem">`). No special attribute discipline — just clean semantic markup the way an LLM naturally produces it. The viewer's TOC builder walks `h1`/`h2`/`h3` for sidebar entries; in-doc cross-references use standard `#id` anchors.
+- **Diagram convention** — when a skill identifies a diagram-worthy moment, it spawns `/diagram` as a blocking Task subagent (per D2), receives the SVG, and inlines it inside `<figure>` with a `<figcaption>`. No special attributes required.
+- **Asset distribution (per Q5 grill resolution)** — skills copy `style.css`, `serve.js`, and any required JS (e.g., turndown for Copy-Markdown) into `{feature_folder}/assets/` at write time. Each feature folder is fully self-contained — the goal is "zip-and-share" with no setup on the recipient's side. Trade-off: stylesheet updates don't propagate to existing folders (acceptable per D5: forward-only).
+- **Image handling** — image sidecars (screenshots, photos) go to `{feature_folder}/assets/`; HTML references via relative paths. Inline SVG is preferred for small diagrams; large/reused diagrams go to `assets/diagrams/`.
 
-User-observable behavior: skill prompts get **shorter and more directive** ("write content for `<section data-section="problem">`") rather than longer (no markdown-styling rules to enforce).
+User-observable behavior: skill prompts get **shorter and more directive** ("write a `<section>` for the problem statement") rather than longer (no markdown-styling rules to enforce, no special attribute taxonomy to memorize).
 
 ### 2. Per-skill rewrites
 
@@ -124,7 +124,7 @@ Zero-deps static page generated at write time (each skill regenerates after writ
 
 Layout (high-level user-observable behavior — visual design comes from `/wireframes`, not this doc):
 
-- **Sidebar** — TOC across every artifact in the folder, including nested folders (`wireframes/`, `prototype/`, `grills/`, `simulate-spec/`, `verify/`). Group by phase. Each entry expands to show the artifact's own `data-section` anchors as second-level nav.
+- **Sidebar** — TOC across every artifact in the folder, including nested folders (`wireframes/`, `prototype/`, `grills/`, `simulate-spec/`, `verify/`). Group by phase. Each entry expands to show the artifact's `<h2>`/`<h3>` headings as second-level nav (auto-generated by walking the loaded HTML's heading tree).
 - **Main pane** — the currently-selected artifact rendered inline (HTML inserted directly, not via `<iframe>`) so anchored navigation works seamlessly.
 - **Per-doc toolbar** — at the top of each rendered artifact: "Copy Markdown" button (runs html→md at click time). Possibly also "Open in new tab" and "Copy section link".
 - **Frame chrome** — minimal; the artifact's own content dominates.
@@ -135,12 +135,18 @@ Reuse the pattern from `/wireframes`: zero-dep Node.js `http.createServer`, serv
 
 ### 5. Reviewer subagent migration
 
-Reviewer subagents in `/grill`, `/verify`, `/msf-req`, `/msf-wf`, `/simulate-spec` switch their input-parsing logic:
+Reviewer subagents in `/grill`, `/verify`, `/msf-req`, `/msf-wf`, `/simulate-spec` switch their input file extension and prompt expectations:
 
-- **Before:** read the markdown file, regex on `^##` to extract sections.
-- **After:** read the HTML file, query DOM by `data-section="<slug>"` to extract sections.
+- **Before:** read `*.md`. Reviewer prompts speak in terms of markdown structure (`## Decisions`, `### Open Questions`, etc.).
+- **After:** read `*.html`. Reviewer prompts speak in terms of HTML semantic structure (`<section>` for "Decisions", `<h2>` named "Open Questions", etc.). The LLM is the parser — no jsdom, no regex, no DOM queries. Same approach the existing markdown reviewers already use; just the input format changes.
 
-Decision D3 below: parser tech choice. Migration ships in the same release as artifact format — no intermediate state.
+Migration ships in the same release as artifact format — no intermediate state. Smoke verification: during `/verify` of this pipeline, each of the 5 reviewers runs at least once on real HTML output from this very feature folder; reviewer findings are spot-checked to confirm sections were actually identified, not silent no-findings.
+
+### 6. Cross-skill artifact resolution (per Q2 grill resolution)
+
+Downstream skills (`/spec` reads `01_requirements`, `/plan` reads `02_spec`, `/verify` reads all priors, etc.) currently resolve upstream artifacts via hardcoded paths or via `_shared/resolve-input.md`. Post-migration, two formats exist on disk: new pipelines write `.html`, old folders contain `.md` (per D5 forward-only).
+
+`_shared/resolve-input.md` is extended with format-aware resolution: given a logical artifact name (e.g., `01_requirements`), it tries `.html` first, falls back to `.md`, errors if neither exists. Every "read upstream artifact" path in every downstream skill routes through it. Resolves the mixed-format-folders concern across feature-folder boundaries (one folder MD, another HTML, both still readable).
 
 ### Settings + flag
 
@@ -167,13 +173,13 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 ### Primary journey — Skill author runs the pipeline (Tier-3 feature, fresh folder)
 
 1. User runs `/feature-sdlc <brief>`. Settings has `output_format: html` (default).
-2. `/requirements` runs. At write step, it composes HTML against the shared authoring contract (problem, goals, journeys, decisions all under `data-section` blocks). Saves `{feature_folder}/01_requirements.html`. Regenerates `index.html`.
+2. `/requirements` runs. At write step, it composes semantic HTML against the shared authoring contract (problem, goals, journeys, decisions as `<section>` blocks with auto-generated heading anchors). Saves `{feature_folder}/01_requirements.html`. Copies `assets/style.css` + `serve.js` into the folder. Regenerates `index.html`.
 3. Pipeline announces: `Wrote 01_requirements.html. Run \`node serve.js\` from {feature_folder} to view.`
 4. User runs `node serve.js`. Browser opens to `http://localhost:<port>/index.html`. Sidebar shows `01 Requirements` with sub-anchors. Main pane shows the rendered HTML.
 5. User clicks "Copy Markdown" — clipboard receives clean structured markdown.
 6. Pipeline continues. `/spec` runs, writes `02_spec.html` with inline SVG architecture diagram (from `/diagram` or inlined directly), regenerates `index.html`. Sidebar now shows `02 Spec` too.
 7. After `/wireframes`, sidebar shows nested `wireframes/` group with each screen file. Clicking a screen renders it inline in the main pane (existing HTML, no conversion).
-8. After `/verify`, the verify reports appear in sidebar as `verify/` group. Each report's reviewer-subagent findings cite `data-section` anchors that the user can click to jump to in the corresponding artifact.
+8. After `/verify`, the verify reports appear in sidebar as `verify/` group. Each report's reviewer-subagent findings cite section headings (e.g., "in §Decisions of 02_spec") and may link to in-doc `#decisions` anchors.
 
 ### Alternate journey — User wants markdown alongside HTML
 
@@ -188,19 +194,20 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 3. A banner at the top reads: `Running from file:// — for the embedded viewer, run \`node serve.js\`.`
 4. (Mirror of the existing `/wireframes` "Node missing" pattern.)
 
-### Alternate journey — Reviewer subagent extracts a section
+### Alternate journey — Reviewer subagent reads an artifact
 
 1. `/grill` runs against `01_requirements.html`.
-2. Reviewer subagent receives the HTML (per D3 parser tech) and is asked to extract the "Decisions" section.
-3. Subagent queries `[data-section="decisions"]` (stable anchor), gets the structured content, evaluates per its rubric, and emits findings citing the same anchor. No heading regex involved.
-4. (Migration ships in lockstep — no run can produce HTML artifacts that reviewers can't parse.)
+2. Reviewer subagent receives the HTML wholesale (the same way it currently receives markdown wholesale) and is asked to evaluate the "Decisions" section per its rubric.
+3. Subagent reads the HTML semantically (LLM as parser), finds `<section>` containing the heading "Design Decisions", evaluates per the rubric, and emits findings citing section names.
+4. Migration ships in lockstep — no run can produce HTML artifacts that reviewers haven't been updated to handle. The reviewer-prompt change is small: swap "expect markdown" → "expect HTML"; the LLM does the rest.
 
-### Error journey — `/diagram` invocation fails or is uncallable from a child skill
+### Error journey — `/diagram` subagent stalls or errors
 
-1. `/spec` reaches a diagram-worthy section. Tries to invoke `/diagram` programmatically. Call returns "uncallable" or errors.
-2. **Fallback path** (per Non-Goals + D2): skill prompt inlines an SVG directly. Less polished than `/diagram`'s reviewer-loop output, but viable.
-3. Document records this in its own "diagrams" section: `<figure data-section="diagram-arch" data-source="inline">` (vs `data-source="diagram-skill"`).
-4. Open Question OQ1: revisit `/diagram` callability in a follow-up.
+1. `/spec` reaches a diagram-worthy section. Spawns `/diagram` as a blocking Task subagent.
+2. Subagent stalls past a timeout (per `~/.pmos/learnings.md` `## /msf-wf` entry, subagents do stall) OR returns an error.
+3. **Fallback path:** skill prompt inlines an SVG directly using its own context. Less polished than `/diagram`'s reviewer-loop output, but viable.
+4. The `<figure>` records the source as a `<figcaption>` note (e.g., "Diagram authored inline due to /diagram subagent timeout").
+5. Specific timeout, retry, and stall-fallback policy: resolve in `/spec`.
 
 ### Error journey — User has `output_format: markdown` in their settings.yaml from before this feature shipped
 
@@ -234,14 +241,14 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 | # | Decision | Options Considered | Rationale |
 |---|---|---|---|
 | **D1** | HTML is the **native, primary** authoring target. Markdown is a derived export. | (a) Markdown source-of-truth, convert to HTML for viewing. (b) HTML source-of-truth, convert to markdown on demand. (c) Dual sources (author both). | (b). User explicitly rejected (a): markdown can't express the intent. (c) violates SSOT and creates drift. |
-| **D2** | Diagrams: skill **invokes `/diagram`** when callable; falls back to **inline SVG** authored directly when not. | (a) Always inline SVG. (b) Always call `/diagram`. (c) Mermaid blocks rendered client-side. (d) Mix: `/diagram` preferred, inline fallback. | (d). User-confirmed (in `/feature-sdlc` setup): "Skills call `/diagram` internally and embed the result." Fallback handles the (likely) case that programmatic invocation isn't supported today; resolved in `/grill`. |
-| **D3** | Reviewer subagents parse HTML by `data-section` attribute. Tech choice deferred to `/grill`/`/spec`. | (a) `jsdom` (real DOM, heavier). (b) Regex on `data-section="…"` (lightweight). (c) `node-html-parser` (middle ground). (d) Pass HTML wholesale to LLM and let it parse. | Defer to `/grill`. (b) is the simplest; (a) is sturdiest; (d) is current-state and what we're trying to leave behind for stability. |
+| **D2** | Diagrams: skill spawns **`/diagram` as a blocking Task subagent** per diagram-worthy moment, using its full reviewer loop. Inline-SVG-by-prompt is the fallback when the subagent stalls or errors. | (a) Always inline SVG (cheaper, lower quality). (b) Always spawn `/diagram` subagent (this option). (c) Mermaid client-side (adds JS dep, breaks zero-deps). (d) Refactor `/diagram` to add a render-only mode (scope creep). | (b). Resolved in `/grill` Q1: user accepted the wall-clock cost (30s–2min per diagram) for `/diagram`'s reviewer-refined SVG quality. Stall fallback handles the known subagent-stall risk per `~/.pmos/learnings.md` `## /msf-wf`. Specific timeout/retry policy resolves in `/spec`. |
+| **D3** | Reviewer subagents read HTML semantically — **the LLM is the parser**. No `jsdom`, regex, or DOM queries. Reviewer prompts swap "expect markdown" for "expect HTML"; everything else stays the same. | (a) `jsdom`. (b) Regex on attribute. (c) `node-html-parser`. (d) Pass HTML wholesale to LLM (this option). | (d). Resolved in `/grill` (post-Q3/Q6 reframe): the markdown reviewers already pass MD wholesale to the LLM and find sections semantically. HTML is more structured than MD, not less, so semantic extraction is more robust, not less. The data-section attribute taxonomy that earlier grill answers proposed was solving a problem that doesn't exist if we just trust the LLM. |
 | **D4** | Markdown export: **client-side conversion at click time**, not pre-rendered sidecar (unless `output_format: both`). | (a) Pre-render `.md` always (sidecar). (b) Bundle a JS converter (e.g., turndown), run in browser at click. (c) Server endpoint that converts on demand. | (b) by default. (a) only when `output_format: both` (explicit opt-in). (c) overkill for a static folder. |
 | **D5** | Existing markdown artifacts stay; HTML coexists. Index viewer surfaces orphan `.md` as "legacy" entries. | (a) Migrate existing `.md` to `.html` retroactively. (b) Strict no-touch (this option). (c) Hide legacy entries from index. | (b). Migration is high risk for low value (per Non-Goals). Surfacing them as legacy entries beats hiding (transparency over clean look). |
 | **D6** | Index regeneration: each skill calls the index generator after writing its artifact. | (a) Each skill regenerates after write. (b) Standalone `/index` command, user invokes. (c) Generated by `serve.js` at request time. | (a) for write-time freshness. (c) considered for simplicity, but means index is always 1-step out of date until server runs — surprise-prone. (b) extra step, easy to forget. |
 | **D7** | Global docs (`/changelog`, `/session-log`) are **excluded from this iteration**. | (a) Migrate, separate `docs/index.html`. (b) Migrate, fold into one global viewer per repo. (c) Skip this iteration; only feature-folder skills migrate. | (c). Migrating them is meaningful scope expansion — pulls in "design a repo-wide HTML docs viewer" as its own concern. Address feature-folder asymmetry first; revisit global docs as a follow-up once the feature-folder pattern is proven. |
 | **D8** | Settings field name: `output_format` with values `{html, both}`. Default `html` when unset. | (a) `output_format`, `{html, both}`. (b) `output_format`, `{html, markdown, both}`. (c) `artifact_format`. | (a). (b) re-introduces the markdown-only path the user explicitly rejected. (c) creates a synonym to existing `format` patterns; `output_format` is precise to "what the skill outputs". |
-| **D9** | Reviewer parser tech and html→md tech choice deferred to `/spec`/`/grill`. | n/a | Tech choices belong in `/spec`. Surfaced here so they're not surprises later. |
+| **D9** | html→md tech choice deferred to `/spec`. (Reviewer parser tech resolved in D3.) | (a) turndown.js bundled client-side (D4 default). (b) Pre-rendered `.md` sidecar at write time. (c) Server-side endpoint. | Resolve in `/spec`. Whatever JS is bundled gets copied to `assets/` per Q5. |
 | **D10** | The `_shared/html-authoring/` directory is a **new top-level shared component**, not a per-skill addition. | (a) Each skill owns its own template. (b) Centralized `_shared/html-authoring/`. | (b). Same reason `_shared/pipeline-setup.md` exists — uniform contract beats per-skill drift. |
 | **D11** | **NOT adopting an existing static-site generator** (mdbook, MkDocs, Sphinx, Eleventy, docsify, Hugo, Zola, etc.). Build the viewer ourselves as zero-deps static HTML + tiny JS, in the `/wireframes`+`/prototype` style. | (a) Adopt mdbook/MkDocs (markdown-source SSGs). (b) Adopt Eleventy/docsify (more flexible). (c) Build our own (this option). | (c). All major SSGs assume markdown source-of-truth — directly conflicts with D1 (HTML-native). Most require a build step (we ruled out: zero install). They bring opinionated theming, plugin systems, and config files that we'd have to fight to keep minimal. The viewer's footprint is small (sidebar + main pane + Copy-Markdown) and the existing `/wireframes`+`/prototype` pattern proves zero-deps static-HTML viewer-style works inside this pipeline. Adopting an SSG would be more code on net, not less. |
 
@@ -252,9 +259,10 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 | Metric | Baseline (today) | Target | Measurement |
 |---|---|---|---|
 | Affected skills emitting HTML primary | 0 of 10 | 10 of 10 | Grep affected SKILL.md for "write `.html`"; count post-/verify |
-| Reviewer subagents querying by `data-section` | 0 of 5 | 5 of 5 | Grep reviewer prompts for `data-section`; zero `^##` regex post-migration |
+| Reviewer subagents reading HTML and emitting non-empty findings on real artifacts | 0 of 5 | 5 of 5 | During `/verify` smoke run on this very feature folder, each reviewer must produce at least one section-aware finding (catches silent no-findings) |
 | Time from "skill writes artifact" to "user can navigate it in browser" | Manual (open `.md` in IDE / paste-render) | < 30s (run `node serve.js`, click) | User flow timing during `/verify` |
-| Diagrams rendered as SVG (not ASCII) in `/spec` and `/plan` | 0% | ≥ 80% of diagram-worthy moments | Count `<figure data-section="diagram-*">` per spec/plan vs. ASCII boxes pre-migration |
+| Diagrams rendered as SVG (not ASCII) in `/spec` and `/plan` | 0% | ≥ 80% of diagram-worthy moments | Count `<figure>` blocks containing `<svg>` per spec/plan vs. ASCII boxes pre-migration |
+| Cross-skill artifact resolution success rate | n/a | 100% across mixed-format folders | `_shared/resolve-input.md` test fixtures: folder-with-only-md, folder-with-only-html, folder-with-both, folder-with-neither (error). All four cases resolve correctly. |
 | Round-trip "Copy Markdown → paste → re-render HTML" structural fidelity | n/a (no current path) | Sections, headings, lists, tables preserved | Manual round-trip test on each artifact type during `/verify` |
 | Existing-folder regressions | n/a | Zero | All pre-existing `01_requirements.md` files in `docs/pmos/features/*` still render and navigate post-merge |
 
@@ -278,13 +286,14 @@ Note: `markdown`-only is **not a supported value**. Existing markdown artifacts 
 
 | # | Question |
 |---|---|
-| OQ1 | Is `/diagram` callable programmatically from another skill's prompt — i.e., can `/spec` invoke `/diagram` mid-document and inline the returned SVG? If not, what's the cleanest contract to make it callable, and does that go in this iteration or get fallback'd via inline-SVG (per D2)? **Resolve in `/grill`.** |
-| OQ2 | Reviewer parser tech: jsdom vs. regex on `data-section` vs. `node-html-parser` vs. pass-HTML-to-LLM. Performance, correctness, and reviewer-prompt churn each implicate different choices. **Resolve in `/spec`.** |
+| ~~OQ1~~ | ~~`/diagram` programmatic callability~~ — **resolved in `/grill` Q1:** spawn `/diagram` as blocking Task subagent. |
+| ~~OQ2~~ | ~~Reviewer parser tech~~ — **resolved in `/grill` (post-rollback):** the LLM is the parser. No DOM/regex/parser library. Reviewers receive HTML wholesale and find sections semantically. |
 | OQ3 | html→md derivation tech: turndown.js bundled client-side vs. pre-rendered `.md` sidecar always vs. server endpoint. Bundle size, freshness, and zero-deps stance pull in different directions. **Resolve in `/spec`.** |
 | OQ4 | Index viewer's nested-folder rendering: should `wireframes/` and `prototype/` (already-HTML, with their own `index.html`) embed inline in the parent index or link out? **Resolve in `/wireframes` (Phase 4.c gate of this run) — concrete UI question.** |
 | OQ5 | Should the "Copy Markdown" button copy the full doc, or the section under cursor? Or both (toolbar + per-section)? **Resolve in `/wireframes`.** |
 | OQ6 | This requirements doc is itself written in markdown (bootstrap). When should we re-author it as HTML — at the end of the implementation, or leave as the historical artifact written in the old format? **Resolve in `/complete-dev`.** |
 | OQ7 | What happens to `/feature-sdlc`'s own `00_pipeline.md` and `00_open_questions_index.md`? They're orchestrator artifacts, not skill-pipeline artifacts. In scope or not? **Resolve in `/spec`.** |
+| OQ8 | `/diagram` subagent timeout, retry, and stall-fallback policy (per D2 stall path). What's the wall-clock budget per `/spec` run, and when does the skill give up and fall back to inline SVG? **Resolve in `/spec`.** |
 
 ---
 

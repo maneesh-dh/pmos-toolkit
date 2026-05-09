@@ -1,10 +1,10 @@
 schema_version: 1
 slug: html-artifacts
-tier: null
+tier: 3
 mode: interactive
 started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-09T10:55:00Z
-current_phase: requirements
+last_updated: 2026-05-09T11:30:07Z
+current_phase: msf-req
 worktree_path: null
 branch: feat/html-artifacts
 feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
@@ -30,12 +30,17 @@ phases:
     completed_at: 2026-05-09T10:55:00Z
   - id: requirements
     hardness: hard
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: 01_requirements.md
+    started_at: 2026-05-09T10:55:00Z
+    completed_at: 2026-05-09T11:14:36Z
   - id: grill
     hardness: soft
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: grills/2026-05-09_01_requirements.md
+    started_at: 2026-05-09T11:14:36Z
+    completed_at: 2026-05-09T11:30:07Z
+    notes: "6 questions standard depth + 1 user-driven rollback simplifying data-section/taxonomy/regression-suite design"
   - id: msf-req
     hardness: soft
     status: pending

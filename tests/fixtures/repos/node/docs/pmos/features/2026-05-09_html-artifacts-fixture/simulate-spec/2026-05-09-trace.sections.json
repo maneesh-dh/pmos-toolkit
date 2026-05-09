@@ -1,0 +1,7 @@
+{
+  "artifact": "simulate-spec/2026-05-09-trace.html",
+  "sections": [
+    {"id": "scenarios", "level": 2, "title": "Scenarios", "parent_id": null},
+    {"id": "scenarios-summary", "level": 3, "title": "Summary", "parent_id": "scenarios"}
+  ]
+}

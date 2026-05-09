@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fixture Requirements — html-artifacts-fixture</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.32.0">
+  <script defer src="assets/viewer.js?v=2.32.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Fixture Requirements</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+    <section id="problem" data-pmos-section="problem">
+      <h2 id="problem">Problem</h2>
+      <p>Fixture requirements doc used by Phase-4 assert scripts to validate the
+      HTML-authoring contract end-to-end.</p>
+      <h3 id="problem-context">Context</h3>
+      <p>See <a href="02_spec.html#goals">02_spec.html#goals</a> for the goal set
+      this requirements doc feeds into.</p>
+    </section>
+    <section id="goals" data-pmos-section="goals">
+      <h2 id="goals">Goals</h2>
+      <ul>
+        <li>Cover happy-path HTML structure with section ids and heading ids.</li>
+        <li>Exercise cross-doc anchor resolution (FR-92).</li>
+        <li>Sit alongside a legacy <code>.md</code> sibling for mixed-state coverage.</li>
+      </ul>
+    </section>
+    <section id="decisions" data-pmos-section="decisions">
+      <h2 id="decisions">Decisions</h2>
+      <h3 id="decisions-format">Authoring format</h3>
+      <p>HTML-first per spec D5; legacy <code>.md</code> kept only for
+      <code>03_legacy.md</code> to exercise the resolver fallback.</p>
+    </section>
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-09_html-artifacts-fixture/01_requirements.html</span>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,11 @@
+{
+  "feature": "2026-05-09_html-artifacts-fixture",
+  "generated_at": "2026-05-09T00:00:00Z",
+  "entries": [
+    {"path": "01_requirements.html", "title": "Fixture Requirements", "kind": "requirements", "order": 1},
+    {"path": "02_spec.html", "title": "Fixture Spec", "kind": "spec", "order": 2},
+    {"path": "grills/2026-05-09_test.html", "title": "Grill Report — 2026-05-09", "kind": "grill", "order": 3},
+    {"path": "simulate-spec/2026-05-09-trace.html", "title": "Simulate-spec trace", "kind": "simulate-spec", "order": 4},
+    {"path": "verify/2026-05-09-report.html", "title": "Verify report", "kind": "verify", "order": 5}
+  ]
+}

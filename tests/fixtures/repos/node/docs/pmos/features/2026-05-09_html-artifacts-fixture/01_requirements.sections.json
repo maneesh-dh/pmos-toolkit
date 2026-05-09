@@ -1,0 +1,10 @@
+{
+  "artifact": "01_requirements.html",
+  "sections": [
+    {"id": "problem", "level": 2, "title": "Problem", "parent_id": null},
+    {"id": "problem-context", "level": 3, "title": "Context", "parent_id": "problem"},
+    {"id": "goals", "level": 2, "title": "Goals", "parent_id": null},
+    {"id": "decisions", "level": 2, "title": "Decisions", "parent_id": null},
+    {"id": "decisions-format", "level": 3, "title": "Authoring format", "parent_id": "decisions"}
+  ]
+}

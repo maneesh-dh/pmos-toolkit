@@ -1,0 +1,10 @@
+{
+  "artifact": "02_spec.html",
+  "sections": [
+    {"id": "overview", "level": 2, "title": "Overview", "parent_id": null},
+    {"id": "goals", "level": 2, "title": "Goals", "parent_id": null},
+    {"id": "fr-table", "level": 2, "title": "FR table", "parent_id": null},
+    {"id": "decisions", "level": 2, "title": "Decisions", "parent_id": null},
+    {"id": "decisions-rationale", "level": 3, "title": "Rationale", "parent_id": "decisions"}
+  ]
+}

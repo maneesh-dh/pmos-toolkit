@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fixture Spec — html-artifacts-fixture</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.32.0">
+  <script defer src="assets/viewer.js?v=2.32.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Fixture Spec</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+    <section id="overview" data-pmos-section="overview">
+      <h2 id="overview">Overview</h2>
+      <p>Companion spec to <a href="01_requirements.html#goals">01_requirements.html#goals</a>.
+      Validates that cross-doc anchors round-trip cleanly across both directions.</p>
+    </section>
+    <section id="goals" data-pmos-section="goals">
+      <h2 id="goals">Goals</h2>
+      <p>Two goals:</p>
+      <ol>
+        <li>Demonstrate <code>&lt;section id&gt;</code> + heading-id contract.</li>
+        <li>Exercise <code>&lt;pre&gt;&lt;code&gt;</code> + <code>&lt;table&gt;</code>
+        + <code>&lt;dl&gt;</code> shapes per conventions §6/§7/§5.</li>
+      </ol>
+    </section>
+    <section id="fr-table" data-pmos-section="fr-table">
+      <h2 id="fr-table">FR table</h2>
+      <table>
+        <thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+        <tbody>
+          <tr><td>FR-03.1</td><td>every h2/h3 carries an id</td></tr>
+          <tr><td>FR-92</td><td>cross-doc anchors resolve</td></tr>
+        </tbody>
+      </table>
+    </section>
+    <section id="decisions" data-pmos-section="decisions">
+      <h2 id="decisions">Decisions</h2>
+      <dl class="pmos-decisions">
+        <dt id="d1">D1 — HTML-first artifacts</dt>
+        <dd>Per spec D5; legacy MD only for explicit fallbacks.</dd>
+      </dl>
+      <h3 id="decisions-rationale">Rationale</h3>
+      <pre><code class="language-bash">node assets/serve.js .</code></pre>
+    </section>
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-09_html-artifacts-fixture/02_spec.html</span>
+  </footer>
+</body>
+</html>

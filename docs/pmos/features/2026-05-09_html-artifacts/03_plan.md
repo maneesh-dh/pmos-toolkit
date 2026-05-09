@@ -52,7 +52,8 @@ Phase 2 (Resolver + per-skill rewrites — runbook + table)
 
 Phase 3 (Reviewer + /diagram migration)
 ├── T12: chrome-strip helper (extract <main>+<h1>) used by parent skills before reviewer dispatch
-├── T13: update reviewer prompts in 5 skills (grill, verify, msf-req, msf-wf, simulate-spec)
+├── T13a: /feature-sdlc wires chrome-strip + FR-52 validation at 4 reviewer-dispatch sites (grill, msf-req, msf-wf, simulate-spec; /verify Phase 9 carved out per FR-50.1)
+├── T13b: 5 reviewer skills (grill, verify, msf-req, msf-wf, simulate-spec) document Phase-1 input-contract subsection (FR-51 template + FR-52 pointer)
 └── T14: /diagram blocking Task subagent invocation pattern (in /spec, /plan)
 
 Phase 4 (Test fixtures + assert scripts)
@@ -83,9 +84,10 @@ flowchart TD
   T9 --> T10
   T1 --> T11
   T9 & T10 --> T12
-  T12 --> T13
+  T10 & T12 --> T13a
+  T13a --> T13b
   T9 --> T14
-  T13 & T14 --> T15
+  T13b & T14 --> T15
   T15 --> T16 & T17 & T18 & T19 & T20 & T21 & T22 & T23
   T16 & T17 & T18 & T19 & T20 & T21 & T22 & T23 --> T24
   T24 --> T25 --> T26
@@ -104,6 +106,7 @@ flowchart TD
 | **P3** | **Asset vendoring strategy** — turndown 7.2.4 + GFM plugin downloaded from unpkg as UMD bundles, committed to `plugins/pmos-toolkit/skills/_shared/html-authoring/assets/`. License preserved. NO npm install at build time; NO CDN fetch at runtime. | (a) npm install + bundle; (b) CDN runtime fetch; (c) Vendor UMD pre-built | (c). Spec NFR-08 forbids runtime CDN fetch. (a) requires build pipeline (also forbidden — NFR-06). (c) is one-time vendor commit; turndown 7.2.4 is stable. Update path: future minor turndown bumps re-vendored manually. |
 | **P4** | **html-to-md.js as standalone CLI shim** — node script that requires turndown.umd.js via `require('./turndown.umd.js')` after a 5-line UMD-→-CommonJS wrapper. Reads HTML path from argv, writes MD to stdout. ≤100 LOC. | (a) Python md-converter; (b) Node + UMD shim; (c) Pure regex MD generator | (b). Shares the SAME turndown bundle the browser uses — single SSOT, no behavior drift between client-side Copy-Markdown and `output_format: both` MD sidecar. UMD globals exposed via a tiny CommonJS adapter. |
 | **P5** | **Test fixture as a real feature folder** — build `tests/fixtures/repos/node/docs/pmos/features/2026-05-09_html-artifacts-fixture/` containing realistic 01_requirements.html + 02_spec.html + sections.json + a legacy 03_legacy.md to exercise mixed-state, used by every assert script. | (a) Mock fixtures inline per script; (b) Shared real fixture folder; (c) Generate at test time | (b). Shared fixture mirrors production; assert scripts diff against ground truth not synthetic data. T15 builds it once; T16–T23 consume. |
+| **P6** | **T13 split into T13a (parent) + T13b (reviewer)** — original T13 assumed each of 5 reviewer skills internally dispatches sub-reviewers; reality (per spec D22 / FR-50.1) is 4 of 5 skills declare "No subagents" and /verify's only reviewer-subagent dispatch consumes git diffs (out-of-scope per FR-50.1). Split places chrome-strip + FR-52 validation in the parent (/feature-sdlc, T13a) and input-contract documentation in the 5 reviewer skills (T13b). | (a) Single T13 forced to fit; (b) Defect file → /spec narrowing → T13a/T13b split; (c) Drop T13 entirely | (b). Surfaced by /execute T13 plan-defect handoff at commit `151d806`; resolved via /spec --fix-from FR-50 (commit `1962ecd` adds FR-50.1 carve-out + D22) and this /plan --fix-from T13 run. (a) was the original T13 framing — abandoned because the architecture doesn't support it. (c) loses FR-50/51/52 contract entirely. |
 
 ---
 
@@ -178,16 +181,17 @@ flowchart TD
 | Modify | `plugins/pmos-toolkit/skills/simulate-spec/SKILL.md:456-457` | Apply runbook | T9 (row 5) |
 | Modify | `plugins/pmos-toolkit/skills/grill/SKILL.md:179-219` | Apply runbook | T9 (row 6) |
 | Modify | `plugins/pmos-toolkit/skills/artifact/SKILL.md:430-459` | Apply runbook (feature-folder output only; template store stays MD) | T9 (row 7) |
-| Modify | `plugins/pmos-toolkit/skills/verify/SKILL.md:186-197` | Apply runbook + reviewer prompt updates from T13 | T9 (row 8) + T13 |
+| Modify | `plugins/pmos-toolkit/skills/verify/SKILL.md:186-197` | Apply runbook + Phase-1 input-contract subsection from T13b (Phase 3 multi-agent code review block untouched per FR-50.1) | T9 (row 8) + T13b |
 | Modify | `plugins/pmos-toolkit/skills/design-crit/SKILL.md:148-258` | Apply runbook (output is HTML; Playwright capture unchanged) | T9 (row 9) |
 | Modify | `plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md` | Emit `00_pipeline.html` + `00_open_questions_index.html` per FR-11 / D14 | T10 |
 | Create | `plugins/pmos-toolkit/skills/_shared/html-authoring/index-generator.md` | Index generator algorithm + ordering policy (§9.1) | T11 |
 | Create | `plugins/pmos-toolkit/skills/_shared/html-authoring/chrome-strip.md` | Helper algorithm: extract `<main>` + `<h1>` from HTML | T12 |
-| Modify | `plugins/pmos-toolkit/skills/grill/SKILL.md` (reviewer prompts) | Strip chrome before reviewer dispatch (FR-50/51) | T13 (row 1) |
-| Modify | `plugins/pmos-toolkit/skills/verify/SKILL.md` (reviewer prompts) | Strip chrome | T13 (row 2) |
-| Modify | `plugins/pmos-toolkit/skills/msf-req/SKILL.md` (reviewer prompts) | Strip chrome | T13 (row 3) |
-| Modify | `plugins/pmos-toolkit/skills/msf-wf/SKILL.md` (reviewer prompts) | Strip chrome | T13 (row 4) |
-| Modify | `plugins/pmos-toolkit/skills/simulate-spec/SKILL.md` (reviewer prompts) | Strip chrome | T13 (row 5) |
+| Modify | `plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md` (Phase 3.b/4.a/4.c/6 reviewer-dispatch sites) | Insert chrome-strip + FR-51 prompt + FR-52 validation block per dispatch (Phase 9 /verify dispatch un-instrumented per FR-50.1) | T13a |
+| Modify | `plugins/pmos-toolkit/skills/grill/SKILL.md` (Phase 1) | Add Input Contract (when invoked as reviewer subagent) subsection — FR-51 template + FR-52 pointer; no chrome-strip in reviewer skill | T13b |
+| Modify | `plugins/pmos-toolkit/skills/verify/SKILL.md` (Phase 1, artifact-review only) | Same Input Contract subsection (Phase 3 multi-agent code review block untouched per FR-50.1) | T13b |
+| Modify | `plugins/pmos-toolkit/skills/msf-req/SKILL.md` (Phase 1) | Same Input Contract subsection | T13b |
+| Modify | `plugins/pmos-toolkit/skills/msf-wf/SKILL.md` (Phase 1) | Same Input Contract subsection | T13b |
+| Modify | `plugins/pmos-toolkit/skills/simulate-spec/SKILL.md` (Phase 1) | Same Input Contract subsection | T13b |
 | Modify | `plugins/pmos-toolkit/skills/spec/SKILL.md` | Add `/diagram` blocking-Task-subagent invocation pattern (300s × 3 + inline-SVG fallback + 30min cap, FR-60..65) | T14 |
 | Modify | `plugins/pmos-toolkit/skills/plan/SKILL.md` | Same `/diagram` pattern (when /plan emits diagrams) | T14 |
 | Create | `tests/fixtures/repos/node/docs/pmos/features/2026-05-09_html-artifacts-fixture/01_requirements.html` | Realistic fixture artifact | T15 |
@@ -222,7 +226,7 @@ flowchart TD
 | R2 | Chrome-strip helper (T12) regex-slice approach miscaptures when `<main>` is malformed (LLM-authored) | M | H | High | T12 uses a tested 3-step approach: (1) find first `<main`; (2) find matching `</main>` via balanced-tag tracker (NOT regex `.*?</main>` which fails on nested); (3) include `<h1>` from before `<main>`. Self-test on 5 fixture HTMLs in T12 verification. | T12 |
 | R3 | Per-skill rollout (T9) drifts across the 9 skills (one skill misses a step from the runbook) | M | M | Medium | T9 rollout table includes a per-row "Verified by" column citing T20 (assert_no_md_to_html.sh) + T22 (assert_heading_ids.sh) on each skill's output in the fixture. T8's pilot establishes the procedure and surfaces edge cases before fanout. | T9 |
 | R4 | Plugin version bump collides with concurrent /complete-dev or /create-skill activity bumping to 2.33.0 first | L | M | Low | T24 first checks current versions via `jq -r .version <both manifests>`; if either is already at 2.33.0+, bump to next minor. Existing pre-push hook enforces sync. | T24 |
-| R5 | Reviewer prompt updates in T13 break a reviewer's existing rubric scoring (regression in /grill or /msf-req findings quality) | L | H | Medium | T13 self-tests by re-running each reviewer on the existing `msf-findings.md` fixture; output structure must still match prior shape. Behavioral regression caught at /verify smoke (FR-72). | T13, T26 |
+| R5 | Reviewer-skill input-contract docs (T13b) drift from the parent's actual dispatch payload (T13a) — e.g., parent passes a different prompt template than reviewer Phase-1 documents | L | M | Low | T13a is committed BEFORE T13b (Depends on); T13b authors cite T13a's exact template via per-skill grep. Behavioral end-to-end check at T26 / FR-72 smoke; parent-side FR-52 validation hard-fails any drift. | T13a, T13b, T26 |
 | R6 | viewer.js bundle size exceeds NFR-02 30 KB minified after adding legacy-md shim + sessionStorage try/catch | L | L | Low | T3 inline minification check: `cat viewer.js | tools/min.sh | wc -c` → ≤30720 bytes. If exceeded, factor out optional handlers. | T3 |
 | R7 | Spec patch in §16 Research Sources is wrong about /wireframes serving via `serve.js` (it uses `npx http-server`); spec body claims "Mirror the existing /wireframes pattern" for serve.js | L | L | Low (doc only) | Plan Decision Log notes the divergence; spec already creates a NEW serve.js (FR-06), so functionally fine. T25 CHANGELOG entry mentions "establishes shared serve.js for feature folders." No code impact. | (notes only) |
 | R8 | Concurrent /plan run on same feature folder (per spec §16 G2 accepted-as-risk) | L | L | Low | `.plan.lock` (acquired in Phase 0 step 7) prevents this skill itself from racing; other affected skills don't have locks per G2. Document in T9 runbook: serialize per-folder runs. | T9 |
@@ -653,7 +657,7 @@ Format-aware resolver creation, runbook authoring, runbook application across th
 | R5 | `plugins/pmos-toolkit/skills/simulate-spec/SKILL.md` | 456-457 | T8 runbook §§2-6 (note: applies to trace.md write path only; spec patches via `Edit` are unchanged because spec is already HTML by simulate-spec time — see runbook §"Per-skill edge cases") | `assert_no_md_to_html.sh simulate-spec/`, `assert_heading_ids.sh fixture/simulate-spec/<date>-trace.html` |
 | R6 | `plugins/pmos-toolkit/skills/grill/SKILL.md` | 179-219 | T8 runbook §§2-6 | `assert_no_md_to_html.sh grill/`, `assert_heading_ids.sh fixture/grills/<date>.html` |
 | R7 | `plugins/pmos-toolkit/skills/artifact/SKILL.md` | 430-459 — feature-folder output ONLY; the template store at `~/.pmos/artifacts/templates/<slug>/template.md` retains MD shape (per spec FR-11 carve-out) | T8 runbook §§2-6 (feature-folder write phase only) | `assert_no_md_to_html.sh artifact/` (scoped to feature-folder write path) |
-| R8 | `plugins/pmos-toolkit/skills/verify/SKILL.md` | 186-197 — verify writes verify/<date>-report.html under runbook; reviewer-prompt updates land in T13 | T8 runbook §§2-6 | `assert_no_md_to_html.sh verify/` |
+| R8 | `plugins/pmos-toolkit/skills/verify/SKILL.md` | 186-197 — verify writes verify/<date>-report.html under runbook; Phase-1 input-contract subsection lands in T13b (Phase 3 multi-agent code review block stays untouched per FR-50.1) | T8 runbook §§2-6 | `assert_no_md_to_html.sh verify/` |
 | R9 | `plugins/pmos-toolkit/skills/design-crit/SKILL.md` | 148-258 — design-crit emits findings as HTML; Playwright capture unchanged | T8 runbook §§2-6 | `assert_no_md_to_html.sh design-crit/` |
 
 **Files:**
@@ -761,7 +765,9 @@ Format-aware resolver creation, runbook authoring, runbook application across th
 
 ## Phase 3: Reviewer + /diagram migration
 
-Chrome-strip helper, reviewer prompt updates in 5 skills, /diagram blocking-Task-subagent invocation pattern.
+Chrome-strip helper (T12), /feature-sdlc orchestrator chrome-strip + FR-52 validation at 4 reviewer-dispatch sites (T13a), 5 reviewer skills' Phase-1 input-contract documentation (T13b), /diagram blocking-Task-subagent invocation pattern (T14).
+
+> **T13 split history (D22):** /execute T13 plan-defect handoff at commit `151d806` (2026-05-10) showed the original T13 cited reviewer-subagent dispatch sites at line ranges that don't exist in 4 of 5 skills. /spec --fix-from FR-50 narrowed FR-50/52 + added FR-50.1 (carve-out) + D22 (decision); /plan --fix-from T13 splits T13 into T13a (parent-side: /feature-sdlc dispatch instrumentation) + T13b (reviewer-side: 5-skill input-contract documentation). T13 (original) is rewritten in-place; suffixed IDs follow /plan v2 P11 convention. Backup at `03_plan_pre-cap-abandon_2026-05-10T00-30-00Z.md`.
 
 ### T12: Chrome-strip helper algorithm
 
@@ -808,40 +814,98 @@ Chrome-strip helper, reviewer prompt updates in 5 skills, /diagram blocking-Task
 
 ---
 
-### T13: Update reviewer prompts in 5 skills
+### T13a: /feature-sdlc orchestrator chrome-strip + FR-52 validation at each reviewer-dispatch site
 
-**Goal:** In `/grill`, `/verify`, `/msf-req`, `/msf-wf`, `/simulate-spec`, update the reviewer-subagent dispatch path to: (1) read the artifact HTML; (2) invoke `chrome-strip.js` (T12) to extract `<main>` + `<h1>`; (3) pass the chrome-stripped content to the reviewer with the canonical FR-51 prompt template.
-**Spec refs:** FR-50, FR-51, FR-52, FR-53 (single-release migration — no intermediate state), FR-73 (hard-fail policy non-skippable)
+**Goal:** In `/feature-sdlc` SKILL.md, instrument each reviewer-subagent dispatch site (Phase 3.b /grill, Phase 4.a /msf-req, Phase 4.c /msf-wf, Phase 6 /simulate-spec) with: (1) a chrome-strip Bash step before dispatch; (2) the canonical FR-51 prompt template baked into the subagent dispatch payload; (3) a post-dispatch FR-52 validation block (sections_found set-equality + verbatim quote substring-grep against source HTML, hard-fail on mismatch).
+**Spec refs:** FR-50 (narrowed — chrome-strip is parent's responsibility), FR-50.1 (carve-out — /verify code-diff reviewers out-of-scope so we do NOT touch /verify Phase 9 dispatch in /feature-sdlc), FR-51, FR-52, FR-53, FR-72, FR-73, D14 (orchestrator scope), D22 (T13 split rationale)
 **Wireframe refs:** none
-**Depends on:** T12
+**Depends on:** T10 (orchestrator HTML emission landed first), T12 (chrome-strip.js helper exists)
 **Idempotent:** yes
-**TDD:** no — SKILL.md prose edits. Behavior verified by T26 (Final Verification) reviewer-smoke run.
-**Files:** Modify (5 skills):
-- `plugins/pmos-toolkit/skills/grill/SKILL.md`
-- `plugins/pmos-toolkit/skills/verify/SKILL.md`
-- `plugins/pmos-toolkit/skills/msf-req/SKILL.md`
-- `plugins/pmos-toolkit/skills/msf-wf/SKILL.md`
-- `plugins/pmos-toolkit/skills/simulate-spec/SKILL.md`
+**Requires state from:** T10 (Phase 3.b/4.a/4.c/6 dispatch sites authored), T12 (chrome-strip.js asset present)
+**TDD:** no — SKILL.md prose edits. Behavior verified end-to-end by T26 Final Verification (FR-72 reviewer-smoke run).
+**Files:**
+- Modify: `plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md` — 4 dispatch sites (Phase 3.b grill, Phase 4.a msf-req, Phase 4.c msf-wf, Phase 6 simulate-spec). The Phase 9 /verify dispatch is NOT modified per FR-50.1.
 
 **Steps:**
 
-- [ ] Step 1: For each of the 5 skills:
-  1. Locate the reviewer-subagent dispatch site (per Subagent A's report from /spec Phase 2: grill 179-200, verify 244-268, msf-req 150-200, msf-wf 220-290, simulate-spec 426-447).
-  2. Insert a "chrome-strip" step immediately before the subagent dispatch: `Bash('node ${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js <artifact>.html > /tmp/<artifact>-stripped.html')`.
-  3. Update the subagent prompt to use the FR-51 canonical template: "Read this HTML content (the document's `<main>` body — chrome already stripped). First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: "<≥40-char verbatim from source>"}`."
-  4. Add a post-dispatch validation block: parent reads `<artifact>.sections.json`, diffs `sections_found` vs ground-truth ids (set equality), substring-greps each finding's `quote` against the source HTML. On mismatch, hard fail (FR-52, FR-72).
-  5. Commit per skill:
-     ```bash
-     git add plugins/pmos-toolkit/skills/<skill>/SKILL.md
-     git commit -m "feat(T13-<skill>): update reviewer prompts to consume chrome-stripped HTML + sections.json validation"
-     ```
+- [ ] Step 1: For each of the 4 dispatch sites (Phase 3.b /grill, Phase 4.a /msf-req, Phase 4.c /msf-wf, Phase 6 /simulate-spec), insert a "Chrome-strip + reviewer dispatch contract" subsection immediately before the existing `/pmos-toolkit:<skill>` invocation. Subsection body (template — substitute `<reviewer>` and `<artifact>` per site):
+
+  ```markdown
+  **Reviewer-subagent contract (FR-50/51/52):**
+
+  1. Chrome-strip: `Bash('node ${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js <artifact>.html > /tmp/<reviewer>-stripped.html')`.
+  2. Pass the stripped HTML inline to the subagent prompt with the canonical FR-51 template: *"Read this HTML content (the document's `<main>` body — chrome already stripped). First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: \"<≥40-char verbatim from source>\"}`."*
+  3. Post-dispatch validation (FR-52, hard-fail):
+     - Read `<artifact>.sections.json` (sibling of the artifact HTML).
+     - Assert `sections_found` set-equality with sections.json `ids[]` (any miss/extra → hard-fail with `[/feature-sdlc] reviewer <reviewer> returned sections_found that do not match <artifact>.sections.json: missing=[...], extra=[...]`).
+     - For each finding, substring-grep `quote` against the un-stripped source HTML (any miss → hard-fail with `[/feature-sdlc] reviewer <reviewer> returned quote not found in source: <quote-prefix-30char>...`).
+     - "no findings" return is allowed only if `sections_found` matches AND the rubric explicitly permits it.
+  4. On any FR-52 hard-fail, the orchestrator pauses with the failure dialog from `reference/failure-dialog.md` (soft-phase variant for grill/msf-req/msf-wf, hard-phase for simulate-spec per its existing tier-3 mandatory status).
+  ```
+
+- [ ] Step 2: Commit
+  ```bash
+  git add plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md
+  git commit -m "feat(T13a): /feature-sdlc orchestrator wires chrome-strip + FR-52 validation at 4 reviewer-dispatch sites (grill, msf-req, msf-wf, simulate-spec)"
+  ```
 
 **Inline verification:**
-- `grep -c "chrome-strip.js" plugins/pmos-toolkit/skills/{grill,verify,msf-req,msf-wf,simulate-spec}/SKILL.md` → ≥5 (one per skill)
+- `grep -c "chrome-strip.js" plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md` → ≥4 (one per dispatch site)
+- `grep -c "sections_found" plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md` → ≥4
+- `grep -c "≥40-char verbatim" plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md` → ≥4
+- `grep -c "FR-52" plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md` → ≥4
+- `grep -cE "Phase 9.*verify|verify.*Phase 9" plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md` → ≥1 (Phase 9 /verify dispatch is preserved un-instrumented per FR-50.1; this asserts the section header still exists, not that it has chrome-strip)
+
+**Done when:** /feature-sdlc Phase 3.b, 4.a, 4.c, 6 each carry the chrome-strip + FR-51 + FR-52 contract block; Phase 9 /verify dispatch is unchanged; all four inline-greps pass.
+
+---
+
+### T13b: 5 reviewer skills document Phase-1 "Input Contract (as subagent)" subsection
+
+**Goal:** In each of `/grill`, `/verify`, `/msf-req`, `/msf-wf`, `/simulate-spec`, add a Phase-1 "Input Contract (when invoked as reviewer subagent)" subsection that documents the FR-51 prompt template the parent will pass and the FR-52 validation the parent will run on return. The skills MUST NOT inline a chrome-strip step or self-validate — those responsibilities live in the parent (T13a). This is a documentation-only edit; runtime behavior is covered by T13a.
+**Spec refs:** FR-50 (reviewer-side contract documentation), FR-51 (canonical template), FR-52 (parent-side validation, cited not implemented), D22
+**Wireframe refs:** none
+**Depends on:** T13a (the parent contract must be authored first so the reviewer-side prose can cite stable line refs)
+**Idempotent:** yes
+**TDD:** no — SKILL.md prose edits. Behavior verified end-to-end by T26 Final Verification (FR-72 smoke).
+**Files:** Modify (5 skills):
+- `plugins/pmos-toolkit/skills/grill/SKILL.md` — Phase 1
+- `plugins/pmos-toolkit/skills/verify/SKILL.md` — Phase 1 (artifact-review contract only — Phase 3 code-diff reviewers are NOT touched per FR-50.1)
+- `plugins/pmos-toolkit/skills/msf-req/SKILL.md` — Phase 1
+- `plugins/pmos-toolkit/skills/msf-wf/SKILL.md` — Phase 1
+- `plugins/pmos-toolkit/skills/simulate-spec/SKILL.md` — Phase 1
+
+**Steps:**
+
+- [ ] Step 1: For each of the 5 skills, insert a subsection at the end of Phase 1 (after the existing input-resolution prose and before Phase 2) titled `### Input Contract (when invoked as reviewer subagent)`. Subsection body (one canonical template; reused verbatim across all 5 skills):
+
+  ```markdown
+  ### Input Contract (when invoked as reviewer subagent)
+
+  When a parent orchestrator (currently `/feature-sdlc`) invokes this skill as a reviewer subagent, the parent has chrome-stripped the artifact via `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js` (FR-50, T12) and passes the stripped slice (`<h1>` + `<main>`) inline as the prompt body. In that mode, this skill skips its own resolver (`_shared/resolve-input.md`) and operates directly on the stripped HTML.
+
+  **Output shape (FR-51 canonical):** the skill MUST first enumerate every `<section>` id and every `<h2>`/`<h3>` id it can locate in the stripped slice, returning them as `sections_found: [...]`. It then evaluates against its own rubric and emits findings as `{section_id, severity, message, quote: "<≥40-char verbatim from source>"}`.
+
+  **Parent-side validation (FR-52, the skill MUST NOT self-validate):** the parent will (a) set-equality-check `sections_found` against `<artifact>.sections.json`, (b) substring-grep every `quote` against the original (un-stripped) source HTML, (c) hard-fail on any miss. This skill does not duplicate that validation; the contract lives in the parent.
+  ```
+
+  For `/verify` specifically, scope this subsection to the artifact-review contract (FR-72 smoke + FR-92 cross-doc anchor scan). Do NOT touch the existing Phase 3 "Multi-Agent Code Quality Review" block — those reviewers consume git diffs not artifact HTML and are explicitly carved out by FR-50.1.
+
+- [ ] Step 2: Commit per skill (one commit each — keeps the audit trail per-skill consistent with T9):
+  ```bash
+  git add plugins/pmos-toolkit/skills/<skill>/SKILL.md
+  git commit -m "feat(T13b-<skill>): document Phase-1 reviewer-subagent input contract (FR-51) + parent-side validation pointer (FR-52)"
+  ```
+
+**Inline verification:**
+- `grep -c "Input Contract (when invoked as reviewer subagent)" plugins/pmos-toolkit/skills/{grill,verify,msf-req,msf-wf,simulate-spec}/SKILL.md` → 5 (one per skill)
 - `grep -c "sections_found" plugins/pmos-toolkit/skills/{grill,verify,msf-req,msf-wf,simulate-spec}/SKILL.md` → ≥5
 - `grep -c "≥40-char verbatim" plugins/pmos-toolkit/skills/{grill,verify,msf-req,msf-wf,simulate-spec}/SKILL.md` → ≥5
+- `grep -c "FR-52" plugins/pmos-toolkit/skills/{grill,verify,msf-req,msf-wf,simulate-spec}/SKILL.md` → ≥5
+- `grep -c "Multi-Agent Code Quality Review" plugins/pmos-toolkit/skills/verify/SKILL.md` → 1 (carve-out preserved untouched per FR-50.1)
+- For verify only: `grep -c "chrome-strip.js" plugins/pmos-toolkit/skills/verify/SKILL.md` → 0 OR 1 (depending on whether the FR-72 smoke documentation lands here vs T26 — the constraint is that NO chrome-strip step appears inside verify's Phase 3 multi-agent code review block; locate the block bounds via grep and assert chrome-strip occurrences fall outside).
 
-**Done when:** all 5 skills have chrome-strip + canonical reviewer prompt + sections.json validation block.
+**Done when:** all 5 skills carry the canonical Input-Contract subsection; /verify's Phase 3 multi-agent code review block remains un-instrumented; all greps above pass.
 
 ---
 
@@ -1435,6 +1499,7 @@ Version bump, README + CHANGELOG, full TN.
 |------|----------|-------------|
 | 0    | Initial draft | n/a — see body |
 | 1    | 4 findings: F1 (W01 ⌘K removal not in any task), F2 (execution-order missed T3→T5 + T8→T11 deps), F3 (T9 R5 simulate-spec write-phase nuance), F4-F6 (missing FR cites + PCRE-incompatible regex in T22). All disposed Fix as proposed. | T8 +Step 6 (W01 ⌘K removal) + Step 7 (per-skill edge cases runbook section); T8 commit message updated; T3 spec-refs add FR-23/FR-42; T8 spec-refs add FR-15/FR-27/FR-90; T9 R5 notes column expanded; T13 spec-refs add FR-53/FR-73; T2 spec-refs add FR-90; Mermaid diagram + T3/T8 Depends-on lines fixed; T22 awk rewrite (POSIX-compat); T17 awk rewrite. FR-coverage gate now: 62 spec FRs / 56+ plan-cited (real misses 0; trailing-dot artifacts harmless). |
+| F (fix-from T13) | /execute T13 plan-defect handoff (commit `151d806`, 2026-05-10) showed the original T13 cited reviewer-subagent dispatch sites at line ranges that don't exist in 4 of 5 skills; only /verify dispatches reviewers and those consume git diffs (carved out by FR-50.1). Single high-risk finding: T13 must be split. | /spec --fix-from FR-50 (commit `1962ecd`) narrowed FR-50/52/72 + added FR-50.1 carve-out + D22 decision; this /plan --fix-from T13 run splits T13 → T13a (parent-side: /feature-sdlc dispatch instrumentation, 1 file, 4 sites) + T13b (reviewer-side: 5 SKILL.md Phase-1 input-contract subsections); P6 Decision-Log entry added; File Map rows replaced; R5 risk reframed to drift between T13a payload and T13b documentation; execution-order list + Mermaid graph updated; T13 → T13a/T13b refs swept across the doc. Pre-cap-abandon backup at `03_plan_pre-cap-abandon_2026-05-10T00-30-00Z.md`. |
 
 ---
 

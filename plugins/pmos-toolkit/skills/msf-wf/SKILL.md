@@ -2,12 +2,12 @@
 name: msf-wf
 description: Evaluate generated wireframes from the end-user perspective with grounded MSF analysis plus PSYCH scoring per screen. Recommendations-only by default; pass --apply-edits (typically when invoked from /wireframes Phase 6) to apply user-approved HTML edits inline. Use when the user says "evaluate the wireframes", "check friction in the UI", "PSYCH score these screens", or "wireframe UX evaluation".
 user-invocable: true
-argument-hint: "<path-to-wireframes-folder> [--apply-edits] [--non-interactive | --interactive]"
+argument-hint: "<path-to-wireframes-folder> [--apply-edits] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # /msf-wf — MSF + PSYCH on a Wireframes Folder
 
-Evaluate a generated wireframes folder by walking each screen with persona-conditional MSF analysis and per-screen PSYCH scoring. Output is a single `msf-findings.md` with embedded PSYCH section. Standalone runs are recommendations-only; pass `--apply-edits` (typically when invoked from `/wireframes` Phase 6) to apply user-approved HTML edits inline.
+Evaluate a generated wireframes folder by walking each screen with persona-conditional MSF analysis and per-screen PSYCH scoring. Output is a single `msf-findings.html` (with `.md` sidecar when `output_format: both`) with embedded PSYCH section. Standalone runs are recommendations-only; pass `--apply-edits` (typically when invoked from `/wireframes` Phase 6) to apply user-approved HTML edits inline.
 
 For requirements-doc-only analysis without wireframes, use `/msf-req` instead.
 
@@ -44,6 +44,10 @@ Use workstream context to inform analysis — product constraints and tech-stack
    - Else → ad-hoc invocation; `{feature_folder}` is unset.
 5. Read `~/.pmos/learnings.md` if present; note entries under `## /msf-wf` and factor them into approach.
 <!-- pipeline-setup-block:end -->
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+6. **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. The numbering continues from the pipeline-setup-block above (which ends at step 5). NOTE: this controls the format of the `msf-findings` sidecar only — wireframe HTML files emitted/edited by `--apply-edits` are never converted (per runbook edge case row 1: wireframes/prototype unmodified).
 
 ---
 
@@ -210,7 +214,7 @@ Walk through each screen following the user's attention path (left-to-right, top
 - Medium-intent (exploring): 40
 - Low-intent (casual/first-time): 25
 
-**Default entry context:** Medium (40). Document the assumption as a header line at the top of `msf-findings.md`:
+**Default entry context:** Medium (40). Document the assumption as a header line at the top of `msf-findings.{html,md}` (rendered as a paragraph immediately after `<h1>` in the HTML primary):
 
 ```
 Entry context: Medium (40, default). Override by editing this line and re-running.
@@ -228,13 +232,27 @@ Focus on elements that stand out as clearly positive or negative. Skip neutral /
 
 ## Phase 7: Save Findings
 
-Save a **single** consolidated findings doc.
+Save a **single** consolidated findings doc per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`. The wireframe HTML files themselves are never converted — only the findings sidecar is governed by this runbook (per runbook edge case row 1).
 
 **Save path:**
-- If invoked inside a pipeline feature folder (`{feature_folder}` resolved in Phase 0) → `{feature_folder}/msf-findings.md`.
-- Else (ad-hoc) → `~/.pmos/msf/YYYY-MM-DD_<slug>.md`, where `<slug>` is derived from the wireframes folder name (lowercase, hyphenated).
+- If invoked inside a pipeline feature folder (`{feature_folder}` resolved in Phase 0) → `{feature_folder}/msf-findings.html`.
+- Else (ad-hoc) → `~/.pmos/msf/YYYY-MM-DD_<slug>.html`, where `<slug>` is derived from the wireframes folder name (lowercase, hyphenated).
 
-**Overwrite protection (E4):** if a findings doc already exists at the save path, copy it to `<save_path>.bak` before overwriting. The `.bak` is preserved for one cycle (next run overwrites it). Skip the backup step if no prior file exists.
+**Atomic write (FR-10.2):** write `msf-findings.html` and the companion `msf-findings.sections.json` via temp-then-rename — never serve a half-written file.
+
+**Asset substrate (FR-10):** when writing into a feature folder, copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files. Ad-hoc saves to `~/.pmos/msf/` write a self-contained HTML referencing `~/.pmos/msf/assets/` (first ad-hoc run seeds the cache).
+
+**Asset prefix (FR-10.1):** `assets/` for top-level feature-folder writes.
+
+**Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML.
+
+**Heading IDs (FR-03.1, enforced by `/verify`):** every `<h2>` and `<h3>` carries a stable kebab-case `id` per `_shared/html-authoring/conventions.md` §3 (lowercase, non-alphanumeric runs → `-`, trim, dedupe collisions with `-2`/`-3`/...). `assert_heading_ids.sh` (T22) blocks any artifact missing an id.
+
+**Index regeneration (FR-22, §9.1):** when writing into a feature folder, regenerate `{feature_folder}/index.html` via `_shared/html-authoring/index-generator.md` (manifest inlined as `<script type="application/json" id="pmos-index">`, no on-disk `_index.json`, FR-41).
+
+**Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `msf-findings.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js msf-findings.html > msf-findings.md`. The MD sidecar is read-only — never the source of truth (FR-33).
+
+**Overwrite protection (E4):** if a findings doc already exists at the save path (either `.html` or legacy `.md`), copy it to `<save_path>.bak` before overwriting. The `.bak` is preserved for one cycle (next run overwrites it). Skip the backup step if no prior file exists.
 
 **File structure:**
 

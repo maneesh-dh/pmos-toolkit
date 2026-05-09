@@ -2,7 +2,7 @@
 name: simulate-spec
 description: Pressure-test a spec against realistic and adversarial scenarios before implementation — scenario trace, artifact fitness critique, interface cross-reference, targeted pseudocode. Optional validator between /spec and /plan in the requirements -> spec -> plan pipeline. Use when the user says "simulate the design", "validate this spec", "will this design actually work", "check for gaps in the design", or has a spec ready for end-to-end scrutiny before implementation.
 user-invocable: true
-argument-hint: "<path-to-spec-doc> [--feature <slug>] [--force] [--non-interactive | --interactive]"
+argument-hint: "<path-to-spec-doc> [--feature <slug>] [--force] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # Spec Simulation Generator
@@ -38,7 +38,13 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /simulate-s
 
 ## Phase 0: Load Workstream Context
 
-Before any other work, follow `_shared/pipeline-setup.md` Section 0 (canonical inline block) to read `.pmos/settings.yaml`, resolve `{docs_path}`, load workstream context, and resolve `{feature_folder}` (with `skill_name=simulate-spec`, `feature_arg=<--feature value or empty>`, `feature_hint=<spec slug or topic>`). Use workstream context to inform critique — product constraints and tech-stack decisions shape what counts as a gap. Also note any entries under `## /simulate-spec` in `~/.pmos/learnings.md` and factor them into your approach for this session. This skill consumes `02_spec.md` (via resolve-input.md) and writes traces under `{feature_folder}/simulate-spec/`.
+Before any other work, follow `_shared/pipeline-setup.md` Section 0 (canonical inline block) to read `.pmos/settings.yaml`, resolve `{docs_path}`, load workstream context, and resolve `{feature_folder}` (with `skill_name=simulate-spec`, `feature_arg=<--feature value or empty>`, `feature_hint=<spec slug or topic>`). Use workstream context to inform critique — product constraints and tech-stack decisions shape what counts as a gap. Also note any entries under `## /simulate-spec` in `~/.pmos/learnings.md` and factor them into your approach for this session. This skill consumes `02_spec.{html,md}` (via resolve-input.md) and writes traces under `{feature_folder}/simulate-spec/`.
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+After the pipeline-setup block above, additionally:
+
+- **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. NOTE: this controls the format of the **trace artifact** only — spec patches applied via the `Edit` tool in Phase 7 are unchanged (the spec is already in its primary format by the time this skill runs; per runbook edge case F3).
 
 ---
 
@@ -454,7 +460,21 @@ Every "Accept as risk" or "Defer as open question" MUST capture rationale. "I do
 
 ## Phase 8: Write Simulation Doc
 
-Save trace files to `{feature_folder}/simulate-spec/{YYYY-MM-DD}-trace.md`. Create the `simulate-spec/` directory if it doesn't exist. If a file with the same date already exists, append `-2`, `-3`, etc. for subsequent runs the same day.
+Save trace files to `{feature_folder}/simulate-spec/{YYYY-MM-DD}-trace.html` per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`. Create the `simulate-spec/` directory if it doesn't exist. If a file with the same date already exists, append `-2`, `-3`, etc. for subsequent runs the same day.
+
+**Atomic write (FR-10.2):** write `<date>-trace.html` and the companion `<date>-trace.sections.json` via temp-then-rename — never serve a half-written file.
+
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
+
+**Asset prefix (FR-10.1):** `simulate-spec/` is one level below the feature folder, so the per-folder relative asset prefix is `../assets/`.
+
+**Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML.
+
+**Heading IDs (FR-03.1, enforced by `/verify`):** every `<h2>` and `<h3>` carries a stable kebab-case `id` per `_shared/html-authoring/conventions.md` §3. `assert_heading_ids.sh` (T22) blocks any artifact missing an id.
+
+**Index regeneration (FR-22, §9.1):** after the trace write completes, regenerate `{feature_folder}/index.html` via `_shared/html-authoring/index-generator.md` (manifest inlined as `<script type="application/json" id="pmos-index">`, no on-disk `_index.json`, FR-41). The trace lands under the `simulate-spec/` phase rank.
+
+**Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `<date>-trace.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js simulate-spec/<date>-trace.html > simulate-spec/<date>-trace.md`. The MD sidecar is read-only (FR-33).
 
 Populate the doc from accumulated state:
 - §1 (Scope) ← from Phase 1
@@ -475,9 +495,10 @@ Read the full template at `reference/simulation-doc-template.md` (relative to th
 
 After writing, commit:
 ```
-git add {feature_folder}/simulate-spec/<file>
+git add {feature_folder}/simulate-spec/<file>.html {feature_folder}/simulate-spec/<file>.sections.json {feature_folder}/simulate-spec/<file>.md {feature_folder}/index.html {feature_folder}/assets
 git commit -m "docs: simulation for <feature>"
 ```
+(Sidecar paths are no-ops when absent; legacy MD-only folders still snapshot cleanly.)
 
 ---
 

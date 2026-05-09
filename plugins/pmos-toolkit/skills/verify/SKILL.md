@@ -202,6 +202,16 @@ All other Phase 1+ behavior is unchanged. Standalone /verify invocations (withou
 3. **Identify what changed.** Run `git diff main...HEAD --stat` (or appropriate base) to see which files were modified. This scopes the verification.
 4. **Check if lint/type/tests were already run.** Ask the user or check recent terminal history. Skip steps already completed — but re-run if you're not confident they were clean.
 
+### Input Contract (when invoked as reviewer subagent)
+
+**Scope:** this contract applies ONLY to the artifact-review path (FR-72 smoke + FR-92 cross-doc anchor scan when /verify is invoked as a reviewer over a single artifact's HTML). The Phase 3 "Multi-Agent Code Quality Review" block below is explicitly carved out per FR-50.1 — those reviewers consume git diffs not artifact HTML and are NOT covered by this contract. Do not apply chrome-strip or FR-52 validation to the Phase 3 code-diff path.
+
+When a parent orchestrator (currently `/feature-sdlc`) invokes this skill as a reviewer subagent over a single artifact, the parent has chrome-stripped the artifact via `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js` (FR-50, T12) and passes the stripped slice (`<h1>` + `<main>`) inline as the prompt body. In that mode, this skill skips its own resolver (`_shared/resolve-input.md`) and operates directly on the stripped HTML.
+
+**Output shape (FR-51 canonical):** the skill MUST first enumerate every `<section>` id and every `<h2>`/`<h3>` id it can locate in the stripped slice, returning them as `sections_found: [...]`. It then evaluates against its own rubric and emits findings as `{section_id, severity, message, quote: "<≥40-char verbatim from source>"}`.
+
+**Parent-side validation (FR-52, the skill MUST NOT self-validate):** the parent will (a) set-equality-check `sections_found` against `<artifact>.sections.json`, (b) substring-grep every `quote` against the original (un-stripped) source HTML, (c) hard-fail on any miss. This skill does not duplicate that validation; the contract lives in the parent.
+
 ---
 
 ## Phase 2: Static Verification (fast, run first)

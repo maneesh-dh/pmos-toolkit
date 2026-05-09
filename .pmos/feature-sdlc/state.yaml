@@ -10,6 +10,9 @@ branch: feat/html-artifacts
 feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
 notes:
   - "Worktree initially created at ../agent-skills-html-artifacts but removed due to Claude Code harness cwd-reset behavior. Pipeline runs on feat/html-artifacts branch in main repo cwd."
+  - "Paused 2026-05-09T11:30Z by user for context-budget; resume via /feature-sdlc --resume. Next phase: msf-req (Tier 3 mandatory)."
+paused_at: 2026-05-09T11:30:07Z
+paused_reason: user
 phases:
   - id: setup
     hardness: infra

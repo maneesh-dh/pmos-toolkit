@@ -1,0 +1,87 @@
+schema_version: 1
+slug: html-artifacts
+tier: null
+mode: interactive
+started_at: 2026-05-09T10:53:49Z
+last_updated: 2026-05-09T10:55:00Z
+current_phase: requirements
+worktree_path: null
+branch: feat/html-artifacts
+feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
+notes:
+  - "Worktree initially created at ../agent-skills-html-artifacts but removed due to Claude Code harness cwd-reset behavior. Pipeline runs on feat/html-artifacts branch in main repo cwd."
+phases:
+  - id: setup
+    hardness: infra
+    status: completed
+    artifact_path: null
+    started_at: 2026-05-09T10:53:49Z
+    completed_at: 2026-05-09T10:53:49Z
+  - id: worktree
+    hardness: infra
+    status: skipped
+    artifact_path: null
+    notes: "worktree removed; running on branch in main repo cwd"
+  - id: init-state
+    hardness: infra
+    status: completed
+    artifact_path: 00_pipeline.md
+    started_at: 2026-05-09T10:55:00Z
+    completed_at: 2026-05-09T10:55:00Z
+  - id: requirements
+    hardness: hard
+    status: pending
+    artifact_path: null
+  - id: grill
+    hardness: soft
+    status: pending
+    artifact_path: null
+  - id: msf-req
+    hardness: soft
+    status: pending
+    artifact_path: null
+  - id: creativity
+    hardness: soft
+    status: pending
+    artifact_path: null
+  - id: wireframes
+    hardness: soft
+    status: pending
+    artifact_path: null
+  - id: prototype
+    hardness: soft
+    status: pending
+    artifact_path: null
+  - id: spec
+    hardness: hard
+    status: pending
+    artifact_path: null
+  - id: simulate-spec
+    hardness: soft
+    status: pending
+    artifact_path: null
+  - id: plan
+    hardness: hard
+    status: pending
+    artifact_path: null
+  - id: execute
+    hardness: hard
+    status: pending
+    artifact_path: null
+  - id: verify
+    hardness: hard
+    status: pending
+    artifact_path: null
+  - id: complete-dev
+    hardness: hard
+    status: pending
+    artifact_path: null
+  - id: final-summary
+    hardness: infra
+    status: pending
+    artifact_path: null
+  - id: capture-learnings
+    hardness: infra
+    status: pending
+    artifact_path: null
+open_questions_log: []

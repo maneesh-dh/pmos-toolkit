@@ -50,7 +50,7 @@ Save to `{feature_folder}/<NN>_<artifact>.html` per the substrate at `${CLAUDE_P
 
 **Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically without per-skill prose updates. Idempotent — `cp -n` (no-clobber) or `rsync --update` skips identical files; on initial setup an unconditional `cp assets/* feature_folder/assets/` is fine.
 
-**Asset prefix (FR-10.1):** compute the per-folder relative asset prefix. For top-level feature-folder artifacts the prefix is `assets/`; for nested-folder artifacts (`wireframes/`, `prototype/`, `grills/`, `simulate-spec/`, `verify/<scope>/`) the prefix is `../assets/` (one level up).
+**Asset prefix (FR-10.1):** compute the per-folder relative asset prefix. For top-level feature-folder artifacts the prefix is `assets/`; for nested-folder artifacts (`wireframes/`, `prototype/`, `grills/`, `simulate-spec/`, flat `verify/<YYYY-MM-DD>-review.html`) the prefix is `../assets/` (one level up); for doubly-nested artifacts (phase-scoped `verify/<YYYY-MM-DD>-phase-<N>/review.html`) the prefix is `../../assets/` (two levels up). Skills that emit doubly-nested artifacts (`/verify` phase-scoped runs) MUST select the deeper prefix at write time.
 
 **Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML (the substrate `template.html` already does this for the loader pair; skill-emitted inline `<link>` / `<script>` references must follow suit).
 
@@ -128,8 +128,15 @@ Run after applying §§2–6 to a skill:
 bash tests/scripts/assert_no_md_to_html.sh plugins/pmos-toolkit/skills/<skill>/
 
 # T20 inline-substitute (until T20 lands): single grep that approximates the gate.
+# Exclusion list covers: legacy-MD shim refs (FR-22), explicit sidecar prose, the
+# resolver pointer, /backlog item paths, workstream pointers, mixed-format
+# (output_format=both), the html-to-md.js converter mention, the
+# `<artifact>.{html,md}` shape, the `{ext}` placeholder used by /design-crit,
+# and the four per-skill auxiliary-MD carve-outs documented in row 7
+# (/plan _review/_skip-list/_auto/_blocked sidecars; /design-crit
+# eval-findings-review.md platform fallback).
 ! grep -rEn '<NN>_<artifact>\.md\b' plugins/pmos-toolkit/skills/<skill>/SKILL.md \
-  | grep -vE 'legacy|sidecar|resolve-input|backlog/items|workstream'
+  | grep -vE 'legacy|sidecar|resolve-input|backlog/items|workstream|format: both|format=both|html-to-md|\.\{html,md\}|\{ext\}|_review|_skip-list|_auto|_blocked|eval-findings-review'
 
 # T22 (lands in Phase 4): heading-id assertion against a fixture artifact.
 bash tests/scripts/assert_heading_ids.sh <feature_folder>/<NN>_<artifact>.html

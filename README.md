@@ -45,6 +45,13 @@ pmos-toolkit/
 | `/pmos-toolkit:verify` | Post-implementation verification gate — lint, test, multi-agent code review, interactive QA |
 | `/pmos-toolkit:complete-dev` | End-of-dev orchestrator — merge, deploy per repo norms, capture learnings, /changelog, version bump, commit, tag, push to all remotes. Supersedes legacy /push (which remains available this release; will be removed next release) |
 
+### Pipeline orchestrators
+
+| Skill | Description |
+|-------|-------------|
+| `/pmos-toolkit:feature-sdlc` | End-to-end SDLC orchestrator — turns an initial idea into a shipped feature by sequentially driving requirements → grill → optional gates → spec → simulate-spec → plan → execute → verify → complete-dev. Auto-tiers, creates worktree + branch, persists resumable state inside the worktree, surfaces compact checkpoints before heavy phases |
+| `/pmos-toolkit:update-skills` | Ingest feedback (raw text or `/retro` paste-back), triage proposed changes per skill with user approval, then run the requirements -> spec -> (grill) -> plan -> execute -> verify pipeline (auto-tiered per skill) sequentially. Use when you want retro/feedback turned into shipped changes end-to-end |
+
 ### Pipeline enhancers (optional)
 
 | Skill | Description |
@@ -53,7 +60,6 @@ pmos-toolkit/
 | `/pmos-toolkit:msf-wf` | Grounded MSF + PSYCH analysis on a wireframes folder; `--apply-edits` to apply HTML edits inline (typically invoked from /wireframes Phase 6) |
 | `/pmos-toolkit:creativity` | Structured creativity techniques for non-obvious improvements |
 | `/pmos-toolkit:grill` | Adversarially interview a plan, spec, or design to surface unresolved decisions and shaky assumptions |
-| `/pmos-toolkit:update-skills` | Ingest feedback (raw text or `/retro` paste-back), triage proposed changes per skill with user approval, then run the requirements -> spec -> (grill) -> plan -> execute -> verify pipeline (auto-tiered per skill) sequentially. Use when you want retro/feedback turned into shipped changes end-to-end |
 
 ### Artifacts & docs
 
@@ -90,7 +96,7 @@ pmos-toolkit/
                    optional bridges (UI features)    optional enhancers                  optional validator
 ```
 
-`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/update-skills`, `/diagram`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
+`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/feature-sdlc`, `/update-skills`, `/diagram`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
 
 ## Install
 

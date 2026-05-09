@@ -2,7 +2,7 @@
 name: feature-sdlc
 description: End-to-end SDLC orchestrator that turns an initial idea (text or doc) into a shipped feature by sequentially driving the full pmos-toolkit pipeline — worktree creation, requirements, grill, optional MSF/creativity/wireframes/prototype, spec, optional simulate-spec, plan, execute, verify, and complete-dev — auto-tiering each stage and persisting resumable state inside the worktree. Use when the user says "build this feature end-to-end", "run the full SDLC", "take this idea through to ship", "feature-sdlc this", "/feature-sdlc", or "drive the pipeline for me".
 user-invocable: true
-argument-hint: "<initial idea text | path to brief/doc> [--tier 1|2|3] [--resume] [--no-worktree] [--non-interactive | --interactive] [--backlog <id>]"
+argument-hint: "<initial idea text | path to brief/doc> [--tier 1|2|3] [--resume] [--no-worktree] [--format <html|md|both>] [--non-interactive | --interactive] [--backlog <id>]"
 ---
 
 # Feature SDLC
@@ -39,7 +39,7 @@ These instructions use Claude Code tool names. In other environments:
 - **No interactive prompt tool:** Slug confirmation, optional-stage gates, compact checkpoint, failure dialog, and resume status table all degrade to numbered free-form prompts per `_shared/interactive-prompts.md`. The non-interactive auto-pick contract still applies (Recommended → AUTO-PICK).
 - **No subagents:** Pipeline dispatch is sequential per-phase by design; no parallel work to degrade.
 - **No Playwright / MCP:** Not used by this skill — child skills handle their own browser automation.
-- **TaskCreate / TodoWrite missing:** Skill body works without task tracking; the pipeline-status table in `00_pipeline.md` is the canonical progress artifact.
+- **TaskCreate / TodoWrite missing:** Skill body works without task tracking; the pipeline-status table in `00_pipeline.{html,md}` is the canonical progress artifact.
 - **`.pmos/settings.yaml` missing:** Run `_shared/pipeline-setup.md` Section A first-run setup before resolving paths.
 - **Non-interactive contract:** the canonical `<!-- non-interactive-block -->` below inlines the contract from `_shared/non-interactive.md` byte-for-byte (audit-recommended.sh greps for it).
 - **Platform-aware strings:** the resume command in `reference/compact-checkpoint.md` and the `[mode: <current-mode>]` subagent prefix use the per-platform `execute_invocation` mapping in `_shared/platform-strings.md`.
@@ -62,6 +62,10 @@ Inline `_shared/pipeline-setup.md` (relative to the skills directory) to:
 5. Read `~/.pmos/learnings.md` if present; note any entries under `## /feature-sdlc` and factor them into your approach. Skill body wins on conflict; surface conflicts to user before applying.
 
 Workstream IS loaded — this is a feature-level orchestrator.
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+6. **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. Pass the resolved value through to every dispatched child skill via the `[mode: <current-mode>]\n` first-line convention plus an additional `[output_format: <resolved>]\n` line so children inherit without re-reading settings.
 
 <!-- non-interactive-block:start -->
 1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
@@ -218,7 +222,7 @@ When state.yaml is present:
    - `state.schema_version > current code's max` → abort with: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`.
    - `state.schema_version < current code's max` → auto-migrate; log to chat: `migration: state.schema vM → vN (added: <fields>)`.
 2. **Validate recorded artifact paths.** For every `phases[].artifact_path` that's non-null, check that the file exists. On any missing required artifact, print the list to chat and `AskUserQuestion`: **Continue anyway (treat as orphaned)** / **Abort**.
-3. **Print status table** to chat from `00_pipeline.md` short-form (3 columns: phase | status | artifact). This table is **presentational, not interrogative** — see Anti-pattern below.
+3. **Print status table** to chat from `00_pipeline.{html,md}` short-form (3 columns: phase | status | artifact). This table is **presentational, not interrogative** — see Anti-pattern below.
 4. **Resume cursor:** find the first `phases[]` entry whose status is in `{paused, failed, pending, in_progress}` and jump to that phase. If a `paused` or `failed` entry is found first, surface the corresponding dialog (`reference/compact-checkpoint.md` for compact-paused; `reference/failure-dialog.md` for failed/failure-paused).
 5. **Skip Phases 0.a and 1** — worktree, slug, and state.yaml already exist.
 
@@ -237,7 +241,16 @@ Atomically (per `reference/pipeline-status-template.md` Update protocol):
    - `current_phase: requirements` (the next phase to run).
    - `phases[]` populated in declared order from `state-schema.md` "Phase identifiers + hardness", every status `pending`.
    - `open_questions_log: []`.
-2. Write `<feature_folder>/00_pipeline.md` from the template in `reference/pipeline-status-template.md`.
+2. Write `<feature_folder>/00_pipeline.html` from the template in `reference/pipeline-status-template.md`, rendered through the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`.
+
+   - **Atomic write (FR-10.2):** temp-then-rename.
+   - **Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `<feature_folder>/assets/` (`cp -n` is idempotent).
+   - **Asset prefix (FR-10.1):** `assets/` (top-level feature-folder write).
+   - **Cache-bust (FR-10.3):** `?v=<plugin-version>` on all asset URLs.
+   - **Heading IDs (FR-03.1):** every `<h2>` and `<h3>` carries a stable kebab-case `id` per `_shared/html-authoring/conventions.md` §3.
+   - **No sections.json companion** for orchestrator artifacts (per runbook edge case row 3 — `00_pipeline.html` has no `<h2>`-anchored TOC of substantive content; the status table is the body).
+   - **Index regeneration (FR-22, §9.1):** seed `<feature_folder>/index.html` via `_shared/html-authoring/index-generator.md` — at this point the manifest contains a single entry for `00_pipeline.html` (subsequent child-skill writes will trigger their own regenerations to extend the manifest).
+   - **Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `00_pipeline.md` via `bash node <feature_folder>/assets/html-to-md.js 00_pipeline.html > 00_pipeline.md`.
 3. Print the in-chat short-form status table.
 
 ## Phase 2: Compact checkpoint (recurring micro-phase)
@@ -251,7 +264,7 @@ Skills cannot trigger `/compact` directly — only the user can. The checkpoint 
 After every phase end (pass / fail / skip / pause), do all three atomically — never partial:
 
 1. Update `state.yaml`.
-2. Regenerate `00_pipeline.md`.
+2. Regenerate `00_pipeline.html` (and `00_pipeline.md` sidecar when `output_format=both`) via the atomic-write + cache-bust + asset-prefix rules from Phase 1 step 2. The index regen on each phase-end picks up any sibling artifacts emitted by the just-completed child phase.
 3. Print the in-chat short-form status table.
 
 A failed update of any one of these three breaks the resume contract. Rolling back the partial write is the implementor's responsibility.
@@ -264,7 +277,7 @@ Pass `--backlog <id>` through if it was given to `/feature-sdlc`.
 
 After completion:
 
-- Capture artifact path: `<feature_folder>/01_requirements.md`. Write to `state.yaml.phases.requirements.artifact_path`.
+- Capture artifact path: `<feature_folder>/01_requirements.{html,md}` (resolve via `_shared/resolve-input.md` `phase=requirements` to find whichever extension the child wrote based on the resolved `output_format`). Write to `state.yaml.phases.requirements.artifact_path`.
 - Read auto-tier from the requirements doc frontmatter; if `{tier}` was unset, set it now. If `{tier}` was set and the auto-tier differs, log `child_tier_divergence: <orchestrator=<N>, child=<M>>` and continue (do not override).
 - If `mode == non-interactive`, locate the child's OQ artifact (per the canonical non-interactive block conventions) and append to `state.yaml.open_questions_log[]`.
 
@@ -282,11 +295,11 @@ Skipped /grill: --non-interactive flag (Tier <N> normally requires it).
 
 Status table records `status: skipped-non-interactive`. Per FR-PHASE-TAGS (spec §15 G5) and Anti-pattern #7 (spec §12).
 
-Otherwise, invoke `/pmos-toolkit:grill` with `<feature_folder>/01_requirements.md` as the target.
+Otherwise, invoke `/pmos-toolkit:grill` with `<feature_folder>/01_requirements.{html,md}` (resolved primary path) as the target.
 
 After completion:
 
-- Capture artifact path: `<feature_folder>/grills/<YYYY-MM-DD>_01_requirements.md`. Write to `state.yaml`.
+- Capture artifact path: `<feature_folder>/grills/<YYYY-MM-DD>_01_requirements.{html,md}` (extension follows /grill's resolved `output_format`). Write to `state.yaml`.
 - Append OQ artifact to `open_questions_log[]` if non-interactive.
 
 On failure: soft-phase failure dialog from `reference/failure-dialog.md` (Skip option SHOWN).
@@ -304,7 +317,7 @@ options:
 
 Recommended switches per `{tier}` (FR-TIER-SCOPE).
 
-On Run: invoke `/pmos-toolkit:msf-req` with `<feature_folder>/01_requirements.md`. On missing-skill platform error: missing-skill dialog (soft variant) from `reference/failure-dialog.md`.
+On Run: invoke `/pmos-toolkit:msf-req` with the resolved primary `<feature_folder>/01_requirements.{html,md}`. On missing-skill platform error: missing-skill dialog (soft variant) from `reference/failure-dialog.md`.
 
 ## Phase 4.b: /creativity gate (soft)
 
@@ -364,11 +377,11 @@ On missing-skill: soft-variant missing-skill dialog.
 
 ## Phase 5: /spec (hard)
 
-Invoke `/pmos-toolkit:spec` with `<feature_folder>/01_requirements.md` and `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n`.
+Invoke `/pmos-toolkit:spec` with `<feature_folder>/01_requirements.{html,md}` (resolved primary) and `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n` and `[output_format: <resolved>]\n`.
 
 After completion:
 
-- Capture artifact path: `<feature_folder>/02_spec.md`.
+- Capture artifact path: `<feature_folder>/02_spec.{html,md}` (resolve via `_shared/resolve-input.md` `phase=spec`).
 - Append OQ artifact to `open_questions_log[]` if non-interactive.
 
 No compact checkpoint before this phase — `/spec` context is moderate.
@@ -394,9 +407,9 @@ On missing-skill: soft-variant missing-skill dialog.
 
 ## Phase 7: /plan (hard)
 
-Invoke `/pmos-toolkit:plan` with `<feature_folder>/02_spec.md` (the spec is the source of truth; `/plan` will resolve the feature folder from settings + `--feature` if needed). Pass `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n`.
+Invoke `/pmos-toolkit:plan` with `<feature_folder>/02_spec.{html,md}` (resolved primary; the spec is the source of truth; `/plan` will resolve the feature folder from settings + `--feature` if needed). Pass `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n` and `[output_format: <resolved>]\n`.
 
-After completion: capture `<feature_folder>/03_plan.md`. Append OQ artifact if non-interactive.
+After completion: capture `<feature_folder>/03_plan.{html,md}` (resolve via `_shared/resolve-input.md` `phase=plan`). Append OQ artifact if non-interactive.
 
 On failure: hard-phase failure dialog.
 
@@ -432,11 +445,11 @@ On failure: hard-phase failure dialog.
 
 ## Phase 11: Final summary
 
-Print the full pipeline-status table from `00_pipeline.md`, plus:
+Print the full pipeline-status table from `00_pipeline.html` (or `00_pipeline.md` sidecar in mixed-format mode), plus:
 
 - Branch + tag info from `/complete-dev` output.
-- Links to every artifact (`01_requirements.md`, `02_spec.md`, `03_plan.md`, plus child-skill sidecars).
-- If `state.yaml.open_questions_log[]` is non-empty: write `<feature_folder>/00_open_questions_index.md` with one section per logged child skill (path + deferred count) per FR-OQ-INDEX / spec §15 G4. Link to the index in the chat summary.
+- Links to every artifact (`01_requirements.{html,md}`, `02_spec.{html,md}`, `03_plan.{html,md}`, plus child-skill sidecars). Use the resolver substrate (or `<feature_folder>/index.html`'s inlined manifest) to find each artifact's actual on-disk extension.
+- If `state.yaml.open_questions_log[]` is non-empty: write `<feature_folder>/00_open_questions_index.html` with one section per logged child skill (path + deferred count) per FR-OQ-INDEX / spec §15 G4. Apply the same write-phase rules as `00_pipeline.html` (atomic write, asset prefix `assets/`, cache-bust, heading IDs, no `sections.json` companion per runbook edge case row 3, index regen). Mixed-format sidecar emitted as `00_open_questions_index.md` when `output_format=both`. Link to the HTML primary in the chat summary.
 - Final one-liner: `Pipeline complete for <slug>. Branch feat/<slug> merged to main and tagged via /complete-dev.`
 
 ## Phase 12: Capture Learnings
@@ -450,7 +463,7 @@ Print the full pipeline-status table from `00_pipeline.md`, plus:
 - README row added under **Pipeline / Orchestrators** (alongside `/update-skills`); standalone-line updated to include `/feature-sdlc`.
 - Next release will require a **minor** version bump in BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json` (versions must stay in sync — pre-push hook enforces).
 - **Plugin.json description sync (FR-RELEASE.iii):** the skill description fields in both manifests must be byte-identical.
-- **Argument-hint matches parsed flags (FR-RELEASE.i):** the `argument-hint:` frontmatter must enumerate every flag actually parsed in Phase 0 (`--tier`, `--resume`, `--no-worktree`, `--non-interactive`, `--interactive`, `--backlog`).
+- **Argument-hint matches parsed flags (FR-RELEASE.i):** the `argument-hint:` frontmatter must enumerate every flag actually parsed in Phase 0 (`--tier`, `--resume`, `--no-worktree`, `--format`, `--non-interactive`, `--interactive`, `--backlog`).
 - **Natural-trigger phrases (FR-RELEASE.ii):** the `description:` field must include ≥5 user-spoken phrases. Current set: "build this feature end-to-end", "run the full SDLC", "take this idea through to ship", "feature-sdlc this", "/feature-sdlc", "drive the pipeline for me".
 - **Learnings header bootstrap:** add `## /feature-sdlc` section header to `~/.pmos/learnings.md` (idempotent — only append if missing).
 - No new schema files outside this skill's own `reference/state-schema.md`. No `plugin.json` `skills` array changes (skills auto-discovered from directory).
@@ -462,7 +475,7 @@ Print the full pipeline-status table from `00_pipeline.md`, plus:
 3. **Dispatching child skills with a "see the state file" prompt.** Each child gets a self-contained brief (initial context for `/requirements`; full requirements doc path for `/spec`; etc.). Child skills must not reach into `state.yaml` — that file is the orchestrator's private state.
 4. **Auto-running optional stages without the gate.** `/msf-req`, `/creativity`, `/wireframes`, `/prototype`, `/simulate-spec` each have an explicit `AskUserQuestion` gate. Recommended-default is fine; silent run is not.
 5. **Frontend-detection by LLM gut-feel.** Use `reference/frontend-detection.md` heuristics deterministically; surface uncertainty via `AskUserQuestion` rather than guessing. The gate is always presented (FR-FRONTEND-GATE).
-6. **Forgetting to update `state.yaml` after a child-skill completion.** Every phase end must atomically (a) update `state.yaml`, (b) regenerate `00_pipeline.md`, (c) print the in-chat status table. Skipping any of these breaks resume.
+6. **Forgetting to update `state.yaml` after a child-skill completion.** Every phase end must atomically (a) update `state.yaml`, (b) regenerate `00_pipeline.html` (and the `.md` sidecar when `output_format=both`), (c) print the in-chat status table. Skipping any of these breaks resume.
 7. **Treating `--non-interactive` as "skip /grill silently".** The skill must log `phase: grill / status: skipped-non-interactive / reason: --non-interactive flag` so the user knows what was skipped on review.
 8. **Resuming from a state file with stale artifact paths.** On resume (Phase 0.b), validate every recorded artifact path still exists; if any required artifact is missing, surface to user before continuing — do not re-invoke a phase silently.
 9. **Conflating `--tier` override with per-child auto-tiering.** `--tier` sets the orchestrator's expected scope (drives gates) AND is passed to children that accept it (`/requirements`, `/spec`, `/plan`). Children may auto-tier-escalate; log divergence in `child_tier_divergence` rather than overriding.

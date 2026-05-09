@@ -154,9 +154,9 @@ Resolve the wireframes folder argument. Required structure:
 
 1. Confirm the folder exists.
 2. Read **every** `.html` file in the folder, recursively (including subfolders like `wireframes/components/`). Each file represents a screen or component the user encounters.
-3. Read sibling `01_requirements.md` if present at `{feature_folder}/01_requirements.md` — this provides persona context to ground the analysis.
+3. Read sibling requirements doc if present, via `_shared/resolve-input.md` with `phase=requirements`, `label="sibling requirements doc"` — locates either `{feature_folder}/01_requirements.html` (preferred) or `{feature_folder}/01_requirements.md` (legacy fallback). This provides persona context to ground the analysis.
 4. If the folder is missing or contains zero `.html` files → exit with an error. Do NOT silently degrade to req-doc-only analysis.
-5. If `01_requirements.md` is missing → continue, but flag in the findings doc that persona alignment was inferred from wireframes only.
+5. If the resolver returns no requirements doc → continue, but flag in the findings doc that persona alignment was inferred from wireframes only.
 
 ---
 
@@ -164,7 +164,7 @@ Resolve the wireframes folder argument. Required structure:
 
 Follow `../_shared/msf-heuristics.md` "Persona Alignment" section. Behavior:
 
-- First, extract any personas explicitly named in the sibling `01_requirements.md` (if present), or in wireframe copy (header text, "for [user-type]" labels, etc.).
+- First, extract any personas explicitly named in the sibling `01_requirements.{html,md}` (if present, located via the Phase 2 resolver), or in wireframe copy (header text, "for [user-type]" labels, etc.).
 - Propose those for confirmation.
 - If neither source names personas, propose 2–5 inferred personas (max 2 scenarios each) from the wireframe flow + workstream context.
 <!-- defer-only: ambiguous -->

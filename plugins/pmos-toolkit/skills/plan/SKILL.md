@@ -281,7 +281,7 @@ tier: 1|2|3
 type: bugfix|enhancement|feature
 feature: <slug>
 spec_ref: 02_spec.{html,md}
-requirements_ref: ../requirements/01_requirements.md
+requirements_ref: ../requirements/01_requirements.{html,md}
 date: YYYY-MM-DD
 status: Draft
 commit_cadence: per-task

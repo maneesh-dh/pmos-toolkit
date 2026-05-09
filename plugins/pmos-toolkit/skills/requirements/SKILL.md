@@ -2,7 +2,7 @@
 name: requirements
 description: Brainstorm, shape, and create a requirements document — problem definition, high-level solution direction, user journeys, research synthesis. First stage in the requirements -> spec -> plan pipeline. Auto-tiers by scope (bug fix / enhancement / feature). Use this skill when the user says things like "I have a feature idea", "let's brainstorm", "what should we build", "define what we need", "help me figure out the requirements", or shares initial thoughts about a problem to solve.
 user-invocable: true
-argument-hint: "<initial thoughts or observations to seed the requirements> [--feature <slug>] [--backlog <id>] [--non-interactive | --interactive]"
+argument-hint: "<initial thoughts or observations to seed the requirements> [--feature <slug>] [--backlog <id>] [--non-interactive | --interactive] [--format <html|md|both>]"
 ---
 
 # Requirements Document Generator
@@ -16,7 +16,7 @@ Brainstorm with the user, research existing patterns, and produce a requirements
 
 A requirements doc answers "What are we building and why?" — it contains ZERO implementation details. No database schemas, no API contracts, no code. Those belong in the spec.
 
-**The acid test (dual):** (a) Could a product designer read every sentence and use it to evaluate design options? (b) Could a spec author write `02_spec.md` from this doc with no remaining "why are we building this?" or "what's the user trying to do?" questions? If either fails, the doc isn't done.
+**The acid test (dual):** (a) Could a product designer read every sentence and use it to evaluate design options? (b) Could a spec author write `02_spec.{html,md}` from this doc with no remaining "why are we building this?" or "what's the user trying to do?" questions? If either fails, the doc isn't done.
 
 **Announce at start:** "Using the requirements skill to brainstorm and create a requirements document."
 
@@ -58,6 +58,10 @@ This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skil
 5. **Edge cases — you MUST `Read` `_shared/pipeline-setup.md` Section B before acting:** slug collision, slug validation failure, legacy date-less folder encountered, ambiguous `--feature` lookup, any folder creation.
 6. Read `~/.pmos/learnings.md` if present; note entries under `## /<this-skill-name>` and factor them into approach (skill body wins on conflict; surface conflicts to user before applying).
 <!-- pipeline-setup-block:end -->
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+7. **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. The numbering continues from the pipeline-setup-block above (which ends at step 6).
 
 <!-- non-interactive-block:start -->
 1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
@@ -155,7 +159,7 @@ The user's input can take several forms. Handle each via mode-specific phase rou
 | Input Mode | What you receive | Phase routing |
 |------------|-----------------|---------------|
 | **Raw thoughts** | Rough observations, problem statement, or scattered ideas | Full flow (Phase 2 research → Phase 3 brainstorm → Phase 4 write) |
-| **Existing doc update** | Path to existing `01_requirements.md` + new observations | **Skip Phase 2 full research**; read prior Research Sources and refresh only delta-relevant areas (Phase 2 update-path). Phase 3 brainstorm runs on the delta only. |
+| **Existing doc update** | Path to existing `01_requirements.{html,md}` + new observations (resolver picks the format that exists) | **Skip Phase 2 full research**; read prior Research Sources and refresh only delta-relevant areas (Phase 2 update-path). Phase 3 brainstorm runs on the delta only. |
 <!-- defer-only: ambiguous -->
 | **Multiple text inputs** | Several pasted texts, screenshots, or references | **Add Phase 1.5 synthesis step**: synthesize all inputs into a coherent problem statement; confirm understanding via `AskUserQuestion`; then proceed to Phase 2 |
 | **Spec or detailed brief** | Already well-formed requirements that need shaping | **Skip Phase 3 brainstorm**; structure inputs into the template; Phase 5 review applies a gap-analysis lens specifically |
@@ -169,11 +173,11 @@ The user's input can take several forms. Handle each via mode-specific phase rou
    - The pieces can **ship independently** (no required ordering for value), AND
    - The pieces have **non-overlapping acceptance criteria**.
    If all three hold → propose N feature slugs, ask which to start with, run `/requirements` once per folder. **If any one fails** → treat as a single Tier 3 feature with multiple journeys; do not decompose.
-3. **Check for existing requirements.** Look in `{feature_folder}/01_requirements.md` for an existing file covering this feature.
+3. **Check for existing requirements.** Resolve the prior artifact via `_shared/resolve-input.md` with `phase=requirements`, `label="prior requirements doc"` (prefers `01_requirements.html`, falls back to `01_requirements.md`, errors on neither — but in this skill, "neither" is the fresh-start case, not an error).
    - If found: read it, summarize what's there, ask the user if this is an update or fresh start.
    <!-- defer-only: ambiguous -->
-   - **If found AND `02_spec.md` or `03_plan.md` also exist in the folder:** issue a downstream-drift warning via `AskUserQuestion` BEFORE any further work:
-     > Updating requirements will desync `02_spec.md` and/or `03_plan.md`. Continue / cancel / run /verify after?
+   - **If found AND any of `02_spec.{html,md}` or `03_plan.{html,md}` also exist in the folder:** issue a downstream-drift warning via `AskUserQuestion` BEFORE any further work:
+     > Updating requirements will desync the spec and/or plan. Continue / cancel / run /verify after?
 4. **Detect the tier** based on these explicit signals. Pick the **highest-tier signal that fires**:
 
 | Tier | Signals (any one fires the tier) |
@@ -239,7 +243,7 @@ Collect sources (URLs, product names, library docs, blog posts) — these go int
 
 ### Update-path: refresh stale research selectively
 
-If Phase 1 detected an existing `01_requirements.md` and the user picked "update":
+If Phase 1 detected an existing `01_requirements.{html,md}` (via the resolver) and the user picked "update":
 
 1. Read the prior Research Sources table.
 2. For each row, check if its takeaway still holds (file still exists, URL still resonant for the delta).
@@ -293,18 +297,33 @@ Stop interviewing when:
 
 ## Phase 4: Write the Document
 
-Save to `{feature_folder}/01_requirements.md`.
+Save to `{feature_folder}/01_requirements.html` per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`.
+
+**Atomic write (FR-10.2):** write `01_requirements.html` and the companion `01_requirements.sections.json` via temp-then-rename — never serve a half-written file.
+
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` (no-clobber) or `rsync --update` skips identical files.
+
+**Asset prefix (FR-10.1):** for top-level feature-folder artifacts the prefix is `assets/`. Compute per-file relative prefixes for any nested-folder artifacts.
+
+**Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML (the substrate `template.html` already does this for the loader pair; skill-emitted inline `<link>` / `<script>` references must follow suit).
+
+**Heading IDs (FR-03.1):** every `<h2>` and `<h3>` MUST carry a stable kebab-case `id`. See "Heading IDs" note in the Templates section below.
+
+**Index regeneration (FR-22, §9.1):** after the artifact write completes, regenerate `{feature_folder}/index.html` by inlining the manifest per `_shared/html-authoring/index-generator.md` (no on-disk `_index.json` is written; the manifest is inlined as `<script type="application/json" id="pmos-index">`, FR-41). Honour the §9.1 phase-rank ordering policy.
+
+**Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `01_requirements.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js 01_requirements.html > 01_requirements.md`. The MD sidecar is read-only — never the source of truth (FR-33).
 
 ### Pre-write safety
 
 Before writing:
 
-1. Run `git status` on `{feature_folder}/01_requirements.md`.
+1. Run `git status` on `{feature_folder}/01_requirements.html` (and `.md` if `output_format: both`).
 2. **If the file is dirty (uncommitted changes):** snapshot-commit before overwriting:
    ```
-   git add {feature_folder}/01_requirements.md
+   git add {feature_folder}/01_requirements.html {feature_folder}/01_requirements.md
    git commit -m "snapshot: pre-/requirements-rewrite"
    ```
+   (`git add` on a non-existent path is a no-op, so this works for legacy MD-only folders as well.)
 3. Then overwrite with the new content. Git provides version history.
 
 ### Commit message verb
@@ -317,6 +336,10 @@ After the write, commit with a verb conditional on whether the file existed at P
 ### Templates
 
 Use the template matching the detected tier. Delete sections marked optional ("omit if empty") for that tier.
+
+**Heading IDs (FR-03.1, enforced by `/verify`).** Every `<h2>` and `<h3>` carries a stable kebab-case `id`. Compute via `_shared/html-authoring/conventions.md` §3 — lowercase the heading text, replace every non-alphanumeric run with a single `-`, trim leading/trailing `-`, dedupe collisions with `-2`/`-3`/... suffixes. Stable IDs let cross-doc anchors (`02_spec.html#fr-10`, `03_plan.html#t8`) resolve deterministically across regenerations. `assert_heading_ids.sh` (T22) blocks any artifact missing an id.
+
+The Tier templates below describe the **section structure** (what content goes where); when emitting HTML, wrap each `## ` section as a `<section id="...">` with an `<h2 id="...">` heading per the conventions doc above. The MD-shape templates remain authoritative for content; the HTML rendering applies on top.
 
 #### Tier 1 Template: Bug / Minor Fix
 
@@ -666,6 +689,6 @@ If `--backlog <id>` was set and the doc + commit succeeded, invoke `/backlog set
 - Do NOT write non-goals without a "because" reason.
 - Do NOT default to generic B2B-SaaS competitors (Linear/Stripe/Notion) when researching. Pick in-domain peers.
 - Do NOT infer architecture-level diagrams as "high-level approach" — diagrams in this doc must depict user-observable behavior only.
-- Do NOT silently overwrite an existing `01_requirements.md` — snapshot-commit first if dirty.
-- Do NOT proceed past Phase 1 if `02_spec.md` or `03_plan.md` exist without surfacing the drift warning.
+- Do NOT silently overwrite an existing `01_requirements.{html,md}` — snapshot-commit first if dirty.
+- Do NOT proceed past Phase 1 if `02_spec.{html,md}` or `03_plan.{html,md}` exist without surfacing the drift warning.
 - Do NOT skip the Phase 7 learnings line — empty reflection is unfinished work.

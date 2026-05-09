@@ -148,6 +148,14 @@ Before asking anything, internally enumerate the decisions embedded in the artif
 
 Order branches by leverage: questions whose answers gate other questions go first. Don't grill leaves before the root.
 
+### Input Contract (when invoked as reviewer subagent)
+
+When a parent orchestrator (currently `/feature-sdlc`) invokes this skill as a reviewer subagent, the parent has chrome-stripped the artifact via `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js` (FR-50, T12) and passes the stripped slice (`<h1>` + `<main>`) inline as the prompt body. In that mode, this skill skips its own resolver (`_shared/resolve-input.md`) and operates directly on the stripped HTML.
+
+**Output shape (FR-51 canonical):** the skill MUST first enumerate every `<section>` id and every `<h2>`/`<h3>` id it can locate in the stripped slice, returning them as `sections_found: [...]`. It then evaluates against its own rubric and emits findings as `{section_id, severity, message, quote: "<≥40-char verbatim from source>"}`.
+
+**Parent-side validation (FR-52, the skill MUST NOT self-validate):** the parent will (a) set-equality-check `sections_found` against `<artifact>.sections.json`, (b) substring-grep every `quote` against the original (un-stripped) source HTML, (c) hard-fail on any miss. This skill does not duplicate that validation; the contract lives in the parent.
+
 ---
 
 ## Phase 2: Grill Loop

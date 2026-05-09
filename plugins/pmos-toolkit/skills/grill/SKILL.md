@@ -2,14 +2,14 @@
 name: grill
 description: Adversarially interview the user about a plan, spec, requirements doc, ADR, design, or code change to surface unresolved decisions and shaky assumptions. Walks the decision tree branch by branch — one question at a time, each with a recommended answer. Use when the user says "grill me", "stress-test this plan", "poke holes in my design", "interview me about X", or wants an adversarial review before committing to a direction.
 user-invocable: true
-argument-hint: "[<path-to-artifact-or-topic>] [--depth=quick|standard|deep] [--save|--no-save] [--non-interactive | --interactive]"
+argument-hint: "[<path-to-artifact-or-topic>] [--depth=quick|standard|deep] [--save|--no-save] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # Grill
 
 Adversarial interrogation of a plan, design, or artifact. Walks the decision tree one branch at a time, asks one question per turn, and proposes a recommended answer for each. The goal is to expose unstated assumptions, unresolved branches, and weak rationale **before** the user commits to a direction.
 
-This is **orthogonal to the pipeline** — not a stage. Use it on any artifact at any time: a half-formed idea, a `01_requirements.md`, a draft `02_spec.md`, an ADR, a code diff, a Slack proposal.
+This is **orthogonal to the pipeline** — not a stage. Use it on any artifact at any time: a half-formed idea, a `01_requirements.{html,md}`, a draft `02_spec.{html,md}`, an ADR, a code diff, a Slack proposal.
 
 **Announce at start:** "Using the grill skill to stress-test {artifact}."
 
@@ -23,7 +23,12 @@ This is **orthogonal to the pipeline** — not a stage. Use it on any artifact a
 ## Phase 0: Intake & Scope
 
 1. **Resolve the target.**
-   - If argument is a file path → read it.
+   - If argument is a file path → read it directly.
+   - If argument is a pipeline-doc stem (e.g., `01_requirements`, `02_spec`, `03_plan`) → derive the resolver phase via the switch below and use `_shared/resolve-input.md` with `phase=<derived>`, `label="<stem>"` to locate either the `.html` (preferred) or `.md` (legacy fallback) primary in `{feature_folder}`. Switch:
+     - `01_requirements` → `phase=requirements`
+     - `02_spec` → `phase=spec`
+     - `03_plan` → `phase=plan`
+     - any other stem → fall through to direct file-path read.
    - If argument is a URL or topic name → ask the user to paste the content or point to a file.
    <!-- defer-only: ambiguous -->
    - If no argument → use `AskUserQuestion`: "What are we grilling? (a) most recent artifact in this conversation, (b) a file path, (c) a topic I'll describe inline."
@@ -37,6 +42,10 @@ This is **orthogonal to the pipeline** — not a stage. Use it on any artifact a
    | deep | full decision tree to leaves | **no limit** — keep going until the tree is exhausted or the user calls stop |
 
 3. **Summarize what you read** in 3–5 bullets so the user can confirm you've understood the artifact correctly. If the summary is wrong, fix it before grilling — interrogating a misread is wasted turns.
+
+### Phase 0 addendum: output_format resolution (FR-12)
+
+4. **Resolve `output_format`.** Read `output_format` from `.pmos/settings.yaml` (default: `html`; valid values: `html`, `md`, `both`). A `--format <html|md|both>` argument-string flag overrides settings (last flag wins on conflict, per FR-12). Print to stderr exactly: `output_format: <value> (source: <cli|settings|default>)` once at Phase 0 entry. Controls the format of the optional Phase 3b grill-report save only — chat output is unaffected.
 
 ---
 
@@ -196,7 +205,7 @@ Emit a compact report at the end. The report always goes in the chat. Persisting
 - [e.g., "Update §3 of spec to capture the retry decision" / "Run /simulate-spec to pressure-test the revised design"]
 ```
 
-If the artifact is a pipeline doc (`01_requirements.md`, `02_spec.md`, `03_plan.md`), suggest the right follow-up skill in **Recommended next step** — but do not auto-invoke it.
+If the artifact is a pipeline doc (`01_requirements.{html,md}`, `02_spec.{html,md}`, `03_plan.{html,md}`), suggest the right follow-up skill in **Recommended next step** — but do not auto-invoke it.
 
 ---
 
@@ -206,16 +215,25 @@ After emitting the chat report, offer to persist it.
 
 1. **Skip the prompt** if the user passed `--no-save` (do nothing) or `--save` (save without asking).
 
-2. **Resolve the save path** in this order:
-   - Target is inside a pipeline feature dir (matches `.../NN_<slug>/` where `NN` is two digits) → `<feature_dir>/grills/{YYYY-MM-DD}_{slug}.md`
-   - Target is a repo file outside the pipeline → `<repo_root>/.pmos/grills/{YYYY-MM-DD}_{slug}.md`
-   - Target is an inline topic or has no file → `~/.pmos/grills/{YYYY-MM-DD}_{slug}.md`
+2. **Resolve the save path** in this order (extension is `.html` when `output_format` ∈ {`html`, `both`}; `.md` when `output_format=md`):
+   - Target is inside a pipeline feature dir (matches `.../NN_<slug>/` where `NN` is two digits) → `<feature_dir>/grills/{YYYY-MM-DD}_{slug}.<ext>`
+   - Target is a repo file outside the pipeline → `<repo_root>/.pmos/grills/{YYYY-MM-DD}_{slug}.<ext>`
+   - Target is an inline topic or has no file → `~/.pmos/grills/{YYYY-MM-DD}_{slug}.<ext>`
 
 3. **Build the slug** from the artifact filename (without extension) or, for inline topics, the first 4–5 meaningful words of the topic. Lowercase, hyphenated, ASCII only. If a file already exists at the resolved path, append `-2`, `-3`, … until unique.
 
 4. **Prompt** (unless `--save`/`--no-save` was passed): "Save grill report to `<resolved_path>`? [Y/n]" — single yes/no question per `_shared/interactive-prompts.md`.
 
-5. **On save:** create parent directories as needed, write the same markdown report shown in chat, and confirm the path back to the user.
+5. **On save (HTML primary path):** create parent directories as needed and emit per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`.
+   - **Atomic write (FR-10.2):** write `{slug}.html` and the companion `{slug}.sections.json` via temp-then-rename.
+   - **Asset substrate (FR-10):** when saving inside a pipeline feature dir, copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `<feature_dir>/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files. Repo-level and `~/.pmos/grills/` saves seed `<repo_root>/.pmos/grills/assets/` and `~/.pmos/grills/assets/` respectively on first use.
+   - **Asset prefix (FR-10.1):** `grills/` is one level below the feature folder, so the relative prefix is `../assets/`; for repo and home-cache saves the prefix is `assets/` (sibling to the grill dir).
+   - **Cache-bust (FR-10.3):** append `?v=<plugin-version>` to all asset URL references emitted into the HTML.
+   - **Heading IDs (FR-03.1):** every `<h2>` and `<h3>` carries a stable kebab-case `id` per `_shared/html-authoring/conventions.md` §3.
+   - **Index regeneration (FR-22, §9.1):** when saving inside a pipeline feature dir, regenerate `<feature_dir>/index.html` via `_shared/html-authoring/index-generator.md` (manifest inlined; no `_index.json` on disk, FR-41). Repo-level and home-cache saves do NOT regenerate an index — those are loose archives.
+   - **Mixed-format sidecar (FR-12.1):** when `output_format=both`, also emit `{slug}.md` via `bash node <feature_dir>/assets/html-to-md.js {slug}.html > {slug}.md`. The MD sidecar is read-only (FR-33).
+
+6. **On save (MD primary path, `output_format=md`):** create parent directories as needed, write the same markdown report shown in chat, confirm the path back to the user. No substrate copy, no index regen.
 
 ---
 

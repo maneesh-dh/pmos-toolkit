@@ -195,6 +195,8 @@ When a parent orchestrator (currently `/feature-sdlc`) invokes this skill as a r
 
 ## Phase 2: Scenario Enumeration
 
+> **Shared substrate:** the canonical 4-pass enumeration + scenario trace + artifact-fitness critique + apply-loop logic lives at `_shared/sim-spec-heuristics.md` (factored 2026-05-10 so the same logic can be reused by `/spec`'s folded sim-spec phase). The body below is the standalone-skill phrasing; both paths converge on the same heuristics. When in doubt, the substrate doc is canonical.
+
 Generate the full scenario list in four passes, then confirm with the user before tracing. The point of simulation is to find gaps the spec MISSED — trusting only the spec's stated scenarios defeats the purpose.
 
 ### 2a. Extract from spec

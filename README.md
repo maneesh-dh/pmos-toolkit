@@ -49,7 +49,7 @@ pmos-toolkit/
 
 | Skill | Description |
 |-------|-------------|
-| `/pmos-toolkit:feature-sdlc` | End-to-end SDLC orchestrator — turns an initial idea into a shipped feature by sequentially driving requirements → grill → optional gates → spec → simulate-spec → plan → execute → verify → complete-dev. Auto-tiers, creates worktree + branch, persists resumable state inside the worktree, surfaces compact checkpoints before heavy phases |
+| `/pmos-toolkit:feature-sdlc` | End-to-end SDLC orchestrator — turns an initial idea into a shipped feature by sequentially driving requirements → grill → optional gates → spec → simulate-spec → plan → execute → verify → complete-dev. Auto-tiers, creates worktree + branch via `EnterWorktree` (with `cd <worktree> && claude --resume` handoff if the harness can't enter inline), persists resumable state inside the worktree, surfaces compact checkpoints before heavy phases. `/feature-sdlc list` shows in-flight features across all `feat/*` worktrees |
 | `/pmos-toolkit:update-skills` | Ingest feedback (raw text or `/retro` paste-back), triage proposed changes per skill with user approval, then run the requirements -> spec -> (grill) -> plan -> execute -> verify pipeline (auto-tiered per skill) sequentially. Use when you want retro/feedback turned into shipped changes end-to-end |
 
 ### Pipeline enhancers (optional)

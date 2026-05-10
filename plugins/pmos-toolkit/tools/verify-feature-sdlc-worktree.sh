@@ -30,24 +30,26 @@ else
   fail "Case 2 FR-W02" "Status: handoff-required line missing"
 fi
 
-# Case 3: FR-D01 — realpath drift check: byte-equal canonical paths pass
-TMPDIR="$(mktemp -d)"
-trap 'rm -rf "$TMPDIR"' EXIT
-STORED="$(realpath "$TMPDIR" 2>/dev/null || python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$TMPDIR")"
-ACTUAL="$(realpath "$TMPDIR" 2>/dev/null || python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$TMPDIR")"
-if [ "$STORED" = "$ACTUAL" ]; then
-  pass "Case 3 FR-D01" "byte-equal canonical paths: drift check passes"
+# Case 3: FR-R02 — drift-check prose is wired into Phase 0.b Step 1 of feature-sdlc/SKILL.md.
+# We assert on production code (not host OS) so a regression that deletes the drift logic
+# would flip this case red. The four anchors below collectively pin FR-R02 + NFR-06.
+FS_SKILL="$REPO_ROOT/plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md"
+if grep -q -F "Drift check (FR-R02" "$FS_SKILL" \
+   && grep -q -F 'realpath($PWD)' "$FS_SKILL" \
+   && grep -q -F "pre-flight check failed: realpath(pwd)" "$FS_SKILL" \
+   && grep -q -F "drift check: realpath(pwd)=" "$FS_SKILL"; then
+  pass "Case 3 FR-R02" "Phase 0.b drift-check prose wired (FR-R02 + NFR-06 anchors present)"
 else
-  fail "Case 3 FR-D01" "byte-equal canonical paths differed ('$STORED' vs '$ACTUAL')"
+  fail "Case 3 FR-R02" "drift-check anchors missing from feature-sdlc/SKILL.md"
 fi
 
-# Case 4: FR-D02 — realpath drift check: distinct canonical paths fail
-STORED2="$(realpath "$TMPDIR" 2>/dev/null || python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$TMPDIR")"
-ACTUAL2="$(realpath "$HOME" 2>/dev/null || python3 -c "import os, sys; print(os.path.realpath(sys.argv[1]))" "$HOME")"
-if [ "$STORED2" != "$ACTUAL2" ]; then
-  pass "Case 4 FR-D02" "distinct canonical paths: drift detected"
+# Case 4: FR-R02 mismatch path — assert the hard-error + exit-64 contract is wired.
+# Pin the literal error text and the exit code citation so removing either flips this red.
+if grep -q -F "Relaunch claude from <expected> and try again." "$FS_SKILL" \
+   && grep -q -E "Exit 64\.|exit 64" "$FS_SKILL"; then
+  pass "Case 4 FR-R02-mismatch" "drift-fail emits relaunch instruction + exit 64"
 else
-  fail "Case 4 FR-D02" "distinct paths collided unexpectedly"
+  fail "Case 4 FR-R02-mismatch" "drift-fail error text or exit-64 citation missing"
 fi
 
 # Case 5: FR-G01 — .gitignore contains .pmos/feature-sdlc/

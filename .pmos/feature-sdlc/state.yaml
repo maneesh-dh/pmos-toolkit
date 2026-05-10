@@ -3,8 +3,8 @@ slug: html-artifacts
 tier: 3
 mode: interactive
 started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-10T05:00:00Z
-current_phase: complete-dev
+last_updated: 2026-05-10T05:30:00Z
+current_phase: complete
 paused_at: null
 paused_reason: null
 worktree_path: null
@@ -147,14 +147,21 @@ phases:
     notes: "Feature-scope /verify PASS. Consolidator strategy. 58/58 spec FRs verified (57 Verified + 1 NA-alt-evidence FR-40). 26/26 plan tasks Verified-complete. 0 regressions, 0 blocking. 5 non-blocking advisories carried (ADV-T19/T21/T24, ADV-V4-1/2/3). 2 inherited OQs deferred to pre-2.34.0. OQ-3 fully resolved via T8+T15+T18+T19+T26+Phase-9-smoke. Live runtime smoke: serve.js on :8767 + Playwright (per-artifact view + heading-ids + Copy MD toolbar + per-section anchors + cross-doc deep-link 02_spec.html#goals). file:// fallback NA-alt-evidence (Playwright MCP blocks file://; viewer.test.js::test 1 covers FR-40). Wireframe diff W01-W04: 0 deltas on authoritative dimensions; flat-nav vs chrome+iframe is fixture-design choice (chrome path covered by viewer.test.js JSDOM)."
   - id: complete-dev
     hardness: hard
-    status: pending
+    status: completed
     artifact_path: null
+    started_at: 2026-05-10T05:00:00Z
+    completed_at: 2026-05-10T05:30:00Z
+    notes: "Rebase + ff-merge feat/html-artifacts (78 commits) → main. v2.33.0 tag annotated. Pushed main + tag to `all` multi-push remote (gitlab + github + github-work). Local feat branch deleted. 2 learnings captured: ## /verify (consolidator-pass after N phase-scoped verifies); ## /complete-dev (plugin-distribution repos: deploy = git push)."
   - id: final-summary
     hardness: infra
-    status: pending
+    status: completed
     artifact_path: null
+    started_at: 2026-05-10T05:30:00Z
+    completed_at: 2026-05-10T05:30:00Z
   - id: capture-learnings
     hardness: infra
-    status: pending
+    status: completed
     artifact_path: null
+    started_at: 2026-05-10T05:30:00Z
+    completed_at: 2026-05-10T05:30:00Z
 open_questions_log: []

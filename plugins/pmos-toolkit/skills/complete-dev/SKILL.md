@@ -237,9 +237,13 @@ If **merge** chosen, the existing sequence:
 5. `git merge <feature-branch>` (fast-forward where possible; `--no-ff` if explicitly chosen)
 6. **Conflicts → STOP and ask user. Do NOT auto-resolve.**
 
-## Phase 4 — Worktree cleanup
+## Phase 4 — Worktree cleanup (FR-CD01–CD06)
 
-If Phase 2 detected a worktree and Phase 3 merged successfully:
+If Phase 2 detected a worktree AND Phase 3 merged successfully:
+
+Skip Phase 4 entirely (chat: `Phase 4 skipped: not in a worktree.`) when Phase 2 detected `--no-worktree` mode or a non-worktree session (FR-CD06).
+
+Otherwise, run the existing user gate:
 
 ```
 question: "Worktree at <path> can be removed (changes merged to main locally). Remove now?"
@@ -249,9 +253,24 @@ options:
   - Cancel
 ```
 
-If "Remove": `git worktree remove <path>`. **Note**: this happens BEFORE push by design. If push fails later (Phase 15), the worktree is already gone — recovery uses the rollback recipes in `reference/rollback-recipes.md`, not the worktree.
+On **Remove**:
 
-Cwd is now the root main checkout; print confirmation.
+1. **Compute dirty status excluding `.pmos/feature-sdlc/`** (FR-CD03). Query the worktree's tracked + untracked status, **excluding the entire `.pmos/feature-sdlc/` subtree** (state.yaml is gitignored but exists on disk and would otherwise count as untracked). Non-empty result set = dirty. The exact git invocation (porcelain flags, pathspec syntax, or two-step `git ls-files --others --exclude-standard` + `git diff --name-only`) is left to the implementor to pin against the installed git version; the contract is the exclusion + the boolean result.
+
+2. **Dirty branch (FR-CD01 step 2 + FR-CD02):**
+   - With `--force-cleanup` flag: `git worktree remove --force <path>`; proceed to step 4.
+   - Without `--force-cleanup`: surface the raw git error and stop. The user decides whether to commit, stash, or rerun with `--force-cleanup`. No auto-stash.
+
+3. **Clean branch (FR-CD01 steps 3–5):**
+   - Call `ExitWorktree(action=keep)` (FR-CD04).
+     - Success → cwd is restored to the launch session's root; proceed.
+     - No-op (any non-success return — typically "Must not already be in a worktree" / "Must have entered the worktree this session") → print fallback (FR-CD05): `Worktree removed. After this session ends, run: cd <root-main-path>` where `<root-main-path>` is the first entry of `git worktree list` (canonical realpath per `_shared/canonical-path.md`); proceed.
+   - Run `git worktree remove <path>` (no `--force`).
+   - Run `git branch -D feat/<slug>`.
+
+4. **Confirm.** `git worktree list` no longer contains the feature's worktree; `git branch --list "feat/<slug>"` is empty. Print confirmation to chat.
+
+**Note:** Removal happens BEFORE push by design (preserves the existing Phase 4 ordering). If push fails later (Phase 15), the worktree is already gone — recovery uses the rollback recipes in `reference/rollback-recipes.md`, not the worktree.
 
 ## Phase 5 — Detect deployment norms
 

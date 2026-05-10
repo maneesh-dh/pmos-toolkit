@@ -447,6 +447,60 @@ This sub-step exists because automated tests, API smoke tests, and happy-path Pl
 
 ---
 
+## Phase 4.5: Folded-phase awareness (new in v2.34.0 per T19/W4/E14)
+
+When verifying a feature folder produced by /feature-sdlc v2.34.0+, check folded-phase artifacts and state.yaml signals:
+
+### Slug-distinct artifact preference (FR-20, D4)
+
+For MSF artifacts, prefer the slug-distinct paths (the v2.34.0 convention):
+
+- `<feature_folder>/msf-req-findings.md` — written by /requirements Phase 5.5 folded MSF-req.
+- `<feature_folder>/wireframes/msf-wf-findings/<wireframe-id>.md` — written by /wireframes Phase 6 folded MSF-wf (per-wireframe directory variant).
+
+**Legacy fallback:** if `msf-req-findings.md` is absent but `msf-findings.md` exists, /verify still passes the artifact check but emits a soft warning:
+
+```
+legacy slug detected at <path>; new writes use msf-req-findings.md (D3 / pipeline-consolidation v2.34.0). No action required for this run.
+```
+
+### Affirmative folded-phase-completion signal (E14)
+
+When BOTH conditions hold for a Tier-3 feature:
+
+1. All folded phases were Skipped (state.yaml.phases.<x>.notes records `--skip-folded-{msf,msf-wf,sim-spec}` flags)
+2. `state.yaml.phases.<x>.folded_phase_failures[]` is empty for all phases
+
+…emit an affirmative line in the compliance summary:
+
+```
+✓ folded phases skipped per documented flags
+```
+
+### Advisory warning — Tier-3 feature with no folded artifacts and no documented skip (E1 softened, F4)
+
+When a Tier-3 feature has:
+
+- NO `msf-req-findings.md`, NO per-wireframe MSF-wf findings, NO simulate-spec patches in `02_spec.md` git history
+- NO `--skip-folded-*` flags documented in state.yaml.phases.<x>.notes
+- NO entries in `folded_phase_failures[]`
+
+…emit ADVISORY (not blocking):
+
+```
+WARNING: Tier-3 feature has no folded MSF artifacts and no documented skips; folded phases may have been bypassed silently. Verify intentional.
+```
+
+### Per-failure advisory emit (FR-52, F4)
+
+For every entry in any phase's `folded_phase_failures[]`, emit:
+
+```
+WARNING: <folded-skill> crashed in <phase> (advisory per D11): <error_excerpt>
+```
+
+These are advisory (not blocking) per D11; /verify still PASSes if everything else is green. They surface so the user sees folded-phase health at every /verify run.
+
 ## Phase 5: Spec Compliance Check
 
 This is the most important phase. Re-read each upstream document and verify every requirement is implemented.

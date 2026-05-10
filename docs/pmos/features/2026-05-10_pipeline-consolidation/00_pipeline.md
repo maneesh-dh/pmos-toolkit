@@ -14,10 +14,10 @@ mode: interactive
 | requirements     | completed  | 01_requirements.md (Loop-2 from grill) |
 | grill            | completed  | grills/2026-05-10_01_requirements.md  |
 | msf-req          | completed  | msf-req-findings.md (3 Must / 5 Should / 6 Nice) |
-| creativity       | pending    | —                                     |
-| wireframes       | pending    | —                                     |
-| prototype        | pending    | —                                     |
-| spec             | pending    | —                                     |
+| creativity       | skipped    | —                                     |
+| wireframes       | skipped    | —                                     |
+| prototype        | skipped    | —                                     |
+| spec             | completed  | 02_spec.md (Ready for Plan; 35 decisions, 63 FRs) |
 | simulate-spec    | pending    | —                                     |
 | plan             | pending    | —                                     |
 | execute          | pending    | —                                     |

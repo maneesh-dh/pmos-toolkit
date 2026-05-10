@@ -2,7 +2,7 @@ schema_version: 1
 slug: pipeline-consolidation
 mode: interactive
 started_at: 2026-05-10T00:00:00Z
-last_updated: 2026-05-10T01:30:00Z
+last_updated: 2026-05-10T02:30:00Z
 paused_at: null
 paused_reason: null
 resumed_at: 2026-05-10T00:40:00Z
@@ -10,7 +10,7 @@ worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-pipeline-cons
 branch: feat/pipeline-consolidation
 feature_folder: docs/pmos/features/2026-05-10_pipeline-consolidation
 tier: 3
-current_phase: creativity
+current_phase: simulate-spec
 backlog_id: null
 notes:
   - "User confirmed: Keep standalone + fold as phase (msf-req, msf-wf, simulate-spec)"
@@ -37,20 +37,24 @@ phases:
     notes: "Tier 3 Recommended=Run. 1 persona x 4 scenarios; 4 journeys walked. 14 findings (3 Must / 5 Should / 6 Nice). Slug override applied per D3/W4 dogfood (msf-req-findings.md, not msf-findings.md). Must items concentrate on D11/D16/D17 contracts: M1 in-line failure surfacing, M2 resume granularity inside folded phase, M3 per-finding revert safety when findings interrelate. To fold into /spec scope: 3 Must + 5 Should items expand G-A through G-D and add commit-strategy + --minimal flag decisions."
   - id: creativity
     hardness: soft
-    status: pending
+    status: skipped
     artifact_path: null
+    notes: "Skipped per user (Recommended). Design surface well-explored after grill + msf-req."
   - id: wireframes
     hardness: soft
-    status: pending
+    status: skipped
     artifact_path: null
+    notes: "Skipped per user (Recommended). Frontend-detection: zero UI signal; pipeline/orchestrator feature touches SKILL.md prose, state.yaml schema, lint, git-commit cadence, subagent dispatch only."
   - id: prototype
     hardness: soft
-    status: pending
+    status: skipped
     artifact_path: null
+    notes: "Skipped per user (Recommended). Wireframes were skipped; no UI surface."
   - id: spec
     hardness: hard
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/02_spec.md
+    notes: "Tier 3 type=feature; status promoted to Ready for Plan. 17 new decisions D19-D35 resolving 7 OQs + 4 grill gaps + 3 Must items. 2 review loops (Loop 1: 2 Blockers + 5 Should-fix all fix-as-proposed; Loop 2: 1 Nit folded inline). 63 FRs across W1-W8 + 4 cross-cutting. State schema bumped v1->v2 (folded_phase_failures[], started_at, retro phase). Major surprise: W6 audit revealed 27/27 supported skills already pass canonical-block lint; W6 reframed from 'rollout' to 'preserve invariant'."
   - id: simulate-spec
     hardness: soft
     status: pending

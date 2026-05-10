@@ -1,167 +1,67 @@
 schema_version: 1
-slug: html-artifacts
-tier: 3
+slug: pipeline-consolidation
 mode: interactive
-started_at: 2026-05-09T10:53:49Z
-last_updated: 2026-05-10T05:30:00Z
-current_phase: complete
-paused_at: null
-paused_reason: null
-worktree_path: null
-branch: feat/html-artifacts
-feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills/docs/pmos/features/2026-05-09_html-artifacts
+started_at: 2026-05-10T00:00:00Z
+last_updated: 2026-05-10T00:00:00Z
+worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-pipeline-consolidation
+branch: feat/pipeline-consolidation
+feature_folder: docs/pmos/features/2026-05-10_pipeline-consolidation
+tier: 3
+current_phase: requirements
+backlog_id: null
 notes:
-  - "Worktree initially created at ../agent-skills-html-artifacts but removed due to Claude Code harness cwd-reset behavior. Pipeline runs on feat/html-artifacts branch in main repo cwd."
-  - "Paused 2026-05-09T11:30Z by user for context-budget; resumed and ran /msf-req + /wireframes + /msf-wf in one block."
-  - "Paused 2026-05-09T13:32Z compact-pending before /spec. Resume via /feature-sdlc --resume after /compact. Next phase: spec (Tier 3, expects /diagram subagent dispatch and reviewer loop). 4 OQs queued for /spec from /wireframes (W3 localStorage scoping, W5 cross-doc affordance bridges, W4 Search ⌘K behavior, plus /msf-req R3 reinforcement)."
-  - "Resumed 2026-05-09T13:35Z. Ran /spec → /simulate-spec → /plan in one block. /spec produced 02_spec.md (Tier 3, 21 decisions, Ready for Plan). /simulate-spec produced simulate-spec/2026-05-09-trace.md (28 scenarios; 21 gaps; 14 patches applied to spec; 5 skipped; 2 deferred to OQ-DEFER-1/2 for /complete-dev). /plan produced 03_plan.md (Tier 3; 26 tasks in 5 phases; 5 decisions; 1 review loop with 4 fix findings; FR-coverage 62/62; status=Planned)."
-  - "Paused 2026-05-09T17:05Z compact-pending before /execute. Heavy phase (TDD across 26 tasks). Resume via /feature-sdlc --resume after /compact. Next phase: execute. 3 Open Questions in plan: OQ-1 (/complete-dev MD re-author, deferred), OQ-2 (stale .md sidecars, deferred), OQ-3 (T18 per-skill harness shape, resolves during /execute)."
-  - "Resumed 2026-05-09T18:50Z post-compact. Execute Phase 1 progress: T1, T2, T5, T6, T4 all done + committed (5/6). T3 (viewer.js, ≤30KB classic-script with JSDOM TDD across 11 surfaces) remaining; deferred to next post-compact session. Two deviations logged: (a) GFM plugin substituted to non-@joplin upstream because @joplin fork dropped UMD bundles; (b) html-to-md.js needs jsdom at runtime (vendored turndown is browser bundle; @mixmark-io/domino is 7.5MB and not vendorable) — clear-error path + HTML_TO_MD_JSDOM_PATH escape hatch in place. Paused 2026-05-09T19:14Z compact-pending before T3."
-  - "Resumed 2026-05-09T19:30Z post-compact. T3 complete: viewer.js authored (12984 bytes, ≤30720 budget); 11 surfaces; 3 JSDOM tests pass (file:// fallback FR-40, sessionStorage fallback FR-26, legacy-md shim FR-22); 0 ES module patterns (FR-05.1). Test bootstrap reuses T6 HTML_TO_MD_JSDOM_PATH escape hatch + /tmp/pmos-jsdom-boot auto-install. Phase 1 (T1–T6) now COMPLETE. Phase 2.5 boundary check next: invoke /verify --scope phase --feature 2026-05-09_html-artifacts --phase 1, OR pause for /compact (heavy phase boundary), OR continue to Phase 2 with --no-halt. Awaiting user choice."
-  - "/verify --scope phase 1 PASSED at 2026-05-09T20:35Z. 4 review-gate fixes landed: (1) serve.js safeJoin path-traversal (URL-encoded %2E%2E leaked sibling-dir content; conf 88, empirically reproduced + regression-tested); (2) style.css fallback-banner class rename (.pmos-file-fallback-banner → .pmos-fallback-banner; conf 90; banner was shipping unstyled); (3) viewer.js artifactSlug now prefers manifest.id over path-derived kebab (conf 80; spec §9.1 alignment); (4) slugify → artifactSlug rename to disambiguate from conventions.md §3 heading-id rule (conf 75). New regression test files: tests/scripts/serve.test.js + assert_serve_js_unit.sh. viewer test count: 3 → 4. All verify evidence at docs/pmos/features/2026-05-09_html-artifacts/verify/2026-05-09-phase-1/. 12 FRs Verified, 3 NA-alt-evidence, 0 Unverified. Pausing for /compact before Phase 2 (T7–T11)."
-  - "Resumed 2026-05-09T20:45Z post-compact. Dispatching /execute to pick up at Plan Phase 2 (T7–T11). Mode: interactive."
-  - "Phase 2 progress 2/5: T7 (resolve-input.md, 125 lines, 4/4 inline checks pass) + T11 (index-generator.md, 122 lines, 4/4 inline checks pass) done + committed. Plan-doc orders T11 after T8 but dep-DAG required T11 first (T8 Depends on: T1..T7,T11) — ran topologically; deviation logged in task-11.md. Paused 2026-05-09T20:55Z compact-pending-pre-T8. Next: T8 (runbook + /requirements pilot + W01 ⌘K removal — 8 steps, includes subagent dispatch). Forward-dep note: T8 step 4 cites tests/scripts/assert_no_md_to_html.sh which lands in Phase 4 T20 — implementer to substitute inline grep equivalent or defer to T20."
-  - "Resumed 2026-05-09T21:00Z post-compact. Dispatching T8 inline (per-skill runbook + /requirements pilot + W01 ⌘K removal). T8-step-4 forward-dep handling: substituting inline grep -rE for assert_no_md_to_html.sh until T20 lands."
-  - "T8 done at 2026-05-09T21:18Z (commit 411521e). Phase 2 progress 3/5: T7 ✅ T11 ✅ T8 ✅. Step 3 dispatched as inline pilot per user direction (vs full subagent) — 8/8 fidelity gates pass on /tmp/pmos-pilot scratch folder. Runbook refined post-pilot (asset copy → assets/* glob). 7 Edits to /requirements/SKILL.md. W01 ⌘K removed. Forward-deps T20/T22 substituted with inline grep gates. T15+T18 will exercise /requirements end-to-end on real fixture. Paused 2026-05-09T21:18Z compact-pending-pre-T9 — T9 is the heavy fanout (9 skills × ~6 edits + per-row grep). T10 (light, /feature-sdlc orchestrator) deferred to post-T9 in same Phase-2 wrap. Phase 2.5 /verify boundary fires after T10."
-  - "Resumed 2026-05-09T21:30Z post-compact. Dispatching T9 inline (R1 /spec → R9 /design-crit, per-row commit, per-row inline-grep gate; T20/T22 substituted with inline greps until Phase 4 lands the canonical scripts)."
-  - "T9 done at 2026-05-09T22:30Z. Phase 2 progress 4/5: T7 ✅ T11 ✅ T8 ✅ T9 ✅ — T10 remaining. 9 per-row commits + 1 follow-up commit (msf-wf resolver + plan frontmatter ref + runbook edge-case row 7). 58 Edits across 9 SKILL.md files (+7% over plan estimate). Holistic T20 substitute clean across all 10 affected skills (R0 /requirements pilot + R1-R9). Runbook gained one edge-case row covering /plan auxiliary sidecars (03_plan_{review,skip-list,auto,blocked}.md) and /design-crit eval-findings-review.md as by-design MD carve-outs."
-  - "T10 done at 2026-05-09T22:45Z. Phase 2 progress 5/5 — COMPLETE. /feature-sdlc orchestrator now emits 00_pipeline.html + 00_open_questions_index.html per FR-11/D14. ~12 Edits to feature-sdlc SKILL.md (vs plan estimate of ~6 — orchestrator self-references its primary artifact in many tracking paths; all load-bearing). Holistic audit across 11 affected skills (R0-R9 + T10 orchestrator): 0 residual MD primary references. Phase 2.5 boundary (/verify --scope phase --feature 2026-05-09_html-artifacts --phase 2) fires next."
-  - "Paused 2026-05-09T22:50Z compact-pending-pre-phase-2-verify per user direction. Same pattern as Phase-1 verify pause — frees context for the verify multi-agent review (~8 reviewer subagents pattern from Phase-1 verify run). Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor will land on /verify --scope phase 2."
-  - "Resumed 2026-05-09T23:05Z post-compact. Dispatching /verify --scope phase --feature 2026-05-09_html-artifacts --phase 2. Plan-Phase 2 covers T7 (resolve-input.md), T8 (runbook + /requirements pilot + W01 ⌘K removal), T9 (R1-R9 runbook fanout across 9 SKILL.md files), T10 (/feature-sdlc orchestrator HTML emission per FR-11/D14), T11 (index-generator.md). 11 affected skill files + 2 _shared substrate docs. Mode: interactive."
-  - "/verify --scope phase 2 PASSED at 2026-05-09T23:35Z. 6 multi-agent reviewers dispatched in parallel; 5/6 PASS clean, R4 surfaced 2 review-gate fixes — both runbook documentation polish (no SKILL.md changes): (F1, conf 95) §7 inline-grep filter expanded with 5 carve-out exclusions (_review|_skip-list|_auto|_blocked|eval-findings-review) the holistic-gate filter already had but the canonical §7 didn't; (A1, conf 80) §2 asset-prefix rule clarified for doubly-nested verify/<date>-phase-<N>/ → ../../assets/. Holistic post-fix grep gate: 0/11 residual hits across all affected skills. 12 FRs Verified, 1 D14 Verified, 0 Unverified. Evidence: docs/pmos/features/2026-05-09_html-artifacts/verify/2026-05-09-phase-2/review.md. Phase 2.5 boundary CLOSED PASS. Phase 3 (T12-T15 fixtures + end-to-end runs) unblocked."
-  - "Paused 2026-05-09T23:40Z compact-pending-pre-phase-3 per user direction (Recommended). Same pattern as Phase-1 → Phase-2 boundary pause. Plan-Phase 3 covers T12 (substrate fixtures) + T13 (canonical-feature fixture seed) + T14 (per-skill fixture dispatch harness) + T15 (end-to-end run of all 10 skills against canonical fixture). Heavy phase — per-skill subagent dispatch + fixture verification per skill. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Plan-Phase 3 T12."
-  - "Resumed 2026-05-09T23:55Z post-compact. Dispatching /execute to pick up at Plan-Phase 3 (T12 substrate fixtures → T13 canonical-feature fixture seed → T14 per-skill fixture dispatch harness → T15 end-to-end run of all 10 skills against canonical fixture). /execute does its own task-level resume detection from per-task logs under execute/. Mode: interactive."
-  - "CORRECTION 2026-05-10T00:00Z: prior pause-note mischaracterized Plan-Phase 3 as fixtures (T12-T15). Per actual 03_plan.md §Phase 3, Plan-Phase 3 is Reviewer + /diagram migration (T12 chrome-strip / T13 5 reviewer-prompt updates / T14 /diagram subagent pattern). Fixtures are T15 in Plan-Phase 4."
-  - "T12 done at 2026-05-10T00:05Z (commit 2416c7a). chrome-strip.md (algorithm doc) + chrome-strip.js (≤80 LOC ref impl, 55 LOC actual) + 5-fixture self-test (assert_chrome_strip.sh, exit 0). R2 mitigated: balanced-tag tracker handles literal <main>...</main> inside <pre><code> correctly."
-  - "Paused 2026-05-10T00:20Z plan-defect-T13. T13 cannot be implemented as written: plan cites reviewer-subagent dispatch sites at specific line ranges in /grill, /msf-req, /msf-wf, /simulate-spec — those line ranges do NOT contain reviewer dispatches (4 of 5 skills have explicit 'No subagents' Platform Adaptation lines). Only /verify dispatches reviewers, and those reviewers consume code diffs not artifact HTML. Defect file at docs/pmos/features/2026-05-09_html-artifacts/03_plan_defect_T13.md per /execute Phase 2 §7.5. Suggested fix: split T13 into T13a (/verify wire-up), T13b (4-skill input-contract docs), T13c (parent-dispatch chrome-strip in /feature-sdlc orchestrator). Resume via /plan --fix-from T13 or /spec --fix-from FR-50 if spec needs narrowing first. /execute halts. T14 deferred. Phase 2.5 verify deferred."
-  - "Resolved via /spec --fix-from FR-50 at 2026-05-10T00:25Z (commit 1962ecd). Narrowed FR-50 (chrome-strip is parent's responsibility, not reviewer's), added FR-50.1 carve-out (/verify Phase 3 code-diff reviewers out-of-scope), narrowed FR-52 (parent-side validation), clarified FR-72 (smoke runs chrome-strip itself). New decision D22 documents the architectural narrowing."
-  - "Then via /plan --fix-from T13 at 2026-05-10T00:30Z (commit 20931f9). Edit-mode rewrite: T13 → T13a + T13b (suffixed IDs per /plan v2 P11). T13a = parent-side chrome-strip + FR-52 instrumentation (originally scoped to feature-sdlc only). T13b = reviewer-side Phase-1 'Input Contract' subsection in 5 skills. Decision Log P6 added; File Map / Risks R5 / Mermaid graph / execution-order list updated; Loop F entry in Review Log."
-  - "Then via /execute --resume at 2026-05-10T00:35Z. T13a done at 00:50Z (commit bfa12b7). DEVIATION logged: plan T13a Files: scope was feature-sdlc/SKILL.md only but /msf-wf is dispatched by /wireframes/SKILL.md (Phase 6, line 553) not /feature-sdlc. Adjusted to 3 dispatch sites in /feature-sdlc (grill, msf-req, simulate-spec) + 1 in /wireframes (msf-wf) = 4 total. Plan-level inline-greps now span 2 files. /verify Phase 9 dispatch in /feature-sdlc preserved un-instrumented per FR-50.1."
-  - "Paused 2026-05-10T00:55Z compact-pending-pre-T13b per user direction (Recommended). T13b = 5 SKILL.md edits (grill, verify, msf-req, msf-wf, simulate-spec) — Phase-1 Input Contract subsection per skill. /verify edit MUST NOT touch its Phase 3 Multi-Agent Code Quality Review block per FR-50.1. Per-skill commits expected (5 commits). Then T14 (/diagram pattern, 2 SKILL.md edits + selftest), then Phase 2.5 /verify --scope phase 3. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on T13b."
-  - "Resumed 2026-05-10T01:00Z post-compact. T13b done at 01:08Z (5 per-skill commits 0f7229e/ae5fb6c/1916cae/c3df1a2/4d54a62 + cleanup 045b286 sealing log + removing 03_plan_defect_T13.md per FR-100b lifecycle now that T13a+T13b both done). All 5 reviewer skills carry canonical Input Contract (when invoked as reviewer subagent) subsection at end of Phase 1; /verify scope-noted to FR-50.1 carve-out (Phase 3 Multi-Agent block at line 258 untouched; chrome-strip mention at line 209 confined to Input-Contract subsection). msf-wf adapted for /wireframes parent + per-wireframe iteration shape; /verify adapted with explicit FR-50.1 scope clause. All inline-greps pass: Input Contract×5, sections_found×10, ≥40-char verbatim×5, FR-52×6, Multi-Agent Code Quality Review preserved×2 in /verify."
-  - "T14 done at 2026-05-10T01:15Z (commit 5a4b8ab + log 09fb7a5). /diagram blocking Task subagent pattern documented in /spec Phase 5 (canonical ~28-line subsection between Heading IDs and Tier 1 Template) + /plan Execution-order section (1-paragraph cross-reference). FR-60..65 + D2 satisfied: blocking dispatch + 300s timeout + 2 retries + inline-SVG fallback after 3 failures + 30min wall-clock cap via diagram_subagent_state accumulator + 3 figcaption provenance variants. Selftest python3 plugins/pmos-toolkit/skills/diagram/tests/run.py exit 0. Plan-Phase 3 (Reviewer + /diagram migration) 4/4 COMPLETE: T12 chrome-strip + T13a parent dispatch + T13b reviewer contracts + T14 /diagram pattern."
-  - "Paused 2026-05-10T01:18Z compact-pending-pre-phase-3-verify per user direction (Recommended). Same pattern as Phase-1 + Phase-2 boundary pauses — frees context for /verify multi-agent reviewer fan-out (~6-8 reviewer subagents over 9 SKILL.md files + chrome-strip substrate + 2 plan/spec edits). Phase-3 changed-files set spans: feature-sdlc/SKILL.md, wireframes/SKILL.md, grill/SKILL.md, verify/SKILL.md, msf-req/SKILL.md, msf-wf/SKILL.md, simulate-spec/SKILL.md, spec/SKILL.md, plan/SKILL.md, _shared/html-authoring/chrome-strip.md, _shared/html-authoring/assets/chrome-strip.js, tests/fixtures/chrome-strip/, tests/scripts/assert_chrome_strip.sh. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Phase 2.5 /verify --scope phase --feature 2026-05-09_html-artifacts --phase 3."
-  - "Resumed 2026-05-10T01:30Z post-compact. Dispatching /verify --scope phase --feature 2026-05-09_html-artifacts --phase 3 with multi-agent reviewer fan-out. Mode: interactive."
-  - "Paused 2026-05-10T01:45Z compact-pending-pre-phase-4 per user direction (Recommended). Same pattern as Phase-1/2/3 boundary pauses. Plan-Phase 4 covers T15-T23: 9 fixtures (canonical-feature seed) + 8 assert scripts (per-skill end-to-end runs against canonical fixture). Heavy phase — per-skill subagent dispatch + per-row inline-grep gate + holistic post-fanout verification. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Plan-Phase 4 T15 (fixture seed) or T15-equivalent fixture-task, depending on plan ordering."
-  - "/verify --scope phase 3 PASSED at 2026-05-10T01:40Z. 6 multi-agent reviewers dispatched in parallel; 0 blocking findings. R1 (FR-50/50.1/51/52 contract): PASS 14 inline-checks. R2 (T14 /diagram FR-60..65 + D2): PASS 8 inline-checks. R3 (chrome-strip substrate): false-positive (looked under html-authoring/ subtree; substrate lives at top-level tests/ — fixtures + assert script tracked since 2416c7a, exit 0). R4 (cross-file consistency): PASS 7 checks (sections_found×10 + FR-52 callout×5 verbatim + chrome-strip.js path canonical across 4 dispatch sites). R5 (bug scan + git history): PASS 15 regions scanned (balanced-tag tracker correct; FR-50.1 placement correct verify:207-217 vs Phase-3 block 258-303; all FR-IDs resolve). R6 (CLAUDE.md): PASS 5 rules (canonical path, manifest sync 2.32.0, /complete-dev refs, comment compliance). 2 non-blocking advisories: A1 wireframes:562 pre-existing stale 'msf-findings.md' mention (pre-Phase-3); A2 feature-sdlc:469 legacy /push parenthetical (conf 35). 13 FRs Verified, 0 Unverified. Evidence: docs/pmos/features/2026-05-09_html-artifacts/verify/2026-05-10-phase-3/review.md. Phase 2.5 boundary CLOSED PASS. Plan-Phase 4 (T15-T23 fixtures + 8 assert scripts) unblocked."
-  - "Resumed 2026-05-10T01:55Z post-compact. Dispatching /execute to pick up at Plan-Phase 4 (T15-T23: 9 fixtures canonical-feature seed + 8 assert scripts per-skill end-to-end runs against canonical fixture). /execute does its own task-level resume detection from per-task logs under execute/. Mode: interactive."
-  - "Plan-Phase 4 (T15-T23) tasks done at 2026-05-10T02:30Z. 9 commits: T15 bf0398b (fixture seed, 19 files, +2422 lines), T16 (assert_resolve_input.sh + 4 sub-fixtures + harness), T17 (assert_sections_contract.sh), T18 (assert_format_flag.sh static-check, OQ-3 resolved), T19 (assert_unsupported_format.sh static-check, OQ-3 resolved), T20 (assert_no_md_to_html.sh G2 enforcement), T21 (lint-no-modules-in-viewer.sh + assert wrapper FR-05.1), T22 (assert_heading_ids.sh FR-03.1/72), T23 (assert_cross_doc_anchors.sh FR-92). Holistic green sweep: 8/8 assert scripts PASS. 2 advisories logged (non-blocking): ADV-T19 msf-req missing non-interactive-block (pre-existing); ADV-T21 lint not wired into multi-lint runner (no runner exists). OQ-3 resolution: T18+T19 use static-check harnesses (live runtime invocation impossible from bash); live coverage deferred to FR-72 smoke at T26. phase-4.md log written; verify_outcome=pending."
-  - "Paused 2026-05-10T02:35Z compact-pending-pre-phase-4-verify per user direction (Recommended). Same pattern as Phase-1/2/3 boundary pauses. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Phase 2.5 /verify --scope phase --feature 2026-05-09_html-artifacts --phase 4. Phase-4 changed-files set spans: tests/fixtures/repos/node/docs/pmos/features/2026-05-09_html-artifacts-fixture/* (19 files), tests/fixtures/resolve-input/* (5 files), tests/scripts/assert_{resolve_input,sections_contract,format_flag,unsupported_format,no_md_to_html,no_es_modules_in_viewer,heading_ids,cross_doc_anchors}.sh + tests/scripts/_resolve_input_harness.sh, plugins/pmos-toolkit/tools/lint-no-modules-in-viewer.sh."
-  - "Resumed 2026-05-10T02:50Z post-compact. Dispatching /verify --scope phase --feature 2026-05-09_html-artifacts --phase 4 with multi-agent reviewer fan-out over the Phase-4 changed-files set. Mode: interactive."
-  - "/verify --scope phase 4 PASSED at 2026-05-10T03:00Z. 6 multi-agent reviewers dispatched in parallel; all 6 PASS clean with 0 blocking findings (75+). Pre-verify static baseline: 8/8 assert scripts re-run green. R1 (HTML conformance FR-03.1/70/71/92/05.1): PASS — all 5 fixture HTMLs + sibling sections.json + 4 cross-doc anchors clean. R2 (assert-script bash safety): PASS — set -e + grep -c pitfall correctly handled; 3 sub-75 hardening advisories (ADV-V4-1/2/3). R3 (resolver picking rule FR-30/31/33): PASS — 7/7 checklist. R4 (cross-file consistency): PASS — 6 assets byte-identical to substrate, asset-prefix correct, AFFECTED list parity 2/2 (3rd by-design pattern-scan). R5 (bug scan + git history): PASS — all 9 commits carry T<N>, all 9 task logs present + accurate. R6 (CLAUDE.md + scope-creep): PASS — 0 SKILL.md changes, 0 manifest version drift, 0 CHANGELOG/README touch, scope strictly tests/+docs/+1 tool. 13 FRs Verified, 0 Unverified. Evidence: docs/pmos/features/2026-05-09_html-artifacts/verify/2026-05-10-phase-4/review.md. Phase 2.5 boundary CLOSED PASS. Plan-Phase 5 (T24-T26: manifest version bump 2.32.0→2.33.0 + README/CHANGELOG + FR-72 feature-scope smoke) unblocked."
-  - "Paused 2026-05-10T03:05Z compact-pending-pre-phase-5 per user direction (Recommended). Same pattern as Phase-1/2/3/4 boundary pauses. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Plan-Phase 5 T24 (manifest version sync 2.32.0→2.33.0 across both .claude-plugin/plugin.json and .codex-plugin/plugin.json — pre-push hook enforces sync per CLAUDE.md), then T25 (README row + CHANGELOG entry per FR-RELEASE), then T26 (FR-72 feature-scope smoke runs each affected skill end-to-end against the canonical fixture at tests/fixtures/repos/node/docs/pmos/features/2026-05-09_html-artifacts-fixture/ — this is the live runtime coverage OQ-3 deferred from T18+T19). Then orchestrator advances to Phase 9 /verify (feature-scope), then Phase 10 /complete-dev. ADV-T19/ADV-T21/ADV-V4-1/ADV-V4-2/ADV-V4-3 all non-blocking, optional Phase-5 polish."
-  - "Resumed 2026-05-10T03:30Z post-compact. T24 done at 03:32Z (commit c3b971b — both manifests bumped to 2.33.0; version + description sync diffs empty). ADV-T24 logged: audit-recommended.sh fails on 13 unmarked AskUserQuestion calls across changelog/create-skill/execute/feature-sdlc — pre-existing on main, not introduced by this feature. T25 done at 03:38Z (commit 467f90d — top entry prepended to docs/pmos/changelog.md; README no-op). T26 mechanical sealed at 03:45Z (commit a819e60 — task-26.md + phase-5.md + state.yaml): 6/7 lint scripts PASS (audit-recommended pre-existing fail), 11/11 assert scripts PASS, manifest sync PASS, FR coverage gate PASS (58 spec FRs all cited). Interactive smoke (Playwright + scratch /requirements run + wireframe diff) deferred to orchestrator Phase 9 /verify per user direction (Recommended) at T26 boundary checkpoint — those checks substantially overlap with /verify Phase-4 sub-step 3f UI/runtime evidence. Plan-Phase 5 (T24-T26) tasks done; phase-5.md log written; verify_outcome=pending. Orchestrator advances directly to Phase 9 /verify (feature-scope, non-skippable). No Phase 2.5 /verify --scope phase 5 fired — Phase 5 contains no SKILL.md or substrate edits; natural verify boundary is the feature-scope Phase 9."
-  - "Paused 2026-05-10T04:35Z compact-pending-pre-phase-10-complete-dev per user direction (Recommended). Same pattern as every prior phase boundary pause. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Phase 10 /pmos-toolkit:complete-dev (release: merge feat/html-artifacts → main, tag v2.33.0, push to all remotes, regenerate changelog if needed, capture learnings into CLAUDE.md/AGENTS.md, deploy per repo norms). Branch state: feat/html-artifacts at ed16e10 (or whatever HEAD becomes after pause commit), 2 commits ahead of Phase-9 baseline (b5f7be0 verify-phase-9 + ed16e10 gitignore polish). Working tree clean. Phase 9 verify outcome: PASS — 58/58 spec FRs verified, 26/26 plan tasks verified, 0 regressions, 0 blocking. 5 carried-forward advisories non-blocking. 2 inherited OQs (OQ-1/OQ-2) deferred to pre-2.34.0. OQ-3 fully resolved. Phase 10 will: (a) ensure manifest sync still 2.33.0, (b) ensure CHANGELOG entry exists for 2.33.0 (already done T25), (c) merge to main with --no-ff for release commit visibility, (d) tag v2.33.0 with annotated tag containing top-of-CHANGELOG snippet, (e) push to all remotes (origin + any others configured), (f) post-merge: capture learnings into CLAUDE.md/AGENTS.md if any /feature-sdlc patterns emerged this run."
-  - "Resumed 2026-05-10T04:00Z post-compact. Phase 9 /verify (feature-scope) ran with Consolidator strategy per user direction (Recommended) — skipped duplicate Phase 3 multi-agent fan-out over union diff (already covered by 4 prior phase-scope verifies). Static baseline re-run: 11/11 feature-asserts PASS, 6/7 lints PASS (audit-recommended ADV-T24 pre-existing). Phase-5-delta review (T24-T26) clean. Phase 4 live-runtime smoke: serve.js on :8767, Playwright navigated index.html → 01_requirements.html → cross-doc 02_spec.html#goals; per-artifact title/H1/Copy-MD-toolbar/per-section-anchors/heading-ids all PASS; 1 console error (favicon 404, irrelevant). file:// fallback FR-40 = NA-alt-evidence (Playwright blocks file://; viewer.test.js::test 1 covers). Scratch /requirements pilot = NA-alt-evidence (T8 inline pilot + T15 fixture seed exhaustively cover). Wireframe diff W01-W04: 0 deltas on authoritative dimensions. Phase 5 spec-compliance: 58/58 FRs Verified+NA, 26/26 plan tasks Verified, 0 regressions. Verdict: PASS. review.md at verify/2026-05-10/review.md. Orchestrator advances to Phase 10 /complete-dev (release: merge to main, tag v2.33.0, push remotes, capture learnings)."
-  - "Paused 2026-05-10T03:50Z compact-pending-pre-phase-9-verify per user direction (Recommended). Same pattern as every prior phase boundary pause. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Phase 9 /pmos-toolkit:verify (feature-scope, no --scope phase flag — full Phases 1-8 of verify checklist). This is the orchestrator-level non-skippable verify with multi-agent reviewer fan-out (5+ subagents over the full feature-branch diff vs main), Playwright MCP frontend smoke, file:// fallback smoke, real new scratch feature folder smoke (interactive /requirements + /spec + /plan runs), wireframe diff (W01..W04 vs live fixture), UX polish checklist, FR-coverage compliance grading across all 58 spec FRs. Branch state: feat/html-artifacts at a819e60, 5 commits ahead of 5f20e67 (Plan-Phase 4 pause baseline) — c3b971b T24 + 467f90d T25 + a819e60 T26-seal. Working tree clean. After Phase 9 /verify PASS, orchestrator runs Phase 10 /complete-dev (release: merge to main, tag v2.33.0, push to remotes, capture learnings into CLAUDE.md/AGENTS.md). 5 advisories carried forward as non-blocking polish: ADV-T19 (msf-req non-interactive-block gap), ADV-T21 (lint-no-modules-in-viewer wiring), ADV-V4-1/2/3 (regex hardening), ADV-T24 (audit-recommended pre-existing fail). 2 inherited Open Questions: OQ-1 (/complete-dev MD re-author) + OQ-2 (.md sidecars on format flip) — both deferred to pre-2.34.0."
-  - "Resumed 2026-05-10T05:00Z post-compact. Dispatching /pmos-toolkit:complete-dev for Phase 10 release: merge feat/html-artifacts → main with --no-ff, tag v2.33.0, push to all remotes, capture learnings into CLAUDE.md/AGENTS.md. Mode: interactive."
+  - "User confirmed: Keep standalone + fold as phase (msf-req, msf-wf, simulate-spec)"
+  - "Retro multi-session scope: --last/--days/--since + --project all + subagent-per-session dispatch"
+  - "OQ format: adopt /feature-sdlc canonical non-interactive-block contract across pipeline skills"
+  - "Tier 3 confirmed by user"
+  - "Previous html-artifacts pipeline state.yaml overwritten (that feature shipped at v2.33.0)"
 phases:
-  - id: setup
-    hardness: infra
-    status: completed
-    artifact_path: null
-    started_at: 2026-05-09T10:53:49Z
-    completed_at: 2026-05-09T10:53:49Z
-  - id: worktree
-    hardness: infra
-    status: skipped
-    artifact_path: null
-    notes: "worktree removed; running on branch in main repo cwd"
-  - id: init-state
-    hardness: infra
-    status: completed
-    artifact_path: 00_pipeline.md
-    started_at: 2026-05-09T10:55:00Z
-    completed_at: 2026-05-09T10:55:00Z
   - id: requirements
     hardness: hard
-    status: completed
-    artifact_path: 01_requirements.md
-    started_at: 2026-05-09T10:55:00Z
-    completed_at: 2026-05-09T11:14:36Z
+    status: pending
+    artifact_path: null
   - id: grill
     hardness: soft
-    status: completed
-    artifact_path: grills/2026-05-09_01_requirements.md
-    started_at: 2026-05-09T11:14:36Z
-    completed_at: 2026-05-09T11:30:07Z
-    notes: "6 questions standard depth + 1 user-driven rollback simplifying data-section/taxonomy/regression-suite design"
+    status: pending
+    artifact_path: null
   - id: msf-req
     hardness: soft
-    status: completed
-    artifact_path: msf-findings.md
-    started_at: 2026-05-09T12:00:00Z
-    completed_at: 2026-05-09T12:30:00Z
-    notes: "3 Must / 5 Should / 3 Nice; key threads = recipient cold-open friction (R2), HTML structural-validation gap (R3), /spec wall-clock spike from /diagram subagents (R4/R11)"
+    status: pending
+    artifact_path: null
   - id: creativity
     hardness: soft
-    status: skipped
+    status: pending
     artifact_path: null
-    notes: "user skipped at gate (Recommended skip)"
   - id: wireframes
     hardness: soft
-    status: completed
-    artifact_path: wireframes/
-    started_at: 2026-05-09T12:32:00Z
-    completed_at: 2026-05-09T13:30:00Z
-    notes: "4 wireframes (W01 default, W02 file:// fallback, W03 mixed-state, W04 quickstart) desktop-web; medium-rigor cross-file pass clean; /msf-wf delegated and applied 3 of 6 findings (W1, W2, W4); E4 collision recovered to msf-findings.md.bak; W3 deferred to /spec"
+    status: pending
+    artifact_path: null
   - id: prototype
     hardness: soft
-    status: skipped
+    status: pending
     artifact_path: null
-    notes: "user skipped at gate (Recommended skip — wireframes static-fidelity sufficient for /spec; viewer interaction model is straightforward)"
   - id: spec
     hardness: hard
-    status: completed
-    artifact_path: 02_spec.md
-    started_at: 2026-05-09T13:35:00Z
-    completed_at: 2026-05-09T14:30:00Z
-    notes: "Tier 3 spec; 21 Decision Log entries (D1-D21); 9 FR sections + 10 NFRs; 17 edge cases; 4 sequence diagrams; 1 review loop (2 should-fix + 2 nit, all fixed); committed 02_spec.md as Ready for Plan; bootstrap markdown (per OQ6 deferred to /complete-dev)."
+    status: pending
+    artifact_path: null
   - id: simulate-spec
     hardness: soft
-    status: completed
-    artifact_path: simulate-spec/2026-05-09-trace.md
-    started_at: 2026-05-09T14:30:00Z
-    completed_at: 2026-05-09T15:30:00Z
-    notes: "28 scenarios; 21 gaps (1 blocker G14, 6 sig, 13 minor, 1 fwd-compat); 14 patches applied to 02_spec.md, 5 skipped, 2 deferred (OQ-DEFER-1: /complete-dev MD re-author; OQ-DEFER-2: stale .md sidecars on format flip). Spec patches: FR-03.1, FR-05.1, FR-10.1/.2/.3, FR-25.1, FR-50/51 chrome-strip, FR-26 try/catch, FR-22 legacy-md shim, FR-92 cross-doc anchor scan, §9.0 schema fwd-compat, §9.1 ordering, FR-06 MIME map, FR-07 html-to-md.js, Non-Goals + mobile."
+    status: pending
+    artifact_path: null
   - id: plan
     hardness: hard
-    status: completed
-    artifact_path: 03_plan.md
-    started_at: 2026-05-09T15:30:00Z
-    completed_at: 2026-05-09T17:00:00Z
-    notes: "Tier 3 plan; 26 tasks in 5 phases; 5 decisions (P1-P5); 1 review loop (4 findings, all Fix); FR-coverage gate clean (62/62); status=Planned. Open Questions: 2 inherited (OQ-1, OQ-2 → /complete-dev pre-2.34.0) + 1 planning (OQ-3 → resolves during /execute T18 harness wiring)."
+    status: pending
+    artifact_path: null
   - id: execute
     hardness: hard
-    status: completed
+    status: pending
     artifact_path: null
-    started_at: 2026-05-09T18:50:00Z
-    completed_at: 2026-05-10T03:45:00Z
-    notes: "All 5 plan phases done. Phase 1 (T1–T6) verified via /verify --scope phase 1 PASS (4 review-gate fixes). Phase 2 (T7–T11) verified via /verify --scope phase 2 PASS (2 runbook-doc fixes). Phase 3 (T12–T14) verified via /verify --scope phase 3 PASS (0 blocking, 2 advisories). Phase 4 (T15-T23) verified via /verify --scope phase 4 PASS (0 blocking, 3 sub-75 advisories). Phase 5 (T24-T26) tasks done; T26 mechanical sealed (interactive smoke deferred to Phase 9 /verify per user direction). Evidence: docs/pmos/features/2026-05-09_html-artifacts/verify/{2026-05-09-phase-1,2026-05-09-phase-2,2026-05-10-phase-3,2026-05-10-phase-4}/review.md + execute/phase-{1..5}.md."
   - id: verify
     hardness: hard
-    status: completed
-    artifact_path: verify/2026-05-10/review.md
-    started_at: 2026-05-10T04:00:00Z
-    completed_at: 2026-05-10T04:30:00Z
-    notes: "Feature-scope /verify PASS. Consolidator strategy. 58/58 spec FRs verified (57 Verified + 1 NA-alt-evidence FR-40). 26/26 plan tasks Verified-complete. 0 regressions, 0 blocking. 5 non-blocking advisories carried (ADV-T19/T21/T24, ADV-V4-1/2/3). 2 inherited OQs deferred to pre-2.34.0. OQ-3 fully resolved via T8+T15+T18+T19+T26+Phase-9-smoke. Live runtime smoke: serve.js on :8767 + Playwright (per-artifact view + heading-ids + Copy MD toolbar + per-section anchors + cross-doc deep-link 02_spec.html#goals). file:// fallback NA-alt-evidence (Playwright MCP blocks file://; viewer.test.js::test 1 covers FR-40). Wireframe diff W01-W04: 0 deltas on authoritative dimensions; flat-nav vs chrome+iframe is fixture-design choice (chrome path covered by viewer.test.js JSDOM)."
+    status: pending
+    artifact_path: null
   - id: complete-dev
     hardness: hard
-    status: completed
+    status: pending
     artifact_path: null
-    started_at: 2026-05-10T05:00:00Z
-    completed_at: 2026-05-10T05:30:00Z
-    notes: "Rebase + ff-merge feat/html-artifacts (78 commits) → main. v2.33.0 tag annotated. Pushed main + tag to `all` multi-push remote (gitlab + github + github-work). Local feat branch deleted. 2 learnings captured: ## /verify (consolidator-pass after N phase-scoped verifies); ## /complete-dev (plugin-distribution repos: deploy = git push)."
-  - id: final-summary
-    hardness: infra
-    status: completed
-    artifact_path: null
-    started_at: 2026-05-10T05:30:00Z
-    completed_at: 2026-05-10T05:30:00Z
-  - id: capture-learnings
-    hardness: infra
-    status: completed
-    artifact_path: null
-    started_at: 2026-05-10T05:30:00Z
-    completed_at: 2026-05-10T05:30:00Z
 open_questions_log: []

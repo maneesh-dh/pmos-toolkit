@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-10
 **Last updated:** 2026-05-10
-**Status:** Draft
+**Status:** In Review
 **Tier:** 3 — Feature
 
 ## Problem
@@ -115,12 +115,15 @@ The pipeline becomes:
 **W1 — Fold /msf-req into /requirements.**
 - After `/requirements` Phase 5 (review loops) completes and the doc is committed, dispatch a folded Phase 5.5 that runs the MSF-req logic inline against the just-written `01_requirements.md`.
 - Tier gate: Tier 3 → mandatory (no user prompt; runs every time). Tier 2 → soft `AskUserQuestion` with Recommended=Run. Tier 1 → soft with Recommended=Skip.
+- **`--skip-folded-msf` escape hatch:** the user can pass `--skip-folded-msf` to `/requirements` to bypass even the Tier-3 mandatory case (e.g., purely-backend feature with no UX surface). Always logged to `state.yaml.phases.requirements.notes` when running under `/feature-sdlc`.
+- **Findings handling:** mirrors the /msf-wf-folded-into-/wireframes precedent from html-artifacts — high-confidence findings (e.g. confidence ≥80) are auto-applied to the doc with a Review-Log row noting the auto-apply; remaining findings are surfaced inline via `AskUserQuestion` for Fix/Modify/Skip/Defer disposition just like a review-loop. Folded MSF is NOT a silent advisory pass.
 - Standalone `/msf-req` slash command stays invokable; the folded path and the standalone path both call into shared logic in `_shared/msf-heuristics.md` (already exists).
 - Output goes to a slug-distinct artifact (see W4).
 
 **W2 — Fold /msf-wf into /wireframes.**
 - Same shape; folded as a phase after wireframes are generated. Per-wireframe iteration retained (the existing standalone `/msf-wf` iterates per wireframe).
-- Tier gate: same matrix as W1.
+- Tier gate: same matrix as W1. Same `--skip-folded-msf` escape (renamed to `--skip-folded-msf-wf` if both flags are needed at `/wireframes`; final naming pinned in `/spec`).
+- Findings handling: same auto-apply-high-confidence + inline-disposition model as W1. This already exists in /msf-wf's standalone path per the html-artifacts run; folded path reuses it.
 - Standalone `/msf-wf` retained. Shared logic via `_shared/msf-heuristics.md`.
 
 **W3 — Fold /simulate-spec into /spec.**
@@ -142,7 +145,7 @@ The pipeline becomes:
 
 **W6 — Standardize --non-interactive across pipeline.**
 - Source of truth: `_shared/non-interactive.md` (canonical text) + the inlined block in `/feature-sdlc/SKILL.md` (the audited byte-identical region between `<!-- non-interactive-block:start -->` and `<!-- non-interactive-block:end -->`).
-- Rollout target set: every pipeline skill that supports `--non-interactive` (the orchestrator's child skills: `/requirements`, `/grill`, `/msf-req`, `/wireframes`, `/msf-wf`, `/prototype`, `/spec`, `/simulate-spec`, `/plan`, `/execute`, `/verify`, `/complete-dev`, `/retro`, `/creativity`).
+- Rollout target set: every pipeline skill that **currently supports** `--non-interactive`. The exact list is produced by `/spec` via an audit pass (grep each pipeline SKILL.md for the `<!-- non-interactive-block:start -->` marker AND for `--non-interactive` argument parsing). Skills that don't currently parse the flag are out of scope for this feature; adding new flag-handling is a follow-up.
 - Each target SKILL.md gets the canonical block inlined. `tools/lint-non-interactive-inline.sh` enforces byte-identity in CI; new failures block the pre-push hook.
 - Open-questions emission per skill follows FR-03 in the canonical block (single-MD primary → append section; multi-artifact → `_open_questions.md` aggregator; non-MD primary → sidecar; chat-only → stderr block). Skills that produce HTML-primary artifacts use the sidecar path with HTML-aware naming (`<artifact>.open-questions.md` for HTML, MD-side companion).
 
@@ -233,7 +236,9 @@ The pipeline becomes:
 | D9 | NOT cross-referencing /retro findings against current skill body | (a) Include cross-ref (b) Exclude | (b) — user explicitly scoped out at the orchestrator gate; the cross-ref is high-signal but high-complexity; deferred to a future feature once multi-session aggregation is proven |
 | D10 | Aggregation hash: `(skill, severity, first-100-chars-of-finding)` for dedup; `(skill, finding-hash)` for count | (a) Exact-string match (b) Levenshtein fuzzy match (c) Truncated-prefix hash | (c) — exact-string under-clusters; full fuzzy match is complex and needs tuning; truncated-prefix is good-enough per the brief, with the human reader merging visual edge cases |
 | D11 | Folded-phase failure semantics — soft (logs, doesn't block) at all tiers OR fail-stop at Tier 3? | (a) Always advisory (b) Always blocking (c) Tier-keyed | (a) — folded phases are quality gates not invariant gates; if MSF-req crashes, the requirements doc itself is still valid; downstream `/spec` can proceed. Tier 3 just gets a louder warning in the OQ index. Pipeline halts only on hard-phase failure (`/requirements` itself, `/spec` itself, etc.) |
-| D12 | Where the "tier" lives that drives folded-phase decisions inside child skills | (a) Re-derive from doc frontmatter at every entry (b) Read from `state.yaml` (c) Pass via prompt | (a) — child skills must remain invokable standalone; reading their own input doc's frontmatter (`Tier: N` line) is the single authoritative source. Orchestrator-derived tier is informational only; child skills enforce their own |
+| D12 | Where the "tier" lives that drives folded-phase decisions inside child skills | (a) Re-derive from doc frontmatter at every entry (b) Read from `state.yaml` (c) Pass via prompt | (a) — child skills must remain invokable standalone; reading their own input doc's tier line is the single authoritative source. Orchestrator-derived tier is informational only; child skills enforce their own. **Parsing rule (pinned for /spec):** regex `^\*\*Tier:\*\* ([0-9]+)` against the doc's first 20 lines (matches the existing `**Tier:** 3 — Feature` header convention used by /requirements/spec/plan templates) |
+| D13 | `--skip-folded-msf` escape hatch for purely-backend Tier 3 features | (a) No escape — Tier 3 always runs MSF (b) Non-Goal carve-out only (c) Explicit `--skip-folded-msf` flag | (c) — purely-backend Tier 3 features (e.g., infra refactors) get no signal from a UX-friction skill; forcing the run is noise. Flag is opt-out, not opt-in; logged to `state.yaml.phases.<parent>.notes` when running under `/feature-sdlc` so the choice is auditable |
+| D14 | Folded MSF findings handling: auto-apply high-confidence + inline disposition for the rest | (a) Advisory-only (write findings, don't block) (b) Auto-apply all (c) Auto-apply high-confidence + inline disposition for rest | (c) — matches /msf-wf-folded-into-/wireframes precedent from html-artifacts (where /msf-wf delegated and applied 3 of 6 findings inline). Auto-apply threshold defaults to confidence ≥80 (pinned in /spec). Remaining findings get the same Fix/Modify/Skip/Defer disposition as review-loop findings. Folded MSF therefore actively shapes the doc rather than producing a sidecar nobody reads |
 
 ## Success Metrics
 
@@ -266,9 +271,16 @@ The pipeline becomes:
 
 | # | Question |
 |---|---|
-| 1 | Folded MSF-req at Tier 3: should the user still be able to abort the folded phase mid-run if MSF surfaces blocking findings, or does it always run to completion and surface findings as advisory? Default: always-completion + advisory; user can re-run if they want to act on findings. Confirm in `/spec`. |
-| 2 | Folded simulate-spec at Tier 3: how many scenarios is the right floor? Standalone /simulate-spec runs ~28 scenarios for a Tier-3 spec (per html-artifacts evidence). Folded version should match or be tunable — confirm in `/spec`. |
-| 3 | OQ aggregator filename when a child skill produces multiple artifacts: spec says `_open_questions.md`. Should the orchestrator's aggregation in `00_open_questions_index.html` (Phase 11) read these MD aggregators directly, or require a sidecar HTML version? Default: read MD aggregators; orchestrator's index is HTML and renders MD via the html-authoring substrate. Confirm in `/spec`. |
-| 4 | /retro multi-session subagent failure: if 1 of 5 subagents errors, do we ship a partial report (with "1 session unscanned" notice) or block? Default: partial-report-with-notice. Confirm in `/spec`. |
-| 5 | Cross-project retro permissions: `~/.claude-personal/projects/*/` may contain projects the user has since archived/abandoned. Should `--project all` filter by recent-mtime threshold (e.g. last 90 days) by default? Default: no filter; explicit --since for that. Confirm in `/spec`. |
-| 6 | Tier-keyed mandatoriness inside folded phases: a Tier-2 `/requirements` run with the user picking Skip at the soft MSF-req gate — does that selection get logged anywhere observable, or is it ephemeral? Default: log to `state.yaml.phases.requirements.notes` if running under `/feature-sdlc`; ephemeral if standalone. Confirm in `/spec`. |
+| 1 | Folded simulate-spec at Tier 3: how many scenarios is the right floor? Standalone /simulate-spec runs ~28 scenarios for a Tier-3 spec (per html-artifacts evidence). Folded version should match or be tunable — confirm in `/spec`. |
+| 2 | OQ aggregator filename when a child skill produces multiple artifacts: spec says `_open_questions.md`. Should the orchestrator's aggregation in `00_open_questions_index.html` (Phase 11) read these MD aggregators directly, or require a sidecar HTML version? Default: read MD aggregators; orchestrator's index is HTML and renders MD via the html-authoring substrate. Confirm in `/spec`. |
+| 3 | /retro multi-session subagent failure: if 1 of 5 subagents errors, do we ship a partial report (with "1 session unscanned" notice) or block? Default: partial-report-with-notice. Confirm in `/spec`. |
+| 4 | Cross-project retro permissions: `~/.claude-personal/projects/*/` may contain projects the user has since archived/abandoned. Should `--project all` filter by recent-mtime threshold (e.g. last 90 days) by default? Default: no filter; explicit --since for that. Confirm in `/spec`. |
+| 5 | Tier-keyed mandatoriness inside folded phases: a Tier-2 `/requirements` run with the user picking Skip at the soft MSF-req gate — does that selection get logged anywhere observable, or is it ephemeral? Default: log to `state.yaml.phases.requirements.notes` if running under `/feature-sdlc`; ephemeral if standalone. Confirm in `/spec`. |
+| 6 | D14 auto-apply confidence threshold: defaults to ≥80 by analogy with html-artifacts /msf-wf precedent. Should this be tunable per tier (e.g. ≥90 at Tier 1, ≥80 at Tier 3)? Confirm in `/spec`. |
+| 7 | `--skip-folded-msf` flag naming: single flag covering both /requirements (msf-req) and /wireframes (msf-wf), or split into `--skip-folded-msf-req` / `--skip-folded-msf-wf`? Default: split. Confirm in `/spec`. |
+
+## Review Log
+
+| Loop | Findings | Changes Made |
+|---|---|---|
+| 1 | F1 [D12 tier-parsing rule ambiguous]; F2 [folded-MSF findings disposition unspecified]; F3 [no escape for backend Tier 3]; F4 [W6 rollout list speculative] | F1 fix-as-proposed → D12 carries explicit regex parsing rule. F2 modified per user → D14 added (auto-apply high-confidence + inline disposition); W1 + W2 Solution Direction sub-bullets updated. F3 fix-as-proposed → D13 added (`--skip-folded-msf` flag); W1 sub-bullet added. F4 fix-as-proposed → W6 reframed (target set produced by /spec audit pass, not asserted here). OQ-1 retired (resolved by D14); 2 new OQs added (D14 threshold tunability; flag naming). |

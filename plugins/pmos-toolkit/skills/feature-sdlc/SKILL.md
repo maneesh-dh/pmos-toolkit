@@ -256,12 +256,23 @@ When `--resume` reads a pre-2.34.0 `state.yaml` carrying these phase entries, tr
 Atomically (per `reference/pipeline-status-template.md` Update protocol):
 
 1. Write `.pmos/feature-sdlc/state.yaml` from the schema in `reference/state-schema.md`:
-   - `schema_version: 1`
+   - `schema_version: 2` (v2 per T2 — adds `folded_phase_failures[]` and `retro` phase entry).
    - top-level fields populated from Phases 0/0.a (slug, mode, started_at = now, last_updated = now, worktree_path, branch, feature_folder).
    - `tier: null` (set after Phase 3 unless `--tier` was passed).
    - `current_phase: requirements` (the next phase to run).
-   - `phases[]` populated in declared order from `state-schema.md` "Phase identifiers + hardness", every status `pending`.
+   - `phases[]` populated in declared order from `state-schema.md` "Phase identifiers + hardness", every status `pending`. Each entry initialized with `started_at: null` AND `folded_phase_failures: []`. The `retro` phase entry MUST be present (between `complete-dev` and `final-summary`).
    - `open_questions_log: []`.
+
+### Phase status-transition write contract (FR-57; T13)
+
+When transitioning any phase from `pending` → `in_progress`:
+
+- Set `phases[<id>].status = "in_progress"`.
+- If `phases[<id>].started_at` is currently `null`, set it to ISO-8601 `now`. If non-null (a prior /resume), preserve the original timestamp (do NOT overwrite).
+- Update top-level `last_updated = now` and `current_phase = <id>`.
+- Apply the atomic D31 write protocol: write `.pmos/feature-sdlc/state.yaml.tmp`, then `rename(2)` to `state.yaml`. On rename failure, surface the failure dialog per NFR-08 — never leave a `.tmp` orphan.
+
+The `started_at` write is the cursor `/execute` and folded apply-loops use to detect already-applied work after a /resume (`git log --since=<phase.started_at>`). Never-overwrite semantics are critical: a re-entered phase must not lose its original cursor or duplicate-apply-loop guard fires.
 2. Write `<feature_folder>/00_pipeline.html` from the template in `reference/pipeline-status-template.md`, rendered through the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`.
 
    - **Atomic write (FR-10.2):** temp-then-rename.

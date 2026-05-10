@@ -2,7 +2,7 @@ schema_version: 1
 slug: pipeline-consolidation
 mode: interactive
 started_at: 2026-05-10T00:00:00Z
-last_updated: 2026-05-10T01:10:00Z
+last_updated: 2026-05-10T01:30:00Z
 paused_at: null
 paused_reason: null
 resumed_at: 2026-05-10T00:40:00Z
@@ -10,7 +10,7 @@ worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-pipeline-cons
 branch: feat/pipeline-consolidation
 feature_folder: docs/pmos/features/2026-05-10_pipeline-consolidation
 tier: 3
-current_phase: msf-req
+current_phase: creativity
 backlog_id: null
 notes:
   - "User confirmed: Keep standalone + fold as phase (msf-req, msf-wf, simulate-spec)"
@@ -32,8 +32,9 @@ phases:
     notes: "Standard depth, 7 questions, all branches resolved. 7 dispositions folded into 01_requirements.md as Loop-2: D2 reworded (mandatory→default-on), D10/D14 updated, D15-D18 added. 4 gaps (G-A..G-D) deferred to /spec. /verify edge-case row softened; W1/W2/W3/W5/W8 sub-bullets added; success-metric row added for folded-phase-failure surfacing."
   - id: msf-req
     hardness: soft
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/msf-req-findings.md
+    notes: "Tier 3 Recommended=Run. 1 persona x 4 scenarios; 4 journeys walked. 14 findings (3 Must / 5 Should / 6 Nice). Slug override applied per D3/W4 dogfood (msf-req-findings.md, not msf-findings.md). Must items concentrate on D11/D16/D17 contracts: M1 in-line failure surfacing, M2 resume granularity inside folded phase, M3 per-finding revert safety when findings interrelate. To fold into /spec scope: 3 Must + 5 Should items expand G-A through G-D and add commit-strategy + --minimal flag decisions."
   - id: creativity
     hardness: soft
     status: pending

@@ -220,22 +220,28 @@ options:
   - Cancel
 ```
 
-### Step 2 — Worktree edge cases
+### Step 2 — Unified pre-flight (FR-PA01–PA04)
 
-Before `git worktree add`, check the four edge cases from FR-WORKTREE / spec §15 G7:
+Before `git worktree add`, the skill MUST run all six checks below and, on any collision, surface a single unified dialog:
 
-| Case | Behavior |
-|------|----------|
-| (a) cwd is not a git repo | Abort: `not a git repo — cd to your repo or pass --no-worktree` |
-| (b) HEAD detached | Abort: `detached HEAD — checkout a branch first or pass --no-worktree` |
-| (c) Dirty working tree | Abort: `dirty tree — commit/stash or pass --no-worktree` |
-| (d) Branch `feat/<slug>` already exists | `AskUserQuestion`: **Use existing branch (Recommended)** / **Pick new slug** / **Abort**. "Use existing" enters resume mode (Phase 0.b) if state.yaml is present in that worktree; otherwise initializes state.yaml fresh on top of the existing branch with a warning logged in `state.yaml.notes`. |
+| Check | Condition | Detection |
+|---|---|---|
+| (1) cwd is git repo | `git rev-parse --is-inside-work-tree` returns true | abort if false: `not a git repo — cd to your repo or pass --no-worktree` |
+| (2) HEAD not detached | `git symbolic-ref -q HEAD` returns 0 | abort if non-zero: `detached HEAD — checkout a branch first or pass --no-worktree` |
+| (3) Working tree clean | `git status --porcelain` is empty | abort if non-empty: `dirty tree — commit/stash or pass --no-worktree` |
+| (4) Candidate path absent | `<repo-parent>/<repo-name>-<slug>/` directory does NOT exist | collision dialog if exists |
+| (5) Branch absent | `git branch --list "feat/<slug>"` is empty | collision dialog if non-empty |
+| (6) Worktree-list slot free | `git worktree list --porcelain` has no entry for the candidate path OR the slug | collision dialog if registered |
 
-Detection commands:
-- (a): `git rev-parse --is-inside-work-tree` returns false.
-- (b): `git symbolic-ref -q HEAD` returns non-zero.
-- (c): `git status --porcelain` returns non-empty output.
-- (d): `git branch --list "feat/<slug>"` returns non-empty.
+On (1)–(3) failure: abort with the precise git error and the suggested fix above.
+
+On (4) OR (5) OR (6) collision, present a single `AskUserQuestion`:
+
+- **Use existing branch / worktree (Recommended)** — enters Phase 0.b resume mode if state.yaml is present in the existing worktree path; otherwise initializes state.yaml fresh on top of the existing branch with `state.notes` annotated `"reused-existing-branch:<reason>"`.
+- **Pick new slug (-N suffix)** — appends `-2`, `-3`, ... to the slug and re-runs the unified pre-flight (idempotent).
+- **Abort** — exit 64 with the surfaced collision details.
+
+**Orphan-dir handling (FR-PA04):** if (4) fires (path exists) but (6) does not (path is not in `git worktree list` — git no longer tracks it), the dialog wording MUST include the suffix `(orphan worktree dir detected — git no longer tracks it)` so the user knows manual cleanup may be needed before "Use existing" can succeed.
 
 ### Step 3 — Create worktree
 

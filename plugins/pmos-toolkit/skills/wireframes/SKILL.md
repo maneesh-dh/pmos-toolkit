@@ -563,7 +563,50 @@ Wireframes are now generated. Phase 6 hands off to `/msf-wf` for combined MSF + 
 
 **Tier gating:**
 - **Tier 1**: skip Phase 6 entirely → jump to Phase 8 (Spec Handoff). Tier 1 wireframes are usually 1–2 screens; MSF/PSYCH overkill.
-- **Tier 2 / Tier 3**: Phase 6 is **mandatory**.
+- **Tier 2 / Tier 3**: Phase 6 is **default-on per D2** (Tier 3) / optional (Tier 2). Skip explicitly via `--skip-folded-msf-wf` (D13).
+
+### Folded-phase contract (per pipeline-consolidation v2.34.0)
+
+This phase is the canonical "folded MSF-wf inside /wireframes" contract per W2. The standalone `/msf-wf` skill remains available; the folded path here is the default trigger when /wireframes runs at Tier 2/3.
+
+#### Pre-apply guard (FR-65)
+
+Before opening the apply-loop on each wireframe HTML:
+
+```bash
+git status --porcelain {feature_folder}/wireframes/<NN>_<slug>.html
+```
+
+If non-empty: emit `WARNING: <NN>_<slug>.html has uncommitted edits — folded MSF-wf apply-loop will skip auto-apply (per FR-65) for this wireframe to avoid clobbering. Run /wireframes --skip-folded-msf-wf OR commit your edits first.` Skip auto-apply for that wireframe (fall through to manual disposition); continue with critique + per-wireframe finding emission for advisory value.
+
+#### Output slug (D3)
+
+Per-wireframe findings doc is written to `{feature_folder}/wireframes/msf-wf-findings/<wireframe-id>.md` (directory variant of the slug-distinct convention). The legacy combined `msf-findings.md` is no longer written.
+
+#### Per-finding commits (D16)
+
+Each auto-applied finding is its own git commit:
+
+```
+wireframes: auto-apply msf-wf finding F<N>
+```
+
+Commit body includes `Depends-on: F<M>` when finding F<N> requires F<M> to land first. /complete-dev release-notes recipe (FR-68) consumes this. Commits-as-state is the resume cursor (FR-57).
+
+#### Failure capture (FR-50, M1, D35)
+
+On apply failure, capture `{folded_skill: msf-wf, error_excerpt: <first-200-chars>, ts: <ISO-8601>}` and append to `state.yaml.phases.wireframes.folded_phase_failures[]` per the dedup rule in `feature-sdlc/reference/state-schema.md`. Emit chat line at moment-of-append:
+
+```
+WARNING: msf-wf crashed (advisory continue per D11): <error_excerpt>
+```
+
+Continue per D11 advisory — folded-phase failures do NOT halt /wireframes. /feature-sdlc Phase 11 surfaces the failures (T12b).
+
+#### Flag handling (Phase 0 parser additions)
+
+`--skip-folded-msf-wf` (boolean) — short-circuits this phase entirely.
+`--msf-auto-apply-threshold N` (int, default 80) — overrides the apply threshold.
 
 **Failure handling:**
 If `/msf-wf` returns a non-zero state or the user terminates it, this Phase aborts. /wireframes MUST NOT auto-continue to Phase 8. Surface the underlying error to the user; the user can re-run `/msf-wf` manually and then continue with `/spec`.

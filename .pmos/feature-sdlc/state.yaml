@@ -1,10 +1,10 @@
 schema_version: 2
 slug: feature-sdlc-worktree-resume
-tier: null
+tier: 3
 mode: interactive
 started_at: 2026-05-10T00:00:00Z
-last_updated: 2026-05-10T00:00:00Z
-current_phase: requirements
+last_updated: 2026-05-10T00:03:00Z
+current_phase: spec
 worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-feature-sdlc-worktree-resume
 branch: feat/feature-sdlc-worktree-resume
 feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills-feature-sdlc-worktree-resume/docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume
@@ -25,47 +25,58 @@ phases:
     folded_phase_failures: []
   - id: init-state
     hardness: infra
-    status: in_progress
+    status: completed
     artifact_path: 00_pipeline.md
     started_at: 2026-05-10T00:00:00Z
-    completed_at: null
+    completed_at: 2026-05-10T00:00:30Z
     folded_phase_failures: []
   - id: requirements
     hardness: hard
-    status: pending
-    artifact_path: null
-    started_at: null
+    status: completed
+    artifact_path: docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume/01_requirements.md
+    started_at: 2026-05-10T00:00:30Z
+    completed_at: 2026-05-10T00:01:00Z
     folded_phase_failures: []
+    notes: "Tier 3, 11 decisions D1-D11, 5 OQs, 1 review loop terminal (2 findings: F2 defer-to-spec, F3 Discovery Journey added). Folded MSF-req: no novel findings (UX Analysis covers MSF lens inline)."
   - id: grill
     hardness: soft
-    status: pending
-    artifact_path: null
-    started_at: null
+    status: completed
+    artifact_path: docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume/grills/2026-05-10_01_requirements.md
+    started_at: 2026-05-10T00:01:00Z
+    completed_at: 2026-05-10T00:02:00Z
     folded_phase_failures: []
+    notes: "Standard depth, 6 questions Q1-Q6. Added D11 (extended) + D12 D13 D14 D15 to requirements doc. Closed OQs #3 #4 #5; deferred #1 #2 to /spec."
   - id: creativity
     hardness: soft
-    status: pending
+    status: skipped
     artifact_path: null
     started_at: null
     folded_phase_failures: []
+    notes: "Skipped per user (Recommended). Design surface well-explored after grill."
   - id: wireframes
     hardness: soft
-    status: pending
+    status: skipped
     artifact_path: null
     started_at: null
     folded_phase_failures: []
+    notes: "Skipped per user (Recommended). Frontend-detection: zero UI signal; pure backend orchestrator skill change."
   - id: prototype
     hardness: soft
-    status: pending
+    status: skipped
     artifact_path: null
     started_at: null
     folded_phase_failures: []
+    notes: "Skipped per user (Recommended). Wireframes were skipped; no UI surface."
   - id: spec
     hardness: hard
-    status: pending
+    status: paused
     artifact_path: null
     started_at: null
+    paused_at: 2026-05-10T00:03:00Z
+    paused_reason: compact
+    last_error: null
     folded_phase_failures: []
+    notes: "Compact checkpoint pre-/spec per user. Resume cursor lands on /spec. Carry-forward from grill: requirements doc has 15 decisions D1-D15, 2 open OQs (#1 staleness flagging, #2 legacy v1/v2 worktree handling in /feature-sdlc list). Spec scope: /feature-sdlc rework (Phase 0.a unified pre-flight per D14, Model C try-then-handoff per D2/D11, --no-worktree bypass per D12, schema v3 additive per D6); /complete-dev cleanup (Phase 4 ExitWorktree-then-remove with no-op fallback per D15, --force-cleanup flag per D13); .gitignore .pmos/feature-sdlc/ + git rm --cached existing state.yaml per D4; pre-flight realpath drift check per D5; /feature-sdlc list subcommand per D7."
   - id: plan
     hardness: hard
     status: pending

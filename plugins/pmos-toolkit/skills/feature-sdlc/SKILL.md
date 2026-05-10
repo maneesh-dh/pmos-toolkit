@@ -160,7 +160,7 @@ END { emit_pending() }
 2. After Phase 3 `/requirements` completes — read its auto-tier output.
 3. Until Phase 3 completes, gate-recommendation logic uses Tier-3 conservative defaults.
 
-Per FR-TIER-SCOPE / spec §15 G8: `{tier}` drives BOTH child-skill `--tier` passthrough (only for children that accept it: `/requirements`, `/spec`, `/plan`) AND orchestrator gate logic (Phases 3.b grill, 4.a msf-req, 4.b creativity, 4.c wireframes, 4.d prototype, 6 simulate-spec). Child skills retain the right to auto-tier-escalate; if a child reports a different tier, log to `state.yaml.phases.<X>.child_tier_divergence` and continue — do not override the child.
+Per FR-TIER-SCOPE / spec §15 G8: `{tier}` drives BOTH child-skill `--tier` passthrough (only for children that accept it: `/requirements`, `/spec`, `/plan`) AND orchestrator gate logic (Phases 3.b grill, 4.b creativity, 4.c wireframes, 4.d prototype, 13 retro). Phases 4.a (msf-req) and 6 (simulate-spec) were removed in v2.34.0 — folded into /requirements (Phase 5.5) and /spec (Phase 6.5) respectively. Child skills retain the right to auto-tier-escalate; if a child reports a different tier, log to `state.yaml.phases.<X>.child_tier_divergence` and continue — do not override the child.
 
 ### Missing-skill detection
 
@@ -228,6 +228,15 @@ When state.yaml is present:
 
 The resume status table is **presentational**, not interrogative — followed by at most a single structured ask (continue / abort) when needed. The orchestrator has no review/refinement loops of its own; every refinement is owned by a child skill. Per spec §15 G9.
 
+### Auto-migration of pre-2.34.0 state files
+
+Two phase IDs were removed in v2.34.0:
+
+- `msf-req` — folded into `/requirements` as Phase 5.5 (W1).
+- `simulate-spec` — folded into `/spec` as Phase 6.5 (W3, delegating to `_shared/sim-spec-heuristics.md`).
+
+When `--resume` reads a pre-2.34.0 `state.yaml` carrying these phase entries, transparently elide them on read (do NOT block, do NOT prompt). The resume cursor advances to the next non-elided phase. See `reference/state-schema.md` Schema v2 auto-migration block for the exact 4-step idempotent migration contract. This back-compat handling is silent on a clean migration; if migration fails (e.g., `rename(2)` error per NFR-08), surface the failure dialog.
+
 ## Phase 1: Initialize state
 
 **Skip if Phase 0.b entered resume mode.**
@@ -255,7 +264,7 @@ Atomically (per `reference/pipeline-status-template.md` Update protocol):
 
 ## Phase 2: Compact checkpoint (recurring micro-phase)
 
-**Not a phase that runs once — invoked before each of:** `wireframes` (4.c), `prototype` (4.d), `simulate-spec` (6), `execute` (8), `verify` (9). See `reference/compact-checkpoint.md` for the exact `AskUserQuestion` shape and the three-part Pause-resumable exit contract (FR-PAUSE / spec §15 G1).
+**Not a phase that runs once — invoked before each of:** `wireframes` (4.c), `prototype` (4.d), `execute` (8), `verify` (9). See `reference/compact-checkpoint.md` for the exact `AskUserQuestion` shape and the three-part Pause-resumable exit contract (FR-PAUSE / spec §15 G1). (Phase 6 simulate-spec is no longer a checkpoint trigger — it was folded into /spec in v2.34.0.)
 
 Skills cannot trigger `/compact` directly — only the user can. The checkpoint surfaces the choice; "Pause" exits cleanly so the user can `/compact` and re-run with `--resume`.
 
@@ -307,23 +316,6 @@ After completion:
 - Append OQ artifact to `open_questions_log[]` if non-interactive.
 
 On failure: soft-phase failure dialog from `reference/failure-dialog.md` (Skip option SHOWN).
-
-## Phase 4.a: /msf-req gate (soft)
-
-`AskUserQuestion`:
-
-```
-question: "Run /msf-req for end-user friction analysis on the requirements doc?"
-options:
-  - Run /msf-req                       # (Recommended) when {tier} == 3
-  - Skip                               # (Recommended) when {tier} ∈ {1, 2}
-```
-
-Recommended switches per `{tier}` (FR-TIER-SCOPE).
-
-On Run: invoke `/pmos-toolkit:msf-req` per the **Reviewer-subagent contract (FR-50/51/52, T13a)** below. On missing-skill platform error: missing-skill dialog (soft variant) from `reference/failure-dialog.md`.
-
-**Reviewer-subagent contract (FR-50/51/52, T13a):** before invoking /msf-req, chrome-strip the artifact via `Bash('node ${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js <feature_folder>/01_requirements.html > /tmp/msf-req-stripped.html')`. Pass the stripped HTML inline with the canonical FR-51 template: *"Read this HTML content (the document's `<main>` body — chrome already stripped). First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: \"<≥40-char verbatim from source>\"}`."* After return, run FR-52 validation (hard-fail on miss): (1) read `<feature_folder>/01_requirements.sections.json`; (2) assert `sections_found` set-equality with sections.json `ids[]` — any miss/extra → hard-fail; (3) for each finding, substring-grep `quote` against the un-stripped source HTML — any miss → hard-fail; (4) "no findings" allowed only if `sections_found` matches AND the rubric permits it. On hard-fail, pause with `reference/failure-dialog.md` (soft-phase variant).
 
 ## Phase 4.b: /creativity gate (soft)
 
@@ -394,25 +386,6 @@ No compact checkpoint before this phase — `/spec` context is moderate.
 
 On failure: hard-phase failure dialog (no Skip).
 
-## Phase 6: /simulate-spec gate (soft)
-
-`AskUserQuestion`:
-
-```
-question: "Run /simulate-spec to pressure-test the spec before planning?"
-options:
-  - Run /simulate-spec                 # (Recommended) when {tier} == 3
-  - Skip                               # (Recommended) when {tier} ∈ {1, 2}
-```
-
-Recommended switches per `{tier}`.
-
-Before invoking, run the **compact checkpoint** — `/simulate-spec` is heavy (full scenario trace + pseudocode).
-
-**Reviewer-subagent contract (FR-50/51/52, T13a):** when /simulate-spec runs as a reviewer subagent, chrome-strip the spec artifact via `Bash('node ${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/chrome-strip.js <feature_folder>/02_spec.html > /tmp/simulate-spec-stripped.html')`. Pass the stripped HTML inline with the canonical FR-51 template: *"Read this HTML content (the document's `<main>` body — chrome already stripped). First, enumerate every `<section>` id and every `<h2>`/`<h3>` id you can locate — return as `sections_found: [...]`. Then evaluate against the rubric below. For every finding, return `{section_id, severity, message, quote: \"<≥40-char verbatim from source>\"}`."* After return, run FR-52 validation (hard-fail on miss): (1) read `<feature_folder>/02_spec.sections.json`; (2) assert `sections_found` set-equality with sections.json `ids[]` — any miss/extra → hard-fail; (3) for each finding, substring-grep `quote` against the un-stripped source HTML — any miss → hard-fail; (4) "no findings" allowed only if `sections_found` matches AND the rubric permits it. On hard-fail, pause with `reference/failure-dialog.md` (soft-phase variant per Phase 6's tier-3-mandatory status).
-
-On missing-skill: soft-variant missing-skill dialog.
-
 ## Phase 7: /plan (hard)
 
 Invoke `/pmos-toolkit:plan` with `<feature_folder>/02_spec.{html,md}` (resolved primary; the spec is the source of truth; `/plan` will resolve the feature folder from settings + `--feature` if needed). Pass `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n` and `[output_format: <resolved>]\n`.
@@ -481,7 +454,7 @@ Print the full pipeline-status table from `00_pipeline.html` (or `00_pipeline.md
 1. **Triggering `/compact` from the skill.** The harness does not allow it. Surface a checkpoint, write `paused-resumable` state if the user picks Pause, and exit cleanly. Pretending it auto-compacts is a lie that breaks the resume contract.
 2. **Skipping the worktree step "because the user knows what they're doing".** Worktree is mandatory unless `--no-worktree` is explicitly passed. Auto-skipping when the user is already on a branch loses isolation and corrupts the resume state file's location semantics. The four worktree edge cases (a) not-a-repo, (b) detached HEAD, (c) dirty tree, (d) branch already exists — all handled in Phase 0.a — are non-bypassable; do not auto-stash, auto-rename, or auto-delete to make them go away.
 3. **Dispatching child skills with a "see the state file" prompt.** Each child gets a self-contained brief (initial context for `/requirements`; full requirements doc path for `/spec`; etc.). Child skills must not reach into `state.yaml` — that file is the orchestrator's private state.
-4. **Auto-running optional stages without the gate.** `/msf-req`, `/creativity`, `/wireframes`, `/prototype`, `/simulate-spec` each have an explicit `AskUserQuestion` gate. Recommended-default is fine; silent run is not.
+4. **Auto-running optional stages without the gate.** `/creativity`, `/wireframes`, `/prototype` each have an explicit `AskUserQuestion` gate. Recommended-default is fine; silent run is not. (`/msf-req` and `/simulate-spec` no longer have orchestrator gates — they are folded inside `/requirements` Phase 5.5 and `/spec` Phase 6.5 respectively, default-on at Tier 3.) Note: `--minimal`-driven Skip on the four soft gates (creativity, wireframes, prototype, retro) is user-explicit and does not violate this rule — see Phase 0 `_minimal_active` directive.
 5. **Frontend-detection by LLM gut-feel.** Use `reference/frontend-detection.md` heuristics deterministically; surface uncertainty via `AskUserQuestion` rather than guessing. The gate is always presented (FR-FRONTEND-GATE).
 6. **Forgetting to update `state.yaml` after a child-skill completion.** Every phase end must atomically (a) update `state.yaml`, (b) regenerate `00_pipeline.html` (and the `.md` sidecar when `output_format=both`), (c) print the in-chat status table. Skipping any of these breaks resume.
 7. **Treating `--non-interactive` as "skip /grill silently".** The skill must log `phase: grill / status: skipped-non-interactive / reason: --non-interactive flag` so the user knows what was skipped on review.

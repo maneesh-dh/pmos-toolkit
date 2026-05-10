@@ -433,6 +433,31 @@ Print the full pipeline-status table from `00_pipeline.html` (or `00_pipeline.md
 - If `state.yaml.open_questions_log[]` is non-empty: write `<feature_folder>/00_open_questions_index.html` with one section per logged child skill (path + deferred count) per FR-OQ-INDEX / spec §15 G4. Apply the same write-phase rules as `00_pipeline.html` (atomic write, asset prefix `assets/`, cache-bust, heading IDs, no `sections.json` companion per runbook edge case row 3, index regen). Mixed-format sidecar emitted as `00_open_questions_index.md` when `output_format=both`. Link to the HTML primary in the chat summary.
 - Final one-liner: `Pipeline complete for <slug>. Branch feat/<slug> merged to main and tagged via /complete-dev.`
 
+## Phase 13: /retro gate (soft, Recommended=Skip; new in v2.34.0 per W7)
+
+After `/complete-dev` lands the release, surface an optional retro gate. The default is Skip — most users ship and move on; retro is opt-in for sessions that surfaced patterns worth analyzing across this and prior runs.
+
+`AskUserQuestion`:
+
+```
+question: "Run /retro to capture cross-session learnings before closing the pipeline?"
+options:
+  - Skip (Recommended)
+    description: Pipeline complete; close out without retro.
+  - Run /retro
+    description: Single-session retro on the just-finished /feature-sdlc run.
+  - Run /retro --last 5
+    description: Multi-session retro across the last 5 transcripts (recurring patterns + unique findings).
+  - Defer
+    description: Log to OQ index; user runs /retro later.
+```
+
+**Auto-skip if `_minimal_active` is true** per Phase 0 `--minimal` directive (T11). Log `[orchestrator] phase_minimal_skip: retro` to chat and proceed to Phase 11 final-summary without issuing the AskUserQuestion.
+
+On Run: invoke `/pmos-toolkit:retro` with the appropriate flags. The retro phase entry in `state.yaml.phases.retro` is initialized by Phase 1 fresh-init (per state-schema.md v2). On Defer: append a stub entry to `state.yaml.open_questions_log[]` so /feature-sdlc Phase 11 surfaces the deferral.
+
+On missing-skill: soft-variant missing-skill dialog from `reference/failure-dialog.md`. Skip option is the Recommended default.
+
 ## Phase 12: Capture Learnings
 
 **This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Reflect on whether this session surfaced anything worth capturing about `/feature-sdlc` itself — gate prompts that misfired, resume-state edges, child-skill missing-dialog mistakes, places `--tier` propagation got confused, paused-state recovery friction. Proposing zero learnings is a valid outcome; the gate is that the reflection happens, not that an entry is written.

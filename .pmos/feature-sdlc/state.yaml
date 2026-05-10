@@ -2,14 +2,15 @@ schema_version: 1
 slug: pipeline-consolidation
 mode: interactive
 started_at: 2026-05-10T00:00:00Z
-last_updated: 2026-05-10T00:35:00Z
-paused_at: 2026-05-10T00:35:00Z
-paused_reason: compact-pending-pre-grill
+last_updated: 2026-05-10T01:10:00Z
+paused_at: null
+paused_reason: null
+resumed_at: 2026-05-10T00:40:00Z
 worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-pipeline-consolidation
 branch: feat/pipeline-consolidation
 feature_folder: docs/pmos/features/2026-05-10_pipeline-consolidation
 tier: 3
-current_phase: grill
+current_phase: msf-req
 backlog_id: null
 notes:
   - "User confirmed: Keep standalone + fold as phase (msf-req, msf-wf, simulate-spec)"
@@ -26,8 +27,9 @@ phases:
     notes: "Tier 3, 14 decisions, 7 OQs. Loop 1 terminal — 4 findings dispositioned (F1/F3/F4 fix, F2 modified to D14 auto-apply + inline disposition matching html-artifacts /msf-wf precedent). Approved."
   - id: grill
     hardness: soft
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/grills/2026-05-10_01_requirements.md
+    notes: "Standard depth, 7 questions, all branches resolved. 7 dispositions folded into 01_requirements.md as Loop-2: D2 reworded (mandatory→default-on), D10/D14 updated, D15-D18 added. 4 gaps (G-A..G-D) deferred to /spec. /verify edge-case row softened; W1/W2/W3/W5/W8 sub-bullets added; success-metric row added for folded-phase-failure surfacing."
   - id: msf-req
     hardness: soft
     status: pending

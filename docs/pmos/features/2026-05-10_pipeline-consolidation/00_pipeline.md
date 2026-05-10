@@ -11,8 +11,8 @@ mode: interactive
 
 | Phase            | Status     | Artifact                              |
 |------------------|------------|---------------------------------------|
-| requirements     | completed  | 01_requirements.md                    |
-| grill            | pending    | —                                     |
+| requirements     | completed  | 01_requirements.md (Loop-2 from grill) |
+| grill            | completed  | grills/2026-05-10_01_requirements.md  |
 | msf-req          | pending    | —                                     |
 | creativity       | pending    | —                                     |
 | wireframes       | pending    | —                                     |

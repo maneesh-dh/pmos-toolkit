@@ -11,7 +11,7 @@ mode: interactive
 
 | Phase            | Status     | Artifact                              |
 |------------------|------------|---------------------------------------|
-| requirements     | pending    | —                                     |
+| requirements     | completed  | 01_requirements.md                    |
 | grill            | pending    | —                                     |
 | msf-req          | pending    | —                                     |
 | creativity       | pending    | —                                     |

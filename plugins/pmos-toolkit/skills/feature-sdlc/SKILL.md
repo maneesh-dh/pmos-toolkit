@@ -243,16 +243,40 @@ On (4) OR (5) OR (6) collision, present a single `AskUserQuestion`:
 
 **Orphan-dir handling (FR-PA04):** if (4) fires (path exists) but (6) does not (path is not in `git worktree list` — git no longer tracks it), the dialog wording MUST include the suffix `(orphan worktree dir detected — git no longer tracks it)` so the user knows manual cleanup may be needed before "Use existing" can succeed.
 
-### Step 3 — Create worktree
+### Step 3 — Create worktree, write state, try EnterWorktree (FR-W01–W04)
 
-Default location: sibling directory `<repo-parent>/<repo-name>-<slug>/` to keep navigation predictable.
+1. **Compute the canonical worktree path:**
+   ```bash
+   ABS_PATH="$(realpath -- "<repo-parent>/<repo-name>-<slug>")"
+   ```
+   (Use the canonical-path contract from `_shared/canonical-path.md` — fall back to the python3 oneliner when realpath is unavailable.)
+2. **Create the worktree:**
+   ```bash
+   git worktree add -b feat/<slug> "$ABS_PATH"
+   ```
+   On non-zero exit, surface the raw git error and abort with exit 64 (this should not normally fire after the unified pre-flight).
+3. **Write the initial state.yaml inside the new worktree** per Phase 1 (state-init writes canonical `worktree_path: $ABS_PATH`). The state.yaml MUST exist before the next step so a fallback handoff produces a resumable artifact.
+4. **Call `EnterWorktree(path=$ABS_PATH)`.**
+   - On success: print to chat exactly `Entered worktree at $ABS_PATH on branch feat/<slug>. Continuing pipeline.` and proceed to Phase 1 onwards (Phase 1 is now a no-op — state.yaml already written).
+   - On any error: emit the literal handoff block (FR-W04 below), then a blank line, then the standalone chat line `Status: handoff-required` (no surrounding text — grep-able by wrapper scripts per FR-W02), then exit with code 0. Do NOT inspect the error message; all errors handed off identically per D2.
 
-```bash
-git worktree add -b feat/<slug> <abs-worktree-path>
-cd <abs-worktree-path>
+**Handoff block (FR-W04, plain text, no markup, byte-for-byte):**
+
+```
+Worktree created at <ABS_PATH>.
+State initialized at <ABS_PATH>/.pmos/feature-sdlc/state.yaml.
+
+To continue the pipeline, run these two commands in a new terminal:
+
+    cd <ABS_PATH>
+    claude --resume
+
+Then call /feature-sdlc --resume in the new session.
 ```
 
-Record `worktree_path` and `branch` in `state.yaml` (created in Phase 1).
+Substitute `<ABS_PATH>` (canonical realpath) in both occurrences — no other interpolation.
+
+**`--no-worktree` bypass (FR-W05):** if the user passed `--no-worktree`, this entire Step 3 (and Steps 1–2 of Phase 0.a) is skipped; state path is `./.pmos/feature-sdlc/state.yaml` in the launch cwd; `state.worktree_path: null`, `state.branch: null`. Drift check is bypassed (FR-R03).
 
 ## Phase 0.b: Resume detection
 

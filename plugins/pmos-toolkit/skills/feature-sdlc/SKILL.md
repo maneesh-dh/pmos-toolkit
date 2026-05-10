@@ -329,8 +329,8 @@ When `--resume` reads a pre-2.34.0 `state.yaml` carrying these phase entries, tr
 Atomically (per `reference/pipeline-status-template.md` Update protocol):
 
 1. Write `.pmos/feature-sdlc/state.yaml` from the schema in `reference/state-schema.md`:
-   - `schema_version: 2` (v2 per T2 — adds `folded_phase_failures[]` and `retro` phase entry).
-   - top-level fields populated from Phases 0/0.a (slug, mode, started_at = now, last_updated = now, worktree_path, branch, feature_folder).
+   - `schema_version: 3` (v3 per FR-S01 — pure cohort-marker bump over v2; structural fields unchanged from v2).
+   - top-level fields populated from Phases 0/0.a (slug, mode, started_at = now, last_updated = now, worktree_path = realpath(<abs-worktree-path>) per `_shared/canonical-path.md` — `null` when `--no-worktree` (FR-S02), branch — `null` when `--no-worktree`, feature_folder).
    - `tier: null` (set after Phase 3 unless `--tier` was passed).
    - `current_phase: requirements` (the next phase to run).
    - `phases[]` populated in declared order from `state-schema.md` "Phase identifiers + hardness", every status `pending`. Each entry initialized with `started_at: null` AND `folded_phase_failures: []`. The `retro` phase entry MUST be present (between `complete-dev` and `final-summary`).

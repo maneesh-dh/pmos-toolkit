@@ -636,7 +636,7 @@ If any gate is unmet, run another loop. Do not self-declare exit.
 
 **Skip if `--skip-folded-msf` was passed** (D13 escape). Skip if `{tier}` is 1 unless user opted in. Tier-3: default-on per D2.
 
-This phase delegates to `_shared/msf-heuristics.md` to apply MSF (motivation/friction/satisfaction) findings against the just-written `01_requirements.md`. Findings ≥ confidence threshold (default 80; override via `--msf-auto-apply-threshold N`) auto-apply as inline edits to `01_requirements.md` with a per-finding git commit; sub-threshold findings surface via `AskUserQuestion` with `Recommended=Defer to OQ` (D14).
+This phase delegates to `_shared/msf-heuristics.md` to apply MSF (motivation/friction/satisfaction) findings against the just-written `01_requirements.md`. Findings ≥ confidence threshold (default 80; override via `--msf-auto-apply-threshold N`) auto-apply as inline edits to `01_requirements.md` with a per-finding git commit; sub-threshold findings surface via the structured-ask path with options `Apply now / Defer to OQ (Recommended) / Reject` (D14).
 
 ### Pre-apply guard (FR-64)
 

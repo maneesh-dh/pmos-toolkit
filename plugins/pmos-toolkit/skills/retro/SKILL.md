@@ -47,7 +47,7 @@ Parse the following flags from the argument string before any other processing. 
 - More than one of `--last / --days / --since` set → exit 64.
 - `--project` value not in `{current, all}` → exit 64.
 
-**Mode resolution and the canonical non-interactive block below run AFTER flag parsing.** A malformed flag value short-circuits before any AskUserQuestion is issued.
+**Mode resolution and the canonical non-interactive block below run AFTER flag parsing.** A malformed flag value short-circuits before any structured-ask is issued.
 
 <!-- non-interactive-block:start -->
 1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).

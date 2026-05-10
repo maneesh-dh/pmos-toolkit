@@ -7,6 +7,9 @@ __pycache__/
 *$py.class
 .pytest_cache/
 
+# pmos-toolkit per-repo state (per-worktree state.yaml)
+.pmos/feature-sdlc/
+
 # pmos-toolkit per-repo session pointer
 .pmos/current-feature
 

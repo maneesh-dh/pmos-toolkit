@@ -18,7 +18,7 @@ mode: interactive
 | wireframes       | skipped    | —                                     |
 | prototype        | skipped    | —                                     |
 | spec             | completed  | 02_spec.md (Ready for Plan; 35 decisions, 63 FRs) |
-| simulate-spec    | pending    | —                                     |
+| simulate-spec    | completed  | simulate-spec/2026-05-10-trace.md (30 scen / 18 gaps / 16 patches) |
 | plan             | pending    | —                                     |
 | execute          | pending    | —                                     |
 | verify           | pending    | —                                     |

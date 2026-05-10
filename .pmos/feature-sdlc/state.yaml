@@ -2,7 +2,7 @@ schema_version: 1
 slug: pipeline-consolidation
 mode: interactive
 started_at: 2026-05-10T00:00:00Z
-last_updated: 2026-05-10T02:30:00Z
+last_updated: 2026-05-10T03:30:00Z
 paused_at: null
 paused_reason: null
 resumed_at: 2026-05-10T00:40:00Z
@@ -10,7 +10,7 @@ worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-pipeline-cons
 branch: feat/pipeline-consolidation
 feature_folder: docs/pmos/features/2026-05-10_pipeline-consolidation
 tier: 3
-current_phase: simulate-spec
+current_phase: plan
 backlog_id: null
 notes:
   - "User confirmed: Keep standalone + fold as phase (msf-req, msf-wf, simulate-spec)"
@@ -57,8 +57,9 @@ phases:
     notes: "Tier 3 type=feature; status promoted to Ready for Plan. 17 new decisions D19-D35 resolving 7 OQs + 4 grill gaps + 3 Must items. 2 review loops (Loop 1: 2 Blockers + 5 Should-fix all fix-as-proposed; Loop 2: 1 Nit folded inline). 63 FRs across W1-W8 + 4 cross-cutting. State schema bumped v1->v2 (folded_phase_failures[], started_at, retro phase). Major surprise: W6 audit revealed 27/27 supported skills already pass canonical-block lint; W6 reframed from 'rollout' to 'preserve invariant'."
   - id: simulate-spec
     hardness: soft
-    status: pending
-    artifact_path: null
+    status: completed
+    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/simulate-spec/2026-05-10-trace.md
+    notes: "30 scenarios, 18 gaps surfaced, 16 patches applied to 02_spec.md, 2 deferred. 6 significant gaps clustered on failure/resume/atomicity surfaces (S-G3 uncommitted-edits, S-G4 rename-failure, S-G6 subagent-timeout, S-G9 inline-Fix Depends-on, S-G10 --minimal scope, W-G16 sim-spec shared logic, W-G17 --minimal mechanism). Spec gained FR-64..FR-69 (6 new FRs), NFR-08, E15+E16, refined D14/D29/D31, expanded §10.1 dedup + §6.1 component graph."
   - id: plan
     hardness: hard
     status: pending

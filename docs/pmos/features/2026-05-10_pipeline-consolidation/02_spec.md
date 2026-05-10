@@ -71,7 +71,7 @@ D1–D18 are carried forward from `01_requirements.md` (post-Loop-2, post-grill)
 | D11 | Folded-phase failure semantics: always advisory; pipeline halts only on hard-phase failure | req §Decisions D11 |
 | D12 | Tier parsed by child skills via `^\*\*Tier:\*\* ([0-9]+)` against doc's first 20 lines | req §Decisions D12 |
 | D13 | `--skip-folded-msf` escape hatch on `/requirements` | req §Decisions D13 |
-| D14 | Auto-apply ≥80 confidence + inline disposition for sub-threshold; NI Recommended=Defer | req §Decisions D14 (Loop-2 refined) |
+| D14 | Auto-apply ≥80 confidence + inline disposition for sub-threshold; NI Recommended=Defer; sub-threshold inline-Fix follows same `Depends-on:` contract as auto-apply (S9 sim-spec extension) | req §Decisions D14 (Loop-2 refined) + S9 |
 | D15 | `--skip-folded-sim-spec` escape hatch on `/spec`, mirroring D13 | req §Decisions D15 (added in grill Loop-2) |
 | D16 | Per-finding git commits with last-good rollback on crash | req §Decisions D16 (added in grill Loop-2) |
 | D17 | Folded-phase failure surfacing: distinct Phase-11 subsection + chat; `state.yaml.phases.<parent>.folded_phase_failures[]` structured record | req §Decisions D17 (added in grill Loop-2) |
@@ -91,9 +91,9 @@ D1–D18 are carried forward from `01_requirements.md` (post-Loop-2, post-grill)
 | D26 | **M3 resolved:** dependency-aware reverts use simple recipe + `Depends-on: F<m>, F<n>` line in commit body, computed from git-diff line-range intersection at apply-time | (a) Simple recipe + Depends-on body line (b) Documentation-only (c) Structured state.yaml graph | (a) — low-cost annotation; user-visible; auditable. Structured graph is over-engineered for the actual frequency of revert |
 | D27 | **M2 resolved:** resume granularity inside a folded phase = coarse-grained orchestrator + per-finding-commit-message-based idempotency inside the folded phase | (a) Coarse + commit-as-state idempotency (b) Fine-grained state.yaml.phases.<x>.folded_phase_progress (c) Coarse with full re-apply | (a) — commits ARE the state; no schema delta needed for per-finding progress. Folded phase on entry runs `git log --grep="auto-apply <folded-skill> finding F"` to detect already-applied; resumes from next un-applied finding |
 | D28 | **M3+S1 resolved:** commit strategy = per-finding commits during folded phase, no squash; `/complete-dev` release-notes documents `git log --invert-grep="auto-apply"` recipe | (a) Per-finding no squash (b) Squash at phase-end (c) Per-finding + autosquash at /complete-dev | (a) — preserves M3 revert granularity AND D27 commits-as-state semantics. Trade noise for safety; recipe gives users an opt-in clean view |
-| D29 | **S2 resolved:** `--minimal` flag on `/feature-sdlc` AUTO-PICKs Skip on all 4 soft gates (creativity, wireframes, prototype, retro) regardless of tier | (a) New flag (b) Default-On at Tier 1 (c) No flag | (a) — flag is opt-in (user explicitly requests minimal); does NOT auto-set at Tier 1 because the user might still want some soft gates (e.g., retro for a tricky bug fix). Logged to `state.yaml.notes` |
+| D29 | **S2+S10+W2 resolved:** `--minimal` flag on `/feature-sdlc` AUTO-PICKs Skip on the 4 SOFT GATES only (creativity, wireframes, prototype, retro) — NOT folded phases. Mechanism: sets `_minimal_active: true` in orchestrator's per-run state during Phase 0; at each soft-gate decision point (Phases 4.b, 4.c, 4.d, 13), if `_minimal_active`, the orchestrator AUTO-PICKs Skip without issuing the AskUserQuestion at all (canonical-block classifier never sees these gates). Folded phases (default-on at Tier 3 per D2) are NOT bypassed — they require dedicated `--skip-folded-{msf,msf-wf,sim-spec}` flags | (a) New flag (b) Default-On at Tier 1 (c) No flag | (a) — flag is opt-in (user explicitly requests minimal); does NOT auto-set at Tier 1 because user might still want some soft gates. Logged to `state.yaml.notes`. **Split rationale:** `--minimal` is gate-fatigue relief, `--skip-folded-*` are scope opt-outs — different intents, different flags |
 | D30 | **S3 resolved:** Resume Status panel collapses status table + folded_phase_failures + OQ index into one chat-block on `--resume` | (a) Three separate prints (b) Single combined panel (c) Tier-keyed | (b) — single panel reduces re-orientation latency; sections clearly delimited within the panel |
-| D31 | **S5+G-A resolved:** state.yaml writes use write-temp-then-rename **within state.yaml's parent directory** (POSIX-atomic on same filesystem). Implementation: `open <state.yaml>.tmp.<pid>`, `fsync`, `rename` to `state.yaml`. `folded_phase_failures[]` and `started_at` fields added; schema bumps `1 → 2` with auto-migration on read | (a) write-temp-then-rename in parent dir (b) FS-level lock (c) Append-only log | (a) — POSIX rename(2) is atomic when src and dest are on the same filesystem; placing the temp file in the same directory guarantees this. Matches existing /feature-sdlc Phase 2 protocol; no new lock infrastructure |
+| D31 | **S5+G-A+S4-sim resolved:** state.yaml writes use write-temp-then-rename **within state.yaml's parent directory** (POSIX-atomic on same filesystem). Implementation: `open <state.yaml>.tmp.<pid>`, `fsync`, `rename` to `state.yaml`. **Rename failure handling:** if `rename(2)` returns non-zero (EIO, ENOSPC, EACCES, etc.), emit `state.yaml write failed: <errno>` to stderr; attempt `unlink(<state.yaml>.tmp.<pid>)`; exit 1. Caller treats as orchestrator-level failure. `folded_phase_failures[]` and `started_at` fields added; schema bumps `1 → 2` with auto-migration on read | (a) write-temp-then-rename in parent dir (b) FS-level lock (c) Append-only log | (a) — POSIX rename(2) is atomic when src and dest are on the same filesystem; placing the temp file in the same directory guarantees this. Matches existing /feature-sdlc Phase 2 protocol; no new lock infrastructure |
 | D32 | **G-B resolved:** D18 confirmation prompt under `--non-interactive` AUTO-PICKs `most-recent-20`; lint passes | (a) Recommended=most-recent-20 + AUTO-PICK (b) Defer all (c) Auto-scan-all | (a) — most-recent-20 is the safe default; matches the user-stated intent of D18 cap; explicit `--scan-all` flag overrides for power users |
 | D33 | **G-C resolved:** `/execute`'s commit-cadence handles pre-existing auto-apply commits as ordinary git history; `/execute` commits its TDD-task commits on top with no awareness of upstream auto-apply commits | (a) Coexist transparently (b) Squash auto-apply before /execute starts (c) Refuse to start with auto-apply commits unflushed | (a) — auto-apply commits are durable, attributable, and behave like any other doc-edit commit. /execute's commit cadence (one TDD task = one commit) is unchanged |
 | D34 | **G-D resolved:** Phase-11 final-summary template adds a "Folded-phase failures" section above the OQ index when any failure recorded; format `[<phase>] <folded-skill> crashed: <error_excerpt> (ts: <ts>)` | (a) Distinct subsection above OQ index (b) Inline with OQs (c) Sidecar file | (a) — distinct subsection per D17; visible-by-default; zero rows when no failures |
@@ -218,6 +218,7 @@ plugins/pmos-toolkit/
 ├── skills/
 │   ├── _shared/
 │   │   ├── msf-heuristics.md            (read-only; reused)
+│   │   ├── sim-spec-heuristics.md       (NEW — created by FR-67; factored from /simulate-spec/SKILL.md)
 │   │   ├── non-interactive.md           (read-only; canonical source)
 │   │   └── pipeline-setup.md            (read-only; reused)
 │   ├── feature-sdlc/
@@ -256,6 +257,7 @@ Three flows owned by this spec; each has its own diagram in §5. (a) Tier-3 happ
 | FR-05 | High-confidence findings (≥ tier-default per D24, settings-overridable, CLI-overridable) auto-apply to `01_requirements.md` via per-finding commits (D16/D27) |
 | FR-06 | Sub-threshold findings get inline `AskUserQuestion` for Fix/Modify/Skip/Defer; in `--non-interactive` Recommended=Defer; classifier AUTO-PICKs Defer; FR-03 of the canonical block emits to OQ artifact (D14) |
 | FR-07 | Output written to `<feature_folder>/msf-req-findings.md` (D3); never to `msf-findings.md` |
+| FR-64 | **Uncommitted-edits check (S3 sim-spec):** before applying any auto-apply commit, the folded MSF-req phase MUST run `git status --porcelain <target_doc>` against `01_requirements.md`. If non-empty: emit error `<doc> has uncommitted changes; commit/stash before folded MSF runs` and exit 65 (no folded-phase work performed). Closes the silent-overwrite vector |
 
 ### 7.2 W2 — Fold /msf-wf into /wireframes {#fr-w2-fold-msf-wf}
 
@@ -266,6 +268,7 @@ Three flows owned by this spec; each has its own diagram in §5. (a) Tier-3 happ
 | FR-10 | `--skip-folded-msf-wf` flag bypasses; logged to `state.yaml.phases.wireframes.notes` (D25) |
 | FR-11 | Output written to `<feature_folder>/msf-wf-findings/<wireframe-id>.md` (D3 directory variant); never to `msf-findings.md` |
 | FR-12 | Auto-apply / inline-disposition / per-finding-commit semantics identical to FR-05/FR-06 (commit prefix: `wireframes: auto-apply msf-wf finding F<n>`) |
+| FR-65 | **Uncommitted-edits check (S3 sim-spec):** identical to FR-64, applied per-wireframe HTML target before each per-wireframe auto-apply batch |
 
 ### 7.3 W3 — Fold /simulate-spec into /spec {#fr-w3-fold-simulate-spec}
 
@@ -277,6 +280,8 @@ Three flows owned by this spec; each has its own diagram in §5. (a) Tier-3 happ
 | FR-16 | `--skip-folded-sim-spec` flag bypasses (D15); logged to `state.yaml.phases.spec.notes` |
 | FR-17 | Patches surfaced by simulate-spec apply to `02_spec.md` inline as per-finding commits (commit prefix: `spec: auto-apply simulate-spec patch P<n>`) |
 | FR-18 | Auto-apply / inline-disposition semantics identical to FR-05/FR-06 |
+| FR-66 | **Uncommitted-edits check (S3 sim-spec):** identical to FR-64, applied to `02_spec.md` before folded simulate-spec patch application begins |
+| FR-67 | **Shared logic home (W1 sim-spec):** create `plugins/pmos-toolkit/skills/_shared/sim-spec-heuristics.md` factoring out simulate-spec apply-loop + scenario-trace logic. Both standalone `/simulate-spec/SKILL.md` AND folded path inside `/spec/SKILL.md` call into it. Mirrors W1/W2 `_shared/msf-heuristics.md` substrate-reuse pattern. /plan task: refactor /simulate-spec/SKILL.md to delegate to the shared module |
 
 ### 7.4 W4 — Slug clash fix {#fr-w4-slug-clash}
 
@@ -296,9 +301,11 @@ Three flows owned by this spec; each has its own diagram in §5. (a) Tier-3 happ
 | FR-25 | `/feature-sdlc/SKILL.md` adds Phase 13 (retro gate) — soft, Recommended=Skip; AskUserQuestion shape per W7 (D6) |
 | FR-26 | `state.yaml.phases[]` schema gains a `retro` entry; auto-migration v1→v2 populates as `pending` (D31) |
 | FR-27 | Anti-pattern #4 (`Auto-running optional stages without the gate`) updated to remove now-folded skills and add `/retro` |
-| FR-28 | `--minimal` flag added to `/feature-sdlc` argument-hint and Phase 0 parser; AUTO-PICKs Skip on all 4 soft gates (creativity, wireframes, prototype, retro); logged to `state.yaml.notes` (D29) |
+| FR-28 | `--minimal` flag added to `/feature-sdlc` argument-hint and Phase 0 parser. Sets `_minimal_active: true` in orchestrator per-run state. AUTO-PICKs Skip on the 4 SOFT GATES only (creativity, wireframes, prototype, retro) by short-circuiting BEFORE the AskUserQuestion is issued — classifier never sees these gates. Does NOT bypass folded phases (use `--skip-folded-*` for those). Logged to `state.yaml.notes` (D29) |
 | FR-29 | Phase 11 final-summary template adds "Folded-phase failures" subsection above the OQ index when `state.yaml.phases.<parent>.folded_phase_failures[]` is non-empty for any phase (D17/D34) |
 | FR-30 | Phase 0.b resume detection consumes the new schema; Resume Status panel format per D30 — single chat-block with three sections: Status table / Folded-phase failures / Open Questions index |
+| FR-68 | **Release-notes recipes (S1+W3+B3+S8 sim-spec):** `/complete-dev/SKILL.md` release-notes section MUST include: (a) `git log --invert-grep="auto-apply"` recipe to filter human-author commits (D28); (b) `git log --grep="Depends-on:" <pre-revert>..HEAD` recipe to discover dependency annotations BEFORE reverting (D26 + S1 fold); (c) anti-pattern note "Manual `git rebase -i` mid-pipeline invalidates FR-57 idempotency" (S8 fold); (d) `--help` quick-reference table for the 11-flag surface (B3 + N2 nice fold) |
+| FR-69 | **Concurrency anti-patterns (S2 sim-spec):** `/feature-sdlc/SKILL.md` Phase 0.a anti-patterns section adds: "Two concurrent `/feature-sdlc` instances on the same worktree share state.yaml — single-user assumption documented; no lock infrastructure built. If you spawn two parallel pipelines on one branch, the second instance's writes will overwrite the first's." Severity: minor; document, do not gate |
 
 ### 7.6 W6 — Preserve canonical-block invariant {#fr-w6-preserve-invariant}
 
@@ -325,7 +332,7 @@ Three flows owned by this spec; each has its own diagram in §5. (a) Tier-3 happ
 | FR-39 | Multi-session selectors validated mutually-exclusive among `--last/--days/--since`; conflicts → exit 64 with usage hint |
 | FR-40 | Phase 1 enumerates candidate transcripts: rows `(date, size, skill-invocation-count, project-slug)`; user confirms scope |
 | FR-41 | If candidate count > 20: AskUserQuestion (scan-all / most-recent-20 / cancel); under `--non-interactive`, AUTO-PICK most-recent-20 (D18/D32) |
-| FR-42 | Phase 2 dispatches one subagent per transcript, batched 5-in-flight (D18) |
+| FR-42 | Phase 2 dispatches one subagent per transcript, batched 5-in-flight (D18). **Per-subagent timeout = 60s** (S6 sim-spec); on timeout, mark subagent as `scanned-failed` (FR-44), free the in-flight slot, continue. Total wave upper bound ≤ 5 × 60 = 300s |
 | FR-43 | Each subagent extracts `(skill-invocation, ±N surrounding turns)` slices; returns structured findings list per existing /retro output schema |
 | FR-44 | Subagent failure: mark scanned-failed in report; continue remaining; final report notes `scanned-failed: <count> of <total>` (D21) |
 | FR-45 | Aggregation: hash `(skill, severity, first-100-chars-of-finding-with-boilerplate-stripped)`; boilerplate-strip removes prefixes `The /<skill> skill`, `The skill`, leading articles `A `/`An `/`The `; emit constituent raw findings as nested sub-list under each aggregated row (D10) |
@@ -369,13 +376,14 @@ Three flows owned by this spec; each has its own diagram in §5. (a) Tier-3 happ
 
 | ID | Category | Requirement |
 |----|----------|-------------|
-| NFR-01 | Observability | Folded-phase events emit one structured chat line per template `[<phase>] <event>: <detail>`; events: `start`, `apply F<n>`, `defer F<n>`, `failure`, `complete` |
+| NFR-01 | Observability | Folded-phase events emit one structured chat line per template `[<phase>] <event>: <detail>`. **Canonical event list (B4 sim-spec):** `dispatch_start` / `apply_finding F<n>` / `defer_finding F<n>` / `phase_complete` / `phase_failure` / `resume_entry` / `migration_v1_to_v2`. Event names are case-sensitive; the seven listed are the complete set (additions require an FR amendment) |
 | NFR-02 | Performance | Multi-session retro 20 transcripts in 5-in-flight waves: end-to-end < 90s wall on warm-cache; per-transcript scan ≤ 25s |
 | NFR-03 | Resilience | state.yaml writes are POSIX-atomic via write-temp-then-rename (D31); SIGKILL during write leaves last-good state.yaml unchanged |
 | NFR-04 | Backwards-compat | All standalone slash commands retained (D1); legacy `msf-findings.md` artifacts read-fallback in /verify (D4); state.yaml schema auto-migrates v1→v2 on read (FR-SCHEMA) |
 | NFR-05 | Traceability | Every auto-apply commit attributable to one finding by message convention; review log entries cite finding-ID |
 | NFR-06 | Determinism | Aggregation hash boilerplate-strip rules are pure-text deterministic; no LLM call inside the dedup function |
 | NFR-07 | Audit trail | `--skip-folded-*` flag use logged to `state.yaml.phases.<parent>.notes` when running under `/feature-sdlc` (D13/D15/D23) |
+| NFR-08 | Resilience | state.yaml write failures (rename(2) non-zero) abort the orchestrator with chat-emit `state.yaml write failed: <errno>`; `.tmp.<pid>` cleanup attempted; exit 1 (S4 sim-spec) |
 
 ---
 
@@ -421,6 +429,8 @@ phases:
 2. For each entry in `phases[]`: ensure `folded_phase_failures: []` and `started_at: null` if missing
 3. Append `{id: retro, hardness: soft, status: pending, artifact_path: null, notes: null, started_at: null, folded_phase_failures: []}` to `phases[]` if no entry with `id: retro` exists; insertion position = after `complete-dev` entry
 4. Emit chat log line: `migration: state.schema v1 → v2 (added: phases.<*>.folded_phase_failures, phases.<*>.started_at, phases.retro)`
+
+**`folded_phase_failures[]` append dedup (B1 sim-spec):** when appending a new entry, skip if `(folded_skill, ts)` (with `ts` second-precision) is already present in the last 5 entries of the array. Prevents transient retry from double-recording the same crash.
 
 `started_at` is consumed by FR-57 idempotency check (`git log --since=<phases.<parent>.started_at>`).
 
@@ -546,6 +556,8 @@ Branch / tag info from /complete-dev:
 | E12 | --project all on archived projects | user opt-in cross-project | iterate `~/.claude-personal/projects/*/` without filter; user can pass `--since` for subset (D22/FR-48) |
 | E13 | Mid-folded-phase /compact requested | resume contract | folded phase exits at last-good HEAD; /feature-sdlc detects compact-pause; --resume re-dispatches folded phase; FR-57 idempotency picks up |
 | E14 | All folded phases skipped via flags AT Tier 3 + zero failures recorded | "skipped successfully" | /verify reads notes + folded_phase_failures; emits affirmative `✓ folded phases skipped per documented flags` (covers MSF-req S1 satisfaction concern) |
+| E15 | state.yaml read-only when folded phase tries to record failure (S5 sim-spec) | rare misconfiguration | Folded-phase entry runs `[ -w state.yaml ]` check; if read-only, emit `state.yaml is read-only; cannot record folded-phase state`; exit 1 BEFORE doing apply work. Avoids crash mid-work with no recording |
+| E16 | `/retro --project all` on machine with 0 projects in `~/.claude-personal/projects/` (S7 sim-spec) | fresh machine | Emit `no projects found in ~/.claude-personal/projects/`; exit 0 cleanly. Do NOT error |
 
 ---
 

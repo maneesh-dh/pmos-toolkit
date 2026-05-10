@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-05-10 — pmos-toolkit 2.35.0: feature-sdlc worktree-resume rework
+
+Reworks /feature-sdlc to use harness-native worktree entry, fixes resume friction across compact checkpoints, and teaches /complete-dev to clean up worktrees on success.
+
+### What's new
+
+- **Harness-native worktree entry (FR-W01–W05).** /feature-sdlc Phase 0.a now creates the worktree and immediately calls `EnterWorktree(path=<abs>)`. On harness success, the same Claude session continues into the new worktree. On any error, /feature-sdlc emits a byte-deterministic handoff block + a grep-able `Status: handoff-required` line, then exits 0 — wrapper scripts (/loop, /schedule) see clean exit.
+- **Drift-check resume (FR-R01–R07).** `/feature-sdlc --resume` now compares `realpath($PWD)` to `state.worktree_path` before any other validation. If the user is in the wrong directory, the skill refuses early with the relaunch instruction and exit 64. Each drift check logs its inputs to chat for debuggability (NFR-06).
+- **State schema v3 (FR-S01–S05).** Pure cohort-marker bump over v2 — no field changes, no removals. Auto-migrates on read when the drift check passes; legacy v2 files in main trigger drift-refusal (correct). `worktree_path` is now realpath-canonical at write time.
+- **`/feature-sdlc list` (FR-L01–L08).** New subcommand discovers all in-flight features across `feat/*` worktrees. Outputs a markdown table with `Slug | Branch | Phase | Last updated | Worktree`, sorted by last_updated descending. Worktrees with legacy v1/v2 state get a `(legacy v1/v2)` Phase suffix.
+- **`/complete-dev --force-cleanup` (FR-CD01–CD06).** Phase 4 now does `ExitWorktree(action=keep)` → fallback `cd <root>` instruction → `git worktree remove` → `git branch -D feat/<slug>`. New `--force-cleanup` flag handles dirty-tree and rebased-stale-branch edge cases. Dirty-status check excludes the gitignored `.pmos/feature-sdlc/` subtree (FR-CD03).
+- **state.yaml gitignored.** `.pmos/feature-sdlc/` added to `.gitignore`; the previously-tracked `state.yaml` removed from tracking (FR-G01–G03). Per-worktree state files no longer collide across features in fresh worktrees.
+- **`_shared/canonical-path.md`.** Single source of truth for the realpath contract; cited by /feature-sdlc Phase 0.b + Phase 1, and /complete-dev Phase 4 (FR-SH01).
+
+### Verification
+
+- Unit tests: `tools/test-feature-sdlc-worktree.sh` — 4/4 OK.
+- Integration tests: `tools/verify-feature-sdlc-worktree.sh` — 8/8 PASS. Cases 3+4 hardened to grep production prose (red-green verified) per /verify Phase 3 multi-agent finding (score 95).
+- Manifest version sync: 2.34.0 → 2.35.0 in both `.claude-plugin` and `.codex-plugin`.
+- audit-recommended baseline preserved: 15 unmarked across 28 skills, byte-identical to main pre-merge.
+- Dogfood: this very feature shipped through /feature-sdlc end-to-end; /complete-dev Phase 4 exercised on the rework's own worktree + the stale `pipeline-consolidation` worktree from the prior release.
+
+### References
+
+- [Spec](docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume/02_spec.md)
+- [Plan](docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume/03_plan.md)
+- [Verify review](docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume/verify/2026-05-10-review.md)
+
 ## 2026-05-10 — pmos-toolkit 2.34.0: Pipeline consolidation — folded MSF-req/MSF-wf/simulate-spec, /retro multi-session, /feature-sdlc Phase 13 + --minimal
 
 Folds three optional pipeline skills (`/msf-req`, `/msf-wf`, `/simulate-spec`) into their parents (`/requirements`, `/wireframes`, `/spec` respectively) as Tier-3 default-on phases with per-finding commit cadence and inline-disposition for sub-threshold findings. Removes the now-redundant `/feature-sdlc` Phase 4.a (msf-req gate) and Phase 6 (simulate-spec gate). Adds `/retro` as Phase 13 of `/feature-sdlc` (soft, Recommended=Skip). Enhances `/retro` with multi-session analysis (--last/--days/--since/--project current|all/--skill/--scan-all) via subagent-per-transcript dispatch with 5-in-flight + 60s timeout + boilerplate-strip aggregation. Bumps `state.yaml` schema v1→v2 with auto-migration. Adds `--minimal` flag to short-circuit four soft gates. Fixes the slug clash between `/msf-req` and `/msf-wf` (both previously wrote `msf-findings.md`) by adopting the `<skill-name-slug>-findings.<ext>` convention.

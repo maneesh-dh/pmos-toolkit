@@ -1,84 +1,125 @@
-schema_version: 1
-slug: pipeline-consolidation
+schema_version: 2
+slug: feature-sdlc-worktree-resume
+tier: null
 mode: interactive
 started_at: 2026-05-10T00:00:00Z
-last_updated: 2026-05-10T06:01:00Z
-paused_at: null
-paused_reason: null
-resumed_at: 2026-05-10T05:00:00Z
-current_phase: complete-dev
-worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-pipeline-consolidation
-branch: feat/pipeline-consolidation
-feature_folder: docs/pmos/features/2026-05-10_pipeline-consolidation
-tier: 3
-current_phase_legacy: execute
-backlog_id: null
-notes:
-  - "User confirmed: Keep standalone + fold as phase (msf-req, msf-wf, simulate-spec)"
-  - "Retro multi-session scope: --last/--days/--since + --project all + subagent-per-session dispatch"
-  - "OQ format: adopt /feature-sdlc canonical non-interactive-block contract across pipeline skills"
-  - "Tier 3 confirmed by user"
-  - "Previous html-artifacts pipeline state.yaml overwritten (that feature shipped at v2.33.0)"
-  - "Paused 2026-05-10T00:35Z compact-pending-pre-grill per user direction (Recommended). Phase 3 /requirements PASS — 01_requirements.md Tier 3, 14 decisions (D1-D14), 7 OQs (1-7), 1 review loop, Loop 1 terminal. Resume via /pmos-toolkit:feature-sdlc --resume after /compact; resume-cursor lands on Phase 3.b /grill (Tier 3 mandatory; adversarial interview against decision tree). Next phases: 3.b grill → 4.a msf-req gate (Recommended Run @ Tier 3) → 4.b creativity (Recommended Skip) → 4.c wireframes (no UI in this work, Recommended Skip) → 5 spec → 6 simulate-spec gate → 7 plan → 8 execute → 9 verify → 10 complete-dev → 11 retro (NEW — folded). Branch: feat/pipeline-consolidation. Worktree: /Users/maneeshdhabria/Desktop/Projects/agent-skills-pipeline-consolidation."
-  - "Paused 2026-05-10T04:35Z compact-pending-pre-execute per user direction (Recommended). Pre-execute checkpoint mandated by /feature-sdlc Phase 2 protocol (heavy phase). Phases /requirements + /grill + /msf-req + /spec + /simulate-spec + /plan all completed; creativity/wireframes/prototype skipped. Plan has 22 tasks (T1-T21+TN) across 7 deployable sub-phases. /execute will TDD task-by-task; /feature-sdlc Phase 2.5 handshake will run /verify between sub-phases per execute/SKILL.md cadence. Resume cursor lands on Phase 8 /execute. Branch: feat/pipeline-consolidation. Spec: 02_spec.md (35 D / 69 FR / 8 NFR / 16 EC). Plan: 03_plan.md (22 T)."
+last_updated: 2026-05-10T00:00:00Z
+current_phase: requirements
+worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-feature-sdlc-worktree-resume
+branch: feat/feature-sdlc-worktree-resume
+feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills-feature-sdlc-worktree-resume/docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume
 phases:
+  - id: setup
+    hardness: infra
+    status: completed
+    artifact_path: null
+    started_at: 2026-05-10T00:00:00Z
+    completed_at: 2026-05-10T00:00:00Z
+    folded_phase_failures: []
+  - id: worktree
+    hardness: infra
+    status: completed
+    artifact_path: null
+    started_at: 2026-05-10T00:00:00Z
+    completed_at: 2026-05-10T00:00:00Z
+    folded_phase_failures: []
+  - id: init-state
+    hardness: infra
+    status: in_progress
+    artifact_path: 00_pipeline.md
+    started_at: 2026-05-10T00:00:00Z
+    completed_at: null
+    folded_phase_failures: []
   - id: requirements
     hardness: hard
-    status: completed
-    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/01_requirements.md
-    notes: "Tier 3, 14 decisions, 7 OQs. Loop 1 terminal — 4 findings dispositioned (F1/F3/F4 fix, F2 modified to D14 auto-apply + inline disposition matching html-artifacts /msf-wf precedent). Approved."
+    status: pending
+    artifact_path: null
+    started_at: null
+    folded_phase_failures: []
   - id: grill
     hardness: soft
-    status: completed
-    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/grills/2026-05-10_01_requirements.md
-    notes: "Standard depth, 7 questions, all branches resolved. 7 dispositions folded into 01_requirements.md as Loop-2: D2 reworded (mandatory→default-on), D10/D14 updated, D15-D18 added. 4 gaps (G-A..G-D) deferred to /spec. /verify edge-case row softened; W1/W2/W3/W5/W8 sub-bullets added; success-metric row added for folded-phase-failure surfacing."
-  - id: msf-req
-    hardness: soft
-    status: completed
-    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/msf-req-findings.md
-    notes: "Tier 3 Recommended=Run. 1 persona x 4 scenarios; 4 journeys walked. 14 findings (3 Must / 5 Should / 6 Nice). Slug override applied per D3/W4 dogfood (msf-req-findings.md, not msf-findings.md). Must items concentrate on D11/D16/D17 contracts: M1 in-line failure surfacing, M2 resume granularity inside folded phase, M3 per-finding revert safety when findings interrelate. To fold into /spec scope: 3 Must + 5 Should items expand G-A through G-D and add commit-strategy + --minimal flag decisions."
+    status: pending
+    artifact_path: null
+    started_at: null
+    folded_phase_failures: []
   - id: creativity
     hardness: soft
-    status: skipped
+    status: pending
     artifact_path: null
-    notes: "Skipped per user (Recommended). Design surface well-explored after grill + msf-req."
+    started_at: null
+    folded_phase_failures: []
   - id: wireframes
     hardness: soft
-    status: skipped
+    status: pending
     artifact_path: null
-    notes: "Skipped per user (Recommended). Frontend-detection: zero UI signal; pipeline/orchestrator feature touches SKILL.md prose, state.yaml schema, lint, git-commit cadence, subagent dispatch only."
+    started_at: null
+    folded_phase_failures: []
   - id: prototype
     hardness: soft
-    status: skipped
+    status: pending
     artifact_path: null
-    notes: "Skipped per user (Recommended). Wireframes were skipped; no UI surface."
+    started_at: null
+    folded_phase_failures: []
   - id: spec
     hardness: hard
-    status: completed
-    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/02_spec.md
-    notes: "Tier 3 type=feature; status promoted to Ready for Plan. 17 new decisions D19-D35 resolving 7 OQs + 4 grill gaps + 3 Must items. 2 review loops (Loop 1: 2 Blockers + 5 Should-fix all fix-as-proposed; Loop 2: 1 Nit folded inline). 63 FRs across W1-W8 + 4 cross-cutting. State schema bumped v1->v2 (folded_phase_failures[], started_at, retro phase). Major surprise: W6 audit revealed 27/27 supported skills already pass canonical-block lint; W6 reframed from 'rollout' to 'preserve invariant'."
-  - id: simulate-spec
-    hardness: soft
-    status: completed
-    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/simulate-spec/2026-05-10-trace.md
-    notes: "30 scenarios, 18 gaps surfaced, 16 patches applied to 02_spec.md, 2 deferred. 6 significant gaps clustered on failure/resume/atomicity surfaces (S-G3 uncommitted-edits, S-G4 rename-failure, S-G6 subagent-timeout, S-G9 inline-Fix Depends-on, S-G10 --minimal scope, W-G16 sim-spec shared logic, W-G17 --minimal mechanism). Spec gained FR-64..FR-69 (6 new FRs), NFR-08, E15+E16, refined D14/D29/D31, expanded §10.1 dedup + §6.1 component graph."
+    status: pending
+    artifact_path: null
+    started_at: null
+    folded_phase_failures: []
   - id: plan
     hardness: hard
-    status: completed
-    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/03_plan.md
-    notes: "Tier 3 type=feature; 22 tasks (T1-T21+TN) across 7 deployable phases; 8 Decision-Log entries P1-P8; 7 Risks (3 Medium, 4 Low); 11 fixture tests + 4 lint gates + E2E dogfood in TN. Loop 1: 5 fix-as-proposed + 1 deferred (F6 fixture helpers). Loop 2 self-pass clean. T12 split into T12a (parents capture) + T12b (/feature-sdlc surface) per F5. P5a added clarifying structural-only test-surface contract. Mermaid graph + plan body coherent."
+    status: pending
+    artifact_path: null
+    started_at: null
+    folded_phase_failures: []
   - id: execute
     hardness: hard
-    status: completed
-    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/execute/phase-final.md
-    notes: "All 22 plan tasks (T1-T21+TN) implemented; 19 commits across 7 deployable sub-phases. Lints PASS (non-interactive-inline 27/27, pipeline-setup-inline 7/7). audit-recommended FAIL=15 (baseline 13 + 2 prose-imperative directives in /feature-sdlc - DEVIATION documented). Manifest sync at 2.34.0. All 12 fixture tests OK. E2E dogfood deferred to Phase 9 /verify. Continuation directive 'continue_through_phases' honored - Phase 1 boundary halt suppressed per user direction."
+    status: pending
+    artifact_path: null
+    started_at: null
+    folded_phase_failures: []
   - id: verify
     hardness: hard
-    status: completed
-    artifact_path: docs/pmos/features/2026-05-10_pipeline-consolidation/verify/2026-05-10-review.md
-    notes: "PASS-with-documented-deviations. All 22 plan tasks Verified-complete; all 8 workstreams Verified; lints PASS for non-interactive-inline + pipeline-setup-inline; manifest sync at 2.34.0; 12/12 fixtures OK. Phase 4 (deploy/UI) NA-skipped (markdown+bash only). audit-recommended baseline+2 DEVIATION documented (pre-existing). Zero blocking gaps. E2E dogfood satisfied: /verify runs against this feature's own 02_spec.md cleanly."
+    status: pending
+    artifact_path: null
+    started_at: null
+    folded_phase_failures: []
   - id: complete-dev
     hardness: hard
     status: pending
     artifact_path: null
+    started_at: null
+    folded_phase_failures: []
+  - id: retro
+    hardness: soft
+    status: pending
+    artifact_path: null
+    started_at: null
+    folded_phase_failures: []
+  - id: final-summary
+    hardness: infra
+    status: pending
+    artifact_path: null
+    folded_phase_failures: []
+  - id: capture-learnings
+    hardness: infra
+    status: pending
+    artifact_path: null
+    folded_phase_failures: []
 open_questions_log: []
+notes: |
+  Feature: rework /feature-sdlc worktree creation + resume to use harness-native EnterWorktree.
+
+  Spike findings (pre-pipeline):
+    - EnterWorktree(path=) cleanly enters externally-created worktrees.
+    - Subagents inherit the EnterWorktree-shifted cwd. (Tested via dispatched general-purpose Agent reporting pwd inside an EnterWorktree session.)
+    - macOS canonicalizes /tmp -> /private/tmp; pre-flight realpath comparison required.
+    - ExitWorktree refuses to remove externally-created worktrees; cleanup uses git worktree remove.
+
+  Pre-pipeline empirical findings:
+    - .pmos/feature-sdlc/state.yaml is currently TRACKED in git. Every new worktree inherits the previous feature's state.yaml. Per-worktree state requires this path to be gitignored.
+    - The committed state.yaml in main is from feature pipeline-consolidation (now shipped at v2.34.0).
+
+  In-scope follow-ons:
+    - /complete-dev learns to git worktree remove on success.
+    - .pmos/feature-sdlc/ added to .gitignore; existing committed state.yaml removed from tracking.

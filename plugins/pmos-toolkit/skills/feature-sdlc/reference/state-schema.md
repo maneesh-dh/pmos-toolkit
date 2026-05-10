@@ -148,6 +148,28 @@ State writes use **same-directory write-temp-then-rename**: write to `<state.yam
 
 ---
 
+## Schema v3 (added 2026-05-10)
+
+v3 is a **pure cohort-marker bump** over v2 — no field additions, no removals, no renames. The only behavioral change is a runtime invariant: `worktree_path` is `realpath()`-canonical at write time, and `/feature-sdlc` performs a drift check (`realpath($PWD) == state.worktree_path`) on every entry that loads the state file.
+
+### What's new in v3
+
+- Nothing structural. `schema_version: 3` is the cohort marker.
+
+### v2 → v3 auto-migration block (1 step, idempotent)
+
+Performed on read whenever `state.schema_version < 3` AND the drift check has passed:
+
+1. Set `schema_version: 3`. Emit chat log line: `migration: state.schema v2 → v3 (cohort-marker bump only; no field changes)`.
+
+If the drift check fails (the v2 file is not in the worktree it claims), `/feature-sdlc --resume` aborts with the relaunch instruction; migration is not attempted.
+
+### `worktree_path` canonicalization (new in v3)
+
+`worktree_path` is written as `realpath(<abs-worktree-path>)` on initial state.yaml init (`/feature-sdlc` Phase 1) and on every status-transition update that touches the field. Reads compare via byte equality against `realpath($PWD)`. See `_shared/canonical-path.md` for the canonical-path contract used by both `/feature-sdlc` and `/complete-dev`.
+
+---
+
 ## Worked example (Tier-3 mid-pipeline pause)
 
 Captures every field for an `--resume`-ready pause. The pipeline ran cleanly through `requirements` and `grill`, paused at the compact checkpoint before `wireframes`.

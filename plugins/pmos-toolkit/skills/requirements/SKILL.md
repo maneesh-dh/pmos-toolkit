@@ -632,6 +632,59 @@ If any gate is unmet, run another loop. Do not self-declare exit.
 
 ---
 
+## Phase 5.5: Folded MSF-req (Tier 3 default-on; Tier 1/2 optional)
+
+**Skip if `--skip-folded-msf` was passed** (D13 escape). Skip if `{tier}` is 1 unless user opted in. Tier-3: default-on per D2.
+
+This phase delegates to `_shared/msf-heuristics.md` to apply MSF (motivation/friction/satisfaction) findings against the just-written `01_requirements.md`. Findings ≥ confidence threshold (default 80; override via `--msf-auto-apply-threshold N`) auto-apply as inline edits to `01_requirements.md` with a per-finding git commit; sub-threshold findings surface via `AskUserQuestion` with `Recommended=Defer to OQ` (D14).
+
+### Pre-apply guard (FR-64)
+
+Before opening the apply-loop:
+
+```bash
+git status --porcelain 01_requirements.md
+```
+
+If non-empty: emit `WARNING: 01_requirements.md has uncommitted edits — folded MSF-req apply-loop will skip auto-apply (per FR-64) to avoid clobbering. Run /requirements --skip-folded-msf OR commit your edits first.` Skip auto-apply (fall through to manual disposition); continue with critique + finding emission for advisory value.
+
+### Output slug (D3 / W4)
+
+Findings doc is written to `<feature_folder>/msf-req-findings.md` — **NOT** the legacy `msf-findings.md`. The `<skill-name-slug>-findings.<ext>` convention prevents the slug clash with /msf-wf (W4 dogfood; same pattern adopted in T7's /wireframes folded path).
+
+### Per-finding commits (D16)
+
+Each auto-applied finding is its own git commit:
+
+```
+requirements: auto-apply msf-req finding F<N>
+```
+
+Commit body includes `Depends-on: F<M>` when finding F<N> requires F<M> to land first. /complete-dev release-notes recipe (FR-68) consumes this. The commits-as-state pattern is the resume cursor: on `--resume`, the apply-loop greps `git log --since=<phase.started_at>` to skip already-applied findings and avoid duplicates (FR-57).
+
+### Failure capture (FR-50, M1, D35)
+
+On apply failure, capture `{folded_skill: msf-req, error_excerpt: <first-200-chars>, ts: <ISO-8601>}` and append to `state.yaml.phases.requirements.folded_phase_failures[]` per the dedup rule in `feature-sdlc/reference/state-schema.md`. Emit chat line at moment-of-append:
+
+```
+WARNING: msf-req crashed (advisory continue per D11): <error_excerpt>
+```
+
+Continue per D11 advisory — folded-phase failures do NOT halt /requirements. /feature-sdlc Phase 11 surfaces the failures (T12b).
+
+### Anti-patterns
+
+- Do NOT default output path to `msf-findings.md` — always `msf-req-findings.md` (D3).
+- Do NOT batch multiple findings into one commit. Per-finding commits are the resume contract.
+- Do NOT halt /requirements on substrate failure. Append to `folded_phase_failures[]` and continue per D11.
+
+### Flag handling (Phase 0 parser additions)
+
+`--skip-folded-msf` (boolean) — short-circuits this phase entirely.
+`--msf-auto-apply-threshold N` (int, default 80) — overrides the apply threshold.
+
+---
+
 ## Phase 6: Workstream Enrichment
 
 **Skip if Tier 1.** Bug fixes don't reshape product understanding.

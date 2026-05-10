@@ -2,7 +2,7 @@
 name: spec
 description: Create a detailed technical specification from a requirements document — architecture, API contracts, DB schema, frontend design, testing strategy, verification plan. Second stage in the requirements -> spec -> plan pipeline. Auto-tiers by scope. Use when the user says "write the technical design", "design the system", "create the spec", "how should this work technically", or has a requirements doc ready for detailed design.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or requirements text> [--feature <slug>] [--backlog <id>] [--format <html|md|both>] [--non-interactive | --interactive]"
+argument-hint: "<path-to-requirements-doc or requirements text> [--feature <slug>] [--backlog <id>] [--skip-folded-sim-spec] [--format <html|md|both>] [--non-interactive | --interactive]"
 ---
 
 # Technical Specification Generator

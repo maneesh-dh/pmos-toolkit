@@ -2,7 +2,7 @@
 name: wireframes
 description: Generate static HTML wireframes (single-file, mid-fi, Tailwind) for a user-facing feature — covers all screens, components, states, and target devices. Optional bridge between /requirements and /spec in the requirements -> spec -> plan pipeline (run before /spec when the feature is user-facing). Auto-triggers /requirements if no req doc exists. Optionally extracts a "house style" from the host repo's frontend (Tailwind tokens, component library, layout patterns) so wireframes match the existing app, and accepts screenshots (`--screenshots`) of existing flows as IA anchors for "extend this flow" requests. Self-evaluates each wireframe against UX heuristics with a reviewer subagent and runs up to 2 self-refinement loops. Use when the user says "create wireframes", "mock up the UI", "wireframe this feature", "design the screens", "show me the UI states", "extend this existing flow", or has a requirements doc ready and wants visuals before the spec.
 user-invocable: true
-argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--screenshots <path>] [--bootstrap-design-only] [--non-interactive | --interactive]"
+argument-hint: "<path-to-requirements-doc or feature description> [--devices=desktop-web,mobile-web,...] [--feature <slug>] [--screenshots <path>] [--bootstrap-design-only] [--skip-folded-msf-wf] [--msf-auto-apply-threshold N] [--non-interactive | --interactive]"
 ---
 
 # Wireframe Generator

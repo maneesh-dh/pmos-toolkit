@@ -2,7 +2,7 @@
 name: retro
 description: Generate a paste-back retrospective for every pmos-toolkit skill invoked in the current session. Reads the session transcript (not the skill's source) to identify what went wrong, where the user pushed back, what got skipped, and where friction surfaced — emits one markdown block per skill, severity-tagged (blocker / friction / nit), ready to paste to the skill author. Use when the user says "/retro", "what went wrong this session", "give feedback to the skill authors", "how did the pmos skills hold up", or "produce a session retro".
 user-invocable: true
-argument-hint: "[skill-name to filter, optional] [--non-interactive | --interactive]"
+argument-hint: "[skill-name to filter, optional] [--last N] [--days N] [--since YYYY-MM-DD] [--project current|all] [--skill <name>] [--scan-all] [--msf-auto-apply-threshold N] [--non-interactive | --interactive]"
 ---
 
 # Retro

@@ -2,7 +2,7 @@
 name: requirements
 description: Brainstorm, shape, and create a requirements document — problem definition, high-level solution direction, user journeys, research synthesis. First stage in the requirements -> spec -> plan pipeline. Auto-tiers by scope (bug fix / enhancement / feature). Use this skill when the user says things like "I have a feature idea", "let's brainstorm", "what should we build", "define what we need", "help me figure out the requirements", or shares initial thoughts about a problem to solve.
 user-invocable: true
-argument-hint: "<initial thoughts or observations to seed the requirements> [--feature <slug>] [--backlog <id>] [--non-interactive | --interactive] [--format <html|md|both>]"
+argument-hint: "<initial thoughts or observations to seed the requirements> [--feature <slug>] [--backlog <id>] [--skip-folded-msf] [--msf-auto-apply-threshold N] [--non-interactive | --interactive] [--format <html|md|both>]"
 ---
 
 # Requirements Document Generator

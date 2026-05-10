@@ -134,6 +134,48 @@ END { emit_pending() }
 8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
 <!-- non-interactive-block:end -->
 
+## Phase 1 (multi-session prelude): Enumerate transcript candidates + D18 cap
+
+**Skip if no multi-session flag was set** (no `--last`, `--days`, or `--since`). Single-session path goes directly to Phase 1 below.
+
+When a multi-session flag is set:
+
+1. **Enumerate candidates** by globbing `~/.claude-personal/projects/<project>/*.jsonl` (or all projects if `--project all`). Build candidate rows: `(date, size, skill-invocation-count, project-slug)`. Sort by date descending.
+2. **Apply selector**:
+   - `--last N` → take the first N rows.
+   - `--days N` → keep rows whose date ≥ now() − N days.
+   - `--since YYYY-MM-DD` → keep rows whose date ≥ the given date.
+3. **0-candidate handling (E16)**: emit `no transcripts found matching <selector>`; exit 0 cleanly. Do not error.
+4. **Cap-confirmation (D18, FR-40)**: if candidate count > 20 AND `--scan-all` is NOT set:
+
+   ```
+   AskUserQuestion:
+     question: "Selector matched N transcripts. Scanning all may take >2 min. Pick scope:"
+     options:
+       - Process most-recent-20 (Recommended)
+       - Process all N (--scan-all equivalent)
+       - Cancel
+   ```
+
+   In `--non-interactive` mode the classifier AUTO-PICKs **most-recent-20** per D32. The Recommended option matches D32 default (NI auto-pick is most-recent-20 to keep wall-clock bounded per NFR-02).
+
+5. **Final candidate set** is the resulting trimmed list; this seeds Phase 2 dispatch.
+
+## Phase 2 (multi-session dispatch): Subagent-per-transcript with 5-in-flight + 60s timeout
+
+**Skip if not in multi-session mode.**
+
+For each candidate transcript, dispatch a fresh subagent (per D7) with:
+
+- **Brief**: read the transcript jsonl, identify pmos-toolkit:* skill invocations, extract findings tagged `blocker|friction|nit` per Phase 4 standalone rubric. Return a compact YAML list `{skill, severity, finding, session-date}`.
+- **Concurrency** (D18): 5 in-flight at any time. As one returns, dispatch the next.
+- **Timeout** (FR-42): 60s wall-clock per subagent. On timeout, mark the transcript `scanned-failed`, free the in-flight slot, and continue.
+- **Per-wave progress** to stderr (FR-49): `Wave i/N: <complete>/<in-flight> (T+<sec>s)`. Emit on each subagent return + on each new dispatch.
+
+**Partial-failure handling (FR-44)**: If ≥1 transcript fails, continue with the remaining results. Phase 5 emission marks failed transcripts in a `## Skipped (scan failed)` subsection; recurring-pattern aggregation excludes them but keeps the count visible.
+
+**NFR-02 wall-clock budget**: 5×60s = 300s worst-case for 20 candidates with one wave; per-wave progress emits prevent silent hangs. Empirical target <90s for the 5-transcript W8 fixture.
+
 ## Phase 1: Locate the Session Transcript
 
 The transcript is the source of truth — read it directly rather than relying on summarized in-context history (compaction may have dropped detail).
@@ -169,6 +211,43 @@ For each unique skill name detected, read **only the YAML frontmatter** of `plug
 
 If frontmatter cannot be located, note the skill name and proceed without the contract reference.
 
+## Phase 4 (multi-session aggregation): Boilerplate-strip + nested constituents (T17)
+
+**Skip if not in multi-session mode** (Phase 2 multi-session dispatch was not run).
+
+After Phase 2 dispatch returns the per-transcript findings, aggregate via the hash:
+
+```
+hash = (skill, severity, first-100-chars-of-finding-with-boilerplate-stripped)
+```
+
+### Boilerplate-strip rules (FR-45)
+
+Apply this regex to each finding text BEFORE computing the first-100-chars hash component:
+
+```regex
+^The /\S+ skill\b\s*|^The skill\b\s*|^An?\s+|^The\s+
+```
+
+This strips the skill-name prefix (`The /spec skill ...`) and leading articles (`A wireframes ...`, `An MSF ...`, `The wireframes ...`) so semantically-identical findings hash the same regardless of phrasing variance.
+
+### Aggregation result shape
+
+For each unique hash, emit ONE aggregated row:
+
+```markdown
+- **<skill>** [<severity>] — <stripped-100-chars-finding>
+  - <session-date-1>: <verbatim finding-1>
+  - <session-date-2>: <verbatim finding-2>
+  ...
+```
+
+The nested sub-list lists every constituent finding (verbatim, with session date) — D10 Loop-2 refinement requires constituents inline so the user can audit the aggregation.
+
+### Hash collisions
+
+Findings with identical (skill, severity, stripped-prefix) but different remaining text hash the same. This is intentional — the user reviews the constituent list to confirm. False positives surface as "this aggregation contains semantically-different findings"; the operator splits manually if needed (rare).
+
 ## Phase 4: Analyze Each Invocation
 
 For each invocation, scan the transcript window (start → end) for these signals:
@@ -180,6 +259,53 @@ For each invocation, scan the transcript window (start → end) for these signal
 5. **Friction-but-worked** — skill ultimately produced acceptable output, but had awkward UX: unclear prompts, unnecessary back-and-forth, prose-dump findings instead of structured asks, surprising defaults, redundant confirmations.
 
 For each signal you find, capture: the transcript quote (≤2 lines), what you infer happened, and a concrete proposed change to the skill.
+
+## Phase 5 (multi-session emission): Two-tier output + per-wave progress (T18)
+
+**Skip if not in multi-session mode.**
+
+After Phase 4 aggregation, emit a two-tier report:
+
+```markdown
+# /retro — multi-session
+
+**Selector:** <flag values>  •  **Transcripts processed:** N  •  **Wall-clock:** <sec>s
+
+## Recurring Patterns
+
+> Findings seen in ≥2 sessions, sorted by frequency × severity (blocker=3, friction=2, nit=1).
+
+- **<skill>** [<severity>] — <finding-100-chars>  *(seen across <date-1>, <date-2>, <date-3>)*
+  - <date-1>: <constituent>
+  - <date-2>: <constituent>
+  - ...
+
+## Unique but Notable
+
+> Single-session findings rated `blocker` or persistent friction.
+
+- **<skill>** [<severity>] — <finding-100-chars>  *(<session-date>)*
+
+## Skipped (scan failed)
+
+> Transcripts that timed out or errored during Phase 2 dispatch (FR-44).
+
+- <transcript-path> — <reason>
+```
+
+### Per-wave progress emit (FR-49)
+
+During Phase 2 dispatch, emit to stderr at every subagent return AND every new dispatch:
+
+```
+Wave i/N: <complete>/<in-flight> (T+<sec>s)
+```
+
+Where `i/N` is the current wave (5-in-flight), `<complete>` is the cumulative completed count, `<in-flight>` is the currently-dispatched count. NFR-02 wall-clock budget for 5 transcripts: <90s.
+
+### `seen across <session-dates>` annotation (FR-46)
+
+Every Recurring Patterns row includes the comma-separated list of session dates where the aggregation appeared. This lets the user spot whether a pattern is becoming more frequent over time (versus a one-time blip in two sessions).
 
 ## Phase 5: Emit Retro Blocks
 

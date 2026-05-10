@@ -26,6 +26,29 @@ This skill has multiple phases. Create one task per phase using your agent's tas
 
 Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /retro` and factor them into your approach for this session.
 
+### Multi-session flag parser (T14, new in v2.34.0 per W8)
+
+Parse the following flags from the argument string before any other processing. All are optional; defaults preserve single-session behavior.
+
+| Flag | Type | Default | Purpose |
+|------|------|---------|---------|
+| `--last N` | int (>0) | unset | Analyze the last N session transcripts (most-recent-first). Mutually exclusive with `--days` and `--since`. |
+| `--days N` | int (>0) | unset | Analyze transcripts within the last N days. Mutex with `--last` and `--since`. |
+| `--since YYYY-MM-DD` | ISO date | unset | Analyze transcripts on or after the given date. Mutex with `--last` and `--days`. Future dates → exit 64. |
+| `--project current\|all` | string | `current` | Scope: `current` = this project's transcript dir only; `all` = every project under `~/.claude-personal/projects/`. |
+| `--skill <name>` | string | unset | Filter findings to only the named skill (e.g., `--skill spec`). Combine with `--last` for "recurring spec issues across sessions". |
+| `--scan-all` | boolean | false | Override the cap-confirmation prompt — process every transcript without prompting (D18 escape). |
+| `--msf-auto-apply-threshold N` | int (0-100) | 80 | Confidence threshold for any folded MSF apply-loops invoked by /retro (per FR-RETRO-MSF integration). |
+
+**Validation rules** (exit 64 with usage hint on violation):
+
+- `--last 0` or negative → exit 64.
+- `--since` parses as a future date (after today) → exit 64.
+- More than one of `--last / --days / --since` set → exit 64.
+- `--project` value not in `{current, all}` → exit 64.
+
+**Mode resolution and the canonical non-interactive block below run AFTER flag parsing.** A malformed flag value short-circuits before any AskUserQuestion is issued.
+
 <!-- non-interactive-block:start -->
 1. **Mode resolution.** Compute `(mode, source)` with precedence: `cli_flag > parent_marker > settings.default_mode > builtin-default ("interactive")` (FR-01).
    - `cli_flag` is `--non-interactive` or `--interactive` parsed from this skill's argument string. Last flag wins on conflict (FR-01.1).

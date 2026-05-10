@@ -794,6 +794,53 @@ All items below must be `pass` or `N/A` (with a stated reason for N/A). Loop unt
 
 ---
 
+## Phase 6.5: Folded simulate-spec (Tier 3 default-on; Tier 1/2 optional)
+
+**Skip if `--skip-folded-sim-spec` was passed** (D15 escape). Skip if `{tier}` is 1 unless user opted in. Tier-3: default-on per D2.
+
+This phase delegates to `_shared/sim-spec-heuristics.md` (created in T5; canonical scenario-trace + apply-loop substrate) to pressure-test `02_spec.md` against adversarial scenarios and apply auto-fix patches. Findings ≥ confidence threshold (default 80) auto-apply as inline edits to `02_spec.md` with per-finding git commits; sub-threshold findings surface via `AskUserQuestion` with `Recommended=Defer to OQ` (D14). Replaces the obsolete `/feature-sdlc` Phase 6 gate (W3).
+
+### Pre-apply guard (FR-66)
+
+Before opening the apply-loop:
+
+```bash
+git status --porcelain 02_spec.md
+```
+
+If non-empty: emit `WARNING: 02_spec.md has uncommitted edits — folded simulate-spec apply-loop will skip auto-apply (per FR-66) to avoid clobbering. Run /spec --skip-folded-sim-spec OR commit your edits first.` Skip auto-apply (fall through to manual disposition); continue with critique + gap-register emission for advisory value.
+
+### Per-finding commits (D16)
+
+Each auto-applied patch is its own git commit:
+
+```
+spec: auto-apply simulate-spec patch P<N>
+```
+
+Commit body includes `Depends-on: P<M>` when patch P<N> has a Phase-3 trace dependency on P<M>. /complete-dev release-notes recipe (FR-68) consumes this. Commits-as-state is the resume cursor (FR-57).
+
+### Failure capture (FR-50, M1, D35)
+
+On apply failure, capture `{folded_skill: simulate-spec, error_excerpt: <first-200-chars>, ts: <ISO-8601>}` and append to `state.yaml.phases.spec.folded_phase_failures[]` per the dedup rule in `feature-sdlc/reference/state-schema.md`. Emit chat line at moment-of-append:
+
+```
+WARNING: simulate-spec crashed (advisory continue per D11): <error_excerpt>
+```
+
+Continue per D11 advisory — folded-phase failures do NOT halt /spec. /feature-sdlc Phase 11 surfaces the failures (T12b).
+
+### Substrate delegation
+
+The 4-pass scenario enumeration (Spec extraction → variant generation → adversarial checklist → model-driven), scenario trace + Gap Register, 4-bucket artifact-fitness critique, and apply-loop logic are all canonical in `_shared/sim-spec-heuristics.md`. This folded phase invokes the substrate's sections 1-5 against `02_spec.md`; spec critique findings populate the Gap Register; auto-apply patches edit `02_spec.md` in-place per the per-finding-commit cadence above.
+
+### Flag handling (Phase 0 parser additions)
+
+`--skip-folded-sim-spec` (boolean) — short-circuits this phase entirely.
+`--msf-auto-apply-threshold N` (int, default 80) — overrides the apply threshold (shared with folded MSF paths).
+
+---
+
 ## Phase 7: Final Review — Conciseness, Readability, Coherence
 
 Phase 6 already covered structural completeness and design soundness. Phase 7 is the **fresh-eyes prose pass** — what remains after the spec is structurally and architecturally sound:

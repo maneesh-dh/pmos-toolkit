@@ -23,4 +23,13 @@ test "$(/usr/bin/grep -c '^## Phase 4\.b:' "$f")" = 1
 test "$(/usr/bin/grep -c '^## Phase 4\.c:' "$f")" = 1
 test "$(/usr/bin/grep -c '^## Phase 4\.d:' "$f")" = 1
 
+# T11: --minimal flag + _minimal_active sentinel
+n=$(/usr/bin/grep -c -- '_minimal_active\|--minimal' "$f")
+test "$n" -ge 6
+/usr/bin/grep -q 'phase_minimal_skip' "$f"
+/usr/bin/grep -q 'sentinel short-circuit' "$f"
+
+# T11: argument-hint frontmatter contains --minimal
+/usr/bin/grep -q -- '--minimal' plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md
+
 echo OK

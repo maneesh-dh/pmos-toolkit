@@ -162,6 +162,14 @@ END { emit_pending() }
 
 Per FR-TIER-SCOPE / spec §15 G8: `{tier}` drives BOTH child-skill `--tier` passthrough (only for children that accept it: `/requirements`, `/spec`, `/plan`) AND orchestrator gate logic (Phases 3.b grill, 4.b creativity, 4.c wireframes, 4.d prototype, 13 retro). Phases 4.a (msf-req) and 6 (simulate-spec) were removed in v2.34.0 — folded into /requirements (Phase 5.5) and /spec (Phase 6.5) respectively. Child skills retain the right to auto-tier-escalate; if a child reports a different tier, log to `state.yaml.phases.<X>.child_tier_divergence` and continue — do not override the child.
 
+### `--minimal` flag + `_minimal_active` sentinel (new in v2.34.0 per W17)
+
+If `--minimal` is present in the argument string, set the directive `_minimal_active = true` (a boolean the orchestrator carries through the run). At Phase 4.b (creativity), Phase 4.c (wireframes), Phase 4.d (prototype), and Phase 13 (retro), if `_minimal_active` is true, the orchestrator MUST log `[orchestrator] phase_minimal_skip: <phase-id>` to chat and proceed to the next phase WITHOUT issuing the `AskUserQuestion` for that gate. The `AskUserQuestion` for those four soft gates is contingent on `_minimal_active` being false.
+
+This is a sentinel short-circuit at the orchestrator level (per spec D29 / W17). It does NOT use the canonical-block classifier — the gates are never issued, so they are never seen by audit-recommended.sh. `--minimal` is user-explicit (a flag the user passes deliberately) so it does not violate Anti-pattern #4's "auto-running optional stages" rule.
+
+Hard phases (`/requirements`, `/spec`, `/plan`, `/execute`, `/verify`, `/complete-dev`) are NOT affected by `--minimal`. The flag only short-circuits the four enumerated soft gates.
+
 ### Missing-skill detection
 
 When a child skill invocation returns "skill not found" / "unknown skill" platform error, present the missing-skill dialog from `reference/failure-dialog.md`. Hard phases omit Skip; soft phases include it. Pause-to-install writes `status: paused, paused_reason: missing_skill, missing_skill: <name>` and exits per the Pause contract.

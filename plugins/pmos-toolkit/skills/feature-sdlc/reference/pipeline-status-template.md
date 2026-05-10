@@ -44,6 +44,25 @@ Markdown skeleton for the human-readable pipeline-status doc written at `<worktr
 | 11 | final-summary | infra | pending | — | — | — |
 | 12 | capture-learnings | infra | pending | — | — | — |
 
+## Folded-phase failures (N)
+
+Emitted ABOVE the Deferred questions section when ≥1 phase has a non-empty `state.yaml.phases.<x>.folded_phase_failures[]` (per FR-29 / D34). When N=0 across all phases, **omit this subsection entirely** — no decoration, no "_(none)_", no header.
+
+Format (one line per failure record across all phases):
+
+```text
+[<phase>] <folded-skill> crashed: <error_excerpt> (ts: <ts>)
+```
+
+Example with 2 records:
+
+```markdown
+## Folded-phase failures (2)
+
+[requirements] msf-req crashed: ApplyError: persona inference returned empty (ts: 2026-05-10T01:14:22Z)
+[spec] simulate-spec crashed: subprocess timeout after 60s (ts: 2026-05-10T01:31:08Z)
+```
+
 ## Deferred questions
 
 If `--non-interactive` mode produced any deferred entries, see [`00_open_questions_index.md`](./00_open_questions_index.md) for the aggregated index. Otherwise this section is "_(none)_".

@@ -53,6 +53,36 @@ This skill has multiple phases. Create one task per phase using your agent's tas
 
 ## Phase 0: Pipeline setup + Load Learnings
 
+### Phase 0 Subcommand Dispatch (FR-L01)
+
+Before running pipeline-setup, check the argument string for the `list` subcommand:
+
+- If the argument string matches `^list(\s|$)` (i.e., the first positional arg is the literal word `list`), short-circuit: skip pipeline-setup, skip Phase 0.a, skip Phase 0.b, run the list logic below, exit 0.
+
+### `list` logic (FR-L02–L07)
+
+1. **Run** `git worktree list --porcelain` in the current repo. If git errors (cwd is not a git repo): surface the raw git error and exit 64 (FR-L06).
+2. **Parse** each worktree entry's branch field. **Filter to entries whose branch matches `feat/*`** (the main checkout and any non-feature branch worktrees are excluded per FR-L02). Detached worktrees (no branch field) are skipped.
+3. **For each remaining worktree**, attempt to read `<worktree>/.pmos/feature-sdlc/state.yaml`. Capture: `slug`, `branch`, `current_phase`, `last_updated`, `worktree_path`, `schema_version`.
+4. **Build the rows.** Order by `last_updated` descending; ties broken by `slug` alphabetical ascending; worktrees with no state.yaml sort last (also slug-alphabetical among themselves) (FR-L03).
+5. **Emit a single Markdown table to chat:**
+
+   ```
+   | Slug | Branch | Phase | Last updated | Worktree |
+   |---|---|---|---|---|
+   | <slug> | <branch> | <phase> | <last_updated> | <worktree_path> |
+   ```
+
+   - For worktrees with `schema_version < 3`: append ` (legacy v1/v2)` to the `Phase` column (FR-L04). Example: `spec (legacy v1/v2)`.
+   - For worktrees with no `state.yaml`: `Phase = (no state)` (FR-L05).
+   - For worktrees whose path no longer exists on disk: `Phase = (worktree path missing)` (FR-L05 extended).
+6. **Empty result** (no `feat/*` worktrees): emit `No in-flight features. Start one with /feature-sdlc <seed>.` — no table (FR-L07).
+7. **Stale-detection** (`last_updated` older than N days) is OUT OF SCOPE per FR-L08; emit raw timestamps only.
+
+Exit 0 after table emission.
+
+---
+
 Inline `_shared/pipeline-setup.md` (relative to the skills directory) to:
 
 1. Read `.pmos/settings.yaml`. If missing → run Section A first-run setup before proceeding.

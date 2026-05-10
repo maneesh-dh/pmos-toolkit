@@ -286,13 +286,26 @@ If `--resume` was passed but state.yaml is absent → hard error: `--resume spec
 
 When state.yaml is present:
 
-1. **Schema-version check** (FR-SCHEMA / spec §15 G3, see `reference/state-schema.md`):
-   - `state.schema_version > current code's max` → abort with: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`.
-   - `state.schema_version < current code's max` → auto-migrate; log to chat: `migration: state.schema vM → vN (added: <fields>)`.
-2. **Validate recorded artifact paths.** For every `phases[].artifact_path` that's non-null, check that the file exists. On any missing required artifact, print the list to chat and `AskUserQuestion`: **Continue anyway (treat as orphaned)** / **Abort**.
-3. **Print status table** to chat from `00_pipeline.{html,md}` short-form (3 columns: phase | status | artifact). This table is **presentational, not interrogative** — see Anti-pattern below.
-4. **Resume cursor:** find the first `phases[]` entry whose status is in `{paused, failed, pending, in_progress}` and jump to that phase. If a `paused` or `failed` entry is found first, surface the corresponding dialog (`reference/compact-checkpoint.md` for compact-paused; `reference/failure-dialog.md` for failed/failure-paused).
-5. **Skip Phases 0.a and 1** — worktree, slug, and state.yaml already exist.
+1. **Drift check (FR-R02, runs FIRST before any other validation).** Compute `realpath($PWD)` and compare byte-equal to `state.worktree_path` (already canonical per FR-S03 — see `_shared/canonical-path.md`). On mismatch:
+
+   ```
+   pre-flight check failed: realpath(pwd) [<actual>] != realpath(state.worktree_path) [<expected>]. Relaunch claude from <expected> and try again.
+   ```
+
+   Exit 64.
+
+   **Bypass (FR-R03):** when `state.worktree_path` is `null` (set by `--no-worktree` mode), the drift check is skipped — proceed to step 2.
+
+   **Observability (NFR-06):** before the comparison, log to chat the line `drift check: realpath(pwd)=<a> realpath(state.worktree_path)=<b> result=<pass|fail>` so users can debug unexpected refusals.
+
+2. **Schema-version check (FR-R04, FR-R05, see `reference/state-schema.md`):**
+   - `state.schema_version > 3` → abort: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`. Exit 64.
+   - `state.schema_version < 3` AND drift check passed → auto-migrate by setting `schema_version: 3` (FR-S04 — single-step idempotent migration); emit chat log line `migration: state.schema vN → v3 (cohort-marker bump only; no field changes)`. Apply the v2 atomic write protocol.
+   - `state.schema_version == 3` → no migration.
+3. **Validate recorded artifact paths.** For every `phases[].artifact_path` that's non-null, check that the file exists. On any missing required artifact, print the list to chat and `AskUserQuestion`: **Continue anyway (treat as orphaned)** / **Abort**.
+4. **Print status table** to chat from `00_pipeline.{html,md}` short-form (3 columns: phase | status | artifact). This table is **presentational, not interrogative** — see Anti-pattern below.
+5. **Resume cursor:** find the first `phases[]` entry whose status is in `{paused, failed, pending, in_progress}` and jump to that phase. If a `paused` or `failed` entry is found first, surface the corresponding dialog (`reference/compact-checkpoint.md` for compact-paused; `reference/failure-dialog.md` for failed/failure-paused).
+6. **Skip Phases 0.a and 1** — worktree, slug, and state.yaml already exist.
 
 The resume status table is **presentational**, not interrogative — followed by at most a single structured ask (continue / abort) when needed. The orchestrator has no review/refinement loops of its own; every refinement is owned by a child skill. Per spec §15 G9.
 

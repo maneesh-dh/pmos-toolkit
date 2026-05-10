@@ -88,6 +88,53 @@ Resume re-presents the failure dialog (Retry / [Skip on soft] / Pause-resumable 
 
 ---
 
+## Resume Status panel (D30)
+
+When the user re-invokes /feature-sdlc with `--resume` (or detects an existing `paused` state.yaml in the worktree), the skill emits a **single chat block** consolidating status table + folded-phase-failures + OQ index. This replaces the multi-print pattern used in earlier versions (per FR-30 / D30: one block, one read).
+
+Block format (verbatim — substitute placeholder values from `state.yaml`):
+
+```text
+=== Resume Status ===
+
+Slug:        <slug>
+Tier:        <1|2|3>
+Mode:        <interactive|non-interactive>
+Branch:      <feat/<slug>>
+Worktree:    <abs path>
+Paused:      <ISO-8601> (<paused_reason>)
+
+| Phase | Status | Artifact |
+|-------|--------|----------|
+| <phase> | <status> | <artifact_path or —> |
+| ... |
+
+<!-- Folded-phase failures subsection — emit only when ≥1 phase has non-empty folded_phase_failures[]; otherwise omit entirely. Format per pipeline-status-template.md "Folded-phase failures (N)". -->
+
+Folded-phase failures (N):
+[<phase>] <folded-skill> crashed: <error_excerpt> (ts: <ts>)
+...
+
+<!-- Open-questions subsection — emit only when state.yaml.open_questions_log[] is non-empty; otherwise omit. -->
+
+Open questions index: <feature_folder>/00_open_questions_index.md (N deferred)
+
+Resume cursor lands on: Phase <N> /<phase-id>
+
+=== End Resume Status ===
+```
+
+Emission rules:
+
+1. The block is emitted exactly once per `--resume` invocation, BEFORE the orchestrator surfaces any new prompt or dispatches the next child skill.
+2. The status table includes all non-`pending` phases plus the next pending phase (same rule as the in-chat short-form table from `pipeline-status-template.md`).
+3. The "Folded-phase failures (N)" line uses the same N-counting and same per-failure format as the Phase-11 emission (FR-29 / D34); when N=0 across all phases, omit the entire subsection.
+4. The "Open questions index" line is emitted only when `open_questions_log[]` is non-empty.
+
+This single-block contract is what /feature-sdlc Phase 0.b and Phase 11 both render; they share this template.
+
+---
+
 ## Anti-patterns
 
 - **Don't auto-trigger /compact.** Skills cannot. Pretending otherwise breaks the resume contract — the next invocation finds inconsistent state.

@@ -6,7 +6,7 @@ Single source of truth for the resumable pipeline state file written at `<worktr
 
 ## schema_version
 
-`schema_version: 1` is mandatory at the top of every `state.yaml`.
+`schema_version: 2` is the current version. Files written by /feature-sdlc < 2.34.0 carry `schema_version: 1` and are auto-migrated on read (see "Schema v2 migration" below).
 
 **Migration policy** (per FR-SCHEMA / spec §15 G3):
 
@@ -55,6 +55,7 @@ Every entry has at minimum:
 | `child_tier` | int \| null | Child-skill auto-tier when it differs from the orchestrator tier (per spec §15 G8). |
 | `child_tier_divergence` | string \| null | Free-form note when child reports a different tier. |
 | `missing_skill` | string \| null | Set when `paused_reason: missing_skill` — names the missing child skill. |
+| `folded_phase_failures` | list | (v2) Append-only list of folded-skill failure records — `{folded_skill, error_excerpt, ts}`. Empty `[]` until a folded child crashes. See "Schema v2" below for dedup rule. |
 
 ### Phase identifiers + hardness
 
@@ -75,6 +76,7 @@ In declared execution order (matches spec §5):
 - `execute` — **hard**.
 - `verify` — **hard**.
 - `complete-dev` — **hard**.
+- `retro` — **soft** (v2; gate per FR-34 with `Recommended=Skip`).
 - `final-summary` — **infra**.
 - `capture-learnings` — **infra**.
 
@@ -114,6 +116,35 @@ Per FR-OQ-INDEX / spec §15 G4. Append-only; written after each `--non-interacti
 ```
 
 At end-of-run AND end-of-pause, `/feature-sdlc` writes `<feature_folder>/00_open_questions_index.md` summarizing every entry in this log with links to each child's OQ artifact.
+
+---
+
+## Schema v2 (added 2026-05-10)
+
+v2 is additive over v1 — no field removals, no rename, no reshape. v1 files are auto-migrated to v2 on read.
+
+### What's new in v2
+
+1. **`phases[].folded_phase_failures: []`** — empty list initialized on every phase entry. Appended to by parent skills (`/requirements`, `/wireframes`, `/spec`) when a folded child phase (msf-req, msf-wf, simulate-spec) crashes. Each entry: `{folded_skill: <name>, error_excerpt: <first-200-chars>, ts: <ISO-8601>}`.
+2. **`phases[].started_at`** — timestamp written on the first `pending → in_progress` transition (FR-57). Already documented in v1 phase entries; v2 makes the write contract explicit (only set if currently null; never overwritten).
+3. **`phases[]` includes `retro`** entry — appended after `complete-dev`, before `final-summary`.
+
+### `folded_phase_failures[]` append-dedup rule
+
+When appending a new failure record, compare against existing entries in the same `folded_phase_failures[]` list. If an entry exists with **identical `folded_skill`** AND **identical `error_excerpt`** (byte-for-byte), do NOT append a duplicate; update the existing entry's `ts` to the new timestamp instead. This keeps the list bounded under repeated /resume retries.
+
+### v1 → v2 auto-migration block (4 steps, idempotent)
+
+Performed on read whenever `state.schema_version < 2`:
+
+1. **Set `schema_version: 2`.**
+2. **Ensure `folded_phase_failures: []` is present on every `phases[]` entry.** Default to empty list if absent. Same for `started_at: null` on entries that lack the field.
+3. **Append the `retro` phase entry** between `complete-dev` and `final-summary` if not already present. Default: `{id: retro, hardness: soft, status: pending, artifact_path: null}`.
+4. **Emit chat log line:** `migration: state.schema v1 → v2 (added: folded_phase_failures, started_at on N entries, retro phase)`.
+
+### Atomicity (D31)
+
+State writes use **same-directory write-temp-then-rename**: write to `<state.yaml>.tmp` in `.pmos/feature-sdlc/`, then `rename(2)` to `state.yaml` (POSIX atomic on same filesystem). On rename(2) failure, the `.tmp` file is removed and the operation is reported as a hard error per NFR-08 — never leave a `.tmp` orphan that a future run could mistake for in-progress state. /plan startup runs a stale-tempfile reaper.
 
 ---
 

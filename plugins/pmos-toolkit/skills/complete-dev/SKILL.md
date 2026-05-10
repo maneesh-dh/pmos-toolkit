@@ -2,7 +2,7 @@
 name: complete-dev
 description: End-of-development orchestrator that follows /verify — merges feature work into main, captures learnings into CLAUDE.md/AGENTS.md, regenerates the changelog, bumps versions, deploys per repo norms, tags the release, and pushes to all configured remotes. Supersedes the legacy /push skill. Terminal stage of the requirements -> spec -> plan -> execute -> verify -> complete-dev pipeline. Use when the user says "complete the dev cycle", "ship this work", "merge and deploy", "wrap up this branch", "finish development", "ready to push and deploy", "push to remotes", "push and ship", or "push the release".
 user-invocable: true
-argument-hint: "[--skip-changelog] [--skip-deploy] [--no-tag] [optional commit-message hint] [--non-interactive | --interactive]"
+argument-hint: "[--skip-changelog] [--skip-deploy] [--no-tag] [--force-cleanup] [optional commit-message hint] [--non-interactive | --interactive]"
 ---
 
 # /complete-dev — end-of-development orchestrator

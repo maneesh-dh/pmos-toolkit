@@ -2,7 +2,7 @@
 name: feature-sdlc
 description: End-to-end SDLC orchestrator that turns an initial idea (text or doc) into a shipped feature by sequentially driving the full pmos-toolkit pipeline — worktree creation, requirements, grill, optional MSF/creativity/wireframes/prototype, spec, optional simulate-spec, plan, execute, verify, and complete-dev — auto-tiering each stage and persisting resumable state inside the worktree. Use when the user says "build this feature end-to-end", "run the full SDLC", "take this idea through to ship", "feature-sdlc this", "/feature-sdlc", or "drive the pipeline for me".
 user-invocable: true
-argument-hint: "<initial idea text | path to brief/doc> [--tier 1|2|3] [--resume] [--no-worktree] [--minimal] [--format <html|md|both>] [--non-interactive | --interactive] [--backlog <id>]"
+argument-hint: "<initial idea text | path to brief/doc> [--tier 1|2|3] [--resume] [--no-worktree] [--minimal] [--format <html|md|both>] [--non-interactive | --interactive] [--backlog <id>] [list]"
 ---
 
 # Feature SDLC

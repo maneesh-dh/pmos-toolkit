@@ -236,6 +236,10 @@ When state.yaml is present:
 
 The resume status table is **presentational**, not interrogative — followed by at most a single structured ask (continue / abort) when needed. The orchestrator has no review/refinement loops of its own; every refinement is owned by a child skill. Per spec §15 G9.
 
+### Resume Status panel folded-phase failure re-emit (T12b)
+
+When emitting the Resume Status panel per `reference/compact-checkpoint.md` (T4 deliverable), include the same `Folded-phase failures (N)` subsection format used in Phase 11 (above). Read `state.yaml.phases.<x>.folded_phase_failures[]` across all phases; emit the subsection only when N≥1; otherwise omit. Per FR-52/FR-53 — the user must see the failure history at every resume so they can decide whether to retry, manually patch, or abort.
+
 ### Auto-migration of pre-2.34.0 state files
 
 Two phase IDs were removed in v2.34.0:
@@ -433,6 +437,8 @@ Invoke `/pmos-toolkit:complete-dev` to merge, capture learnings into CLAUDE.md/A
 On failure: hard-phase failure dialog.
 
 ## Phase 11: Final summary
+
+**Folded-phase failure surfacing (FR-29, FR-52, D17, D34, T12b):** read every `state.yaml.phases.<x>.folded_phase_failures[]`. If any non-empty across all phases: emit a `## Folded-phase failures (N)` subsection per `reference/pipeline-status-template.md` (T3 deliverable) BEFORE the OQ index, where N is the total count across all phases. Format per spec §11.3: `[<phase>] <folded-skill> crashed: <error_excerpt> (ts: <ts>)` — one line per failure entry. If all `folded_phase_failures[]` arrays are empty: omit the subsection entirely (no decoration, no "_(none)_").
 
 Print the full pipeline-status table from `00_pipeline.html` (or `00_pipeline.md` sidecar in mixed-format mode), plus:
 

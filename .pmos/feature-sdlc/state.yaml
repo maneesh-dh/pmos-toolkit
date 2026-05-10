@@ -3,8 +3,8 @@ slug: feature-sdlc-worktree-resume
 tier: 3
 mode: interactive
 started_at: 2026-05-10T00:00:00Z
-last_updated: 2026-05-10T00:03:00Z
-current_phase: spec
+last_updated: 2026-05-10T00:30:00Z
+current_phase: plan
 worktree_path: /Users/maneeshdhabria/Desktop/Projects/agent-skills-feature-sdlc-worktree-resume
 branch: feat/feature-sdlc-worktree-resume
 feature_folder: /Users/maneeshdhabria/Desktop/Projects/agent-skills-feature-sdlc-worktree-resume/docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume
@@ -69,14 +69,15 @@ phases:
     notes: "Skipped per user (Recommended). Wireframes were skipped; no UI surface."
   - id: spec
     hardness: hard
-    status: paused
-    artifact_path: null
-    started_at: null
+    status: completed
+    artifact_path: docs/pmos/features/2026-05-10_feature-sdlc-worktree-resume/02_spec.md
+    started_at: 2026-05-10T00:04:00Z
+    completed_at: 2026-05-10T00:30:00Z
     paused_at: 2026-05-10T00:03:00Z
     paused_reason: compact
     last_error: null
     folded_phase_failures: []
-    notes: "Compact checkpoint pre-/spec per user. Resume cursor lands on /spec. Carry-forward from grill: requirements doc has 15 decisions D1-D15, 2 open OQs (#1 staleness flagging, #2 legacy v1/v2 worktree handling in /feature-sdlc list). Spec scope: /feature-sdlc rework (Phase 0.a unified pre-flight per D14, Model C try-then-handoff per D2/D11, --no-worktree bypass per D12, schema v3 additive per D6); /complete-dev cleanup (Phase 4 ExitWorktree-then-remove with no-op fallback per D15, --force-cleanup flag per D13); .gitignore .pmos/feature-sdlc/ + git rm --cached existing state.yaml per D4; pre-flight realpath drift check per D5; /feature-sdlc list subcommand per D7."
+    notes: "Tier 3 spec, 18 decisions D1-D18, 0 open questions (OQ#1 closed via FR-L08 deferred-out-of-scope; OQ#2 closed via FR-L04 legacy marker). 8 FR groups: W (worktree create), PA (pre-flight), R (resume drift), S (state schema v3), G (gitignore), L (list subcommand), CD (complete-dev cleanup), SH (shared canonical-path). 7 NFRs, 20 edge cases, 3 sequence diagrams, full §14 verification plan. Phase 6 ran 1 review loop (5 findings all Fix-as-proposed); Phase 6.5 simulate-spec skipped per user (grill + edge cases already cover surface); Phase 7 fresh-eyes pass clean. Status promoted Draft → Ready for Plan."
   - id: plan
     hardness: hard
     status: pending

@@ -236,7 +236,6 @@ Before `git worktree add`, the skill MUST run all six checks below and, on any c
 On (1)–(3) failure: abort with the precise git error and the suggested fix above.
 
 On (4) OR (5) OR (6) collision, present a single `AskUserQuestion`:
-
 - **Use existing branch / worktree (Recommended)** — enters Phase 0.b resume mode if state.yaml is present in the existing worktree path; otherwise initializes state.yaml fresh on top of the existing branch with `state.notes` annotated `"reused-existing-branch:<reason>"`.
 - **Pick new slug (-N suffix)** — appends `-2`, `-3`, ... to the slug and re-runs the unified pre-flight (idempotent).
 - **Abort** — exit 64 with the surfaced collision details.

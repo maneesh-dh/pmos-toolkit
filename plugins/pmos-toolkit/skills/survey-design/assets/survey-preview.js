@@ -24,6 +24,7 @@
     RANKING: "ranking",
     MATRIX: "matrix",
     CONSTANT_SUM: "constant_sum",
+    MULTI_FIELD_OPEN: "multi_field_open",
     STATEMENT: "statement"
   };
 
@@ -315,6 +316,7 @@
     else if (t === TYPES.MATRIX) { box.appendChild(renderMatrix(q)); }
     else if (t === TYPES.FORCED_CHOICE_GRID) { box.appendChild(renderForcedChoiceGrid(q)); }
     else if (t === TYPES.CONSTANT_SUM) { box.appendChild(renderConstantSum(q)); }
+    else if (t === TYPES.MULTI_FIELD_OPEN) { box.appendChild(renderMultiFieldOpen(q)); }
     else { box.appendChild(el("p", { "class": "unknown-type" }, "[unsupported question type: " + String(t) + "]")); }
     return box;
   }
@@ -540,6 +542,46 @@
       wrap.appendChild(row);
     }
     wrap.appendChild(totalEl);
+    return wrap;
+  }
+
+  function renderMultiFieldOpen(q) {
+    // multi_field_open: a shared stem (rendered by renderQuestion) + one labeled single-line text input per field.
+    var wrap = el("div", { "class": "multi-field-open" });
+    var fields = Array.isArray(q.fields) ? q.fields : [];
+    for (var i = 0; i < fields.length; i++) {
+      var f = fields[i] || {};
+      var fkey = f.id || ("field-" + (i + 1));
+      var fid = "mfo-" + q.id + "-" + fkey;
+      var row = el("div", { "class": "mfo-row" });
+      var label = el("label", { "for": fid }, f.label || fkey);   // label adjacent + associated to the input
+      var inp = el("input", { type: "text", id: fid, "data-mfo-for": q.id, "data-mfo-field": fkey });
+      if (f.placeholder) { inp.setAttribute("placeholder", f.placeholder); }
+      var cur0 = (answers[q.id] && typeof answers[q.id] === "object" && !Array.isArray(answers[q.id])) ? answers[q.id] : {};
+      if (cur0[fkey] !== undefined) { inp.value = cur0[fkey]; }
+      (function (key, inputEl) {
+        inputEl.addEventListener("input", function () {
+          var c = (answers[q.id] && typeof answers[q.id] === "object" && !Array.isArray(answers[q.id])) ? answers[q.id] : {};
+          if (inputEl.value === "") { delete c[key]; } else { c[key] = inputEl.value; }
+          answers[q.id] = c;
+        });
+      })(fkey, inp);
+      row.appendChild(label);
+      row.appendChild(inp);
+      wrap.appendChild(row);
+    }
+    if (Array.isArray(q.opt_out_options) && q.opt_out_options.length) {
+      // opt-out applies to the whole group; in the preview these are illustrative checkboxes (not bound to the field answers).
+      wrap.appendChild(el("hr", { "class": "opt-out-separator" }));
+      for (var j = 0; j < q.opt_out_options.length; j++) {
+        var orow = el("div", { "class": "choice" });
+        var ocb = el("input", { type: "checkbox", name: "q_" + q.id + "_optout", value: String(optionValue(q.opt_out_options[j])) });
+        var olbl = el("label", null, " " + optionLabel(q.opt_out_options[j]));
+        olbl.insertBefore(ocb, olbl.firstChild);
+        orow.appendChild(olbl);
+        wrap.appendChild(orow);
+      }
+    }
     return wrap;
   }
 

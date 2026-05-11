@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>survey-design skill — Spec</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.35.0">
+  <script defer src="assets/viewer.js?v=2.35.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">survey-design skill — Spec</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="frontmatter" data-pmos-section="frontmatter">
+<pre><code>tier: 3
+type: feature
+feature: survey-design-skill
+date: 2026-05-11
+status: Ready for Plan
+requirements: docs/pmos/features/2026-05-11_survey-design-skill/01_requirements.html</code></pre>
+</section>
+
+<section id="problem-statement" data-pmos-section="problem-statement">
+<h2 id="problem-statement">1. Problem Statement</h2>
+<p>Product managers and builders run surveys often but aren't survey methodologists, so they ship instruments full of leading questions, double-barreled items, unbalanced scales, missing opt-outs, and excess length — producing biased or unusable data. We are building a new pmos-toolkit skill, <code>/survey-design</code>, that takes a rough survey intent (or an existing survey) and drives it through a generate → reviewer-critique → simulated-respondent → export loop to a methodologically sound, fielding-ready instrument. <strong>Primary success metric:</strong> a successful run always produces a committed <code>survey.json</code> + <code>survey.html</code> + <code>preview.html</code> + <code>survey-eval.md</code> + <code>question-eval.md</code> + <code>index.html</code>, and (unless the user opts out) at least one platform import file — with the question-critique referencing every question and the simulated time estimate reported against the user's stated budget.</p>
+</section>
+
+<section id="goals" data-pmos-section="goals">
+<h2 id="goals">2. Goals</h2>
+<table>
+<thead><tr><th>#</th><th>Goal</th><th>Success metric</th></tr></thead>
+<tbody>
+<tr><td>G1</td><td>One invocation turns a paragraph of intent (or an existing survey) into a reviewed, fielding-ready survey.</td><td>Run produces all canonical artifacts (G-list above) + ≥1 export file unless opted out.</td></tr>
+<tr><td>G2</td><td>The survey respects the audience + time budget the user gave.</td><td>Simulated-respondent estimate ≤ stated budget, or the overage is explicitly flagged with proposed cuts.</td></tr>
+<tr><td>G3</td><td>Common framing anti-patterns are caught and resolved before fielding.</td><td><code>question-eval.md</code> references every question by id; the apply-step records a disposition (fix/modify/skip-with-reason/defer) for every finding.</td></tr>
+<tr><td>G4</td><td>The survey is adapted to its research mode (generative / evaluative / hybrid).</td><td>Generated question-type mix matches the mode (open-ended-heavy for generative; closed/comparable for evaluative); recorded in <code>survey.json.mode</code>.</td></tr>
+<tr><td>G5</td><td>The user can view and walk the survey before fielding.</td><td><code>preview.html</code> renders a fillable form reachable to the end; <code>index.html</code> links it.</td></tr>
+<tr><td>G6</td><td>The survey moves into a real platform without re-typing.</td><td>For each chosen platform the skill emits a structurally valid import artifact + an import README.</td></tr>
+<tr><td>G7</td><td>Usable interactively and unattended.</td><td><code>--non-interactive</code> run completes, auto-picking recommended options and writing an open-questions sidecar.</td></tr>
+<tr><td>G8</td><td>Ships clean against toolkit release prereqs.</td><td>SKILL.md at canonical path; manifest versions synced in both <code>.claude-plugin</code> + <code>.codex-plugin</code>; README row added; description ≥5 trigger phrases; non-interactive block + findings protocol present.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="non-goals" data-pmos-section="non-goals">
+<h2 id="non-goals">3. Non-Goals</h2>
+<ul>
+<li>NOT calling platform APIs to create the survey live — because that needs the user's tokens + per-platform auth; the skill emits import files + instructions.</li>
+<li>NOT handling distribution, sampling panels, recruitment, or quota management — fielding/ops, not design.</li>
+<li>NOT analyzing survey responses — separate downstream activity.</li>
+<li>NOT conjoint / MaxDiff / advanced experimental designs in v1 — needs specialist statistical tooling; the skill may suggest them.</li>
+<li>NOT a general form builder (payment/registration/quiz forms) — scope is research surveys.</li>
+<li>NOT replacing real pretesting — the simulated-respondent pass is a heuristic stand-in, not cognitive interviews / a soft launch; the skill says so.</li>
+</ul>
+</section>
+
+<section id="decision-log" data-pmos-section="decision-log">
+<h2 id="decision-log">4. Decision Log</h2>
+<p>D1–D11 are carried forward from the requirements doc (see <a href="01_requirements.html#design-decisions">01_requirements.html#design-decisions</a>); the spec adds D12–D20.</p>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>D1–D11</td><td>(carried forward) pmos-toolkit skill + reuse substrate; runtime artifacts under <code>{docs_path}/survey-design/{date}_&lt;slug&gt;/</code>; one reviewer subagent → two eval files; <code>survey.json</code> canonical; separate <code>preview.html</code> + <code>survey-preview.js</code>; commit each stage best-effort; export targets Typeform/SurveyMonkey/Google Forms (+Qualtrics stretch), multi-select; sim-pass = subagent; non-interactive contract; authored as Tier-3 <code>/create-skill</code> artifact.</td><td>see requirements doc</td><td>see requirements doc</td></tr>
+<tr><td>D12</td><td><code>survey-preview.js</code> reads survey data from a JSON blob <strong>inlined into <code>preview.html</code></strong> as <code>&lt;script type="application/json" id="survey-data"&gt;…&lt;/script&gt;</code> — not by <code>fetch()</code>-ing <code>survey.json</code>.</td><td>(a) inline the JSON into preview.html; (b) fetch survey.json at runtime.</td><td><code>fetch()</code> of a sibling file fails under <code>file://</code> in every browser (CORS), so a fetch-based preview would only work when served. Inlining makes <code>preview.html</code> work on double-click. The canonical model is still <code>survey.json</code> on disk; <code>preview.html</code> is regenerated from it whenever it changes (same pattern as the substrate's inlined index manifest).</td></tr>
+<tr><td>D13</td><td>The skill's runtime survey folder gets its own <code>index.html</code> (from the substrate's <code>index-generator.md</code> pattern) listing <code>survey.html</code>, <code>preview.html</code>, the two eval files, and the export files, plus a copy of <code>serve.js</code> in a sibling <code>assets/</code> dir.</td><td>(a) generate index.html + serve script; (b) tell the user to open files directly.</td><td>Matches how pipeline feature folders work; gives the user one entry point; <code>serve.js</code> is needed if they prefer serving over double-click.</td></tr>
+<tr><td>D14</td><td>The skill resolves <code>docs_path</code> from <code>.pmos/settings.yaml</code> if present; if absent it does NOT run the full pipeline first-run setup — it defaults <code>docs_path</code> to <code>docs/pmos/</code> and proceeds (warning once).</td><td>(a) default to <code>docs/pmos/</code> + warn; (b) run full first-run setup; (c) hard error.</td><td>This skill is run in PMs' product repos that won't have pmos set up; forcing first-run setup is friction; a sane default + warning is enough.</td></tr>
+<tr><td>D15</td><td>The reviewer subagent is dispatched once with: the canonical <code>survey.json</code>, the survey context (audience/time/mode/cap), and the two rubric reference files (<code>reference/survey-best-practices.md</code> + <code>reference/question-antipatterns.md</code>). It returns two markdown bodies that the parent writes to <code>survey-eval.md</code> + <code>question-eval.md</code>.</td><td>(a) one subagent, two outputs; (b) two subagents; (c) inline.</td><td>(carried D3) — one subagent shares context, two outputs keep concerns separated; cheaper than two and avoids divergence.</td></tr>
+<tr><td>D16</td><td><code>question-eval.md</code> MUST contain exactly one section per question, keyed by the question's <code>id</code> from <code>survey.json</code>, even if the verdict is "no issues". <code>survey-eval.md</code> covers survey-level concerns (structure/order, length/burden against budget, mode fit, scale-balance summary, accessibility, ethics/PII, intro/consent).</td><td>(a) per-question section always; (b) only flag problem questions.</td><td>G3 requires every question be referenced; "no-issues" sections make coverage auditable (count match).</td></tr>
+<tr><td>D17</td><td>Each reviewer finding (in either eval file) is structured as <code>{ target: survey | &lt;question-id&gt;, severity: blocker|should-fix|nit, defect: &lt;antipattern-name or survey-issue&gt;, message: &lt;1–2 sentences&gt;, proposed_fix: &lt;concrete rewrite/change&gt; }</code> rendered as a markdown table row or list item per finding.</td><td>(a) structured findings; (b) free prose critique.</td><td>Structured findings let the apply-step batch them into <code>AskUserQuestion</code> calls one-per-finding (matches the toolkit's review-loop protocol) and let the apply-step track dispositions.</td></tr>
+<tr><td>D18</td><td>The simulated-respondent subagent is dispatched once per persona (default: one persona = the stated target audience; the skill MAY derive 2 if the audience is clearly heterogeneous). It receives the inlined survey content (or <code>survey.json</code> as text) + the persona description + a friction-walk rubric, and returns a structured report: <code>{ estimated_minutes, per_question: [{id, friction[], confusion[], comprehension_gaps[]}], dropoff_risk_points[], overall_notes }</code>. The parent turns it into a fix list.</td><td>(a) subagent per persona; (b) one subagent all personas; (c) inline.</td><td>(carried D11) — fresh context per persona; the per-question structure lets the fix list cite specific questions; default one persona keeps it cheap.</td></tr>
+<tr><td>D19</td><td>Export transformers are pure functions of <code>survey.json</code> (no network). Unsupported question types per platform are <strong>mapped down</strong> (NPS→0–10 scale, ranking→grid on Google Forms; matrix→per-item on platforms lacking it) with the downgrade noted in <code>export/README.md</code>; if a downgrade would be lossy enough to change meaning, the transformer emits a <code>// TODO</code>/comment in the artifact AND lists it in the README "caveats".</td><td>(a) map down + document; (b) refuse to export unsupported types; (c) silently drop.</td><td>PMs want a usable starting point in their platform; documented downgrades beat a refusal or a silent loss.</td></tr>
+<tr><td>D20</td><td>The 8-step runtime workflow maps to SKILL.md phases 0–9 (see §6.1). Steps 4–5 (critique + apply) and step 6 (simulation + apply) are each a dispatch → structured-findings → batched-<code>AskUserQuestion</code> apply-loop → re-render → commit micro-cycle. There is no minimum loop count; the reviewer pass runs once (re-runs only if the user explicitly asks).</td><td>(a) single reviewer pass + single sim pass; (b) iterate reviewer until clean.</td><td>Surveys aren't code; one good reviewer pass + the sim pass is enough, and iterating risks churn. The user can always re-invoke critique.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="personas-journeys" data-pmos-section="personas-journeys">
+<h2 id="personas-journeys">5. User Personas &amp; Journeys</h2>
+<h3 id="persona-pm">5.1 PM / builder (primary)</h3>
+<p>Comfortable writing prose, knows their product domain, not a research-methods expert. Runs <code>/survey-design</code> in their product repo (which may or may not have pmos set up). Wants trustworthy survey data without becoming a methodologist. Secondary: someone with an existing survey wanting a methods second-opinion before sending.</p>
+<h3 id="journey-new-survey">5.2 Journey: design a new survey</h3>
+<p>(Detailed in <a href="01_requirements.html#primary-journey">01_requirements.html#primary-journey</a>.) Intake paragraph → confirm interpreted variables (audience / time budget / mode / optional cap; AskUserQuestion for gaps) → generate <code>survey.json</code> + render <code>survey.html</code>/<code>preview.html</code> + commit → reviewer subagent → batched-AskUserQuestion dispositions → apply + re-render + commit → simulated-respondent subagent → batched-AskUserQuestion which fixes → apply + re-render + commit → generate <code>index.html</code> + <code>serve.js</code> → ask export platform(s) → generate <code>export/*</code> + README + commit → print summary.</p>
+<h3 id="journey-refine">5.3 Journey: refine an existing survey</h3>
+<p>User passes a path to an existing survey (HTML / markdown / pasted text). The skill parses it into a best-effort <code>survey.json</code>, runs variable interpretation (asking only what the source doesn't make clear), then enters at the reviewer-critique step. All later steps proceed normally. If the source can't be parsed as a survey, the skill says so, shows what it extracted, and offers to treat the content as free-text intake instead.</p>
+</section>
+
+<section id="system-design" data-pmos-section="system-design">
+<h2 id="system-design">6. System Design</h2>
+<h3 id="architecture-overview">6.1 Architecture overview</h3>
+<p>This is a Claude-Code skill (a SKILL.md + a <code>reference/</code> dir) — no services, no DB, no HTTP API. "Architecture" here = the phase pipeline + the artifact graph + the subagent boundaries.</p>
+<figure id="fig-pipeline" data-pmos-figure="fig-pipeline">
+<pre>
+                         /survey-design  (main agent)
+                                │
+  Phase 0  setup ─────────────────────────────────────────────
+            • read .pmos/settings.yaml → docs_path (default docs/pmos/ if absent)
+            • parse flags (--non-interactive / --interactive / --format / --export …)
+            • load reference/ files lazily as needed
+            • resolve {docs_path}/survey-design/{YYYY-MM-DD}_&lt;slug&gt;/  (dedupe -2,-3…)
+  Phase 1  intake ──────────────────────────────────────────
+            • read user context  OR  parse an existing-survey path → best-effort survey.json
+  Phase 2  variable interpretation ────────────────────────
+            • infer {audience, time_budget_min, mode, max_questions?} from context
+            • for each gap → AskUserQuestion (one Q per variable, one batched call)
+  Phase 3  generate initial design ────────────────────────
+            • build survey.json (schema §9.1) applying reference/survey-best-practices.md
+            • render survey.html (substrate-compliant)  +  preview.html (+ survey-preview.js)
+            • git add/commit  "survey-design: initial draft for <slug>"
+  Phase 4  reviewer critique ──────────────► [subagent: survey reviewer]
+            • inputs: survey.json + context + reference/{best-practices,antipatterns}.md
+            • outputs: survey-eval.md  +  question-eval.md  (structured findings, every Q)
+            ◄──────────────────────────────
+  Phase 5  apply critique ─────────────────────────────────
+            • batched AskUserQuestion per finding (fix/modify/skip/defer)
+            • mutate survey.json → re-render survey.html/preview.html
+            • git commit  "survey-design: apply review for <slug>"
+  Phase 6  simulated-respondent pass ─────► [subagent: respondent, per persona]
+            • inputs: survey content + persona + friction-walk rubric
+            • output: {estimated_minutes, per_question[…], dropoff_risk_points[…], notes}
+            ◄──────────────────────────────
+            • build fix list; batched AskUserQuestion which fixes to apply
+            • mutate survey.json → re-render; git commit  "survey-design: apply simulation fixes for <slug>"
+  Phase 7  viewer ─────────────────────────────────────────
+            • copy serve.js → survey-folder/assets/ ; generate index.html (index-generator pattern)
+  Phase 8  export ────────────────────────────────────────
+            • AskUserQuestion: which platform(s)? (multi-select; default = the one named)
+            • for each → transform survey.json → export/<platform>.<ext>  + export/README.md
+            • git commit  "survey-design: add <platforms> export for <slug>"
+  Phase 9  summary + capture-learnings
+            • print folder path, commit list, artifact links, viewer command
+</pre>
+<figcaption>Phase pipeline + subagent boundaries for <code>/survey-design</code>. Two subagent types: the survey reviewer (Phase 4) and the simulated respondent (Phase 6, one dispatch per persona).</figcaption>
+</figure>
+<h3 id="artifact-graph">6.2 Artifact graph (what's written, derived from what)</h3>
+<figure id="fig-artifacts" data-pmos-figure="fig-artifacts">
+<pre>
+  {docs_path}/survey-design/{YYYY-MM-DD}_&lt;slug&gt;/
+    survey.json          ← canonical source of truth (schema §9.1)
+    survey.html          ← rendered from survey.json; substrate-compliant readable doc
+    survey.sections.json ← companion (sections enumeration), written with survey.html
+    preview.html         ← rendered from survey.json; self-contained fillable form;
+                           inlines survey.json as &lt;script type="application/json" id="survey-data"&gt;
+    survey-preview.js     ← static helper used by preview.html (no substrate dep, no CDN)
+    survey-eval.md       ← reviewer subagent output (survey-level findings)
+    question-eval.md     ← reviewer subagent output (one section per question)
+    simulation.md        ← simulated-respondent report(s) + fix list + dispositions  [written Phase 6]
+    index.html           ← regenerated each write (index-generator pattern); links the above
+    assets/              ← serve.js (+ style.css/viewer.js if survey.html uses them)  [copied from substrate]
+    export/              ← [Phase 8, per chosen platform]
+      typeform.json            (Typeform Create-API body)
+      surveymonkey.json        (SurveyMonkey POST /v3/surveys body)
+      surveymonkey-paste.txt   (paste-into-UI fallback: MC + single-textbox only)
+      build-google-form.gs     (Google Apps Script FormApp builder)
+      survey.qsf               (Qualtrics — stretch only)
+      README.md                (per-platform import steps + downgrade caveats)
+    _open_questions.md   ← [non-interactive runs only] deferred AskUserQuestion log
+</pre>
+<figcaption>All HTML/MD/JS artifacts are pure functions of <code>survey.json</code> and are re-rendered whenever it changes. Edits at Phases 5/6 mutate <code>survey.json</code>, never the rendered files directly.</figcaption>
+</figure>
+</section>
+
+<section id="functional-requirements" data-pmos-section="functional-requirements">
+<h2 id="functional-requirements">7. Functional Requirements</h2>
+
+<h3 id="fr-skill-shell">7.1 Skill shell &amp; conventions</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-01</td><td>SKILL.md MUST live at <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (canonical path per repo CLAUDE.md). The directory name is <code>survey-design</code> (lowercase-hyphenated).</td></tr>
+<tr><td>FR-02</td><td>SKILL.md frontmatter MUST include <code>name: survey-design</code> and a <code>description:</code> containing ≥5 user-spoken trigger phrases (e.g., "design a survey", "create a survey", "review my survey", "build a questionnaire", "/survey-design", "refine this survey", "make a survey ready to field").</td></tr>
+<tr><td>FR-03</td><td>SKILL.md MUST begin with the announce line: <code>Using the survey-design skill to ...</code> and MUST include a "Platform Adaptation" section (Claude Code tool names; degrade AskUserQuestion → numbered prompts; degrade subagents → sequential inline; TaskCreate/TodoWrite optional).</td></tr>
+<tr><td>FR-04</td><td>SKILL.md MUST include the canonical non-interactive block (mode resolution, per-checkpoint classifier, OQ buffer+flush, subagent <code>[mode: …]</code> prepend, awk extractor, refusal check, pre-rollout BC, end-of-skill stderr summary) verbatim per the toolkit standard, plus a Phase-0 <code>output_format</code> resolution note.</td></tr>
+<tr><td>FR-05</td><td>SKILL.md MUST include a "Release prerequisites" section listing: canonical skill path; minor version bump in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> and <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code> (kept byte-identical, pre-push hook enforced); README row under the appropriate section; description trigger-phrase count; no <code>plugin.json</code> <code>skills</code> array changes.</td></tr>
+<tr><td>FR-06</td><td>SKILL.md MUST include an Anti-Patterns section and a "Capture Learnings" final phase (emit exactly one line: a new learning under <code>## /survey-design</code> in <code>~/.pmos/learnings.md</code>, or "No new learnings this session because &lt;reason&gt;").</td></tr>
+<tr><td>FR-07</td><td>The skill MUST read <code>.pmos/settings.yaml</code> for <code>docs_path</code>; if the file is absent it MUST default <code>docs_path</code> to <code>docs/pmos/</code> and emit one warning — it MUST NOT run the pipeline first-run setup (D14).</td></tr>
+<tr><td>FR-08</td><td>The skill MUST track its phases via the available task-tracking tool (TaskCreate-equivalent), one task per phase, marking in_progress/completed as it goes; if no such tool exists it announces phase transitions verbally.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-intake-vars">7.2 Intake &amp; variable interpretation</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-10</td><td>The skill accepts as its argument: free-text survey intent, OR a path to an existing survey (any of <code>.html</code>/<code>.md</code>/<code>.txt</code>), OR nothing. With no argument it MUST ask (AskUserQuestion) for the survey's purpose + audience before doing anything else.</td></tr>
+<tr><td>FR-11</td><td>Given an existing-survey path, the skill MUST attempt to parse it into a <code>survey.json</code> (best-effort: titles → sections, recognizable questions/options → questions). If parsing yields nothing recognizable, it MUST report so, show what it extracted, and offer to treat the content as free-text intake.</td></tr>
+<tr><td>FR-12</td><td>The skill MUST attempt to infer four variables from the context: <code>audience</code> (free text), <code>time_budget_min</code> (integer minutes; if the user gave a range, use the upper bound), <code>mode</code> (one of <code>generative</code> / <code>evaluative</code> / <code>hybrid</code>), <code>max_questions</code> (integer or null). It records what it inferred and presents it back to the user.</td></tr>
+<tr><td>FR-13</td><td>For each variable it could NOT confidently infer, the skill MUST ask via a single batched <code>AskUserQuestion</code> call — one question per missing variable (up to 4). Each question's options MUST include a <code>(Recommended)</code> default (mode: recommend <code>hybrid</code> when genuinely ambiguous; time budget: recommend "~5 minutes" for a general audience; cap: recommend "no cap"; audience: no recommended default — that one is <code>defer-only: free-form</code> if it must be asked, since there's no sensible auto-pick — but in practice the audience is almost always in the context).</td></tr>
+<tr><td>FR-14</td><td>If the user cannot articulate a research goal/purpose for the survey, the skill MUST state it cannot design a survey without one and stop (it MUST NOT guess a purpose).</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-generate">7.3 Initial design generation (Phase 3)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-20</td><td>The skill MUST build a <code>survey.json</code> conforming to the schema in §9.1, applying <code>reference/survey-best-practices.md</code>: an intro/consent block; logical sections; funnel order (general → specific); screening/qualifying questions first; demographics/sensitive items last (unless used for routing); balanced rating scales with labeled poles + opt-out options; mode-appropriate question-type mix (open-ended-heavy for <code>generative</code>; closed/comparable for <code>evaluative</code>; a generative section then an evaluative section for <code>hybrid</code>); a closing optional open-ended catch-all.</td></tr>
+<tr><td>FR-21</td><td>The generated survey MUST aim to fit the time budget. The skill estimates time as ≈ (Σ per-question cost) where open-text ≈ 30s, closed single/multi ≈ 8s, rating/scale ≈ 6s, matrix row ≈ 5s, intro/consent ≈ 15s (these constants live in the skill and may be tuned). If the estimate exceeds <code>time_budget_min</code>, the skill MUST trim/prioritize down to the budget (and to <code>max_questions</code> if set) before writing — keeping screening + the highest-value items.</td></tr>
+<tr><td>FR-22</td><td>The skill MUST NOT generate any of the anti-patterns catalogued in <code>reference/question-antipatterns.md</code> (no leading/loaded/double-barreled/double-negative/jargon/absolute stems; no unbalanced scales; no overlapping ranges; no non-exhaustive options; no question/answer-scale mismatch; no agree/disagree batteries — use construct-specific scales; no "select all that apply" where per-item prevalence matters — use forced-choice yes/no grids; no required sensitive items without an opt-out; no PII not needed by the stated purpose; no "anonymous" claim if any identifier is collected).</td></tr>
+<tr><td>FR-23</td><td>After building <code>survey.json</code>, the skill MUST render <code>survey.html</code> (substrate-compliant: uses <code>template.html</code> shape; every <code>&lt;h2&gt;/&lt;h3&gt;</code> has a kebab-case <code>id</code>; no inline <code>&lt;script&gt;</code>/<code>&lt;style&gt;</code> in the body; assets referenced as <code>assets/…?v=&lt;plugin-version&gt;</code>; companion <code>survey.sections.json</code> written) AND <code>preview.html</code> + <code>survey-preview.js</code> (§11), AND seed/refresh <code>index.html</code>.</td></tr>
+<tr><td>FR-24</td><td>The skill MUST <code>git add</code> + <code>git commit</code> the new artifacts with message <code>survey-design: initial draft for &lt;slug&gt;</code>. If the cwd is not a git repo or the commit fails, it MUST warn and continue (best-effort, D9). Folder-slug collisions MUST be resolved by appending <code>-2</code>/<code>-3</code>/… — never overwrite an existing survey folder.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-reviewer">7.4 Reviewer critique (Phases 4–5)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-30</td><td>The skill MUST dispatch ONE reviewer subagent (Task tool, or sequential inline if subagents unavailable). The prompt MUST contain: the survey context (<code>{audience, time_budget_min, mode, max_questions, estimated_minutes}</code>), the full <code>survey.json</code> as text, and the contents (or paths) of <code>reference/survey-best-practices.md</code> and <code>reference/question-antipatterns.md</code>. In non-interactive mode the prompt's first line MUST be <code>[mode: non-interactive]</code>.</td></tr>
+<tr><td>FR-31</td><td>The reviewer subagent's return contract: a survey-level critique body and a per-question critique body, where (a) the per-question body has exactly one section per question keyed by <code>question.id</code> (verdict "no issues" allowed); (b) every finding is the structured shape of D17 (<code>target, severity ∈ {blocker, should-fix, nit}, defect, message, proposed_fix</code>); (c) survey-level concerns covered: section structure + order (funnel), length vs. budget, mode fit, scale-balance summary, accessibility, ethics/PII, intro/consent quality.</td></tr>
+<tr><td>FR-32</td><td>The parent MUST write the two bodies to <code>survey-eval.md</code> and <code>question-eval.md</code> (markdown, not HTML — these are subagent critique sidecars, matching the <code>&lt;skill&gt;-eval</code> convention). The parent MUST verify <code>count(per-question sections) == count(questions in survey.json)</code>; on mismatch it MUST re-dispatch once with the missing ids called out, and if still mismatched, surface the gap to the user and proceed without auto-applying.</td></tr>
+<tr><td>FR-33</td><td>The skill MUST present the findings to the user via batched <code>AskUserQuestion</code> calls: group by category, ≤4 per call, one question per finding, severity-tagged (<code>[Blocker]/[Should-fix]/[Nit]</code>), options <code>Fix as proposed / Modify / Skip / Defer</code>. In non-interactive mode it MUST auto-pick <code>Fix as proposed</code> for blocker/should-fix and <code>Defer</code> for nit, logging each to the OQ buffer.</td></tr>
+<tr><td>FR-34</td><td>The skill MUST apply the dispositions by mutating <code>survey.json</code> (never editing the rendered files directly), then re-render <code>survey.html</code>/<code>preview.html</code>/<code>index.html</code>, append a "Dispositions" section to <code>question-eval.md</code>/<code>survey-eval.md</code>, and <code>git commit</code> with message <code>survey-design: apply review for &lt;slug&gt;</code>.</td></tr>
+<tr><td>FR-35</td><td>If the reviewer subagent fails or returns malformed output, the skill MUST surface the failure, keep the committed draft, and offer (AskUserQuestion) to retry the critique or proceed without it (warning that the survey is unreviewed). In non-interactive mode it proceeds without it and logs the failure.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-simulation">7.5 Simulated-respondent pass (Phase 6)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-40</td><td>The skill MUST dispatch the simulated-respondent subagent once per persona. Default = one persona = the stated <code>audience</code>; the skill MAY derive a second persona only if the audience is clearly heterogeneous (e.g., "trial users AND admins"). The prompt MUST contain: the survey content (the rendered question text + options, or <code>survey.json</code> as text), the persona description, and a friction-walk rubric (walk question-by-question; for each, note any friction / confusion / comprehension gap / time pressure; estimate cumulative minutes; flag drop-off-risk points).</td></tr>
+<tr><td>FR-41</td><td>The subagent's return contract: <code>{ persona, estimated_minutes, per_question: [{id, friction[], confusion[], comprehension_gaps[]}], dropoff_risk_points: [{after_id, reason}], overall_notes }</code>.</td></tr>
+<tr><td>FR-42</td><td>The skill MUST write the simulated-respondent report(s) to <code>simulation.md</code> and derive a fix list (each fix: <code>{target_question_id_or_survey, problem, proposed_fix}</code>). It MUST compare <code>estimated_minutes</code> to <code>time_budget_min</code>: if over budget, the fix list MUST include concrete cut proposals; if the user keeps over-budget questions, the skill MUST prominently flag the expected drop-off + overage in the summary.</td></tr>
+<tr><td>FR-43</td><td>The skill MUST present the fix list via batched <code>AskUserQuestion</code> (same protocol as FR-33: ≤4/call, one Q per fix, options <code>Apply / Modify / Skip / Defer</code>, recommended = Apply for clear comprehension/length fixes). It MUST then apply chosen fixes to <code>survey.json</code>, re-render, append a "Dispositions" section to <code>simulation.md</code>, and <code>git commit</code> with message <code>survey-design: apply simulation fixes for &lt;slug&gt;</code>.</td></tr>
+<tr><td>FR-44</td><td>The skill's output MUST state, near the simulation results, that this pass is a heuristic stand-in and does not replace cognitive interviews / a soft launch (Non-Goal restated; D-requirements).</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-viewer">7.6 Viewer (Phase 7)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-50</td><td>The skill MUST copy <code>serve.js</code> (and <code>style.css</code> + <code>viewer.js</code> if <code>survey.html</code> references them) from the html-authoring substrate <code>assets/</code> into <code>&lt;survey-folder&gt;/assets/</code> (idempotent, <code>cp -n</code>).</td></tr>
+<tr><td>FR-51</td><td>The skill MUST generate <code>&lt;survey-folder&gt;/index.html</code> per the substrate's <code>index-generator.md</code> pattern (manifest inlined as <code>&lt;script type="application/json" id="pmos-index"&gt;</code>), listing <code>survey.html</code>, <code>preview.html</code>, <code>survey-eval.md</code>, <code>question-eval.md</code>, <code>simulation.md</code>, and any <code>export/*</code> files present. It MUST tell the user the view command (<code>node assets/serve.js</code> from the survey folder, or just open <code>preview.html</code>/<code>index.html</code> directly).</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-export">7.7 Export (Phase 8)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-60</td><td>The skill MUST ask (AskUserQuestion, <strong>multiSelect</strong>) which platform(s) to export to: <code>Typeform</code>, <code>SurveyMonkey</code>, <code>Google Forms</code> (and <code>Qualtrics — stretch</code> if implemented), plus a <code>Skip export</code> option. If the user named a platform in the initial context or via a <code>--export &lt;platform[,platform]&gt;</code> flag, that pre-selects it. The <code>(Recommended)</code> option is the platform the user named, else <code>Google Forms</code> (lowest-friction import path). In non-interactive mode with no <code>--export</code> flag, it auto-picks the recommended single platform.</td></tr>
+<tr><td>FR-61</td><td>For each chosen platform the skill MUST transform <code>survey.json</code> into the platform artifact: <code>export/typeform.json</code> (Typeform Create-API request body — <code>title, type, settings, welcome_screens, fields[], logic, thankyou_screens</code>); <code>export/surveymonkey.json</code> (<code>title, language, pages[].questions[]</code> with <code>family/subtype</code>) AND <code>export/surveymonkey-paste.txt</code> (plain-text paste fallback, MC + single-textbox only); <code>export/build-google-form.gs</code> (Apps Script using <code>FormApp.create()</code> + the relevant <code>add*Item()</code> calls). Each MUST be structurally valid (JSON parses; the <code>.gs</code> is syntactically valid JS).</td></tr>
+<tr><td>FR-62</td><td>Question-type mapping per platform MUST follow the tables in <code>reference/platform-export.md</code>. Where a target lacks a type, the transformer MUST map down (Google Forms: NPS → scale 0–10, ranking → grid, matrix → grid; SurveyMonkey/Typeform have native rank/NPS/matrix) and note every downgrade in <code>export/README.md</code>. A meaning-changing downgrade MUST also be flagged as a comment in the artifact.</td></tr>
+<tr><td>FR-63</td><td>The skill MUST write <code>export/README.md</code> with, per chosen platform: the import steps (Typeform: <code>curl -X POST https://api.typeform.com/forms -H "Authorization: Bearer $TOKEN" -d @typeform.json</code>; SurveyMonkey: <code>POST /v3/surveys</code> with the JSON, or paste the <code>.txt</code> in the UI; Google Forms: paste the <code>.gs</code> into script.google.com → Run), the auth/plan requirements (Typeform: personal access token, <code>forms:write</code>; SurveyMonkey: OAuth token + paid plan for API; Google Forms: just sign-in authorization), and the downgrade caveats.</td></tr>
+<tr><td>FR-64</td><td>After writing the export files the skill MUST <code>git commit</code> with message <code>survey-design: add &lt;platforms&gt; export for &lt;slug&gt;</code>. If the user picked <code>Skip export</code>, the skill ends after Phase 7.</td></tr>
+<tr><td>FR-65</td><td>Qualtrics support is OPTIONAL in v1 (stretch). If not implemented, <code>reference/platform-export.md</code> MUST still document the QSF format and the manual UI-import path so a later iteration can add it; the export AskUserQuestion MUST NOT offer Qualtrics unless the transformer exists.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-reference">7.8 Reference directory (skill content)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-70</td><td><code>plugins/pmos-toolkit/skills/survey-design/reference/survey-best-practices.md</code> MUST exist, derived from <code>research-notes.md</code> Stream 1: survey structure &amp; flow, question types &amp; when to use each, scale design (points/labels/balance/midpoint/opt-out/acquiescence), length &amp; burden (with the numeric guidance), sampling &amp; audience, generative-vs-evaluative implications, bias reduction (randomization, social-desirability, satisficing), question-writing rules, pre-testing, accessibility/mobile, ethics/consent/PII. It MUST cite its sources.</td></tr>
+<tr><td>FR-71</td><td><code>plugins/pmos-toolkit/skills/survey-design/reference/question-antipatterns.md</code> MUST exist, derived from <code>research-notes.md</code> Stream 2: the full catalog (A1–A8, B1–B4, C1–C8, D1–D7, E1–E6) with, for each, {name, category, harm, BAD example, FIXED example, <strong>detection heuristic</strong>}. The detection heuristics are what the reviewer subagent applies.</td></tr>
+<tr><td>FR-72</td><td><code>plugins/pmos-toolkit/skills/survey-design/reference/platform-export.md</code> MUST exist, derived from <code>research-notes.md</code> Stream 3: per platform (Typeform, SurveyMonkey, Google Forms, Qualtrics-stretch) the import mechanisms ranked, the exact artifact schema with a concrete example, the question-type mapping table (incl. downgrades), auth/plan limits, and the recommended emitted artifact. It MUST cite its sources.</td></tr>
+<tr><td>FR-73</td><td>The <code>reference/</code> files are loaded on demand (progressive disclosure) — SKILL.md references them by relative path, it does NOT inline them.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="non-functional-requirements" data-pmos-section="non-functional-requirements">
+<h2 id="non-functional-requirements">8. Non-Functional Requirements</h2>
+<table>
+<thead><tr><th>ID</th><th>Category</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>NFR-01</td><td>Portability</td><td>The skill MUST function in a repo with no <code>.pmos/settings.yaml</code> (default <code>docs_path=docs/pmos/</code>) and outside a git repo (best-effort commits, warn-and-continue). It MUST NOT require network access except in Phase 8 only if the user opts into a future live-API mode (out of scope v1 — so v1 needs no network at all).</td></tr>
+<tr><td>NFR-02</td><td>Self-containment</td><td><code>preview.html</code> + <code>survey-preview.js</code> MUST have no external/CDN references and MUST work when opened via <code>file://</code> (hence the inlined JSON, D12). ASCII-only in the JS source (no smart quotes / non-ASCII identifiers).</td></tr>
+<tr><td>NFR-03</td><td>Convention compliance</td><td><code>survey.html</code> and the feature-folder artifacts (<code>01_requirements.html</code>, <code>02_spec.html</code>, etc.) MUST pass the toolkit's HTML conventions (heading IDs, no inline scripts/styles in bodies, local-relative assets with cache-bust, sections.json companions). Manifest versions in both plugin manifests MUST stay byte-identical.</td></tr>
+<tr><td>NFR-04</td><td>Accessibility (generated survey)</td><td>The generated <code>survey.html</code>/<code>preview.html</code> SHOULD follow WCAG 2.1 AA basics for forms: label adjacent to control, "Question X of Y" text progress (not a graphical-only bar), keyboard-navigable, sufficient contrast (inherited from substrate <code>style.css</code> for <code>survey.html</code>; explicit in <code>survey-preview.js</code>'s minimal CSS for <code>preview.html</code>).</td></tr>
+<tr><td>NFR-05</td><td>Determinism</td><td>Export transformers MUST be pure functions of <code>survey.json</code> — same input → same output bytes (so re-exports are diff-clean).</td></tr>
+<tr><td>NFR-06</td><td>Non-interactive parity</td><td>A <code>--non-interactive</code> run MUST produce the same set of artifacts an interactive run would (sans the export the user would have chosen → it picks the recommended one) plus a <code>_open_questions.md</code> aggregator listing every auto-picked/deferred checkpoint.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="data-contracts" data-pmos-section="data-contracts">
+<h2 id="data-contracts">9. Data Contracts (survey.json schema + subagent &amp; export contracts)</h2>
+<p>(There is no HTTP API and no database. This section plays the role of §9/§10 — it specifies the canonical <code>survey.json</code> schema and the subagent/export contracts.)</p>
+
+<h3 id="survey-json-schema">9.1 <code>survey.json</code> schema</h3>
+<p>JSON object. Required keys marked <strong>(req)</strong>.</p>
+<pre><code class="language-json">{
+  "schema_version": 1,                         // (req) int
+  "title": "Trial conversion — exit survey",   // (req) string
+  "purpose": "Understand why recent trial users did not upgrade.",  // (req) string — the research goal
+  "mode": "generative",                        // (req) "generative" | "evaluative" | "hybrid"
+  "audience": "People who started a trial in the last 30 days and did not upgrade.",  // (req) string
+  "time_budget_min": 3,                        // (req) int — target completion minutes
+  "estimated_minutes": 2.7,                    // (req) number — skill's estimate (FR-21 constants)
+  "max_questions": null,                        // int | null
+  "intro": {                                   // (req)
+    "text": "Thanks for trying <Product>. A few quick questions — about 3 minutes. Your answers are confidential and help us improve.",  // (req) string
+    "consent_required": false,                 // bool — if true, an explicit "I agree" gate precedes Q1
+    "anonymous": false,                        // bool — MUST be false if any PII question exists
+    "estimated_seconds": 15                    // number
+  },
+  "sections": [                                // (req) array, ≥1
+    {
+      "id": "screening",                       // (req) kebab id, unique
+      "title": "First, a quick check",         // (req) string
+      "description": null,                     // string | null — signpost text
+      "randomize_questions": false,            // bool — never true for screening / ordinal-dependent sections
+      "questions": [ /* see below */ ]         // (req) array, ≥1
+    }
+  ]
+}</code></pre>
+<p>Each <strong>question</strong> object:</p>
+<pre><code class="language-json">{
+  "id": "q-hoped-to-do",            // (req) kebab id, unique across the whole survey
+  "type": "open_long",              // (req) see type list below
+  "stem": "What were you hoping to accomplish when you started the trial?",  // (req) string
+  "help_text": null,                // string | null — shown under the stem
+  "required": false,                // (req) bool
+  "reference_period": null,         // string | null — e.g. "in the past 7 days"; required for retrospective/frequency questions
+  "screening": false,               // bool — true => answer drives skip logic; such questions come first
+  "skip_logic": null,               // null | { "on_value": <choice-value or [values]>, "action": "skip_to" | "end_survey", "target_section_id": <id|null> }
+  "randomize_options": false,       // bool — true only for nominal (unordered) option lists; never for ordinal scales
+
+  // type-specific fields:
+  "options": [                      // for single_select / multi_select / forced_choice_grid (rows) / ranking
+    { "value": "price", "label": "The price was too high" }
+  ],
+  "other_option": false,            // bool — appends an "Other (please specify)" free-text option
+  "opt_out_options": [],            // array of {value,label} appended & visually separated, e.g. [{ "value":"na","label":"Not applicable" },{ "value":"dk","label":"Don't know" },{ "value":"pnts","label":"Prefer not to say" }]
+
+  "scale": {                        // for rating / nps
+    "points": 5,                    // int — 5 or 7 default; NPS implies 11 (0..10)
+    "min": 1, "max": 5,             // ints — NPS: 0..10
+    "labels": { "min": "Not at all satisfied", "mid": "Neither", "max": "Extremely satisfied" },  // pole labels; "mid" only for odd scales
+    "balanced": true                // bool — equal #positive/#negative around midpoint (MUST be true unless purpose forces a forced-choice even scale)
+  },
+
+  "rows": [ { "id":"r-ease","label":"Ease of use" } ],   // for forced_choice_grid / matrix — the items being rated
+  "columns": [ { "value":"poor","label":"Poor" } ],      // for matrix — the shared scale columns
+
+  "constant_sum_total": 100         // for constant_sum
+}</code></pre>
+<p><strong>Question <code>type</code> enum:</strong></p>
+<table>
+<thead><tr><th><code>type</code></th><th>Meaning</th><th>Required type-specific fields</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><code>single_select</code></td><td>radio, pick one</td><td><code>options</code></td><td>MECE; ~4–5 for attitudinal; <code>opt_out_options</code> recommended; consider <code>randomize_options</code> for nominal lists.</td></tr>
+<tr><td><code>multi_select</code></td><td>checkboxes, pick many</td><td><code>options</code></td><td>Discouraged where per-item prevalence matters — prefer <code>forced_choice_grid</code>. If used, <code>randomize_options: true</code>.</td></tr>
+<tr><td><code>forced_choice_grid</code></td><td>Yes/No per item</td><td><code>rows</code></td><td>The recommended replacement for "select all that apply". Columns are implicitly Yes/No (+ optional "N/A").</td></tr>
+<tr><td><code>rating</code></td><td>Likert / unipolar scale</td><td><code>scale</code></td><td>Construct-specific labels (NOT agree/disagree). Balanced, poles labeled, opt-out separate.</td></tr>
+<tr><td><code>nps</code></td><td>0–10 recommend-likelihood</td><td><code>scale</code> (min 0, max 10, points 11)</td><td>Pair with an open follow-up; the skill SHOULD add one automatically.</td></tr>
+<tr><td><code>dichotomous</code></td><td>Yes/No (single)</td><td><code>options</code> (the two)</td><td>Add a "Don't know" opt-out when uncertainty is plausible. Don't force a binary on a continuum.</td></tr>
+<tr><td><code>open_short</code></td><td>single-line free text</td><td>—</td><td><code>help_text</code> SHOULD hint expected length.</td></tr>
+<tr><td><code>open_long</code></td><td>multi-line free text</td><td>—</td><td>The generative workhorse; keep to a few per survey.</td></tr>
+<tr><td><code>ranking</code></td><td>rank a short list</td><td><code>options</code></td><td>≤5–7 items; for longer lists the skill SHOULD instead emit a "top-3 pick" <code>multi_select</code>.</td></tr>
+<tr><td><code>matrix</code></td><td>rate many items on a shared scale</td><td><code>rows</code> + <code>columns</code></td><td>≤~7 rows; consider splitting; <code>randomize</code> rows; mobile = per-item.</td></tr>
+<tr><td><code>constant_sum</code></td><td>allocate N points across items</td><td><code>options</code> + <code>constant_sum_total</code></td><td>Cognitively heavy; small item count.</td></tr>
+<tr><td><code>statement</code></td><td>display-only (section intro / instructions)</td><td>—</td><td>Not a question; <code>required</code> ignored; not counted toward <code>max_questions</code> or time estimate beyond intro.</td></tr>
+</tbody>
+</table>
+<p><strong>Schema invariants</strong> (the skill and any consumer enforce these): all <code>id</code>s kebab-case and unique; <code>anonymous: true</code> forbids any PII question; rating/nps scales <code>balanced: true</code> unless <code>purpose</code> explicitly justifies a forced even scale; ordinal types never have <code>randomize_options: true</code>; <code>skip_logic.target_section_id</code> (when action is <code>skip_to</code>) MUST reference an existing later section; retrospective/frequency stems MUST set <code>reference_period</code>; <code>required: true</code> on a sensitive item MUST be accompanied by an <code>opt_out_options</code> entry.</p>
+
+<h3 id="reviewer-subagent-contract">9.2 Reviewer subagent contract</h3>
+<p><strong>Inputs (in the prompt):</strong> survey context object; <code>survey.json</code> as text; <code>reference/survey-best-practices.md</code> + <code>reference/question-antipatterns.md</code> contents (or paths if the subagent can read files); <code>[mode: …]</code> first line in non-interactive runs.<br>
+<strong>Output (two bodies):</strong></p>
+<ul>
+<li><code>question-eval.md</code> body: <code>## &lt;question-id&gt;</code> per question, each containing the stem (quoted), a verdict line (<code>Verdict: no issues</code> or <code>Verdict: N finding(s)</code>), then a findings table with columns <code>Severity | Defect | Message | Proposed fix</code> per D17.</li>
+<li><code>survey-eval.md</code> body: sections for Structure &amp; order, Length vs. budget, Mode fit, Scale balance, Accessibility, Ethics/PII, Intro/consent — each with the same findings-table shape; plus an overall verdict line.</li>
+</ul>
+<p><strong>Parent-side validation:</strong> count of <code>## &lt;id&gt;</code> sections in <code>question-eval.md</code> == count of questions in <code>survey.json</code>; on mismatch, one re-dispatch naming the missing ids, then surface-and-proceed.</p>
+
+<h3 id="respondent-subagent-contract">9.3 Simulated-respondent subagent contract</h3>
+<p><strong>Inputs:</strong> the rendered question text + options (or <code>survey.json</code> as text); the persona description; a friction-walk rubric (walk Q-by-Q; for each note friction/confusion/comprehension gaps; estimate cumulative minutes; flag drop-off-risk points); <code>[mode: …]</code> first line in non-interactive runs.<br>
+<strong>Output (JSON or markdown that the parent can parse):</strong> <code>{ persona, estimated_minutes, per_question: [{id, friction:[…], confusion:[…], comprehension_gaps:[…]}], dropoff_risk_points: [{after_id, reason}], overall_notes }</code>.</p>
+
+<h3 id="export-contracts">9.4 Export transformer contracts</h3>
+<p>Each is a pure function <code>survey.json → bytes</code>. Type mappings (full tables live in <code>reference/platform-export.md</code>):</p>
+<table>
+<thead><tr><th>survey.json type</th><th>Typeform <code>fields[].type</code></th><th>SurveyMonkey <code>family/subtype</code></th><th>Google Forms <code>FormApp</code> item</th></tr></thead>
+<tbody>
+<tr><td><code>single_select</code></td><td><code>multiple_choice</code> (single)</td><td><code>single_choice/vertical</code></td><td><code>addMultipleChoiceItem</code></td></tr>
+<tr><td><code>multi_select</code></td><td><code>multiple_choice</code> + <code>allow_multiple_selection</code></td><td><code>multiple_choice/vertical</code></td><td><code>addCheckboxItem</code> (<code>showOtherOption</code> if <code>other_option</code>)</td></tr>
+<tr><td><code>forced_choice_grid</code></td><td><code>matrix</code> (Yes/No cols) — or, if unsupported on the plan, N×<code>yes_no</code> fields</td><td><code>matrix/single</code> (Yes/No cols)</td><td><code>addGridItem</code> (cols = Yes/No) — downgrade noted</td></tr>
+<tr><td><code>rating</code></td><td><code>opinion_scale</code> (<code>steps</code>, <code>labels</code>) or <code>rating</code></td><td><code>matrix/rating</code> single-row, or <code>single_choice</code> with weighted choices</td><td><code>addScaleItem</code> (<code>setBounds</code>, <code>setLabels</code>)</td></tr>
+<tr><td><code>nps</code></td><td><code>nps</code> (or <code>opinion_scale</code> 0–10)</td><td><code>matrix/rating</code> 0–10 / <code>single_choice</code> 0–10</td><td><code>addScaleItem</code> 0–10 — <em>downgrade: not a native NPS</em></td></tr>
+<tr><td><code>dichotomous</code></td><td><code>yes_no</code></td><td><code>single_choice</code> (2 choices)</td><td><code>addMultipleChoiceItem</code> (2 choices)</td></tr>
+<tr><td><code>open_short</code></td><td><code>short_text</code></td><td><code>open_ended/single</code></td><td><code>addTextItem</code></td></tr>
+<tr><td><code>open_long</code></td><td><code>long_text</code></td><td><code>open_ended/essay</code></td><td><code>addParagraphTextItem</code></td></tr>
+<tr><td><code>ranking</code></td><td><code>ranking</code></td><td><code>matrix/ranking</code></td><td><code>addGridItem</code> (1..N cols) — <em>downgrade: no native ranking</em></td></tr>
+<tr><td><code>matrix</code></td><td><code>matrix</code></td><td><code>matrix/single</code> or <code>matrix/rating</code></td><td><code>addGridItem</code> / <code>addCheckboxGridItem</code></td></tr>
+<tr><td><code>constant_sum</code></td><td>(no native) → N×<code>number</code> fields + a note</td><td>(no native) → N×<code>open_ended/numerical</code> + a note</td><td>(no native) → N×<code>addTextItem</code> + a note — <em>downgrade</em></td></tr>
+<tr><td><code>statement</code></td><td><code>statement</code></td><td><code>presentation/descriptive_text</code></td><td><code>addSectionHeaderItem</code></td></tr>
+<tr><td>section boundary</td><td>(field order; <code>type:"branching"</code> if skip logic)</td><td>new <code>pages[]</code> entry</td><td><code>addPageBreakItem</code> / <code>addSectionHeaderItem</code></td></tr>
+<tr><td><code>skip_logic</code></td><td><code>logic[]</code> jump action</td><td>page/question skip logic (best-effort; may be omitted)</td><td><code>createChoice(value, PageNavigationType…)</code> on the MC item — Google supports only section-jump on MC/dropdown</td></tr>
+<tr><td><code>opt_out_options</code> / <code>other_option</code></td><td>extra <code>choices</code> / <code>allow_other_choice</code></td><td>extra <code>choices</code> / <code>answers.other</code></td><td>extra <code>setChoiceValues</code> entries / <code>showOtherOption</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="frontend-design" data-pmos-section="frontend-design">
+<h2 id="frontend-design">10. Frontend Design (generated artifacts)</h2>
+<h3 id="survey-html">10.1 <code>survey.html</code> — readable rendering</h3>
+<p>Substrate-compliant. Uses <code>template.html</code> shape (toolbar with Copy-Markdown/Copy-link, <code>&lt;main&gt;</code> body, footer). Body structure: a <code>&lt;section id="intro"&gt;</code> rendering the intro/consent block; one <code>&lt;section id="&lt;section-id&gt;"&gt;</code> per survey section with an <code>&lt;h2&gt;</code> = section title; within each, each question rendered as an <code>&lt;h3 id="&lt;question-id&gt;"&gt;</code> = stem, the help text as a <code>&lt;p&gt;</code>, options as a <code>&lt;ul&gt;</code> (with opt-out items visually separated by a rule), scales as a small <code>&lt;table&gt;</code>, matrix/grid as a <code>&lt;table&gt;</code>; metadata footer-ish line ("Mode: generative · Target: ~3 min · Estimated: 2.7 min · 7 questions"). Companion <code>survey.sections.json</code> enumerates all section + h2 + h3 ids. No inline <code>&lt;script&gt;/&lt;style&gt;</code>.</p>
+<h3 id="preview-html">10.2 <code>preview.html</code> + <code>survey-preview.js</code> — fillable preview</h3>
+<p><strong>Self-contained.</strong> <code>preview.html</code>: a minimal HTML page with an inline <code>&lt;style&gt;</code> (small, mobile-first, accessible: label-adjacent controls, ≥4.5:1 contrast, visible focus, "Question X of Y" text), an inline <code>&lt;script type="application/json" id="survey-data"&gt;</code> holding the full <code>survey.json</code>, and a <code>&lt;script src="survey-preview.js"&gt;&lt;/script&gt;</code>. (Note: <code>preview.html</code> is intentionally NOT substrate-compliant — it's a standalone interactive page, not a pmos artifact; that's why it's a sibling, not <code>survey.html</code> — D4.)</p>
+<p><code>survey-preview.js</code> (ASCII-only, no deps, no CDN): on load, parse <code>#survey-data</code>; render the intro screen (with the consent gate if <code>consent_required</code>); then render one section at a time (or one question at a time on narrow viewports) with Next/Back; maintain answer state in a plain JS object (in-memory only — no storage); evaluate <code>skip_logic</code> on advance (skip to target section / end survey); render each question type with the appropriate control (radio / checkbox / Yes-No-per-row grid / scale buttons / number / textarea / ranking via up-down or numbered selects / matrix table); show a running "Question X of Y" indicator (Y = count of non-<code>statement</code> questions on the active path); on the final screen show the thank-you text and an optional "Show my answers (JSON)" debug toggle. Required-question validation gates Next. No network calls.</p>
+<h3 id="component-hierarchy">10.3 Component hierarchy (preview)</h3>
+<pre>
+PreviewApp
+ ├─ IntroScreen        (intro.text; ConsentGate if consent_required)
+ ├─ SectionView*       (one active at a time)
+ │   ├─ SectionHeader  (title + description signpost)
+ │   └─ QuestionView*  (one per question; QuestionView dispatches on type)
+ │       ├─ SingleSelect / MultiSelect / ForcedChoiceGrid / Rating / NPS /
+ │       │  Dichotomous / OpenShort / OpenLong / Ranking / Matrix / ConstantSum / Statement
+ │       ├─ OptOutBlock (rendered after main options, visually separated)
+ │       └─ HelpText
+ ├─ ProgressIndicator  ("Question X of Y", text)
+ ├─ NavBar             (Back / Next; Next disabled until required answered)
+ └─ ThankYouScreen     (intro/thankyou text + optional answers-JSON toggle)
+</pre>
+</section>
+
+<section id="edge-cases" data-pmos-section="edge-cases">
+<h2 id="edge-cases">11. Edge Cases</h2>
+<table>
+<thead><tr><th>#</th><th>Scenario</th><th>Condition</th><th>Expected behavior</th></tr></thead>
+<tbody>
+<tr><td>E1</td><td>No argument at all</td><td><code>/survey-design</code> with no context</td><td>AskUserQuestion for purpose + audience before anything else (FR-10).</td></tr>
+<tr><td>E2</td><td>Intake too thin</td><td>One vague sentence; no purpose even after asking</td><td>State it can't design a survey without a research goal; stop (FR-14).</td></tr>
+<tr><td>E3</td><td>Existing-survey file unparseable</td><td>Provided file isn't recognisably a survey</td><td>Report it; show what was extracted; offer to treat as free-text intake (FR-11).</td></tr>
+<tr><td>E4</td><td>Folder-slug collision</td><td><code>{date}_&lt;slug&gt;/</code> already exists</td><td>Append <code>-2</code>/<code>-3</code>/…; never overwrite (FR-24).</td></tr>
+<tr><td>E5</td><td>Mode genuinely ambiguous</td><td>Context supports "understand" and "validate"</td><td>Recommend <code>hybrid</code> via AskUserQuestion; user confirms/picks (FR-13).</td></tr>
+<tr><td>E6</td><td>Reviewer finds nothing</td><td>Draft already clean</td><td>Eval files say "no issues" with the rubric checklist shown passed; proceed to simulation without forcing edits (D16).</td></tr>
+<tr><td>E7</td><td>Reviewer subagent fails / malformed</td><td>Crash or bad output shape</td><td>Surface failure; keep the committed draft; offer retry-or-proceed (FR-35); non-interactive → proceed + log.</td></tr>
+<tr><td>E8</td><td>Per-question count mismatch</td><td><code>question-eval.md</code> misses some question ids</td><td>Re-dispatch once naming the missing ids; if still off, surface gap + proceed without auto-apply (FR-32).</td></tr>
+<tr><td>E9</td><td>User defers every finding</td><td>All review/sim findings → Defer</td><td>Record deferrals in the eval/simulation "Dispositions" sections + the run summary; survey committed as-is.</td></tr>
+<tr><td>E10</td><td>Length can't fit budget with the questions the user insists on</td><td>Trimmed design still over budget</td><td>Field the survey anyway; prominently flag expected drop-off + the overage in the summary (FR-42, requirements E-row).</td></tr>
+<tr><td>E11</td><td>Not in a git repo / commit fails</td><td>cwd isn't git, or <code>git commit</code> errors</td><td>Write artifacts; warn once that commits were skipped; continue (FR-24, D9).</td></tr>
+<tr><td>E12</td><td>Unsupported export platform named</td><td>User asks for a platform with no transformer</td><td>List the supported set; offer the closest match or just the <code>survey.json</code> + <code>survey.html</code> (requirements E-row); Qualtrics not offered unless implemented (FR-65).</td></tr>
+<tr><td>E13</td><td><code>.pmos/settings.yaml</code> missing</td><td>First run in a non-pmos repo</td><td>Default <code>docs_path=docs/pmos/</code>; warn once; proceed (FR-07, D14).</td></tr>
+<tr><td>E14</td><td>Skip logic targets an earlier section</td><td>Generated/parsed survey has a backward jump</td><td>Schema invariant rejects it; the skill rewrites the jump forward or drops it and notes the change (§9.1 invariants).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="configuration-flags" data-pmos-section="configuration-flags">
+<h2 id="configuration-flags">12. Configuration &amp; Flags</h2>
+<table>
+<thead><tr><th>Flag / setting</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>--non-interactive</code> / <code>--interactive</code></td><td>interactive (per mode-resolution precedence)</td><td>Toggle the non-interactive contract (auto-pick recommended at every gate; write <code>_open_questions.md</code>).</td></tr>
+<tr><td><code>--format &lt;html|md|both&gt;</code></td><td><code>html</code> (from <code>.pmos/settings.yaml</code> or default) — applies to the <em>feature-folder pipeline artifacts</em> only, not the runtime survey folder (which is always HTML+JSON)</td><td>Output format for any feature-folder doc this skill writes (it normally writes none — it writes into the survey folder).</td></tr>
+<tr><td><code>--export &lt;platform[,platform…]&gt;</code></td><td>unset → ask</td><td>Pre-select export platform(s); in non-interactive mode, suppresses the export question.</td></tr>
+<tr><td><code>--skip-export</code></td><td>unset</td><td>Skip Phase 8 entirely.</td></tr>
+<tr><td><code>.pmos/settings.yaml :: docs_path</code></td><td><code>docs/pmos/</code> if file/key absent</td><td>Root under which the skill writes <code>survey-design/{date}_&lt;slug&gt;/</code>.</td></tr>
+<tr><td>time-cost constants</td><td>open-text 30s, closed 8s, rating/scale 6s, matrix-row 5s, intro 15s</td><td>Used for <code>estimated_minutes</code> (FR-21); defined in SKILL.md, tunable.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="testing-verification" data-pmos-section="testing-verification">
+<h2 id="testing-verification">13. Testing &amp; Verification Strategy</h2>
+<h3 id="unit-static-checks">13.1 Unit / static checks</h3>
+<ul>
+<li><strong>Skill-shell checks:</strong> <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> exists; frontmatter has <code>name</code> + a <code>description</code> with ≥5 trigger phrases (grep/count); the non-interactive block markers (<code>&lt;!-- non-interactive-block:start --&gt;</code>) present; "Release prerequisites", "Anti-Patterns", "Capture Learnings", "Platform Adaptation" sections present.</li>
+<li><strong>Reference files:</strong> <code>reference/survey-best-practices.md</code>, <code>reference/question-antipatterns.md</code>, <code>reference/platform-export.md</code> exist; the antipatterns file contains all catalog ids A1–A8/B1–B4/C1–C8/D1–D7/E1–E6 and a "detection heuristic" for each (grep); the platform-export file documents Typeform/SurveyMonkey/Google Forms (and a QSF section).</li>
+<li><strong>Manifest sync:</strong> the <code>version</code> field is byte-identical in both plugin manifests; a README row for <code>/survey-design</code> exists (grep).</li>
+<li><strong>Heading IDs:</strong> the feature-folder HTML artifacts (and a generated <code>survey.html</code>) pass an <code>assert_heading_ids.sh</code>-style check (every <code>&lt;h2&gt;/&lt;h3&gt;</code> has an <code>id</code>); <code>survey.html</code> body has no <code>&lt;script&gt;</code>/<code>&lt;style&gt;</code>; <code>preview.html</code>/<code>survey-preview.js</code> have no <code>http(s)://</code> references.</li>
+</ul>
+<h3 id="integration-run">13.2 Integration (one real run)</h3>
+<ul>
+<li>Run <code>/survey-design</code> in a scratch repo on a sample brief in <code>--non-interactive</code> mode. Assert: <code>survey.json</code> exists and <code>python -m json.tool survey.json</code> parses; required keys present; all ids unique kebab; <code>survey.html</code> + <code>survey.sections.json</code> + <code>preview.html</code> + <code>survey-preview.js</code> + <code>index.html</code> exist; <code>survey-eval.md</code> + <code>question-eval.md</code> exist and <code>question-eval.md</code> has one <code>## &lt;id&gt;</code> per question (count match); <code>simulation.md</code> exists with an <code>estimated_minutes</code>; <code>_open_questions.md</code> exists; git log shows the per-stage commits (or a warning if not a repo).</li>
+<li>With <code>--export typeform,google-forms</code>: assert <code>export/typeform.json</code> parses as JSON; <code>export/build-google-form.gs</code> parses as JS (e.g., <code>node --check</code>); <code>export/surveymonkey-paste.txt</code> is absent (not selected); <code>export/README.md</code> exists and mentions both platforms + their auth requirements + any downgrade caveats.</li>
+</ul>
+<h3 id="e2e-manual">13.3 End-to-end / manual spot checks</h3>
+<ul>
+<li>Open <code>preview.html</code> by double-click (file://): the intro renders, you can answer every question type, skip logic works, "Question X of Y" updates, you reach the thank-you screen. Open <code>index.html</code>: links to <code>survey.html</code> + <code>preview.html</code> + the eval files resolve.</li>
+<li>Spot-import on ≥1 platform: paste <code>build-google-form.gs</code> into script.google.com and Run → a Google Form is created matching the survey (acceptable downgrades documented).</li>
+<li>Interactive run on a real brief: confirm the variable-interpretation AskUserQuestion only asks for genuine gaps; the review findings batch is severity-tagged; dispositions apply and re-render; the summary lists folder + commits + artifacts + the view command.</li>
+</ul>
+<h3 id="verification-commands">13.4 Verification commands (illustrative)</h3>
+<pre><code class="language-bash"># shell checks
+test -f plugins/pmos-toolkit/skills/survey-design/SKILL.md
+grep -c -E '"[^"]+"' &lt;(grep '^description:' plugins/pmos-toolkit/skills/survey-design/SKILL.md)   # expect >=5 quoted phrases (or use the repo's trigger-phrase audit)
+grep -q 'non-interactive-block:start' plugins/pmos-toolkit/skills/survey-design/SKILL.md
+test -f plugins/pmos-toolkit/skills/survey-design/reference/question-antipatterns.md
+for id in A1 A8 B1 B4 C1 C8 D1 D7 E1 E6; do grep -q "$id" plugins/pmos-toolkit/skills/survey-design/reference/question-antipatterns.md || echo "MISSING $id"; done
+# manifest sync
+diff &lt;(grep '"version"' plugins/pmos-toolkit/.claude-plugin/plugin.json) &lt;(grep '"version"' plugins/pmos-toolkit/.codex-plugin/plugin.json)
+grep -q 'survey-design' README.md
+# after a sample run in $RUN_DIR/survey-design/&lt;date&gt;_demo/
+python3 -m json.tool "$RUN_DIR"/.../survey.json &gt;/dev/null
+node --check "$RUN_DIR"/.../export/build-google-form.gs
+</code></pre>
+</section>
+
+<section id="rollout" data-pmos-section="rollout">
+<h2 id="rollout">14. Rollout Strategy</h2>
+<ul>
+<li>No feature flag — a new skill is purely additive; it's auto-discovered from <code>plugins/pmos-toolkit/skills/</code>.</li>
+<li>Release: minor version bump in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> and <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code> (kept byte-identical — pre-push hook enforces). Add a README row under the appropriate section (e.g., "Standalone utilities" — <code>/survey-design</code> is not a pipeline stage). Add a <code>## /survey-design</code> header to <code>~/.pmos/learnings.md</code> (idempotent). Changelog entry describing what the system can now do.</li>
+<li>Rollback = revert the commit; no migration, no data, no flag to flip.</li>
+<li>Qualtrics export is shipped (or not) independently; if not shipped in v1, the only "rollout" cost later is adding the transformer + un-gating the export option.</li>
+</ul>
+</section>
+
+<section id="research-sources" data-pmos-section="research-sources">
+<h2 id="research-sources">15. Research Sources</h2>
+<table>
+<thead><tr><th>Source</th><th>Type</th><th>Key takeaway</th></tr></thead>
+<tbody>
+<tr><td><code>docs/pmos/features/2026-05-11_survey-design-skill/research-notes.md</code> (Streams 1–3)</td><td>This-feature research</td><td>The verbatim survey-design best-practices, anti-pattern catalog, and platform export/import research that becomes the skill's <code>reference/</code> dir; carries all upstream source citations (Pew, Dillman, Krosnick, NN/g, MeasuringU, Qualtrics, SurveyMonkey; Typeform/SurveyMonkey/Google/Qualtrics API docs).</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/_shared/html-authoring/</code> (<code>conventions.md</code>, <code>template.html</code>, <code>index-generator.md</code>, <code>assets/{style.css,viewer.js,serve.js}</code>)</td><td>Existing code</td><td>The substrate <code>survey.html</code> + <code>index.html</code> + the serve script reuse; the conventions <code>survey.html</code> must follow; the inlined-manifest pattern reused for <code>preview.html</code>'s inlined <code>survey.json</code>.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/create-skill/</code>, <code>plugins/pmos-toolkit/skills/_shared/interactive-prompts.md</code>, an existing Tier-3 skill (e.g. <code>diagram/</code>, <code>polish/</code>, <code>msf-req/</code>)</td><td>Existing code</td><td>The Tier-3 skill template: non-interactive block, findings/dispositions protocol, reviewer-subagent pattern (FR-50/51/52-style structured findings + parent-side validation), release prereqs, Anti-Patterns + Capture-Learnings phases.</td></tr>
+<tr><td>Repo <code>CLAUDE.md</code></td><td>Project invariant</td><td>Canonical skill path <code>plugins/pmos-toolkit/skills/&lt;name&gt;/SKILL.md</code>; both plugin manifests must carry the same version (pre-push hook); <code>/complete-dev</code> is the release entry point.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="silent-roles" data-pmos-section="silent-roles">
+<h2 id="silent-roles">16. Multi-role review — silent roles</h2>
+<pre>
+Roles considered, no inline questions:
+- Principal Architect — no new services/data flows; the "architecture" is a SKILL.md phase pipeline + subagent boundaries, fully specced in §6. Decisions D12 (inlined JSON in preview) and D18 (per-persona sim subagent) were the only architect-level calls; both resolved (D12 by the file:// CORS constraint, D18 carried from the grilled requirements).
+- Database Administrator — no database; survey.json on disk is the only persistence; schema specced in §9.1.
+- DevOps Engineer — Tier-3 but no deploy-time risk: a new skill is additive + auto-discovered; rollout is a version bump + README row + changelog (§14); rollback = revert.
+- Senior Analyst — FR/NFR coverage cross-checked against the requirements Goals + Design Decisions while writing §7/§8; every requirements goal G1–G8 maps to an FR cluster (G1→FR-20..24/30..43/60..64; G2→FR-21/FR-42; G3→FR-31..34; G4→FR-20/§9.1 mode; G5→FR-23/§10.2; G6→FR-60..63; G7→FR-04/FR-33/NFR-06; G8→FR-01..06/§13.1).
+- Principal Designer — engaged: §10 specifies survey.html rendering, preview.html + survey-preview.js contract (D12), the component hierarchy, and the WCAG-AA basics (NFR-04). No open design questions remained.
+- Product Director — requirements personas + journeys were thorough and grilled; §5 references them; the only Product-level addition was confirming the multi-select export default (already D6).
+</pre>
+</section>
+
+<section id="review-log" data-pmos-section="review-log">
+<h2 id="review-log">17. Review Log</h2>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes made</th></tr></thead>
+<tbody>
+<tr><td>0 (initial draft)</td><td>—</td><td>Tier-3 spec written from the approved + grilled requirements + research-notes.md; D12–D20 added; verification sketch emitted in chat first; folded simulate-spec pass run (§6.5 of /spec) — no above-threshold gaps surfaced beyond what's already specced.</td></tr>
+</tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_survey-design-skill/02_spec.html</span>
+  </footer>
+</body>
+</html>

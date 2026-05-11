@@ -70,10 +70,12 @@
 |---|---|---|---|---|
 | survey-design | requirements | completed | `01_requirements.html` (revised post-grill) | 2026-05-11 |
 | survey-design | grill (on requirements) | completed | `grills/2026-05-11_01-requirements.html` | 2026-05-11 |
-| survey-design | spec | pending | — | — |
-| survey-design | plan | pending | — | — |
-| survey-design | execute | pending | — | — |
+| survey-design | spec | completed | `02_spec.html` (Tier 3, adapted template) | 2026-05-11 |
+| survey-design | plan | completed | `03_plan.html` (9 tasks + TN) | 2026-05-11 |
+| survey-design | execute | **pending — PAUSED HERE** | — | — |
 | survey-design | verify | pending | — | — |
 | _(batch)_ | complete-dev | pending | — | — |
+
+**Paused after /plan, before /execute (user request, 2026-05-11).** To resume: re-run `/update-skills docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/00_triage.md` — it detects this triage doc's `v=1` header marker and resumes from the first `pending` pipeline-status row (execute), skipping triage Phases 2–7. Or just run `/execute` directly against `03_plan.html`. All five approved changes (F1/F3/F6/F7/F8) are fully specced + planned; nothing left to decide before implementation.
 
 **Grill reshaped F1 substantially** (Phase 4 → scored generate↔review refinement loop; reviewer evaluate-only; generator owns mutation; categorical exit, cap 2; product-fit checks for both open & closed questions) and grew F3 (two-tier abort) and F8 (Phase-2 intake variable for response-impact). `01_requirements.html` revised accordingly before /spec. See `grills/2026-05-11_01-requirements.html`.

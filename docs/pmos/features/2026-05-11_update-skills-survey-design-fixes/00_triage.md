@@ -72,8 +72,8 @@
 | survey-design | grill (on requirements) | completed | `grills/2026-05-11_01-requirements.html` | 2026-05-11 |
 | survey-design | spec | completed | `02_spec.html` (Tier 3, adapted template) | 2026-05-11 |
 | survey-design | plan | completed | `03_plan.html` (9 tasks + TN) | 2026-05-11 |
-| survey-design | execute | **pending — PAUSED HERE** | — | — |
-| survey-design | verify | pending | — | — |
+| survey-design | execute | completed | `03_plan.html` → `execute/summary.md` (T1–T9 + TN; 10 per-task commits on `feat/survey-design-fixes`) | 2026-05-11 |
+| survey-design | verify | in-progress | — | 2026-05-11 |
 | _(batch)_ | complete-dev | pending | — | — |
 
 **Paused after /plan, before /execute (user request, 2026-05-11).** To resume: re-run `/update-skills docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/00_triage.md` — it detects this triage doc's `v=1` header marker and resumes from the first `pending` pipeline-status row (execute), skipping triage Phases 2–7. Or just run `/execute` directly against `03_plan.html`. All five approved changes (F1/F3/F6/F7/F8) are fully specced + planned; nothing left to decide before implementation.

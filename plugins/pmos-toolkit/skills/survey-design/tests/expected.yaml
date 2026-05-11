@@ -74,3 +74,46 @@ commits_present:                  # subjects (substring match) in the scratch re
   - "survey-design: apply review"
   - "survey-design: apply simulation fixes"
   - "survey-design: add typeform,google-forms export"
+
+# ---------------------------------------------------------------------------
+# Additional property scenarios (read against a separate run; same harness model
+# -- a human or /verify, no executable runner).
+# ---------------------------------------------------------------------------
+additional_scenarios:
+
+  # A. multi_field_open question type (F6) -- fixture: fixtures/multi-field-brief.txt
+  multi_field_open:
+    fixture: fixtures/multi-field-brief.txt
+    invocation: "/survey-design '<contents of fixtures/multi-field-brief.txt>' --non-interactive --export typeform,surveymonkey,google-forms"
+    survey_json:
+      schema_version_equals: 2
+      has_question_of_type: multi_field_open          # the daily/weekly/monthly active-users question
+      multi_field_open_fields_min: 1                  # the question carries fields: [...] with >= 1 entry
+      multi_field_open_field_ids_kebab_unique: true   # field ids kebab-case, unique within the question
+      multi_field_open_has_no_options_scale_rows_columns: true   # invariant: never carries options/scale/rows/columns/constant_sum_total
+      multi_field_open_not_routable: true             # skip_logic == null and screening == false for it
+    estimated_minutes:
+      # the 3-field active-users question contributes 30s x 3 = 90s = 1.5 min to estimated_minutes
+      multi_field_open_contribution_seconds_per_field: 30
+      example_three_field_contribution_seconds: 90
+    preview_html:
+      renders_one_input_per_field: true               # one <input type="text"> per field, each with a <label for=...> carrying field.label
+      multi_field_open_counted_as_one_question: true  # the group is one step in "Question X of Y"
+    export:
+      surveymonkey_native: true                       # export/surveymonkey.json: open_ended/multi with answers.rows[] = the field labels
+      google_forms_downgrade: true                    # export/build-google-form.gs: addSectionHeaderItem(<stem>) + one addTextItem per field, with a downgrade comment
+      typeform_downgrade: true                        # export/typeform.json: a statement field naming the stem + one short_text field per field
+      readme_lists_downgrade: true                    # export/README.md names the multi_field_open -> N short-answer items + section header downgrade for Typeform & Google Forms
+
+  # B. F8 no-structural-change regression -- a brief that states response-impact and has NO multi_field_open
+  f8_intro_wiifm_regression:
+    fixture: fixtures/sample-brief.txt          # (or any brief that states what happens to the responses)
+    note: "compare against the section-2 baseline above -- F8 changes intro copy only, not survey structure"
+    survey_json:
+      same_top_level_keys_as_baseline: true     # plus intro.response_impact (string or null) and schema_version == 2
+      intro_response_impact_present: true       # the intro object has a response_impact field
+      intro_text_contains_wiifm_sentence: true  # intro.text carries a persuasive, honest motivation sentence (concrete impact, audience-specific) -- NOT a bare "your answers help us improve"
+      no_new_question_types_vs_baseline: true   # the question-type set is unchanged by F8
+      sections_shape_unchanged_vs_baseline: true
+    reviewer:
+      intro_consent_flags_missing_wiifm: true   # survey-eval.md Intro/consent section flags a missing WIIFM sentence as a should-fix finding when one is absent

@@ -1,0 +1,8 @@
+We're sizing how teams actually use our analytics product before a pricing
+rework. I want a short survey for current admins on paid plans. The key thing I
+need is their current active-user counts at three cadences -- daily active users,
+weekly active users, and monthly active users -- as separate labeled numbers, not
+one blob. Also ask, in their own words, what they'd most want the next pricing
+tier to include. Keep it to about 3 minutes. The responses decide which usage
+bands the new tiers are drawn around, so tell respondents that. We'll put it in
+SurveyMonkey.

@@ -65,6 +65,7 @@ if [ -f "$PREVIEW" ]; then
   ! LC_ALL=C grep -qP '[^\x00-\x7F]' "$PREVIEW" 2>/dev/null || note "$PREVIEW: contains non-ASCII bytes (must be ASCII-only)"
   grep -q 'survey-data' "$PREVIEW" || note "$PREVIEW: does not reference the #survey-data element"
   grep -q 'skip_logic' "$PREVIEW" || note "$PREVIEW: does not handle skip_logic"
+  grep -q 'on_value' "$PREVIEW" || note "$PREVIEW: skip_logic matcher does not read the canonical 'on_value' field (regression: was reading rule.value/.when/.equals only)"
   for t in single_select multi_select forced_choice_grid rating nps dichotomous open_short open_long ranking matrix constant_sum statement; do
     grep -q "$t" "$PREVIEW" || note "$PREVIEW: missing handling for question type '$t'"
   done

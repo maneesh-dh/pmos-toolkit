@@ -113,11 +113,23 @@
   }
 
   function ruleMatches(rule, ans) {
-    // A rule with no `when`/`value` matches whenever the question is answered.
-    if (rule.value === undefined && rule.when === undefined && rule.equals === undefined) { return true; }
-    var target = rule.value !== undefined ? rule.value : (rule.equals !== undefined ? rule.equals : rule.when);
-    if (Array.isArray(ans)) { return ans.indexOf(target) !== -1; }
-    return String(ans) === String(target);
+    // Canonical schema field is `on_value` (a single value or an array of values).
+    // `value` / `equals` / `when` are tolerated legacy aliases. A rule with none of
+    // these matches whenever the question is answered.
+    var target = rule.on_value;
+    if (target === undefined) { target = rule.value; }
+    if (target === undefined) { target = rule.equals; }
+    if (target === undefined) { target = rule.when; }
+    if (target === undefined) { return true; }
+    var accepted = Array.isArray(target) ? target : [target];
+    for (var t = 0; t < accepted.length; t++) {
+      if (Array.isArray(ans)) {
+        if (ans.indexOf(accepted[t]) !== -1) { return true; }
+      } else if (String(ans) === String(accepted[t])) {
+        return true;
+      }
+    }
+    return false;
   }
 
   function screenIndexForSectionId(sectionId) {

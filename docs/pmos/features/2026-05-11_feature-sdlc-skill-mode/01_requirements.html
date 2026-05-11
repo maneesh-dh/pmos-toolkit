@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skill development via /feature-sdlc — Requirements</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.36.0">
+  <script defer src="assets/viewer.js?v=2.36.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Skill development via /feature-sdlc — Requirements</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>Date:</strong> 2026-05-11 · <strong>Last updated:</strong> 2026-05-11 · <strong>Status:</strong> Draft · <strong>Tier:</strong> 3 — Feature</p>
+<p><em>Companion: <code>00_seed_brief.md</code> (the brainstorming output that locked the 14 decisions, the target phase map, and the file-move plan). This requirements doc frames the problem, users, journeys, success criteria, and the FR/NFR set the <code>/spec</code> stage needs. The locked decisions in the seed brief are settled inputs, not open questions.</em></p>
+
+<section id="problem">
+<h2 id="problem">Problem</h2>
+<p>The pmos-toolkit has <strong>three skills that all drive essentially the same SDLC pipeline</strong> (<code>requirements → spec → plan → execute → verify → complete-dev</code>): <code>/feature-sdlc</code> (feature development), <code>/create-skill</code> (authoring a new skill), and <code>/update-skills</code> (applying feedback to existing skills). Only <code>/feature-sdlc</code> has git-worktree isolation and a resumable <code>state.yaml</code>; <code>/create-skill</code> and <code>/update-skills</code> re-implement the pipeline without those, so skill-authoring work cannot be paused/resumed and is not isolated from the working tree. The three implementations have drifted and must be kept in sync by hand.</p>
+<p>Separately, <strong>skill quality is currently governed only by a prose "Conventions" checklist</strong> inside <code>/create-skill</code> with no scoring and no self-refinement loop — and that checklist is pmos-toolkit-specific, so it does not help users author skills for their own repos or plugins under the broader SKILLS standard.</p>
+
+<h3 id="who-experiences-this">Who experiences this?</h3>
+<ul>
+<li><strong>Skill author (new skill)</strong> — a developer/PM who wants a new <code>/slash-command</code> skill, in pmos-toolkit <em>or</em> in their own repo/plugin. Today they run <code>/create-skill</code>; they get no worktree, no resume, and a quality bar that is just a checklist.</li>
+<li><strong>Skill author (applying feedback)</strong> — someone who has feedback about an existing skill (free-form notes, or a <code>/retro</code> paste-back) and wants it triaged and implemented end-to-end. Today they run <code>/update-skills</code>; same gaps, plus a triage-doc-based resume that diverges from <code>/feature-sdlc</code>'s.</li>
+<li><strong>Feature developer</strong> — runs <code>/feature-sdlc</code> as today. Their experience must not regress; they should also benefit from the phase-numbering cleanup.</li>
+<li><strong>Toolkit maintainer</strong> — currently keeps three pipeline implementations in sync. After this change, one.</li>
+</ul>
+
+<h3 id="why-now">Why now?</h3>
+<p><code>/feature-sdlc</code> recently gained harness-native worktree creation, drift-checked resume, and a v3 state schema (v2.35.0). That makes it a credible single home for every pipeline-driven workflow. The skill-authoring ecosystem has also matured — Anthropic, OpenAI Codex, and the agentskills.io open standard now publish concrete authoring guidance — so a research-grounded patterns/eval pair is feasible and worth building once.</p>
+</section>
+
+<section id="goals-non-goals">
+<h2 id="goals-non-goals">Goals &amp; Non-Goals</h2>
+<h3 id="goals">Goals</h3>
+<ul>
+<li>A skill author can take a new skill from idea to merged-and-released through <strong>one orchestrator</strong> (<code>/feature-sdlc skill &lt;desc&gt;</code>), with git-worktree isolation and <code>--resume</code> — measured by: the run produces a worktree + <code>state.yaml</code> and survives a session restart at any phase boundary.</li>
+<li>A skill author can take feedback about an existing skill to a merged change through the same orchestrator (<code>/feature-sdlc skill --from-feedback &lt;input&gt;</code>) — measured by: feedback (raw text or <code>/retro</code> paste-back) is triaged with explicit keep/drop approval, then implemented via the standard pipeline.</li>
+<li>Every skill produced or modified through skill-dev mode is <strong>scored against a binary eval rubric</strong> and refined until it passes (or the user knowingly accepts residual failures) — measured by: a <code>state.yaml</code> record of the eval loop with pass/fail per check and the residual set.</li>
+<li>The patterns guide and eval rubric are <strong>portable across the SKILLS standard</strong> (Claude Code primary; Codex and other compliant agents in scope) — measured by: no check or instruction is Claude-Code-only where a portable phrasing exists; per-platform specifics are labelled as such.</li>
+<li><code>/feature-sdlc</code>'s phases are <strong>linearly numbered</strong> with optional steps as alphabetic sub-phases — measured by: the phase list reads <code>0, 0a, 0b, 0c, 0d, 1, 2, 2a, 3, 3a, 3b, 3c, 4, 5, 6, 6a, 7, 8, 8a, 9, 10</code> with no gaps and no out-of-order entries.</li>
+<li>The feature developer's experience is unchanged except for the renumbering and the new (suppressed-in-feature-mode-by-default) plumbing — measured by: a bare <code>/feature-sdlc &lt;idea&gt;</code> run executes the same logical steps as 2.36.0.</li>
+<li><code>/create-skill</code> and <code>/update-skills</code> are removed from the loadable plugin and preserved for reference — measured by: both directories live under <code>archive/skills/</code> with an <code>archive/README.md</code>; the plugin loader no longer exposes them.</li>
+</ul>
+<h3 id="non-goals">Non-Goals (explicit scope cuts)</h3>
+<ul>
+<li>NOT building a multi-skill batch mode for <code>--from-feedback</code> — because the single-skill flow keeps the <code>state.yaml</code>/resume model simple; a <code>/retro</code> touching N skills is run N times.</li>
+<li>NOT keeping <code>/create-skill</code>'s <code>~/.pmos/skill-specs/</code> spec location — because every other pipeline artifact lives in the feature folder and one location is simpler.</li>
+<li>NOT adding a canonical-path-enforcement phase — because "where skills live / how releases work" is host-repo policy that <code>/execute</code> already reads from the repo's <code>CLAUDE.md</code>; baking pmos-toolkit specifics into a generic skill would break it for other repos.</li>
+<li>NOT shipping the "focused / change-scoped eval subset" for <code>--from-feedback</code> in this iteration — because the full-rubric run is correct and simpler; the focused variant is a follow-up.</li>
+<li>NOT renaming <code>/feature-sdlc</code> — because the cost of churning README/manifests/muscle-memory outweighs the naming nicety; a thin <code>/skill-sdlc</code> alias covers discoverability.</li>
+<li>NOT changing how <code>/wireframes</code> or <code>/prototype</code> work — they are simply suppressed in skill-dev modes (skills have no UI).</li>
+<li>NOT auto-applying feedback findings without explicit user approval — the triage keep/drop gate is mandatory.</li>
+</ul>
+</section>
+
+<section id="user-experience-analysis">
+<h2 id="user-experience-analysis">User Experience Analysis</h2>
+<h3 id="motivation">Motivation</h3>
+<ul>
+<li><strong>Job to be done (new skill):</strong> "I keep typing the same prompt / doing the same workflow — turn it into a reliable, well-formed skill and ship it." <strong>Importance:</strong> high for power users; a badly-formed skill silently fails to trigger or bloats context. <strong>Alternatives:</strong> hand-write SKILL.md and hope; use <code>/create-skill</code> (no isolation/resume, checklist-only quality).</li>
+<li><strong>Job to be done (feedback):</strong> "I ran <code>/retro</code> (or jotted notes) and want the real problems fixed in the skill, end-to-end, without losing the audit trail." <strong>Importance:</strong> high — this is how skills improve. <strong>Alternatives:</strong> <code>/update-skills</code> (diverging resume); manual edits (no triage, no verify).</li>
+</ul>
+<h3 id="friction-points">Friction Points</h3>
+<table>
+<thead><tr><th>Friction Point</th><th>Cause</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>"Which command do I use — create-skill, update-skills, or feature-sdlc?"</td><td>Three overlapping entry points</td><td>One entry point (<code>/feature-sdlc skill …</code>) + a discoverable <code>/skill-sdlc</code> alias; old commands archived</td></tr>
+<tr><td>"I have to start over if my session dies mid-skill-build"</td><td>create-skill/update-skills have no resumable state</td><td>Skill-dev runs through <code>/feature-sdlc</code>'s worktree + <code>state.yaml</code> + <code>--resume</code></td></tr>
+<tr><td>"Did my new skill actually come out well, or just look fine?"</td><td>No objective quality bar</td><td>Binary <code>skill-eval.md</code> rubric + TDD-style refine loop that feeds failures back to <code>/execute</code>; <code>/verify</code> re-checks</td></tr>
+<tr><td>"This guidance only makes sense for pmos-toolkit"</td><td>Conventions doc is pmos-specific</td><td><code>skill-patterns.md</code> targets the open SKILLS standard; host-repo policy stays in the host repo's <code>CLAUDE.md</code></td></tr>
+<tr><td>"The feature-sdlc phase numbers don't make sense (no Phase 4 or 6, Phase 12 after 13)"</td><td>Organic accretion</td><td>Linear renumber; optional steps become alphabetic sub-phases</td></tr>
+<tr><td>"The reviewer rewrote my skill in ways I didn't ask for"</td><td>Reviewer agents that edit</td><td>The eval reviewer <strong>scores and reports only</strong>; all edits go back through <code>/execute</code></td></tr>
+</tbody>
+</table>
+<h3 id="satisfaction-signals">Satisfaction Signals</h3>
+<ul>
+<li>The author sees a single, obvious command and a familiar pipeline they already trust from feature work.</li>
+<li>A killed session resumes exactly where it stopped, in an isolated worktree, with no lost work.</li>
+<li>The eval loop reports concrete, checkable failures ("description embeds a step list", "body is 540 lines &gt; 500") and the final skill passes them — the author trusts it will trigger and stay maintainable.</li>
+<li>A skill authored for a non-pmos repo works the same way and the patterns guidance still applies.</li>
+</ul>
+</section>
+
+<section id="solution-direction">
+<h2 id="solution-direction">Solution Direction</h2>
+<p><strong>Fold both skill-authoring skills into <code>/feature-sdlc</code> as a <code>skill</code> subcommand</strong>, archive the originals, add a research-grounded patterns guide + binary eval rubric + a TDD-style refinement sub-phase, ship a thin <code>/skill-sdlc</code> alias, and linearly renumber <code>/feature-sdlc</code>. The pipeline spine (requirements → spec → plan → execute → verify → complete-dev) and the worktree/resume machinery are reused unchanged; a <code>mode</code> switch turns mode-specific phases on/off.</p>
+<p><strong>Modes</strong> (explicit subcommand, per locked decision 2):</p>
+<ul>
+<li><code>/feature-sdlc &lt;idea&gt;</code> → <code>feature</code> mode — today's behavior.</li>
+<li><code>/feature-sdlc skill &lt;description&gt;</code> → <code>skill-new</code> mode.</li>
+<li><code>/feature-sdlc skill --from-feedback &lt;text | path | --from-retro&gt;</code> → <code>skill-feedback</code> mode (single skill per invocation).</li>
+<li><code>/feature-sdlc list</code> → unchanged.</li>
+</ul>
+<p><strong>Target linear phase map</strong> (full detail in <code>00_seed_brief.md</code>; the <code>/spec</code> stage owns the exact prose):</p>
+<pre>0  setup + load learnings + subcommand dispatch        (all)
+0a worktree + slug + branch                             (all)
+0b resume detection — the single resume mechanism       (all)
+0c feedback triage                                      (skill-feedback only)
+0d tier resolve (create-skill matrix → --tier N)        (skill-new, skill-feedback)
+1  initialize state (schema v4 adds `mode`)             (all)
+2  /requirements   (folded /msf-req runs, incl. skill)  (all)
+2a /grill          (Tier 2+, mandatory)                 (all)
+3  enhancement gates (container)
+3a /creativity gate (soft, Recommended=Skip)            (all)
+3b /wireframes gate                                     (feature only; suppressed in skill-dev)
+3c /prototype gate                                      (feature only; suppressed in skill-dev)
+4  /spec           (folded /simulate-spec per its tier) (all)
+5  /plan                                                (all)
+6  /execute        (skill-patterns.md as impl ref)      (all)
+6a skill-eval gate — TDD loop, ≤2 iters, feeds /execute (skill-new, skill-feedback)
+7  /verify         (non-skippable; re-runs skill-eval)  (all)
+8  /complete-dev                                        (all)
+8a /retro gate (soft, Recommended=Skip)                 (all)
+9  final summary                                        (all)
+10 capture learnings                                    (all)
+(compact checkpoint stays a recurring named procedure before 3b/3c/6/7 — not numbered)</pre>
+<p><strong>New / moved files</strong> (target state — the <code>/plan</code> stage sequences the moves):</p>
+<ul>
+<li>NEW <code>feature-sdlc/reference/skill-patterns.md</code> — generic SKILLS-standard authoring guide (frontmatter / description &amp; triggering / structure &amp; progressive disclosure / body &amp; content / scripts). Supersedes <code>/create-skill</code>'s "Conventions" section minus the pmos-specific bits.</li>
+<li>NEW <code>feature-sdlc/reference/skill-eval.md</code> — ~35–40 binary checks, 1:1 with the patterns, each tagged <code>[deterministic]</code> or <code>[llm-judge]</code>, with check / why / how-to-verify / pass-condition; groups skipped when N/A.</li>
+<li>NEW <code>feature-sdlc/tools/skill-eval-check.sh</code> (or <code>.js</code>) — implements the <code>[deterministic]</code> subset (mirrors <code>audit-recommended.sh</code>).</li>
+<li>NEW <code>plugins/pmos-toolkit/skills/skill-sdlc/SKILL.md</code> — thin wrapper forwarding to <code>/feature-sdlc skill …</code>.</li>
+<li>MOVED <code>update-skills/reference/{retro-parser,triage-doc-template,seed-requirements-template}.md</code> → <code>feature-sdlc/reference/</code> (used by Phase 0c + the Phase 2 seed in <code>skill-feedback</code> mode).</li>
+<li>MOVED <code>plugins/pmos-toolkit/skills/create-skill/</code> → <code>archive/skills/create-skill/</code>; <code>…/update-skills/</code> → <code>archive/skills/update-skills/</code>; + <code>archive/README.md</code>.</li>
+<li>DROPPED <code>create-skill/reference/spec-template.md</code> — generic <code>/spec</code> output used; patterns flow in as requirements.</li>
+<li>EDITED <code>feature-sdlc/SKILL.md</code> (subcommand parsing, schema v4, phases 0c/0d/6a, mode-conditioned gates, skill-tier resolver, renumber), <code>feature-sdlc/reference/state-schema.md</code> (schema v4: add <code>mode</code> ∈ {feature, skill-new, skill-feedback}), <code>README.md</code>, both <code>plugin.json</code> (minor bump, kept in sync), this repo's <code>CLAUDE.md</code> (new "skill-authoring conventions" section absorbing the pmos-specific bits removed from the Conventions doc).</li>
+</ul>
+<p><strong>Alternatives considered</strong> (decided against — see Design Decisions): thin front-ends that delegate the spine; absorbing only <code>/create-skill</code>; extracting a <code>_shared/pipeline-spine.md</code> without archiving anything.</p>
+</section>
+
+<section id="user-journeys">
+<h2 id="user-journeys">User Journeys</h2>
+<h3 id="primary-journey-new-skill">Primary Journey — author a new skill</h3>
+<ol>
+<li>Author runs <code>/feature-sdlc skill "a skill that summarizes a PR diff into release notes"</code> from their repo.</li>
+<li>Orchestrator derives a slug, creates a worktree + <code>feat/&lt;slug&gt;</code> branch, writes <code>state.yaml</code> with <code>mode: skill-new</code>, enters the worktree.</li>
+<li>Phase 0d resolves a tier using the create-skill matrix (phase count / <code>reference/</code> files / eval rubric / pipeline integration), surfaces it for confirmation, passes <code>--tier N</code> down.</li>
+<li>Phase 2 <code>/requirements</code> runs with the description + <code>skill-patterns.md</code> as seed; folded <code>/msf-req</code> runs (skills are user-facing).</li>
+<li>Phase 2a <code>/grill</code> (Tier 2+) adversarially reviews the requirements.</li>
+<li>Phase 3a creativity gate offered (Recommended = Skip); 3b/3c wireframes/prototype are not presented (suppressed).</li>
+<li>Phase 4 <code>/spec</code> → Phase 5 <code>/plan</code> → Phase 6 <code>/execute</code> writes the SKILL.md (+ any <code>reference/</code> files), with <code>skill-patterns.md</code> as the implementation reference, honoring the host repo's <code>CLAUDE.md</code> for save location and release policy.</li>
+<li>Phase 6a runs <code>skill-eval-check.sh</code> (deterministic) + a reviewer subagent (LLM-judge) against the written files; the reviewer returns pass/fail per check and, for each fail, a concrete fix note — it makes no edits. Failures are bundled and handed back to <code>/execute</code>; re-score; cap 2 loops; then a structured ask: Accept-as-risk / iterate manually / abort. The loop count + residual checks are recorded in <code>state.yaml</code>.</li>
+<li>Phase 7 <code>/verify</code> (non-skippable) re-runs <code>skill-eval.md</code> as a final idempotent gate and grades the host-repo release prereqs.</li>
+<li>Phase 8 <code>/complete-dev</code> merges, bumps version, regenerates changelog, deploys per repo norms, pushes.</li>
+<li>Phase 8a <code>/retro</code> gate (Recommended = Skip); Phase 9 summary; Phase 10 capture learnings.</li>
+</ol>
+<h3 id="primary-journey-feedback">Primary Journey — apply feedback to an existing skill</h3>
+<ol>
+<li>Author runs <code>/feature-sdlc skill --from-feedback --from-retro</code> (or pastes notes / a file path).</li>
+<li>Orchestrator creates the worktree/branch, writes <code>state.yaml</code> with <code>mode: skill-feedback</code>, enters the worktree.</li>
+<li>Phase 0c parses the input (using <code>retro-parser.md</code> if it's a <code>/retro</code> paste-back), critiques each finding against the current SKILL.md ("already handled?", classify, recommend), and surfaces a keep/drop approval; the result is the approved-change list (an artifact in the feature folder + a <code>state.yaml</code> entry).</li>
+<li>Phase 0d resolves a tier from the size of the approved change set; passes <code>--tier N</code> down.</li>
+<li>Phase 2 <code>/requirements</code> runs with a seed built from the approved findings + current-SKILL.md excerpts + <code>skill-patterns.md</code> (the moved <code>seed-requirements-template.md</code>).</li>
+<li>Phases 2a → 4 → 5 → 6 → 6a → 7 → 8 → 8a → 9 → 10 proceed as in the new-skill journey, targeting the skill being modified.</li>
+</ol>
+<h3 id="primary-journey-feature">Primary Journey — feature development (unchanged)</h3>
+<p>A bare <code>/feature-sdlc &lt;idea&gt;</code> run executes the same logical steps as 2.36.0; the only visible change is the linear phase numbering and the renumbered <code>state.yaml</code> phase ids (with a back-compat migration on resume).</p>
+<h3 id="alternate-journeys">Alternate Journeys</h3>
+<ul>
+<li><strong><code>/skill-sdlc</code> alias:</strong> <code>/skill-sdlc &lt;desc&gt;</code> or <code>/skill-sdlc --from-feedback …</code> forwards verbatim to <code>/feature-sdlc skill …</code>; identical behavior thereafter.</li>
+<li><strong>Resume:</strong> the author re-launches Claude in the worktree and runs <code>/feature-sdlc --resume</code>; the drift check + schema check pass, the status table is shown, and the cursor jumps to the first non-complete phase — regardless of mode.</li>
+<li><strong><code>--no-worktree</code>:</strong> skill-dev modes honor it the same way feature mode does (state lives in the launch cwd, <code>worktree_path: null</code>, drift check bypassed).</li>
+<li><strong>Tier 1 skill:</strong> the create-skill matrix can still resolve Tier 1 (one-shot utility); <code>/grill</code> is then skipped (Tier 2+ only), and the pipeline is shorter — but <code>/verify</code> and the Phase 6a eval gate still run.</li>
+</ul>
+<h3 id="error-journeys">Error Journeys</h3>
+<ul>
+<li><strong>Eval loop exhausts 2 iterations with residual failures:</strong> orchestrator presents Accept-as-risk (residuals logged + handed to <code>/verify</code> as known findings) / keep iterating manually / abort. No silent pass.</li>
+<li><strong>Feedback input has zero actionable findings:</strong> Phase 0c reports "no actionable findings in &lt;input&gt;" and exits cleanly without creating downstream artifacts.</li>
+<li><strong>Resuming a pre-v4 <code>state.yaml</code>:</strong> auto-migrate (add <code>mode</code> defaulting to <code>feature</code>, renumber phase ids, elide removed ids) with a chat log line; never block, never prompt — same contract as the existing v1→v2→v3 migrations.</li>
+<li><strong>A skill-dev run targets a repo whose <code>CLAUDE.md</code> says nothing about where skills go:</strong> <code>/execute</code> falls back to the SKILLS-standard default location (<code>.claude/skills/&lt;name&gt;/</code> or the platform equivalent) and notes the assumption; no hard failure.</li>
+<li><strong>Old command invoked:</strong> a user typing <code>/create-skill</code> or <code>/update-skills</code> after archival gets "unknown skill"; the README + <code>archive/README.md</code> point them at <code>/feature-sdlc skill</code> (acceptable — no shim required).</li>
+</ul>
+<h3 id="empty-states-edge-cases">Empty States &amp; Edge Cases</h3>
+<table>
+<thead><tr><th>Scenario</th><th>Condition</th><th>Expected Behavior</th></tr></thead>
+<tbody>
+<tr><td>No scripts bundled</td><td>Skill has no <code>scripts/</code></td><td>Phase 6a skips the Scripts check group; not a failure</td></tr>
+<tr><td>Skill has no <code>reference/</code> files</td><td>Tier 1 utility</td><td>Progressive-disclosure checks that only apply to reference files are N/A; body-size check still applies</td></tr>
+<tr><td>Source/disagreement in patterns</td><td>e.g. "what+when" vs "when-only" description guidance</td><td><code>skill-patterns.md</code> records the disagreement and the resolved rule rather than picking silently</td></tr>
+<tr><td>Codex-target skill</td><td>Author wants a Codex skill</td><td>Frontmatter checks run against the open-standard required fields; Claude-Code-only fields are not flagged as missing</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="design-decisions">
+<h2 id="design-decisions">Design Decisions</h2>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>D1</td><td>Full merge: <code>/feature-sdlc</code> absorbs both skill-authoring skills; originals archived</td><td>(a) thin front-ends that delegate the spine; (b) absorb only <code>/create-skill</code>; (c) extract <code>_shared/pipeline-spine.md</code> without archiving; (d) full merge</td><td>User chose (d). One entry point, one resume model, one quality bar; the pipeline spine + worktree/resume are exactly what the two skills lacked. (a)/(c) leave duplication or two more skills to maintain; (b) is half a solution.</td></tr>
+<tr><td>D2</td><td>Explicit subcommand for mode selection</td><td>(a) <code>/feature-sdlc skill …</code> / <code>skill --from-feedback …</code>; (b) <code>--skill-dev</code> flag + auto new/feedback; (c) infer from seed text</td><td>User chose (a) — unambiguous and discoverable in the argument-hint; auto-detection is brittle and misclassification sends the run down the wrong pipeline.</td></tr>
+<tr><td>D3</td><td><code>skill-feedback</code> is single-skill per invocation</td><td>(a) one worktree/branch for a multi-skill batch + one <code>/complete-dev</code>; (b) one worktree per skill, N runs; (c) single-skill only</td><td>User chose (c) — the simplest <code>state.yaml</code>/resume model; the multi-skill convenience of today's <code>/update-skills</code> is not worth the structural mismatch with <code>/feature-sdlc</code>'s single-branch design.</td></tr>
+<tr><td>D4</td><td>All skill-dev artifacts use the feature-folder model</td><td>(a) <code>docs/.../features/&lt;date&gt;_&lt;slug&gt;/</code>; (b) keep <code>~/.pmos/skill-specs/</code> for the spec</td><td>User chose (a) — consistent with feature mode and today's <code>/update-skills</code>; one artifact location.</td></tr>
+<tr><td>D5</td><td>Generic skill; host-repo policy lives in the host repo's <code>CLAUDE.md</code></td><td>(a) bake pmos canonical-path / release rules into the skill; (b) keep them out, read <code>CLAUDE.md</code></td><td>User chose (b) — the skill must work for any repo/plugin; <code>/execute</code> already reads <code>CLAUDE.md</code>. This change moves pmos-toolkit's skill-authoring conventions into this repo's <code>CLAUDE.md</code>.</td></tr>
+<tr><td>D6</td><td>Thin <code>/skill-sdlc</code> wrapper; all logic in <code>/feature-sdlc</code></td><td>(a) keep <code>/feature-sdlc</code> name only; (b) rename to <code>/sdlc</code>; (c) keep + add thin <code>/skill-sdlc</code> alias</td><td>User chose (c) — discoverability for skill authoring without churning the established name or duplicating logic.</td></tr>
+<tr><td>D7</td><td>Keep <code>/msf-req</code> in skill-dev modes</td><td>(a) skip it (skills aren't "user-facing"); (b) keep it</td><td>User chose (b) — skills <em>are</em> user-facing; analyzing user motivation/friction applies.</td></tr>
+<tr><td>D8</td><td>Patterns + eval target the open SKILLS standard, not just Claude Code</td><td>(a) Claude-Code-specific; (b) cross-platform with per-platform notes</td><td>User chose (b) — the docs should work for Codex and other compliant agents; Claude Code is primary but not exclusive.</td></tr>
+<tr><td>D9</td><td><code>/grill</code> at Tier 2+ in skill-dev modes</td><td>(a) Tier 3 only (as <code>/create-skill</code> does today); (b) Tier 2+</td><td>User chose (b) — aligns with feature mode; Tier 2 skill changes benefit from adversarial review too.</td></tr>
+<tr><td>D10</td><td>Skill-eval gate is a dedicated post-<code>/execute</code> sub-phase (6a) that feeds failures back to <code>/execute</code>; reviewer scores-and-reports only; <code>/verify</code> re-runs the eval</td><td>(a) sub-phase 6a feeding <code>/execute</code>; (b) inside <code>/execute</code>; (c) inside <code>/verify</code> only</td><td>User chose (a), explicitly: keep <code>/execute</code> as the only writer (TDD discipline — "tests don't fix the code"); run before <code>/verify</code> so <code>/verify</code> sees an already-passing skill; <code>/verify</code> re-checks idempotently so nothing regresses.</td></tr>
+<tr><td>D11</td><td><code>skill-eval.md</code> scoring is hybrid, binary pass/fail per check</td><td>(a) hybrid deterministic + LLM-judge, binary; (b) pure LLM-judge 1–5 per dimension; (c) pure deterministic checklist</td><td>User chose (a) — deterministic checks (sections present, frontmatter shape, body-size, path style) are machine-run via a script; quality judgments (description triggers, no embedded workflow) are LLM-judged; binary results drive the refine loop. Mirrors <code>/polish</code>'s rubric.</td></tr>
+<tr><td>D12</td><td>One resume mechanism: <code>/feature-sdlc</code>'s <code>state.yaml</code> resume for every mode</td><td>(a) reuse <code>/update-skills</code>' triage-doc-header resume for feedback mode; (b) one mechanism</td><td>User chose (b) — the feedback-triage step is just a pipeline phase whose output is an artifact + a <code>state.yaml</code> entry, never a separate resume entry point.</td></tr>
+<tr><td>D13</td><td>Suppress <code>/wireframes</code> and <code>/prototype</code> entirely in skill-dev modes (gate not presented)</td><td>(a) show the gate with Recommended = Skip; (b) suppress the gate</td><td>User chose (b) — skills have no UI; presenting the gate is pure noise.</td></tr>
+<tr><td>D14</td><td>Drop <code>/create-skill</code>'s <code>spec-template.md</code>; patterns flow into <code>/spec</code> as requirements</td><td>(a) keep a skill-aware spec template; (b) use generic <code>/spec</code> output, patterns-as-requirements</td><td>Chose (b) — avoids coupling <code>/spec</code> to skill-authoring specifics; the generic spec plus <code>skill-patterns.md</code>-derived requirements is sufficient.</td></tr>
+<tr><td>D15</td><td>This work is itself a Tier 3 change to <code>/feature-sdlc</code></td><td>n/a</td><td>Pipeline integration, multi-mode behavior, new eval rubric, archival migration → run the full pipeline (<code>/requirements → /grill → /spec → /plan → /execute → /verify → /complete-dev</code>).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="success-metrics">
+<h2 id="success-metrics">Success Metrics</h2>
+<table>
+<thead><tr><th>Metric</th><th>Baseline</th><th>Target</th><th>Measurement</th></tr></thead>
+<tbody>
+<tr><td>Skill-authoring entry points exposed by the plugin</td><td>3 (<code>/feature-sdlc</code>, <code>/create-skill</code>, <code>/update-skills</code>)</td><td>2 (<code>/feature-sdlc</code> + thin <code>/skill-sdlc</code> alias)</td><td><code>plugin.json</code> / loadable-skills listing</td></tr>
+<tr><td>Pipeline implementations to keep in sync</td><td>3</td><td>1</td><td>Code review — only <code>/feature-sdlc</code> contains pipeline-orchestration prose</td></tr>
+<tr><td>Skill-dev runs that are worktree-isolated &amp; resumable</td><td>0%</td><td>100%</td><td>A skill-dev run produces a worktree + <code>state.yaml</code>; <code>--resume</code> works at every phase boundary</td></tr>
+<tr><td>Skill-dev runs scored against the eval rubric before merge</td><td>0% (checklist only)</td><td>100%</td><td><code>state.yaml.phases.skill_eval</code> records pass/fail per check + residual set</td></tr>
+<tr><td>Eval checks with a deterministic implementation</td><td>0</td><td>≥ the <code>[deterministic]</code>-tagged subset of ~35–40 checks</td><td><code>skill-eval-check.sh</code> exists and covers every <code>[deterministic]</code> check</td></tr>
+<tr><td><code>/feature-sdlc</code> phase numbering linearity</td><td>gaps (no 4/6) + out-of-order (12 after 13)</td><td>fully linear with alphabetic sub-phases</td><td>Read the SKILL.md phase headings</td></tr>
+<tr><td>Feature-mode behavior regressions</td><td>n/a</td><td>0</td><td><code>/verify</code> on a feature-mode run; spec-compliance grading</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="research-sources">
+<h2 id="research-sources">Research Sources</h2>
+<table>
+<thead><tr><th>Source</th><th>Type</th><th>Key Takeaway</th></tr></thead>
+<tbody>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md</code> (2.36.0)</td><td>Existing code</td><td>The orchestrator already has worktree + drift-checked resume + v3 state schema + gate plumbing; phase numbering is non-linear and needs cleanup; <code>--minimal</code> and folded-phase patterns exist to reuse.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/create-skill/SKILL.md</code></td><td>Existing code</td><td>Front-half = tiered interview + the "Conventions" knowledge base + canonical-path enforcement + spec at <code>~/.pmos/skill-specs/</code>; runs essentially the same spine; no worktree/resume.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/update-skills/SKILL.md</code></td><td>Existing code</td><td>Front-half = feedback ingestion (<code>retro-parser.md</code>) + per-finding critique + triage doc + multi-skill batching with one <code>/complete-dev</code>; triage-doc-header resume diverges from <code>/feature-sdlc</code>'s.</td></tr>
+<tr><td><code>feature-sdlc/reference/state-schema.md</code></td><td>Existing code</td><td>Schema v1→v2→v3 migration pattern (additive, on-read, chat-logged, atomic temp-then-rename) is the template for the v4 (<code>mode</code> field + renumber) migration.</td></tr>
+<tr><td>Anthropic "Skill authoring best practices" — platform.claude.com/docs</td><td>External</td><td>64/1024-char frontmatter limits; gerund naming; "what + when" descriptions, third person; progressive-disclosure patterns; one-level-deep references; ToC for reference files &gt;100 lines; ≤500-line body; validate→fix→repeat loops; "context window is a public good"; eval-driven development; anti-pattern catalog.</td></tr>
+<tr><td><code>anthropics/skills</code> — skill-creator &amp; doc-coauthoring SKILL.md</td><td>External</td><td>Real frontmatter examples; "pushy" descriptions to combat under-triggering; 20-query trigger-eval methodology; imperative form + "explain the why, avoid all-caps MUSTs"; <code>scripts/</code>/<code>references/</code>/<code>assets/</code> layout; platform-specific notes section.</td></tr>
+<tr><td>Claude Code "Extend Claude with skills" — code.claude.com/docs</td><td>External</td><td>Full frontmatter field reference (<code>when_to_use</code>, <code>argument-hint</code>, <code>arguments</code>, <code>disable-model-invocation</code>, <code>user-invocable</code>, <code>allowed-tools</code>, <code>model</code>, <code>effort</code>, <code>context: fork</code>, <code>agent</code>, <code>paths</code>, <code>hooks</code>, <code>shell</code>); 1,536-char listing cap; content lifecycle; <code>${CLAUDE_SKILL_DIR}</code>; agentskills.io open standard.</td></tr>
+<tr><td>OpenAI Codex "Agent Skills" — developers.openai.com/codex/skills; <code>openai/skills</code> catalog</td><td>External</td><td>Codex <code>SKILL.md</code> requires <code>name</code>+<code>description</code>; <code>agents/openai.yaml</code> sidecar for UI/invocation/tool deps; <code>.agents/skills/</code> search order; ~8,000-char listing budget — front-load the key use case.</td></tr>
+<tr><td><code>obra/superpowers</code> — writing-skills + anthropic-best-practices.md</td><td>External</td><td>Strong dissent: "Description = When to Use, NOT What the Skill Does" (workflow-in-description bug); required body skeleton (Overview / When to Use / Core Pattern / Implementation / Common Mistakes); "one excellent example beats many mediocre"; flowcharts only for non-obvious decisions; "NO SKILL WITHOUT A FAILING TEST FIRST"; verb-first naming.</td></tr>
+<tr><td><code>travisvn/awesome-claude-skills</code>; practitioner writeups (Dunham, Babich, claudeskills.info, claude.com blog)</td><td>External</td><td>Corroborate: concise discovery descriptions, document deps, test across scenarios, peer review, git-tag versioning; "write trigger phrases the way you actually ask for the task, not the way a feature page would describe it".</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">Open Questions</h2>
+<table>
+<thead><tr><th>#</th><th>Question</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Exact <code>state.yaml</code> phase-id renaming map and the v3→v4 migration steps (which old ids elide, which rename) — to be pinned in <code>/spec</code> against <code>state-schema.md</code>.</td></tr>
+<tr><td>2</td><td>Whether Phase 0d's tier resolver lives in <code>/feature-sdlc</code> verbatim or is extracted to a <code>reference/skill-tier-matrix.md</code> shared with the (archived-for-reference) <code>/create-skill</code> — <code>/spec</code> decides.</td></tr>
+<tr><td>3</td><td>Whether <code>skill-eval-check.sh</code> is bash or node — <code>/spec</code>/<code>/plan</code> decide based on what the existing <code>tools/</code> scripts use (<code>audit-recommended.sh</code> is bash; html-authoring tools are node).</td></tr>
+<tr><td>4</td><td>Whether the <code>/skill-sdlc</code> wrapper gets its own <code>~/.pmos/learnings.md</code> section or rides on <code>/feature-sdlc</code>'s — minor; <code>/spec</code> decides.</td></tr>
+<tr><td>5</td><td>Whether <code>00_seed_brief.md</code> should be committed into the feature folder as a permanent artifact or treated as scratch — leaning "commit it" since it records the locked decisions; confirm at <code>/complete-dev</code>.</td></tr>
+</tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/01_requirements.html</span>
+  </footer>
+</body>
+</html>

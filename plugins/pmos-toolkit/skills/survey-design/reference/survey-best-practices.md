@@ -6,9 +6,66 @@ Companion files: `question-antipatterns.md` (the catalog the generator must avoi
 
 ---
 
+## Product fit (evaluate this first)
+
+Methodology hygiene (wording, scales, order, accessibility, ethics) is necessary but not sufficient. A question can be methodologically immaculate and still be *useless* — it produces an answer everyone could have predicted, or it doesn't move the needle on the stated research goal, or it's framed wider/narrower than the thing actually being researched. PMs lead with these checks; so does the Phase-4 reviewer (it evaluates **every** question against the three binary checks below **before** it walks the methodology / anti-pattern catalog), and the Phase-3 generator self-checks against them before committing `survey.json`.
+
+All checks are **binary** (PASS / FAIL) and **contextual to `purpose` and `audience`** — there is no abstract "good question", only "load-bearing for *this* research goal, for *this* audience".
+
+**1. Predictability check — "is the answer a foregone conclusion?"**
+- *Closed-ended* (`single_select`, `multi_select`, `forced_choice_grid`, `rating`, `nps`, `dichotomous`, `ranking`, `matrix`): write a one-line **predicted answer distribution** for the stated audience (e.g. "≈70% will pick 'price', ≈20% 'missing integration', the rest scattered"). **FAIL** iff one or two options would plausibly absorb ≳80% of responses — the question won't discriminate, you already know the answer. The written prediction is the evidence; a verdict with no prediction is not a verdict.
+- *Open-ended* (`open_short`, `open_long`, `multi_field_open` field): a yes/no on whether **multiple distinct high-signal answers** are realistically expected from this audience. **FAIL** iff it collapses to one or two predictable themes ("everyone will say 'the analytics team'", "everyone will say 'it was too expensive'") — then it's a closed question wearing an open coat; either make it closed (and re-run check 1) or cut it.
+
+**2. Load-bearing check — "does this question earn its place?"** **FAIL** iff dropping the question would not change what the author learns *relative to `purpose`*. Decorative demographics, "nice to know" items, questions that re-ask something an earlier item already answered, questions whose answer can't act on anything — all FAIL. (A question can pass check 1 — genuinely unpredictable answers — and still FAIL this one if the unpredictable answer is irrelevant to the goal.)
+
+**3. Scope-match check — "is the framing the right size?"** **FAIL** iff the question is framed **broader** than the actual scope implied by `purpose`/`audience` (asking about "your experience with our product" when the research is about one onboarding step) **or narrower** (asking only about feature X's pricing when the research is about churn drivers generally). The frame should match the thing being researched — not the whole product, not one pixel of it.
+
+**Survey-wide: research-goal coverage.** Beyond the per-question checks, the reviewer also asks of the question *set*: does it actually answer `purpose`? — **coverage gaps** (a dimension of the goal no question touches), **redundancy** (two+ questions that yield the same signal), **scope drift** (the set as a whole has wandered off the stated goal). These land in the `survey-eval.md` "Research-goal coverage / product fit" section, not the per-question file.
+
+### Worked examples
+
+**FAIL — predictability (closed wearing an open coat).** `purpose`: "Understand why trial users who hit a wall didn't upgrade." Draft question: *open_long* — "When you hit a wall during the trial, who did you reach out to?" Audience: solo-and-small-team trial users. Predicted distribution: "≈85% 'the analytics team' (it's the obvious internal owner), ≈10% 'nobody', the rest scattered." → **FAIL check 1** (open-ended collapses to one theme). It also FAILs check 2 — even if you got the answer, "who they asked" doesn't tell you *why the wall blocked the upgrade*. Disposition: cut it, or replace with "What was the wall?" (open) + "What would have gotten you past it?" (open) — both unpredictable and load-bearing.
+
+**PASS.** Same `purpose`. Draft question: *single_select* — "What was the main thing that stopped you from upgrading?" options `{price · missing capability · still evaluating · solved it another way · changed priorities · other}` + opt-out. Predicted distribution: "genuinely spread — price and 'missing capability' likely lead but neither dominates past ~40%; 'still evaluating' is a real chunk." → **PASS check 1** (discriminates). **PASS check 2** (the answer routes the follow-up and is directly the research goal). **PASS check 3** (framed at exactly the churn-driver level the research is about). Keep it; pair with an open "tell us more about that" follow-up.
+
+---
+
+## Scoring rubric (0–100, informational)
+
+The Phase-4 reviewer also computes a single 0–100 composite as a **progress signal** for the refinement loop — it lets the loop and the user see "did iteration 2 actually improve things" at a glance. **It never gates the loop.** Loop exit is *categorical*: zero product-fit FAILs **and** zero blocker-severity methodology findings, **or** the 2-iteration cap — the composite score is reported alongside but is not a threshold.
+
+**Eight dimensions, weights sum to 100:**
+
+| Dimension | Weight | What it scores |
+|---|---|---|
+| product-fit | **30** | the three binary checks above + the survey-wide coverage check (a single product-fit FAIL is a large deduction here) |
+| structure / funnel | **15** | general→specific order, screening first, demographics last, signposting, no clustered hard items |
+| length vs. budget | **10** | `estimated_minutes` vs. `time_budget_min`; question count vs. `max_questions` |
+| mode fit | **10** | type mix matches `mode` (generative→open-heavy, evaluative→closed-comparable) |
+| scale balance | **10** | balanced scales, labeled poles/midpoint, separate opt-out, construct-specific (not agree/disagree) |
+| accessibility | **10** | label-adjacent controls, text progress, no color-only meaning, mobile-first, keyboard/SR |
+| ethics / PII | **10** | consent before collection, anonymous≠confidential honesty, PII minimization, opt-outs on sensitive items |
+| intro / consent | **5** | sponsor/purpose/accurate-time/what's-collected/voluntary + the persuasive WIIFM line (see §1 intro guidance) |
+
+**Per-dimension deduction sizes** (applied to that dimension's sub-score, before weighting):
+
+| Finding severity in a dimension | Deduction off that dimension |
+|---|---|
+| `blocker` | −60% (large) |
+| `should-fix` | −25% (medium) |
+| `nit` | −8% (small) |
+
+Multiple findings in one dimension compound multiplicatively (`(1−d₁)(1−d₂)…`), floored at 0. A product-fit FAIL on any question counts as a `blocker` for the product-fit dimension.
+
+**Composite formula:** `composite = round( Σ over dimensions [ weight_d × (1 − total_deduction_d) ] )`. Example: a survey with one product-fit FAIL (product-fit dim → 30 × 0.40 = 12), one `should-fix` scale issue (scale-balance → 10 × 0.75 = 7.5), everything else clean → composite = 12 + 15 + 10 + 10 + 7.5 + 10 + 10 + 5 ≈ **80**. The number is informational only — the loop keeps going because there's a product-fit FAIL, not because 80 < some bar; it would stop at the same 80 if that FAIL were instead, say, a coverage gap the user accepted.
+
+---
+
 ## 1. Survey structure & flow
 
 **Intro / consent screen.** State sponsor, purpose, an *accurate* completion-time estimate, what's collected / how it's used / how it's stored, whether responses are anonymous or merely confidential (do not conflate — see §11), that participation is voluntary and can be stopped, and a contact. For research, require an affirmative consent action before any data is collected.
+
+**Persuasive respondent-motivation (WIIFM) line — required.** The generated `intro.text` MUST include one sentence that gives the respondent a concrete reason to spend the time — *what changes as a result of their answers*, framed for *this* audience, and kept **honest**: no fake scarcity ("only 10 spots!"), no fake urgency, no overclaiming impact you can't deliver. When `survey.json :: intro.response_impact` is stated (the Phase-2 intake variable — "what happens to the responses / what does the audience get out of it"), build the WIIFM sentence from it ("your answers decide which onboarding gaps we fix first this quarter"). When `response_impact` is `null`, the WIIFM sentence is a *benefit-framed restatement of `purpose`* ("we're figuring out which gaps actually block people like you") and MUST NOT assert a downstream action that wasn't stated. A bare "your answers help us improve" is not a WIIFM line — it's the absence of one; the Phase-4 reviewer's intro/consent dimension flags that absence as a `should-fix` finding.
 
 **Funnel order: general → specific.** Specific items prime general ones (contrast effect — Pew: asking presidential approval before "satisfaction with the country" pushed the dissatisfied share 78% → 88%). Warm up with easy, interesting, low-effort, non-sensitive items. A common Pew pattern: an open "most important problem" question before the related closed items. Narrow as you go.
 

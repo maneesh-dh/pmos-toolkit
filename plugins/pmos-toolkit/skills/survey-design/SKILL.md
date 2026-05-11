@@ -147,6 +147,7 @@ Infer the design variables from the brief / existing survey / conversation:
 - `time_budget_min` — target completion minutes; if the brief gives a range, take the **upper** bound; default ~5 min for a general audience.
 - `mode` — `generative` (understand / discover, open-ended-heavy), `evaluative` (validate / measure, closed-ended-heavy), or `hybrid` (a generative section then an evaluative section).
 - `max_questions` — an optional hard cap on the question count; default: no cap.
+- `response_impact` — what happens to the responses / what the audience gets out of answering (e.g. "decides which onboarding gaps we fix first this quarter"). Inferred from the brief if it says so; otherwise asked once (see below); if the author skips it, `response_impact: null`. It feeds the persuasive WIIFM line in `intro.text` (Phase 3.4) and travels in the Phase-4 reviewer context.
 
 Present what you inferred back to the user. For each variable that is **not** confidently inferable, ask via a single batched `AskUserQuestion` (one question per missing variable, at most 4 in the call):
 - `mode` — options: `Hybrid — understand and validate (Recommended)`, `Generative — understand / discover`, `Evaluative — validate / measure`.
@@ -155,10 +156,12 @@ Present what you inferred back to the user. For each variable that is **not** co
 - `audience` — no recommended default; this question, if it must be asked, is the one free-form gate.
 <!-- defer-only: free-form -->
 If the audience is still unclear after the inferences above, ask it on its own via `AskUserQuestion` (free-form answer; no auto-pickable default).
+<!-- defer-only: free-form -->
+If `response_impact` wasn't stated in the brief, ask it on its own via `AskUserQuestion` (free-form answer; no auto-pickable default — "what happens to these answers / what does your audience get out of it?"). If the author has nothing to say, set `response_impact: null` and proceed (the WIIFM line then falls back to a benefit-framed restatement of `purpose`).
 
 **Hard stop:** if the user cannot articulate a research goal / purpose even after asking, state plainly that a survey can't be designed without one, and stop — do not guess a purpose (E2, FR-14).
 
-Record the resolved `{purpose, audience, time_budget_min, mode, max_questions}` — they go into `survey.json` and into the Phase-4 / Phase-6 subagent prompts.
+Record the resolved `{purpose, audience, time_budget_min, mode, max_questions, response_impact}` — they go into `survey.json` and into the Phase-4 / Phase-6 subagent prompts.
 
 ---
 
@@ -168,7 +171,7 @@ Record the resolved `{purpose, audience, time_budget_min, mode, max_questions}` 
 
 ```json
 {
-  "schema_version": 1,                         // (req) int
+  "schema_version": 2,                         // (req) int
   "title": "Trial conversion — exit survey",   // (req) string
   "purpose": "Understand why recent trial users did not upgrade.",  // (req) string — the research goal
   "mode": "generative",                        // (req) "generative" | "evaluative" | "hybrid"
@@ -177,7 +180,8 @@ Record the resolved `{purpose, audience, time_budget_min, mode, max_questions}` 
   "estimated_minutes": 2.7,                    // (req) number — the skill's estimate (time constants below)
   "max_questions": null,                       // int | null
   "intro": {                                   // (req)
-    "text": "Thanks for trying <Product>. A few quick questions — about 3 minutes. Your answers are confidential and help us improve.",  // (req) string
+    "text": "Thanks for trying <Product>. We're figuring out which gaps actually block people who try a paid plan — your answers (about 3 minutes) decide which ones we fix first this quarter. Responses are confidential.",  // (req) string — MUST carry a persuasive, honest WIIFM sentence (Phase 3.4)
+    "response_impact": "decides which trial-blocking gaps we fix first this quarter",  // string | null — the Phase-2 intake variable; null when the author didn't state it
     "consent_required": false,                 // bool — if true, an explicit "I agree" gate precedes Q1
     "anonymous": false,                        // bool — MUST be false if any PII question exists
     "estimated_seconds": 15,                   // number
@@ -194,6 +198,8 @@ Record the resolved `{purpose, audience, time_budget_min, mode, max_questions}` 
   ]
 }
 ```
+
+**Schema version & migration.** Current `schema_version` is `2`. A `schema_version: 1` `survey.json` (or one parsed from an existing-survey file) is still valid **input** — the skill reads it, then writes `schema_version: 2` on the next re-derive. v2 **removes no v1 field**; the only additions over v1 are `intro.response_impact` (here in §3.1) and the `multi_field_open` question type (added to the §3.2 `type` enum, with a `fields[]` array — see §3.2/§3.3).
 
 ### 3.2 The question object
 
@@ -240,7 +246,7 @@ Per-question seconds: `open_short` / `open_long` = 30; `single_select` / `multi_
 ### 3.4 Build `survey.json`
 
 Apply `reference/survey-best-practices.md` (load it now):
-- An **intro/consent block** (sponsor, purpose, accurate time estimate, what's collected / how used, anonymous vs. confidential stated honestly, voluntary; `consent_required: true` for research contexts).
+- An **intro/consent block** (sponsor, purpose, accurate time estimate, what's collected / how used, anonymous vs. confidential stated honestly, voluntary; `consent_required: true` for research contexts). `intro.text` **MUST include a persuasive respondent-motivation / WIIFM sentence** — concrete impact of their answers, audience-specific framing, kept honest (no fake scarcity, no fake urgency, no overclaiming): built from `response_impact` when non-null, else a benefit-framed restatement of `purpose` with no invented downstream-action claim. (See `reference/survey-best-practices.md` §1 "Persuasive respondent-motivation (WIIFM) line — required"; a bare "your answers help us improve" is the absence of one and the Phase-4 reviewer's intro/consent dimension flags it `should-fix`.)
 - **Sections in funnel order** (general → specific). **Screening / qualifying questions first** (mark `screening: true`); wire their `skip_logic` to bypass downstream sections for non-qualifiers. **Demographics / sensitive items last** (unless used for routing). Warm-up: an easy, non-sensitive item early. Signpost section transitions via `description` and/or `statement` items.
 - **Mode-appropriate type mix:** `generative` → mostly `open_long` / `open_short` + a few broad closed items; `evaluative` → mostly closed/comparable (`single_select`, `rating`, `nps`, `forced_choice_grid`); `hybrid` → a generative section ("what happened, in your own words") then an evaluative section ("structured read on the usual suspects"). Always end with an optional open catch-all ("Anything else?").
 - **Scales:** balanced, poles (and midpoint on odd scales) labeled, a separate visually-offset opt-out (`opt_out_options`); construct-specific labels (never agree/disagree); 5-point default, 7-point for nuanced/employee research. For every `nps` question, add an `open_short` follow-up ("What's the main reason for your score?").

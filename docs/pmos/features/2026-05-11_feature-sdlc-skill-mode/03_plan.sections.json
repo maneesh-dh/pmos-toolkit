@@ -1,0 +1,15 @@
+{
+  "doc": "03_plan.html",
+  "title": "Skill development via /feature-sdlc — Implementation Plan",
+  "ids": [
+    "overview",
+    "decision-log",
+    "code-study-notes",
+    "prerequisites",
+    "file-map",
+    "risks",
+    "rollback",
+    "tasks",
+    "review-log"
+  ]
+}

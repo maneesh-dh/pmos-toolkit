@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Skill development via /feature-sdlc — Spec</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.36.0">
+  <script defer src="assets/viewer.js?v=2.36.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Skill development via /feature-sdlc — Spec</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>tier:</strong> 3 · <strong>type:</strong> feature · <strong>feature:</strong> feature-sdlc-skill-mode · <strong>date:</strong> 2026-05-11 · <strong>status:</strong> Ready for Plan · <strong>requirements:</strong> <code>docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/01_requirements.html</code></p>
+<p><em>Source-of-truth inputs: <code>01_requirements.html</code> (D1–D15, G1–G15; D3 revised at grill → skill-feedback is multi-skill), <code>00_seed_brief.md</code> (target phase map, file-move plan, patterns/eval outlines), <code>msf-findings.html</code> (8 recs). This spec turns G1–G15 + the four carried Open Questions into FRs, owns the <code>skill-eval.md</code> check list (§10), and resolves OQ1–OQ3 (see Decision Log D17–D19).</em></p>
+
+<section id="problem-statement">
+<h2 id="problem-statement">1. Problem Statement</h2>
+<p>The pmos-toolkit ships three skills that each re-implement the same SDLC spine (<code>requirements → spec → plan → execute → verify → complete-dev</code>): <code>/feature-sdlc</code>, <code>/create-skill</code>, <code>/update-skills</code>. Only <code>/feature-sdlc</code> has git-worktree isolation and a resumable <code>state.yaml</code>; the two skill-authoring skills lack both, have drifted from each other, and must be hand-synced. Skill quality is governed only by a prose "Conventions" checklist inside <code>/create-skill</code> — no scoring, no refinement loop, and pmos-toolkit-specific so it doesn't help authors targeting their own repos under the open SKILLS standard. <strong>Primary success metric:</strong> skill-authoring entry points drop from 3 → 2 (<code>/feature-sdlc</code> + thin <code>/skill-sdlc</code> alias) and pipeline implementations to keep in sync drop from 3 → 1, with every skill-dev run worktree-isolated, resumable, and scored against a binary eval rubric before merge.</p>
+</section>
+
+<section id="goals">
+<h2 id="goals">2. Goals</h2>
+<table>
+<thead><tr><th>#</th><th>Goal</th><th>Success Metric</th></tr></thead>
+<tbody>
+<tr><td>G1</td><td>One orchestrator takes a new skill from idea to merged-and-released</td><td><code>/feature-sdlc skill &lt;desc&gt;</code> produces a worktree + <code>state.yaml</code> (<code>pipeline_mode: skill-new</code>) and survives a session restart at any phase boundary via <code>--resume</code></td></tr>
+<tr><td>G2</td><td>The same orchestrator applies feedback to one or more existing skills in a single combined run</td><td><code>/feature-sdlc skill --from-feedback &lt;input&gt;</code> triages with explicit keep/drop approval, then runs one combined requirements→spec→plan→execute→6a→verify→complete-dev cycle across all approved skills (D3-revised / G10)</td></tr>
+<tr><td>G3</td><td>Every skill produced/modified in skill-dev mode is scored against a binary eval rubric and refined until pass (or residuals knowingly accepted)</td><td><code>state.yaml.phases.skill-eval.skill_eval</code> records pass/fail per check + the residual set</td></tr>
+<tr><td>G4</td><td>Patterns guide + eval rubric are portable across the SKILLS standard</td><td>No check or instruction is Claude-Code-only where a portable phrasing exists; platform specifics are labelled; <code>skill-eval-check.sh --target generic</code> runs the intersection only</td></tr>
+<tr><td>G5</td><td><code>/feature-sdlc</code>'s phases are linearly numbered</td><td>Phase headings read <code>0, 0a, 0b, 0c, 0d, 1, 2, 2a, 3, 3a, 3b, 3c, 4, 5, 6, 6a, 7, 8, 8a, 9, 10</code> — no gaps, in order</td></tr>
+<tr><td>G6</td><td>Feature-mode behavior is unchanged except for the renumber</td><td><code>state.yaml</code> diff vs. a 2.36.0 run is exactly <code>schema_version: 4</code> + <code>pipeline_mode: feature</code>; executed logical steps identical; <code>/verify</code> spec-compliance grading on a feature run = 0 regressions</td></tr>
+<tr><td>G7</td><td><code>/create-skill</code> and <code>/update-skills</code> are removed from the loadable plugin and preserved for reference</td><td>Both dirs under <code>archive/skills/</code> with <code>archive/README.md</code>; <code>ls plugins/pmos-toolkit/skills/</code> shows neither</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="non-goals">
+<h2 id="non-goals">3. Non-Goals</h2>
+<ul>
+<li><strong>NOT</strong> keeping <code>/create-skill</code>'s <code>~/.pmos/skill-specs/</code> location — every artifact lives in the feature folder.</li>
+<li><strong>NOT</strong> allowing multiple <em>new</em> skills in one run — <code>skill-new</code> is one skill per invocation; only <code>skill-feedback</code> is multi-skill (G11).</li>
+<li><strong>NOT</strong> adding a canonical-path-enforcement phase — that's host-repo policy (<code>/execute</code> reads the repo's <code>CLAUDE.md</code>); baking pmos specifics into a generic skill breaks it elsewhere.</li>
+<li><strong>NOT</strong> shipping the focused/change-scoped eval subset for <code>--from-feedback</code> this iteration — full-rubric run is correct and simpler; focused variant is a follow-up.</li>
+<li><strong>NOT</strong> renaming <code>/feature-sdlc</code> — a thin <code>/skill-sdlc</code> alias covers discoverability.</li>
+<li><strong>NOT</strong> changing how <code>/wireframes</code>/<code>/prototype</code> work — simply suppressed in skill-dev modes (no UI).</li>
+<li><strong>NOT</strong> auto-applying feedback findings without explicit approval — the triage keep/drop gate is mandatory.</li>
+<li><strong>NOT</strong> hardening <code>/complete-dev</code> for arbitrary repos — Phase 8 in skill-dev delegates wholly to it and accepts its graceful degradation (G12).</li>
+<li><strong>NOT</strong> a runtime feature flag — this is a structural change; <code>/feature-sdlc skill</code> simply does not exist until the release lands.</li>
+</ul>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log">4. Decision Log</h2>
+<p>D1–D15 are carried verbatim from <code>01_requirements.html §Design Decisions</code> (full rationale there); summarised here for traceability. D16–D22 are decided at this <code>/spec</code> stage.</p>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>D1</td><td>Full merge: <code>/feature-sdlc</code> absorbs both skill-authoring skills; originals archived</td><td>(a) thin front-ends delegating the spine; (b) absorb only <code>/create-skill</code>; (c) extract <code>_shared/pipeline-spine.md</code>; (d) full merge</td><td>User chose (d) — one entry point, one resume model, one quality bar.</td></tr>
+<tr><td>D2</td><td>Explicit subcommand for mode selection (<code>skill</code> / <code>skill --from-feedback</code>)</td><td>(a) subcommand; (b) <code>--skill-dev</code> flag + auto new/feedback; (c) infer from seed text</td><td>User chose (a) — unambiguous, discoverable; auto-detection misclassifies.</td></tr>
+<tr><td>D3 <em>(revised at grill — G10)</em></td><td><code>skill-feedback</code> is multi-skill: one combined req→spec→plan→execute→6a→verify→complete-dev per run across all approved skills</td><td>(a) one branch + one <code>/complete-dev</code> for the batch; (b) one worktree per skill, N runs; (c) single-skill only</td><td>Originally (c); revised to (a) — old <code>/update-skills</code> batched per skill, and the combined-doc / single-<code>/complete-dev</code> model fits the single-branch design (one version bump, one changelog entry, N edited SKILL.md files). <code>skill-new</code> stays one-skill (G11).</td></tr>
+<tr><td>D4</td><td>All skill-dev artifacts use the feature-folder model</td><td>(a) <code>docs/.../features/&lt;date&gt;_&lt;slug&gt;/</code>; (b) keep <code>~/.pmos/skill-specs/</code></td><td>User chose (a) — one artifact location.</td></tr>
+<tr><td>D5</td><td>Generic skill; host-repo policy lives in the host repo's <code>CLAUDE.md</code></td><td>(a) bake pmos rules into the skill; (b) read <code>CLAUDE.md</code></td><td>User chose (b) — works for any repo; pmos skill-authoring conventions move to this repo's <code>CLAUDE.md</code> (FR-90).</td></tr>
+<tr><td>D6</td><td>Thin <code>/skill-sdlc</code> wrapper; all logic in <code>/feature-sdlc</code></td><td>(a) keep name only; (b) rename to <code>/sdlc</code>; (c) keep + thin <code>/skill-sdlc</code> alias</td><td>User chose (c).</td></tr>
+<tr><td>D7</td><td>Keep folded <code>/msf-req</code> in skill-dev modes</td><td>(a) skip; (b) keep</td><td>User chose (b) — skills are user-facing.</td></tr>
+<tr><td>D8</td><td>Patterns + eval target the open SKILLS standard, not just Claude Code</td><td>(a) CC-specific; (b) cross-platform with per-platform notes</td><td>User chose (b) — Claude Code primary, not exclusive.</td></tr>
+<tr><td>D9</td><td><code>/grill</code> at Tier 2+ in skill-dev modes</td><td>(a) Tier 3 only; (b) Tier 2+</td><td>User chose (b) — aligns with feature mode.</td></tr>
+<tr><td>D10</td><td>Skill-eval gate is a dedicated post-<code>/execute</code> sub-phase (6a) that feeds failures back to <code>/execute</code>; reviewer scores-and-reports only; <code>/verify</code> re-runs the eval</td><td>(a) 6a feeding <code>/execute</code>; (b) inside <code>/execute</code>; (c) inside <code>/verify</code> only</td><td>User chose (a) — keep <code>/execute</code> as the only writer (TDD discipline); run before <code>/verify</code> so <code>/verify</code> sees an already-passing skill and re-checks idempotently.</td></tr>
+<tr><td>D11</td><td><code>skill-eval.md</code> scoring is hybrid (deterministic + LLM-judge), binary pass/fail per check</td><td>(a) hybrid binary; (b) pure LLM-judge 1–5; (c) pure deterministic checklist</td><td>User chose (a) — mirrors <code>/polish</code>'s rubric; binary drives the refine loop.</td></tr>
+<tr><td>D12</td><td>One resume mechanism: <code>/feature-sdlc</code>'s <code>state.yaml</code> resume for every mode</td><td>(a) reuse <code>/update-skills</code>' triage-doc-header resume for feedback; (b) one mechanism</td><td>User chose (b) — feedback-triage is just a pipeline phase with an artifact + a <code>state.yaml</code> entry.</td></tr>
+<tr><td>D13</td><td>Suppress <code>/wireframes</code> + <code>/prototype</code> entirely in skill-dev modes (gate not presented)</td><td>(a) show gate with Recommended = Skip; (b) suppress</td><td>User chose (b) — skills have no UI.</td></tr>
+<tr><td>D14</td><td>Drop <code>/create-skill</code>'s <code>spec-template.md</code>; <code>skill-patterns.md</code> is one standing constraints reference cited (not copied) at every stage</td><td>(a) keep a skill-aware spec template; (b) generic <code>/spec</code> + one patterns reference cited at requirements/spec/execute/verify</td><td>Chose (b) — avoids coupling <code>/spec</code> to skill-authoring; per G6, <code>skill-patterns.md</code> is one file in three roles.</td></tr>
+<tr><td>D15</td><td>This work is itself a Tier 3 change to <code>/feature-sdlc</code></td><td>n/a</td><td>Pipeline integration + multi-mode + new eval rubric + archival migration → full pipeline.</td></tr>
+<tr><td>D16</td><td>The schema-v4 mode field is named <code>pipeline_mode</code> (not <code>mode</code>)</td><td>(a) <code>mode</code> (as G5 wording suggested); (b) <code>pipeline_mode</code>; (c) <code>run_kind</code></td><td><code>state.yaml</code> already has a top-level <code>mode ∈ {interactive, non-interactive}</code> — a naming collision G5 didn't catch. Chose (b): the new field is <code>pipeline_mode ∈ {feature, skill-new, skill-feedback}</code>, default <code>feature</code> on read of a v3 file. (c) was rejected as less self-evident.</td></tr>
+<tr><td>D17</td><td>Phase 0d's three resolvers are extracted to two reference files</td><td>(a) extract to <code>reference/skill-tier-matrix.md</code> + <code>reference/repo-shape-detection.md</code>; (b) inline in SKILL.md; (c) one combined file</td><td>Resolves OQ1. Chose (a) — keeps the already-large meta-skill body bounded (NFR-06); matches how <code>compact-checkpoint.md</code>/<code>failure-dialog.md</code>/<code>frontend-detection.md</code> are factored out. <code>repo-shape-detection.md</code> is shared by the skill-location and target_platform resolvers; <code>skill-tier-matrix.md</code> holds the create-skill tier matrix. (c) couples unrelated logic.</td></tr>
+<tr><td>D18</td><td><code>skill-eval-check.sh</code> is bash</td><td>(a) bash; (b) node</td><td>Resolves OQ2. Chose (a) — mirrors <code>tools/audit-recommended.sh</code>; the <code>[deterministic]</code> checks are all <code>grep</code>/<code>awk</code>/<code>wc</code>/<code>sed</code>-able; no Node runtime dependency. The Node tools under <code>_shared/html-authoring/assets/</code> exist for real HTML/Markdown parsing (turndown), which a lint script doesn't need. File: <code>feature-sdlc/tools/skill-eval-check.sh</code> (new <code>tools/</code> dir under the skill).</td></tr>
+<tr><td>D19</td><td><code>/skill-sdlc</code> rides on <code>/feature-sdlc</code>'s learnings section</td><td>(a) rides on <code>/feature-sdlc</code>'s; (b) own <code>## /skill-sdlc</code> section</td><td>Resolves OQ3. Chose (a) — all skill-dev logic lives in <code>/feature-sdlc</code>; its Phase 10 capture-learnings reflects on skill-dev runs. The alias runs no logic — no learnings-load line, no <code>## /skill-sdlc</code> section in <code>~/.pmos/learnings.md</code>.</td></tr>
+<tr><td>D20</td><td>Diagrams in this spec are ASCII flow diagrams, not <code>/diagram</code>-rendered SVG</td><td>(a) dispatch <code>/pmos-toolkit:diagram</code> per diagram; (b) ASCII inline (template-permitted)</td><td>Chose (b) — the "architecture" here is pipeline-phase control flow, not a system topology that benefits from a rendered SVG; the Tier-3 template explicitly permits "ASCII or Mermaid diagram". The <code>/diagram</code> subagent + retry-loop + 30-min cap machinery is disproportionate for a phase flowchart in a prose-heavy meta-spec. If a reviewer disagrees, escalate at Phase 6.</td></tr>
+<tr><td>D21</td><td><code>state.yaml.phases[]</code> membership is mode-conditional (not always-present-but-skipped)</td><td>(a) all phase ids always present, skill-dev-only ones <code>skipped</code> in feature mode; (b) feature mode = 2.36.0 set, skill modes = extended sets</td><td>Chose (b) — keeps feature-mode state clean and makes the v3→v4 migration a pure additive bump (no phases[] retrofit). The resume cursor scans whatever <code>phases[]</code> contains, so it's mode-agnostic. Skill-new = 2.36.0 set − <code>{wireframes, prototype}</code> + <code>{skill-tier-resolve, skill-eval}</code>; skill-feedback = skill-new's set + <code>{feedback-triage}</code>.</td></tr>
+<tr><td>D22</td><td>New-phase hardness: <code>feedback-triage</code> = <strong>hard</strong>, <code>skill-tier-resolve</code> = <strong>infra</strong>, <code>skill-eval</code> = <strong>hard</strong></td><td>n/a</td><td><code>feedback-triage</code>: its only clean exit is "no actionable findings"; the approval gate is mandatory → hard. <code>skill-tier-resolve</code>: a setup/detection phase like <code>worktree</code>/<code>init-state</code> → infra. <code>skill-eval</code>: a non-skippable quality gate (accept-as-risk is a documented exit, not a skip), peer of <code>verify</code> → hard.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="personas-journeys">
+<h2 id="personas-journeys">5. User Personas &amp; Journeys</h2>
+<p>Personas and journeys are fully developed in <code>01_requirements.html §User Experience Analysis</code> and <code>§User Journeys</code>. Recap of the three primary actors and the control-flow each follows:</p>
+
+<h3 id="persona-skill-author-new">5.1 Skill author — new skill (primary)</h3>
+<p><code>/feature-sdlc skill "&lt;description&gt;"</code> → slug + worktree + <code>feat/&lt;slug&gt;</code> + <code>state.yaml(pipeline_mode: skill-new)</code> → <strong>Phase 0d</strong> (one repo-shape pass → tier / skill-location / target_platform, confirmed once) → <strong>Phase 2</strong> <code>/requirements</code> (+ folded <code>/msf-req</code>; <code>skill-patterns.md</code> cited as acceptance criteria) → <strong>2a</strong> <code>/grill</code> (Tier 2+) → <strong>3a</strong> creativity gate (Recommended Skip); 3b/3c not presented → <strong>4</strong> <code>/spec</code> → <strong>5</strong> <code>/plan</code> → <em>[compact checkpoint]</em> → <strong>6</strong> <code>/execute</code> (writes SKILL.md + any <code>reference/</code> files; <code>skill-patterns.md</code> as implementation reference; honours host <code>CLAUDE.md</code>) → <strong>6a</strong> skill-eval TDD loop → <em>[compact checkpoint]</em> → <strong>7</strong> <code>/verify</code> (non-skippable; re-runs <code>skill-eval.md</code>) → <strong>8</strong> <code>/complete-dev</code> → <strong>8a</strong> <code>/retro</code> gate (Recommended Skip) → <strong>9</strong> summary → <strong>10</strong> capture learnings.</p>
+
+<h3 id="persona-skill-author-feedback">5.2 Skill author — feedback to one or more existing skills (primary)</h3>
+<p><code>/feature-sdlc skill --from-feedback &lt;text | path | --from-retro&gt;</code> → worktree + <code>state.yaml(pipeline_mode: skill-feedback)</code> → <strong>Phase 0c</strong> (parse input [<code>retro-parser.md</code> if a <code>/retro</code> paste-back], extract + confirm the target-skill set, per-finding critique against each skill's current SKILL.md, keep/drop approval, write <code>0c_feedback_triage.html</code>) → <strong>0d</strong> (per-skill tier from each skill's approved-change-set size; run tier = max, shown with the breakdown; target_platform per skill) → <strong>2</strong> <code>/requirements</code> (seed = approved findings + current-SKILL.md excerpts for every targeted skill + <code>skill-patterns.md</code>; via the moved <code>seed-requirements-template.md</code>) → produces <strong>one combined requirements doc</strong> with a per-skill section → 2a → 3a → 4 → 5 → 6 (<code>/execute</code> edits each targeted SKILL.md) → 6a (scores each skill's files; failures across any skill feed back via the plan addendum) → 7 → 8 (<code>/complete-dev</code> → one version bump + one changelog entry covering all the skills) → 8a → 9 → 10.</p>
+
+<h3 id="persona-feature-developer">5.3 Feature developer — unchanged</h3>
+<p>A bare <code>/feature-sdlc &lt;idea&gt;</code> executes the same logical steps as 2.36.0; the only visible change is the linear phase numbering. <code>state.yaml</code> phase ids stay name-based (G5); on resume of a pre-v4 file, the v3→v4 migration adds <code>pipeline_mode: feature</code> and bumps the version (FR-13).</p>
+
+<h3 id="alternate-error-journeys">5.4 Alternate &amp; error journeys</h3>
+<ul>
+<li><strong><code>/skill-sdlc</code> alias:</strong> forwards verbatim to <code>/feature-sdlc skill …</code>; identical thereafter.</li>
+<li><strong>Resume (any mode):</strong> re-launch Claude in the worktree, <code>/feature-sdlc --resume</code>; drift + schema checks pass, status table shown, cursor jumps to the first non-complete phase.</li>
+<li><strong><code>--no-worktree</code>:</strong> skill modes honour it (state in launch cwd, <code>worktree_path: null</code>, drift bypassed).</li>
+<li><strong>Tier-1 skill (G8):</strong> short-form <code>/requirements</code> → skip <code>/grill</code> + <code>/creativity</code> → short-form <code>/spec</code> → <code>/plan</code> → <code>/execute</code> → 6a (still runs) → <code>/verify</code> (non-skippable) → <code>/complete-dev</code>; folded <code>/msf-req</code> runs but brief.</li>
+<li><strong>Eval loop exhausts 2 iters with residuals:</strong> Accept-as-risk / iterate manually / (restore iteration 1 if iter 2 net-worse) / abort. No silent pass.</li>
+<li><strong>Feedback input has zero actionable findings:</strong> Phase 0c reports "no actionable findings in &lt;input&gt;" and exits cleanly — no downstream artifacts.</li>
+<li><strong>Resuming a pre-v4 <code>state.yaml</code>:</strong> auto-migrate (add <code>pipeline_mode: feature</code>, bump version) with a chat log line; never block, never prompt — same contract as v1→v2→v3.</li>
+<li><strong>Host repo's <code>CLAUDE.md</code> says nothing about skill location:</strong> <code>/execute</code> falls back to <code>.claude/skills/&lt;name&gt;/</code> (or the platform equivalent) and notes the assumption; no hard failure.</li>
+<li><strong>Old command invoked:</strong> <code>/create-skill</code> / <code>/update-skills</code> → "unknown skill"; README + <code>archive/README.md</code> redirect to <code>/feature-sdlc skill …</code> (acceptable — no shim).</li>
+</ul>
+</section>
+
+<section id="system-design">
+<h2 id="system-design">6. System Design</h2>
+
+<h3 id="architecture-overview">6.1 Architecture Overview</h3>
+<p>The change is a <strong>mode switch over the existing pipeline spine</strong>. The worktree/resume machinery, the folded-phase pattern, the compact-checkpoint micro-phase, the reviewer-input-contract (FR-50/51/52), and the child-skill dispatch are all reused unchanged. <code>pipeline_mode</code> (read from CLI subcommand at Phase 0, persisted in <code>state.yaml</code>) gates which phases run.</p>
+<pre>
+                 token-1 dispatch (FR-01/02)
+  /feature-sdlc &lt;idea&gt;            → pipeline_mode = feature
+  /feature-sdlc skill &lt;desc&gt;       → pipeline_mode = skill-new
+  /feature-sdlc skill --from-feedback &lt;…&gt; → pipeline_mode = skill-feedback
+  /feature-sdlc list               → list logic (unchanged)
+  /feature-sdlc --resume           → pipeline_mode from state.yaml
+
+  PHASE             feature   skill-new   skill-feedback
+  0  setup+dispatch    ●          ●            ●
+  0a worktree+slug     ●          ●            ●
+  0b resume detect     ●          ●            ●
+  0c feedback triage   –          –            ●          (FR-20..26)
+  0d skill-tier-resolve –         ●            ●          (FR-30..34; reference/skill-tier-matrix.md + reference/repo-shape-detection.md)
+  1  init state v4     ●          ●            ●          (FR-10..14)
+  2  /requirements     ●          ●            ●          (folded /msf-req; cites skill-patterns.md)
+  2a /grill (T2+)      ●          ●            ●
+  3  enhancement gates (container)
+  3a /creativity gate  ●          ●            ●
+  3b /wireframes gate  ●          –            –          (suppressed in skill modes — D13)
+  3c /prototype gate   ●          –            –          (suppressed in skill modes — D13)
+  4  /spec             ●          ●            ●          (folded /simulate-spec)
+  5  /plan             ●          ●            ●
+     [compact checkpoint]                                  fires before 3b/3c/6/7 (feature) | before 6/7 only (skill modes)
+  6  /execute          ●          ●            ●          (skill-patterns.md as impl ref)
+  6a skill-eval gate   –          ●            ●          (FR-40..49; TDD loop ≤2 iters; feeds /execute via 03_plan addendum)
+  7  /verify           ●          ●            ●          (non-skippable; re-runs skill-eval.md in skill modes — FR-50)
+  8  /complete-dev     ●          ●            ●          (degrades gracefully — G12)
+  8a /retro gate       ●          ●            ●
+  9  final summary     ●          ●            ●
+  10 capture learnings ●          ●            ●
+</pre>
+<p><strong>New files</strong> (the <code>/plan</code> stage sequences creation/moves): <code>feature-sdlc/reference/skill-patterns.md</code> (§7.7), <code>feature-sdlc/reference/skill-eval.md</code> (§7.8 + §10), <code>feature-sdlc/reference/skill-tier-matrix.md</code> (§7.4), <code>feature-sdlc/reference/repo-shape-detection.md</code> (§7.4), <code>feature-sdlc/tools/skill-eval-check.sh</code> (§7.8), <code>plugins/pmos-toolkit/skills/skill-sdlc/SKILL.md</code> (§7.9). <strong>Moved:</strong> <code>update-skills/reference/{retro-parser,triage-doc-template,seed-requirements-template}.md</code> → <code>feature-sdlc/reference/</code>; <code>create-skill/</code> → <code>archive/skills/create-skill/</code>; <code>update-skills/</code> → <code>archive/skills/update-skills/</code> (+ <code>archive/README.md</code>). <strong>Dropped:</strong> <code>create-skill/reference/spec-template.md</code>. <strong>Edited:</strong> <code>feature-sdlc/SKILL.md</code>, <code>feature-sdlc/reference/state-schema.md</code>, <code>README.md</code>, both <code>plugin.json</code>, this repo's <code>CLAUDE.md</code>.</p>
+
+<h3 id="control-flow-phase-6a">6.2 Control flow — Phase 6a skill-eval TDD loop</h3>
+<pre>
+  /execute (Phase 6) completes → orchestrator records HEAD as iterations[1].pre_ref
+        │
+        ▼
+  ┌─ score ──────────────────────────────────────────────────────────────┐
+  │ skill-eval-check.sh --target &lt;p&gt; &lt;skill_dir&gt;  → [deterministic] verdicts │
+  │   (script unavailable → those checks fall back to LLM-judge + logged note)│
+  │ reviewer subagent (raw SKILL.md + reference/ files + [llm-judge] checks) │
+  │   → per check {check_id, verdict, fix_note (req. on fail), quote (≥40ch)}│
+  │ orchestrator validates: check_id set == skill-eval.md set (hard-fail);  │
+  │   substring-grep every quote against the file (hard-fail)               │
+  └────────────────────────────────────────────────────────────────────────┘
+        │
+   all pass? ──yes──▶ Phase 6a done; iterations[N].result = pass ──▶ Phase 7 /verify
+        │ no
+        ▼  (iteration count &lt; 2?)
+   append "## Eval-remediation — iteration N" to 03_plan (one task / failed check:
+        fix_note + quote + [for deterministic checks] the skill-eval-check.sh re-run cmd);
+   bump plan task-status marker; record iterations[N].{addendum_task_ids, pre_ref=HEAD};
+   re-invoke /execute (task-level resume picks up only the new tasks) ──▶ back to score
+        │ iteration count == 2 and still failing
+        ▼
+   AskUserQuestion: Accept-as-risk (→ accepted_residuals[]; handed to /verify as KNOWN)
+                  | Iterate manually (user edits → re-run Phase 6a)
+                  | Restore iteration 1 (only if iter 2 net-worse: git reset skill files to iterations[2].pre_ref)
+                  | Abort
+        │ Accept-as-risk
+        ▼
+   write accepted_residuals[] (atomic) ──▶ Phase 7 /verify
+</pre>
+<p><em>(Diagram authored inline as ASCII — see Decision Log D20.)</em></p>
+</section>
+
+<section id="functional-requirements">
+<h2 id="functional-requirements">7. Functional Requirements</h2>
+
+<h3 id="fr-subcommand-parsing">7.1 Subcommand parsing &amp; mode resolution</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-01</td><td><code>/feature-sdlc</code> recognises four run kinds: <code>feature</code> (default — bare idea), <code>skill-new</code> (<code>skill &lt;description&gt;</code>), <code>skill-feedback</code> (<code>skill --from-feedback &lt;text | path | --from-retro&gt;</code>), <code>list</code> (unchanged). The resolved kind is written to <code>state.yaml.pipeline_mode</code> at Phase 1.</td></tr>
+<tr><td>FR-02</td><td>Token 1 is treated as the mode selector ONLY when it is exactly <code>skill</code> or <code>list</code> AND one of: (a) it is the sole token; (b) the next token is a recognised flag (<code>--from-feedback</code>, <code>--from-retro</code>, <code>--tier</code>, <code>--resume</code>, <code>--no-worktree</code>, <code>--format</code>, <code>--non-interactive</code>, <code>--interactive</code>, <code>--backlog</code>, <code>--minimal</code>); (c) the remainder is exactly one quoted argument. Otherwise token 1 is part of a feature description. (G2)</td></tr>
+<tr><td>FR-03</td><td><code>skill</code> with no further description → error to stderr: <code>usage: /feature-sdlc skill &lt;description&gt; | /feature-sdlc skill --from-feedback &lt;text|path|--from-retro&gt;</code>; exit 64.</td></tr>
+<tr><td>FR-04</td><td><code>skill --from-feedback</code> with no source argument AND no <code>--from-retro</code> → same usage error, exit 64. <code>--from-retro</code> resolves to the newest <code>/retro</code> artifact (per the <code>/retro</code> skill's output location); if none found → error <code>no /retro artifact found; pass feedback text or a file path</code>, exit 64.</td></tr>
+<tr><td>FR-05</td><td><code>--resume</code> ignores any subcommand token — <code>pipeline_mode</code> is read from <code>state.yaml</code>. If both <code>--resume</code> and a subcommand are present, warn to stderr: <code>subcommand ignored on --resume; mode read from state.yaml</code>.</td></tr>
+<tr><td>FR-06</td><td>The <code>argument-hint</code> frontmatter enumerates every parsed token/flag: <code>[skill [--from-feedback]] &lt;description|idea&gt; [--from-retro] [--tier N] [--resume] [--no-worktree] [--format html|md|both] [--non-interactive|--interactive] [--backlog id] [--minimal] | list</code>.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-schema-v4">7.2 state.yaml schema v4 (persistent-state contract)</h3>
+<p><em>(This subsection is the analog of the Tier-3 template's "Database Design" — there is no relational DB; the persistent-state contract is <code>state.yaml</code> schema v4. Authoritative field list lives in <code>feature-sdlc/reference/state-schema.md</code> after the FR-13 edit.)</em></p>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-10</td><td><code>state.yaml.schema_version</code> is bumped to <code>4</code>. Schema v4 = schema v3 + (a) a top-level <code>pipeline_mode ∈ {feature, skill-new, skill-feedback}</code> field (D16); (b) an optional <code>skill_eval</code> substructure on the <code>skill-eval</code> phase entry (FR-12); (c) for <code>skill-feedback</code> runs, optional fields on the <code>feedback-triage</code> phase entry (FR-14). All structural fields from v3 are unchanged. v3's existing <code>mode ∈ {interactive, non-interactive}</code> field is untouched.</td></tr>
+<tr><td>FR-11</td><td><code>phases[]</code> membership is mode-conditional at fresh init (D21): <strong>feature</strong> = the 2.36.0 set (<code>setup, worktree, init-state, requirements, grill, creativity, wireframes, prototype, spec, plan, execute, verify, complete-dev, retro, final-summary, capture-learnings</code>) with all <code>id</code> labels unchanged; <strong>skill-new</strong> = that set − <code>{wireframes, prototype}</code> + <code>{skill-tier-resolve, skill-eval}</code> (in order: <code>setup, worktree, init-state, skill-tier-resolve, requirements, grill, creativity, spec, plan, execute, skill-eval, verify, complete-dev, retro, final-summary, capture-learnings</code>); <strong>skill-feedback</strong> = skill-new's set + <code>{feedback-triage}</code> inserted after <code>init-state</code> (before <code>skill-tier-resolve</code>). Hardness per D22: <code>feedback-triage</code> = hard, <code>skill-tier-resolve</code> = infra, <code>skill-eval</code> = hard. The resume cursor (Phase 0b) scans whatever <code>phases[]</code> contains — it is mode-agnostic.</td></tr>
+<tr><td>FR-12</td><td>The <code>skill-eval</code> phase entry carries an optional <code>skill_eval</code> substructure:
+<pre>skill_eval:
+  iterations:
+    - n: 1
+      pre_ref: &lt;git sha&gt;          # HEAD recorded by orchestrator before iteration n's remediation
+      addendum_task_ids: [T47, T48]
+      checks_failed: [b-desc-no-step-list, c-body-size]
+      result: fail
+    - n: 2
+      pre_ref: &lt;git sha&gt;
+      addendum_task_ids: [T49]
+      checks_failed: [c-body-size]
+      result: fail
+  accepted_residuals:
+    - {check_id: c-body-size, fix_note: "Move the §6 example bank to reference/examples.md", acked_at: &lt;ISO-8601&gt;}</pre>
+<code>iterations[0]</code> is implicit (the initial <code>/execute</code> Phase 6 build); the first recorded iteration is <code>n: 1</code> with <code>pre_ref</code> = HEAD after Phase 6 completes. <code>pre_ref</code> = HEAD <em>before</em> that iteration's remediation commits → "restore iteration 1" resets the skill files to <code>iterations[2].pre_ref</code> (state after iter 1's remediation, before iter 2's). All writes to this substructure use the atomic temp-then-rename protocol.</td></tr>
+<tr><td>FR-13</td><td><strong>v3 → v4 auto-migration</strong> (idempotent, additive, on-read, chat-logged, atomic temp-then-rename — mirrors v1→v2→v3): on <code>--resume</code> reading a v3 file, after the drift check passes: (1) set <code>schema_version: 4</code>; (2) set <code>pipeline_mode: feature</code> if absent; (3) <code>phases[]</code> unchanged (the skill-dev phase ids are only ever added by a fresh skill-mode init, never retrofitted); (4) log to chat: <code>migration: state.schema v3 → v4 (added: pipeline_mode=feature; cohort-marker bump)</code>. Pre-2.34.0 files (carrying <code>msf-req</code>/<code>simulate-spec</code> phase ids) still elide those per the existing rule <em>before</em> the v4 step. <code>schema_version &gt; 4</code> → abort: <code>state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry</code>, exit 64.</td></tr>
+<tr><td>FR-14</td><td>For <code>skill-feedback</code> runs, the <code>feedback-triage</code> phase entry carries <code>artifact_path: 0c_feedback_triage.html</code> plus: <code>feedback_source</code> (the resolved input path or <code>&lt;inline-text&gt;</code>), <code>target_skills: [&lt;name&gt;, …]</code>. The <code>skill-tier-resolve</code> phase entry carries <code>resolved_tier</code>, <code>skill_location</code>, <code>target_platform</code>, and (skill-feedback only) <code>per_skill_tiers: {&lt;skill&gt;: &lt;n&gt;}</code>.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-phase-0c">7.3 Phase 0c — feedback triage (skill-feedback only)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-20</td><td>Parse the feedback input. If it is a <code>/retro</code> paste-back (detected via the <code>retro-parser.md</code> block-header regex <code>### Retro: /&lt;skill&gt; · &lt;n&gt; run(s)</code>) → use <code>feature-sdlc/reference/retro-parser.md</code> (moved here per FR-93) verbatim to extract <code>{skill, severity, finding, evidence, proposed_fix, source_block}</code> per finding. If a file path → read it, then apply the same detection (retro-format vs raw text). If raw text → LLM extraction into the same finding shape.</td></tr>
+<tr><td>FR-21</td><td>Extract the target-skill set: grep <code>/&lt;name&gt;</code> tokens in the findings against the installed-skill list (the plugin's loadable skill directories); for a retro artifact, also read which skills the artifact flags. If the resulting set is empty AND there are no findings → emit "no actionable findings in &lt;input&gt;" and exit cleanly with NO downstream artifacts created (error journey).</td></tr>
+<tr><td>FR-22</td><td>If the target-skill set is ambiguous (a <code>/&lt;token&gt;</code> matching no installed skill, or findings exist but no skill is named) → <code>AskUserQuestion</code> to confirm or correct the set before proceeding.</td></tr>
+<tr><td>FR-23</td><td>For each finding, critique against the target skill's current <code>SKILL.md</code> (+ only the reference files it cites — no bulk reads): <code>already_handled ∈ {yes, no, partial}</code> (cite the SKILL.md location/section when <code>yes</code>); <code>classification ∈ {bug, ux-friction, new-capability, nit}</code>; <code>recommendation ∈ {apply, modify, skip, defer}</code> + one-line rationale; <code>scope_hint ∈ {small, medium, large}</code>. (mirrors <code>/update-skills</code> Phase 4)</td></tr>
+<tr><td>FR-24</td><td>Surface keep/drop approval via the Findings Presentation Protocol: <code>AskUserQuestion</code>, ≤4 findings per batch, one question per finding, options <strong>Apply as recommended</strong> / <strong>Modify</strong> / <strong>Skip (drop with reason)</strong> / <strong>Defer</strong>. &gt;20 findings → prompt once to filter to blockers + friction only. Platform fallback = a numbered findings table with a disposition column. (mirrors <code>/update-skills</code> Phase 6)</td></tr>
+<tr><td>FR-25</td><td>Write the approved-change list to <code>&lt;feature_folder&gt;/0c_feedback_triage.html</code> via the HTML substrate (with companion <code>.sections.json</code>, asset prefix <code>assets/</code>, cache-bust, heading IDs, index regen). Sections: findings table, critique table, disposition log, approved-changes-grouped-by-skill, per-skill tier table. Record <code>target_skills</code> + <code>feedback_source</code> in the <code>feedback-triage</code> phase entry per FR-14.</td></tr>
+<tr><td>FR-26</td><td>Resume: Phase 0c is just a pipeline phase — its completion is recorded in <code>state.yaml</code> like any other; there is no separate resume entry point (D12). On <code>--resume</code> landing before <code>feedback-triage</code> completes, re-run it (the approval <code>AskUserQuestion</code>s re-issue from the persisted draft artifact if one exists, else from scratch).</td></tr>
+<tr><td>FR-27</td><td><strong>skill-feedback <code>/requirements</code> seed (Phase 2):</strong> in <code>skill-feedback</code> mode the Phase 2 <code>/requirements</code> invocation is seeded via the moved <code>feature-sdlc/reference/seed-requirements-template.md</code> — the seed contains, per targeted skill: the approved findings verbatim (from <code>0c_feedback_triage.html</code>), trimmed current-<code>SKILL.md</code> excerpts, a one-paragraph proposed direction, an out-of-scope list, and constraints — plus <code>skill-patterns.md</code> cited as the standing acceptance criteria (FR-61). The seed is self-contained (no "see the triage doc" back-references). The output is <strong>one combined</strong> <code>01_requirements.{html,md}</code> with a per-skill section (D3-revised / G10).</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-phase-0d">7.4 Phase 0d — skill-tier-resolve (both skill modes)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-30</td><td>One repo-shape detection pass produces three resolved values. <strong>(a) Tier</strong> — via <code>feature-sdlc/reference/skill-tier-matrix.md</code> (the create-skill matrix): inputs = expected phase count, number of <code>reference/</code> files warranted, whether an eval rubric is warranted, pipeline-integration depth → Tier 1 / 2 / 3. For <code>skill-feedback</code>: a per-skill tier from each skill's approved-change-set size; the run tier = <strong>max</strong> of the per-skill tiers, shown with the per-skill breakdown (G11).</td></tr>
+<tr><td>FR-31</td><td><strong>(b) Skill-location path</strong> — via <code>feature-sdlc/reference/repo-shape-detection.md</code>; detection order: host repo <code>CLAUDE.md</code> explicit rule wins; else <code>plugins/&lt;p&gt;/.claude-plugin/plugin.json</code> present → <code>plugins/&lt;p&gt;/skills/&lt;name&gt;/SKILL.md</code> (if multiple plugins, <code>AskUserQuestion</code> which); else a <code>.agents/</code> dir present → <code>.agents/skills/&lt;name&gt;/SKILL.md</code>; else (<code>.claude/skills/</code> dir or nothing) → <code>.claude/skills/&lt;name&gt;/SKILL.md</code> with a noted assumption. (G1)</td></tr>
+<tr><td>FR-32</td><td><strong>(c) target_platform</strong> — via <code>feature-sdlc/reference/repo-shape-detection.md</code> (shared resolver): a <code>plugins/&lt;p&gt;/.claude-plugin/</code> or <code>.claude/</code> shape → <code>claude-code</code>; a <code>.agents/</code> + <code>agents/openai.yaml</code> shape → <code>codex</code>; ambiguous or bare → <code>generic</code>. (G7)</td></tr>
+<tr><td>FR-33</td><td>All three values are recorded in the <code>skill-tier-resolve</code> phase entry (FR-14). <code>--tier N</code> is passed down to <code>/requirements</code>, <code>/spec</code>, <code>/plan</code> (the orchestrator's existing tier-passthrough). If <code>--tier N</code> was given on the CLI it overrides the matrix result, logging a divergence note (<code>child_tier_divergence</code>-style).</td></tr>
+<tr><td>FR-34</td><td>A single confirmation step (one <code>AskUserQuestion</code> with up to 4 questions, or one consolidated question): "Detected: tier &lt;N&gt; (&lt;reasons&gt;); skill location &lt;path&gt;; target platform &lt;p&gt;. Confirm or edit?" — options <strong>Confirm all</strong> / <strong>Edit tier</strong> / <strong>Edit location</strong> / <strong>Edit platform</strong>; on an edit, re-prompt for that value, then re-confirm. For <code>skill-feedback</code>, the per-skill tier breakdown is shown alongside the resolved max.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-phase-6a">7.5 Phase 6a — skill-eval gate (both skill modes)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-40</td><td>Phase 6a runs after <code>/execute</code> (Phase 6) and before <code>/verify</code> (Phase 7). In skill-dev modes the recurring compact checkpoint fires before Phase 6 and before Phase 7 only (3b/3c are suppressed, so those checkpoints are gone). No compact checkpoint fires before Phase 6a itself (scoring is light).</td></tr>
+<tr><td>FR-41</td><td>The orchestrator records HEAD as <code>iterations[n].pre_ref</code> immediately before iteration <code>n</code> begins: <code>n: 1</code>'s <code>pre_ref</code> = HEAD after <code>/execute</code> Phase 6 completes; subsequent iterations' <code>pre_ref</code> = HEAD after the previous iteration's remediation commits. (G3)</td></tr>
+<tr><td>FR-42</td><td><strong>Deterministic checks:</strong> run <code>feature-sdlc/tools/skill-eval-check.sh --target &lt;claude-code|codex|generic&gt; &lt;skill_dir&gt;</code> → per-check <code>{check_id, verdict ∈ {pass, fail}, evidence}</code> (TSV, exit 0 all-pass / 1 any-fail / 2 script error). If the script cannot run on the platform (no bash, missing dependency, exit 2) → the <code>[deterministic]</code>-tagged checks fall back to LLM-judging with a logged note: <code>skill-eval-check.sh unavailable (&lt;reason&gt;); &lt;N&gt; deterministic checks fell back to LLM-judge</code>. Never silently skipped.</td></tr>
+<tr><td>FR-43</td><td><strong>LLM-judge checks:</strong> dispatch a reviewer subagent given the <strong>raw</strong> <code>SKILL.md</code> (+ any <code>reference/</code> files) and the <code>[llm-judge]</code> check list (each check carries a stable <code>check_id</code>, rule text, why, how-to-verify, pass-condition). The reviewer returns, per check, <code>{check_id, verdict ∈ {pass, fail}, fix_note (a concrete edit instruction — required and non-empty on fail), quote (≥40-char verbatim substring of the file the check is about — required)}</code>. The reviewer makes <strong>no edits</strong> (D10 — <code>/execute</code> is the only writer). LLM-judge runs at <code>temperature: 0</code>; a <code>fail</code> with an empty or non-substring-verifiable <code>quote</code> is treated as <code>pass</code> (mirrors <code>/polish</code>'s "fail with empty cited_spans → pass"). (G9)</td></tr>
+<tr><td>FR-44</td><td><strong>Orchestrator-side validation (the reviewer does NOT self-validate — FR-52-style hard-fail):</strong> (a) the returned <code>check_id</code> set must equal the <code>[llm-judge]</code> check-id set declared in <code>skill-eval.md</code> — any miss/extra → hard-fail <code>reviewer returned check_ids that do not match skill-eval.md: missing=[…], extra=[…]</code>; (b) for every check, substring-grep <code>quote</code> against the actual file content — any miss → hard-fail <code>reviewer quote not found in &lt;file&gt;: &lt;quote-prefix-30char&gt;…</code>. On any hard-fail → pause with the soft-phase failure dialog. (G9)</td></tr>
+<tr><td>FR-45</td><td><strong>Net-worse check:</strong> compare iteration N's failed-check set against iteration N−1's. Iteration N is "net-worse" if <code>|checks_failed(N)| &gt; |checks_failed(N−1)|</code> OR <code>checks_failed(N)</code> contains a check that passed in N−1. If iteration 2 is net-worse than iteration 1, the post-cap dialog (FR-47) includes a <strong>"Restore iteration 1"</strong> option that <code>git reset</code>s the skill files (only) to <code>iterations[2].pre_ref</code>. (G3)</td></tr>
+<tr><td>FR-46</td><td><strong>Remediation loop:</strong> on any failed checks after scoring, if the iteration count is &lt; 2: append a task group titled <code>## Eval-remediation — iteration N</code> to <code>03_plan.{html,md}</code> — one task per failed check, task body = <code>fix_note</code> + the <code>quote</code> + (for <code>[deterministic]</code> checks) the exact <code>skill-eval-check.sh</code> re-run command; bump the plan's task-status marker; record <code>iterations[N].{addendum_task_ids, pre_ref=HEAD}</code>; re-invoke <code>/execute</code> (its task-level resume picks up only the new tasks); then re-score. The plan stays the single source of work. (G14)</td></tr>
+<tr><td>FR-47</td><td><strong>Cap = 2 remediation iterations.</strong> After iteration 2 (or sooner if all pass) with checks still failing → <code>AskUserQuestion</code>: <strong>Accept residuals as known risk</strong> (residuals → <code>accepted_residuals[]</code>, handed to <code>/verify</code> as known findings) / <strong>Iterate manually</strong> (user edits, then re-run Phase 6a) / <strong>Restore iteration 1</strong> (shown only if iter 2 net-worse, per FR-45) / <strong>Abort</strong>. No silent pass. (G15)</td></tr>
+<tr><td>FR-48</td><td><code>accepted_residuals[]</code> entries = <code>{check_id, fix_note, acked_at: &lt;ISO-8601&gt;}</code>, written atomically to <code>state.yaml.phases.skill-eval.skill_eval.accepted_residuals[]</code>.</td></tr>
+<tr><td>FR-49</td><td>If all checks pass at any iteration → Phase 6a completes; <code>iterations[N]</code> records that iteration with <code>result: pass</code>; <code>accepted_residuals[]</code> is left empty (or, if a prior residual now passes, dropped — see FR-50(c)).</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-verify">7.6 Phase 7 — /verify integration</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-50</td><td>In skill-dev modes, <code>/verify</code> (Phase 7) re-runs <code>skill-eval.md</code> fresh as a final idempotent gate (re-running <code>skill-eval-check.sh</code> + a fresh reviewer pass). Results are reconciled against <code>accepted_residuals[]</code>: (a) <strong>accepted-and-still-failing</strong> → reported <code>KNOWN / accepted in Phase 6a</code> — non-blocking, but surfaced <strong>loudly</strong> in the <code>/verify</code> report AND in the <code>/complete-dev</code> summary; (b) a <strong>newly-failing</strong> check (not in <code>accepted_residuals[]</code>) → blocks <code>/verify</code> normally; (c) a <strong>previously-accepted-now-passing</strong> check → dropped from the residual set (state updated). (G15)</td></tr>
+<tr><td>FR-51</td><td>In skill-dev modes, <code>/verify</code> also grades the host-repo release prerequisites it can detect (e.g. plugin-manifest version-sync if two manifests exist, a README row for the skill, changelog presence) — best-effort, gracefully degrading per G12. <code>/complete-dev</code> (Phase 8) does the actual release and degrades gracefully: it skips version-bump/changelog/deploy steps the repo lacks and pushes only if a remote exists. Hardening <code>/complete-dev</code> for arbitrary repos is out of scope (G12).</td></tr>
+<tr><td>FR-52</td><td><code>/verify</code> is non-skippable in all modes (Anti-pattern #10). The orchestrator presents no Skip option for Phase 7 at any tier.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-skill-patterns">7.7 skill-patterns.md</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-60</td><td>NEW <code>feature-sdlc/reference/skill-patterns.md</code> — the generic SKILLS-standard authoring guide, organised in five sections, each with a stable <code>§</code>-id used as the <code>check_id</code> prefix in <code>skill-eval.md</code>:
+<ul>
+<li><strong>§A — Frontmatter:</strong> open-standard required fields (<code>name</code>, <code>description</code>); platform-optional fields labelled <code>[claude-code]</code> (<code>user-invocable</code>, <code>argument-hint</code>, <code>arguments</code>, <code>allowed-tools</code>, <code>model</code>, <code>disable-model-invocation</code>, <code>when_to_use</code>, <code>paths</code>, <code>hooks</code>, <code>shell</code>, <code>context</code>, <code>agent</code>, <code>effort</code>) or <code>[codex]</code> (<code>agents/openai.yaml</code> sidecar); char limits (<code>name</code> ≤64, <code>description</code> ≤1024; per-platform listing-budget caps noted); naming = lowercase-hyphenated, verb-first or gerund — <strong>records the Anthropic-gerund vs superpowers-verb-first disagreement and the resolved rule</strong> (verb-or-gerund, lowercase-hyphenated).</li>
+<li><strong>§B — Description &amp; triggering:</strong> records the "what + when" (Anthropic) vs "when, not what" (superpowers) disagreement; resolved rule = the description states <em>when to use</em> (trigger conditions) plus a one-clause <em>what</em>; third person; ≥5 user-spoken trigger phrases written the way users actually ask; "pushy" phrasing to combat under-triggering; <strong>no embedded step-list / workflow in the description</strong> (the superpowers "workflow-in-description bug").</li>
+<li><strong>§C — Structure &amp; progressive disclosure:</strong> body line count graduated — ≤500 pass, ~500–800 with good progressive disclosure pass-with-note, &gt;~800 fail; an <strong>orchestrator/meta-skill acknowledgement</strong> (these run larger; the check asks "should anything here move to a reference file?" not raw count) (G13); references one level deep; a ToC for any reference file &gt;100 lines; portable path tokens (<code>${CLAUDE_SKILL_DIR}</code> / <code>${CLAUDE_PLUGIN_ROOT}</code>); <code>scripts/</code> + <code>references/</code> + <code>assets/</code> layout; "context window is a public good".</li>
+<li><strong>§D — Body &amp; content:</strong> imperative form; "explain the why, avoid all-caps MUSTs"; flowcharts only for non-obvious decisions; one excellent example over many mediocre; a <code>## Platform Adaptation</code> section; the recommended body skeleton as <em>guidance</em> not a rigid template (Overview / When to Use / Core Pattern / Implementation / Common Mistakes — per superpowers); a learnings-load line + numbered Workstream-Enrichment / Capture-Learnings phases; Progress-Tracking for 3+-phase skills.</li>
+<li><strong>§E — Scripts &amp; tooling:</strong> when to bundle a script vs inline; document dependencies; scripts get their own self-tests; eval-driven development ("validate→fix→repeat"; records the superpowers strong-form "no skill without a failing test first" as a stated position).</li>
+</ul>
+Each section ends with an explicit enumeration of the binary checks it maps to in <code>skill-eval.md</code>.</td></tr>
+<tr><td>FR-61</td><td><code>skill-patterns.md</code> is <strong>one file in three roles</strong> (G6/D14): <code>/requirements</code> cites it as acceptance criteria ("conforms to §C"); <code>/spec</code> turns the cited sections into FRs; <code>/execute</code> uses it as the implementation reference; <code>/verify</code> + Phase 6a check conformance via <code>skill-eval.md</code> (its 1:1 binary mirror). It is <strong>cited, never copied</strong> into the per-run pipeline artifacts.</td></tr>
+<tr><td>FR-62</td><td><code>skill-patterns.md</code> supersedes <code>/create-skill</code>'s "Conventions" section <strong>minus the pmos-toolkit-specific bits</strong> — the canonical path <code>plugins/pmos-toolkit/skills/&lt;name&gt;/SKILL.md</code>, the plugin-manifest version-sync rule, and the <code>/complete-dev</code> release-entry rule — which move to this repo's <code>CLAUDE.md</code> (FR-90). The generic remainder (Conventions 2–7 in spirit: Platform Adaptation, Description Quality, Pipeline Awareness, Standard Frontmatter, Learning Integration, Progress Tracking) is folded into §A–§E above with the open-standard framing.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-skill-eval">7.8 skill-eval.md + skill-eval-check.sh</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-70</td><td>NEW <code>feature-sdlc/reference/skill-eval.md</code> — the binary check list (the authoritative enumeration is §10 of this spec — resolves OQ4). Each check carries: <code>check_id</code> (stable kebab, prefixed by patterns §, e.g. <code>a-name-lowercase-hyphen</code>, <code>b-desc-no-step-list</code>), <code>tag ∈ {[deterministic], [llm-judge]}</code>, <code>applies_when</code> (e.g. "skill has reference/ files", "target_platform == claude-code", "skill bundles scripts/"), <code>check</code> (the question), <code>why</code>, <code>how-to-verify</code>, <code>pass-condition</code> (the binary predicate). Check groups are skipped when N/A (no <code>scripts/</code> → skip the Scripts group, not a failure; Tier-1 utility with no <code>reference/</code> → progressive-disclosure-of-reference-files checks are N/A; the body-size check still applies). It carries the cross-reference back to <code>skill-patterns.md</code> per FR-72.</td></tr>
+<tr><td>FR-71</td><td>NEW <code>feature-sdlc/tools/skill-eval-check.sh</code> (bash — D18) implements every <code>[deterministic]</code>-tagged check in <code>skill-eval.md</code>. Interface: <code>skill-eval-check.sh [--target claude-code|codex|generic] [--selftest] &lt;skill_dir&gt;</code>. <code>--target</code> (default <code>generic</code>) selects which platform-conditional checks run — <code>generic</code> = the SKILLS-standard intersection only. Output = TSV <code>check_id&lt;TAB&gt;verdict&lt;TAB&gt;evidence</code>, one line per executed check; exit 0 if all pass, 1 if any fail, 2 on script error. <code>--selftest</code> mode cross-references <code>skill-eval.md</code> and asserts every <code>[deterministic]</code> check has a code path here (and vice versa), exiting non-zero on a mismatch.</td></tr>
+<tr><td>FR-72</td><td><code>skill-eval.md</code> and <code>skill-patterns.md</code> carry a mutual cross-reference: every patterns <code>§</code>-rule lists its <code>check_id</code>(s); every <code>skill-eval.md</code> check names its patterns <code>§</code>-rule. A <code>/verify</code> structural check (and <code>skill-eval-check.sh --selftest</code>) asserts the mapping is bijective — every rule has ≥1 check and every check has exactly one rule.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-skill-sdlc">7.9 /skill-sdlc alias</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-80</td><td>NEW <code>plugins/pmos-toolkit/skills/skill-sdlc/SKILL.md</code>, ≈15 lines: frontmatter (<code>name: skill-sdlc</code>; <code>description:</code> with a one-clause "what" + ≥5 skill-authoring trigger phrases — e.g. "create a skill", "build me a slash command", "author a new skill", "turn this workflow into a skill", "apply this retro feedback to the skill", "/skill-sdlc"; <code>user-invocable: true</code>; <code>argument-hint: "[--from-feedback] &lt;description|feedback&gt; [--from-retro] [...flags]"</code>) + a body that says: this is an alias; immediately invoke <code>/feature-sdlc</code> with arguments <code>skill &lt;verbatim args&gt;</code>; do nothing else. (G4)</td></tr>
+<tr><td>FR-81</td><td><code>/skill-sdlc</code> has <strong>no</strong> learnings-load line and <strong>no</strong> <code>## /skill-sdlc</code> section in <code>~/.pmos/learnings.md</code> (D19). Skill-dev learnings ride on <code>/feature-sdlc</code>'s section, captured by <code>/feature-sdlc</code> Phase 10 (which reflects on skill-dev runs); <code>/complete-dev</code>'s release-prereq list adds a <code>## /feature-sdlc</code> learnings-header bootstrap (no separate <code>/skill-sdlc</code> header).</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-renumber">7.10 Linear renumber of /feature-sdlc</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-85</td><td><code>/feature-sdlc</code> SKILL.md phase headings are rewritten to the linear sequence (no gaps, in order): <code>0</code> setup + load-learnings + subcommand-dispatch; <code>0a</code> worktree + slug + branch; <code>0b</code> resume detection; <code>0c</code> feedback triage <em>(skill-feedback only)</em>; <code>0d</code> skill-tier-resolve <em>(skill modes only)</em>; <code>1</code> initialize state (schema v4); <code>2</code> /requirements (folded /msf-req); <code>2a</code> /grill (Tier 2+); <code>3</code> enhancement gates (container); <code>3a</code> /creativity gate; <code>3b</code> /wireframes gate <em>(feature only; suppressed in skill modes)</em>; <code>3c</code> /prototype gate <em>(feature only; suppressed)</em>; <code>4</code> /spec (folded /simulate-spec); <code>5</code> /plan; <code>6</code> /execute; <code>6a</code> skill-eval gate <em>(skill modes only)</em>; <code>7</code> /verify (non-skippable; re-runs skill-eval in skill modes); <code>8</code> /complete-dev; <code>8a</code> /retro gate; <code>9</code> final summary; <code>10</code> capture learnings. The compact-checkpoint stays a recurring named procedure (not numbered), firing before 3b/3c/6/7 in feature mode and before 6/7 only in skill modes.</td></tr>
+<tr><td>FR-86</td><td>The renumber is <strong>prose-only</strong> — <code>state.yaml.phases[].id</code> values stay name-based (G5). New phase ids introduced by the skill modes: <code>feedback-triage</code> (0c), <code>skill-tier-resolve</code> (0d), <code>skill-eval</code> (6a) — hardness per D22. <code>phases[]</code> membership is mode-conditional per FR-11. No feature-mode phase id is renamed or removed.</td></tr>
+<tr><td>FR-87</td><td>Feature-mode behavior is otherwise unchanged — a bare <code>/feature-sdlc &lt;idea&gt;</code> executes the same logical steps as 2.36.0; only the heading numbers and the SKILL.md prose layout change (NFR-04). The <code>list</code> subcommand, the <code>--minimal</code> sentinel, the folded-phase pattern, and the reviewer-input-contract are untouched in feature mode.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-archival">7.11 Archival &amp; repo changes</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-90</td><td>This repo's <code>CLAUDE.md</code> gains a <code>## Skill-authoring conventions</code> section absorbing the pmos-specific bits removed from <code>/create-skill</code>'s Conventions: the canonical path <code>plugins/pmos-toolkit/skills/&lt;name&gt;/SKILL.md</code>, lowercase-hyphenated naming, the post-move <code>ls plugins/pmos-toolkit/skills/</code> check, plus a pointer to <code>feature-sdlc/reference/skill-patterns.md</code> for the generic guidance. (The plugin-manifest version-sync rule and the <code>/complete-dev</code> release-entry rule are already in <code>CLAUDE.md</code> — leave as-is or fold into the new section's "see also".) (D5)</td></tr>
+<tr><td>FR-91</td><td><code>plugins/pmos-toolkit/skills/create-skill/</code> → <code>archive/skills/create-skill/</code>; <code>plugins/pmos-toolkit/skills/update-skills/</code> → <code>archive/skills/update-skills/</code> (move whole dirs, preserving internal structure). Create <code>archive/README.md</code> explaining the archive and redirecting <code>/create-skill</code> / <code>/update-skills</code> users to <code>/feature-sdlc skill …</code> (and noting the <code>/skill-sdlc</code> alias). The plugin loader reads from <code>plugins/pmos-toolkit/skills/</code> only, so the moved dirs are no longer exposed — no <code>plugin.json</code> <code>skills</code>-array edit (skills are directory-auto-discovered). (D1)</td></tr>
+<tr><td>FR-92</td><td><code>create-skill/reference/spec-template.md</code> is <strong>not moved</strong> — it is dropped (generic <code>/spec</code> output is used; patterns flow in as requirements). (D14)</td></tr>
+<tr><td>FR-93</td><td><code>update-skills/reference/retro-parser.md</code>, <code>triage-doc-template.md</code>, <code>seed-requirements-template.md</code> → <code>feature-sdlc/reference/</code>. Update their internal cross-references and the Phase 0c (FR-20, FR-25) + Phase 2-seed (FR for the <code>skill-feedback</code> requirements seed) prose that uses them to the new paths. Nothing left dangling.</td></tr>
+<tr><td>FR-94</td><td><code>README.md</code> — add a <code>/skill-sdlc</code> row under "Pipeline / Orchestrators"; update the <code>/feature-sdlc</code> row + standalone line to mention the <code>skill</code> subcommand; remove the <code>/create-skill</code> and <code>/update-skills</code> rows (or replace with an "archived — see <code>archive/README.md</code>" note). (release prereq)</td></tr>
+<tr><td>FR-95</td><td><code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> + <code>.codex-plugin/plugin.json</code> — <strong>minor</strong> version bump, both edited in the same commit, versions kept in sync (pre-push hook enforces). The <code>/feature-sdlc</code> <code>description</code> field is updated (mention the <code>skill</code> subcommand + skill-authoring trigger phrases) and kept <strong>byte-identical</strong> between the two manifests. The <code>/feature-sdlc</code> <code>argument-hint</code> frontmatter is updated to enumerate every parsed flag/subcommand (FR-06). A new <code>skill-sdlc</code> skill directory is auto-discovered (no manifest array edit). Bootstrap <code>## /feature-sdlc</code> in <code>~/.pmos/learnings.md</code> if missing (idempotent append).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="non-functional-requirements">
+<h2 id="non-functional-requirements">8. Non-Functional Requirements</h2>
+<table>
+<thead><tr><th>ID</th><th>Category</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>NFR-01</td><td>Portability</td><td>No check or instruction in <code>skill-patterns.md</code> / <code>skill-eval.md</code> is Claude-Code-only where a portable phrasing exists; platform-specific items are explicitly labelled <code>[claude-code]</code> / <code>[codex]</code> and gated by <code>applies_when</code>. <code>skill-eval-check.sh --target generic</code> runs only the SKILLS-standard intersection.</td></tr>
+<tr><td>NFR-02</td><td>Idempotence / determinism</td><td><code>skill-eval.md</code> re-run by <code>/verify</code> is deterministic given the same skill files: LLM-judge at <code>temperature: 0</code>, output schema <code>{check_id, verdict, fix_note, quote}</code>; a <code>fail</code> with an empty / non-substring-verifiable <code>quote</code> is treated as <code>pass</code>; <code>skill-eval-check.sh</code> produces byte-identical TSV for byte-identical inputs.</td></tr>
+<tr><td>NFR-03</td><td>Back-compat</td><td>The v3→v4 migration is additive, on-read, chat-logged, atomic temp-then-rename; never blocks, never prompts. A pre-2.34.0 file still elides <code>msf-req</code>/<code>simulate-spec</code> phase ids per the existing rule before the v4 step.</td></tr>
+<tr><td>NFR-04</td><td>No-regression</td><td>A feature-mode run produces a <code>state.yaml</code> whose only diff vs. a 2.36.0 run is <code>schema_version: 4</code> + <code>pipeline_mode: feature</code>; executed logical steps are identical (verified by <code>/verify</code> spec-compliance grading on a feature run).</td></tr>
+<tr><td>NFR-05</td><td>Graceful degradation</td><td>Every skill-dev step that touches host-repo policy (skill location, release prereqs, version bump) degrades to a documented assumption rather than a hard failure when the repo doesn't declare it.</td></tr>
+<tr><td>NFR-06</td><td>Context budget</td><td>The four new reference files are loaded only when their phase needs them; <code>/feature-sdlc</code> SKILL.md growth is bounded by extracting the Phase 0d resolvers (D17). The renumber adds no net length beyond the new-phase prose.</td></tr>
+<tr><td>NFR-07</td><td>Observability</td><td>Every mode/migration/fallback decision logs one line to chat: <code>pipeline_mode: &lt;m&gt; (source: cli|state)</code>; <code>migration: state.schema v3 → v4 …</code>; <code>skill-eval-check.sh unavailable …</code>; per-iteration <code>skill-eval iteration N: &lt;p&gt; passed, &lt;f&gt; failed [&lt;ids&gt;]</code>.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="contracts">
+<h2 id="contracts">9. Contracts (CLI &amp; subagent)</h2>
+<p><em>(This subsection is the analog of the Tier-3 template's "API Contracts" — there is no HTTP surface; the contracts are the new CLI shapes and the reviewer-subagent message shape.)</em></p>
+
+<h3 id="contract-cli">9.1 CLI</h3>
+<pre>
+/feature-sdlc &lt;idea text…&gt;                              → feature mode
+/feature-sdlc skill &lt;description text…|"quoted"&gt;          → skill-new mode
+/feature-sdlc skill --from-feedback &lt;text…&gt;              → skill-feedback (inline text)
+/feature-sdlc skill --from-feedback &lt;path&gt;               → skill-feedback (file)
+/feature-sdlc skill --from-feedback --from-retro         → skill-feedback (newest /retro artifact)
+/feature-sdlc list                                       → list (unchanged)
+/feature-sdlc --resume                                   → resume; mode from state.yaml
+  shared flags (any mode): [--tier N] [--no-worktree] [--format html|md|both]
+                           [--non-interactive|--interactive] [--backlog id] [--minimal]
+  errors: missing description / missing feedback source / unknown /retro → stderr usage, exit 64
+
+/skill-sdlc [--from-feedback] &lt;description|feedback&gt; [--from-retro] [...flags]
+  → forwards verbatim: /feature-sdlc skill &lt;those args&gt;
+
+feature-sdlc/tools/skill-eval-check.sh [--target claude-code|codex|generic] [--selftest] &lt;skill_dir&gt;
+  stdout: &lt;check_id&gt;\t&lt;pass|fail&gt;\t&lt;evidence&gt;   (one line per executed check)
+  exit:   0 all pass | 1 any fail | 2 script error
+  --selftest: cross-checks skill-eval.md ↔ this script for [deterministic] coverage; exit 0 ok / 1 mismatch
+</pre>
+
+<h3 id="contract-reviewer">9.2 Phase 6a reviewer subagent</h3>
+<p><strong>Parent → reviewer (prompt body):</strong> the raw <code>SKILL.md</code> content + the raw content of each <code>reference/</code> file (clearly delimited, each labelled with its path) + the <code>[llm-judge]</code> check list from <code>skill-eval.md</code> (each check: <code>check_id</code>, rule text, why, how-to-verify, pass-condition) + this instruction: <em>"Evaluate the skill against every check below. Return a JSON array; one object per check, exactly the set of <code>check_id</code>s given. Make no edits. For each: <code>{check_id, verdict: 'pass'|'fail', fix_note: '&lt;a concrete edit to make the check pass — required and non-empty when verdict is fail&gt;', quote: '&lt;a ≥40-character verbatim substring copied from the file this check is about&gt;'}</code>."</em> No HTML, no <code>sections.json</code> — markdown/JSON only (G9).</p>
+<p><strong>Reviewer → parent (return shape):</strong> a JSON array of <code>{check_id, verdict, fix_note, quote}</code>. <strong>Parent-side validation (FR-44):</strong> (1) the <code>check_id</code> set must equal the <code>[llm-judge]</code> set in <code>skill-eval.md</code> — miss/extra → hard-fail; (2) each <code>quote</code> must be a substring of the file the check targets — miss → hard-fail; (3) a <code>fail</code> with empty/unverifiable <code>quote</code> is downgraded to <code>pass</code>. Hard-fail → soft-phase failure dialog.</p>
+</section>
+
+<section id="skill-eval-check-list">
+<h2 id="skill-eval-check-list">10. skill-eval.md check list (authoritative — resolves OQ4)</h2>
+<p>~39 binary checks, 1:1 with <code>skill-patterns.md</code> §A–§E. Columns: <strong>id</strong> (the <code>check_id</code>), <strong>tag</strong> (<code>[D]</code> = deterministic, in <code>skill-eval-check.sh</code>; <strong>[J]</strong> = llm-judge), <strong>applies-when</strong>, <strong>check / pass-condition</strong>. <code>skill-eval.md</code> expands each row with full <code>why</code> + <code>how-to-verify</code> prose; this table is the contract for <em>which</em> checks exist and their det/judge split (the count + split is a hard requirement; the prose is authored at <code>/execute</code>).</p>
+
+<h3 id="eval-group-a">10.A — Frontmatter (8 checks)</h3>
+<table>
+<thead><tr><th>id</th><th>tag</th><th>applies-when</th><th>check / pass-condition</th></tr></thead>
+<tbody>
+<tr><td>a-frontmatter-present</td><td>[D]</td><td>always</td><td>SKILL.md starts with a YAML frontmatter block delimited by <code>---</code> lines. Pass iff present and parseable.</td></tr>
+<tr><td>a-name-present</td><td>[D]</td><td>always</td><td>Frontmatter has a non-empty <code>name</code>. Pass iff present.</td></tr>
+<tr><td>a-name-lowercase-hyphen</td><td>[D]</td><td>always</td><td><code>name</code> matches <code>^[a-z0-9]+(-[a-z0-9]+)*$</code>. Pass iff it matches.</td></tr>
+<tr><td>a-name-len</td><td>[D]</td><td>always</td><td><code>len(name) ≤ 64</code>. Pass iff true.</td></tr>
+<tr><td>a-name-matches-dir</td><td>[D]</td><td>always</td><td><code>name</code> equals the skill directory name. Pass iff equal.</td></tr>
+<tr><td>a-desc-present</td><td>[D]</td><td>always</td><td>Frontmatter has a non-empty <code>description</code>. Pass iff present.</td></tr>
+<tr><td>a-desc-len</td><td>[D]</td><td>always</td><td><code>len(description) ≤ 1024</code> (and a soft per-platform listing-budget note in <code>evidence</code> when over the platform cap). Pass iff ≤1024.</td></tr>
+<tr><td>a-name-verb-or-gerund</td><td>[J]</td><td>always</td><td><code>name</code> reads as a verb or gerund describing the action (not a noun phrase). Pass iff it does.</td></tr>
+</tbody>
+</table>
+
+<h3 id="eval-group-b">10.B — Description &amp; triggering (6 checks)</h3>
+<table>
+<thead><tr><th>id</th><th>tag</th><th>applies-when</th><th>check / pass-condition</th></tr></thead>
+<tbody>
+<tr><td>b-desc-has-when</td><td>[J]</td><td>always</td><td>The <code>description</code> states <em>when to use</em> the skill (trigger conditions), not only what it does. Pass iff trigger conditions are present.</td></tr>
+<tr><td>b-desc-has-what</td><td>[J]</td><td>always</td><td>The <code>description</code> includes a one-clause statement of <em>what</em> the skill does. Pass iff present.</td></tr>
+<tr><td>b-desc-third-person</td><td>[J]</td><td>always</td><td>The <code>description</code> is third-person ("Use when…", not "I will…" / "You should…"). Pass iff third-person.</td></tr>
+<tr><td>b-desc-trigger-phrases</td><td>[J]</td><td>always</td><td>The skill body or description supplies ≥5 user-spoken trigger phrases written the way users actually ask. Pass iff ≥5 such phrases are present.</td></tr>
+<tr><td>b-desc-no-step-list</td><td>[J]</td><td>always</td><td>The <code>description</code> does NOT embed a numbered/bulleted step list or workflow (the "workflow-in-description bug"). Pass iff no embedded workflow.</td></tr>
+<tr><td>b-desc-pushy</td><td>[J]</td><td>always</td><td>The <code>description</code> is assertive enough to combat under-triggering (not hedged into invisibility). Pass iff it reads as a confident trigger.</td></tr>
+</tbody>
+</table>
+
+<h3 id="eval-group-c">10.C — Structure &amp; progressive disclosure (9 checks)</h3>
+<table>
+<thead><tr><th>id</th><th>tag</th><th>applies-when</th><th>check / pass-condition</th></tr></thead>
+<tbody>
+<tr><td>c-body-size</td><td>[D]</td><td>always</td><td>SKILL.md body line count (excluding frontmatter): ≤500 → pass; 501–800 → pass-with-note (verdict <code>pass</code>, <code>evidence</code> = "501–800; verify progressive disclosure"); &gt;800 → fail. (G13)</td></tr>
+<tr><td>c-body-size-judge</td><td>[J]</td><td>body &gt; 500 lines OR skill is an orchestrator/meta-skill</td><td>For a 501–800-line body or a self-declared orchestrator: should any block here live in a reference file instead? Pass iff the body's length is justified by content that genuinely belongs inline. (G13)</td></tr>
+<tr><td>c-references-dir-name</td><td>[D]</td><td>skill has a reference-files dir</td><td>The reference dir is named <code>reference/</code> or <code>references/</code> (per the platform). Pass iff so.</td></tr>
+<tr><td>c-references-one-level</td><td>[D]</td><td>skill has <code>reference/</code> files</td><td>No reference file links to another reference file more than one level deep (no chains). Pass iff the link graph from SKILL.md → reference files is depth ≤1.</td></tr>
+<tr><td>c-reference-toc</td><td>[D]</td><td>a reference file is &gt;100 lines</td><td>Each reference file &gt;100 lines opens with a table of contents / section index. Pass iff every such file has one.</td></tr>
+<tr><td>c-portable-paths</td><td>[D]</td><td>SKILL.md or reference files reference bundled files by path</td><td>Bundled-file paths use a portable token (<code>${CLAUDE_SKILL_DIR}</code> / <code>${CLAUDE_PLUGIN_ROOT}</code> or the platform equivalent), not a hard-coded absolute path. Pass iff no hard-coded absolute bundle paths.</td></tr>
+<tr><td>c-asset-layout</td><td>[D]</td><td>skill bundles non-doc files</td><td>Bundled files live under <code>scripts/</code> / <code>references/</code>(or <code>reference/</code>) / <code>assets/</code> as appropriate, not loose in the skill root. Pass iff layout conforms.</td></tr>
+<tr><td>c-progressive-disclosure</td><td>[J]</td><td>skill has <code>reference/</code> files</td><td>Detailed/optional material is in reference files; SKILL.md stays the lean entry point that points to them. Pass iff disclosure is genuinely progressive (not everything dumped inline, not everything hidden).</td></tr>
+<tr><td>c-context-economy</td><td>[J]</td><td>always</td><td>The skill respects "context window is a public good" — no gratuitous restatement, no copy-pasted boilerplate that a reference could carry. Pass iff lean.</td></tr>
+</tbody>
+</table>
+
+<h3 id="eval-group-d">10.D — Body &amp; content (9 checks)</h3>
+<table>
+<thead><tr><th>id</th><th>tag</th><th>applies-when</th><th>check / pass-condition</th></tr></thead>
+<tbody>
+<tr><td>d-platform-adaptation</td><td>[D]</td><td>always</td><td>SKILL.md has a <code>## Platform Adaptation</code> (or equivalently-named) section. Pass iff present.</td></tr>
+<tr><td>d-learnings-load-line</td><td>[D]</td><td>skill is not a thin alias</td><td>SKILL.md instructs reading <code>~/.pmos/learnings.md</code> (entries under <code>## /&lt;name&gt;</code>) at startup. Pass iff present. (N/A for thin aliases — FR-81.)</td></tr>
+<tr><td>d-capture-learnings-phase</td><td>[D]</td><td>skill is not a thin alias</td><td>SKILL.md has a numbered Capture-Learnings phase (not a trailing un-numbered section). Pass iff present and numbered.</td></tr>
+<tr><td>d-progress-tracking</td><td>[D]</td><td>skill has ≥3 sequential phases/steps</td><td>SKILL.md has a <code>## Track Progress</code> (or equivalent) instruction to create one task per phase. Pass iff present.</td></tr>
+<tr><td>d-imperative-form</td><td>[J]</td><td>always</td><td>Instructions are in imperative form ("Read X", "Write Y"), not narrated ("the skill will read X"). Pass iff predominantly imperative.</td></tr>
+<tr><td>d-explain-why</td><td>[J]</td><td>always</td><td>Non-obvious instructions explain the rationale; the doc avoids all-caps shouting (gratuitous MUST/NEVER). Pass iff rationale is given where needed and shouting is restrained.</td></tr>
+<tr><td>d-flowcharts-justified</td><td>[J]</td><td>SKILL.md contains a flowchart/diagram</td><td>Flowcharts appear only for genuinely non-obvious decision logic, not to decorate linear steps. Pass iff every flowchart earns its place.</td></tr>
+<tr><td>d-examples-quality</td><td>[J]</td><td>SKILL.md or reference files contain examples</td><td>Examples are few and excellent rather than many and mediocre; each one teaches something. Pass iff so.</td></tr>
+<tr><td>d-body-skeleton</td><td>[J]</td><td>skill is not a thin alias</td><td>The body covers the essentials (overview / when-to-use / core pattern / implementation / common mistakes) in spirit — not as a rigid template, but nothing critical is missing. Pass iff the essentials are present.</td></tr>
+</tbody>
+</table>
+
+<h3 id="eval-group-e">10.E — Scripts &amp; tooling (4 checks)</h3>
+<table>
+<thead><tr><th>id</th><th>tag</th><th>applies-when</th><th>check / pass-condition</th></tr></thead>
+<tbody>
+<tr><td>e-scripts-dir</td><td>[D]</td><td>skill bundles executable scripts</td><td>Scripts live under <code>scripts/</code>. Pass iff so. (Group skipped entirely when the skill bundles no scripts — not a failure.)</td></tr>
+<tr><td>e-deps-documented</td><td>[J]</td><td>skill bundles scripts with external dependencies</td><td>Script dependencies (interpreters, packages, CLIs) are documented in SKILL.md or the script header. Pass iff documented.</td></tr>
+<tr><td>e-script-selftest</td><td>[J]</td><td>skill bundles a non-trivial script</td><td>Non-trivial scripts have a self-test / <code>--selftest</code> / smoke check. Pass iff present (or the script is trivial enough not to need one).</td></tr>
+<tr><td>e-eval-driven</td><td>[J]</td><td>always</td><td>The skill (or its dev history) reflects validate→fix→repeat — it isn't a one-shot dump. Records the superpowers strong-form "no skill without a failing test first" as the aspirational bar; pass iff there is evidence of iterative refinement (an eval rubric, a test, or a documented refine loop).</td></tr>
+</tbody>
+</table>
+
+<h3 id="eval-platform-conditional">10.F — Platform-conditional frontmatter (3 checks; gated by target_platform)</h3>
+<table>
+<thead><tr><th>id</th><th>tag</th><th>applies-when</th><th>check / pass-condition</th></tr></thead>
+<tbody>
+<tr><td>f-cc-user-invocable</td><td>[D]</td><td><code>target_platform == claude-code</code> AND skill is meant to be a slash command</td><td>Frontmatter has <code>user-invocable: true</code> and an <code>argument-hint</code>. Pass iff both present.</td></tr>
+<tr><td>f-cc-argument-hint-matches</td><td>[J]</td><td><code>target_platform == claude-code</code> AND <code>argument-hint</code> present</td><td>The <code>argument-hint</code> enumerates the flags/positional args the skill body actually parses. Pass iff it matches.</td></tr>
+<tr><td>f-codex-sidecar</td><td>[D]</td><td><code>target_platform == codex</code></td><td>An <code>agents/openai.yaml</code> sidecar exists alongside SKILL.md with the required Codex fields. Pass iff present. (For <code>--target generic</code>: this group and the <code>f-cc-*</code> group are both skipped — intersection only.)</td></tr>
+</tbody>
+</table>
+<p><strong>Totals:</strong> 39 checks — 20 <code>[D]</code> (in <code>skill-eval-check.sh</code>), 19 <code>[J]</code> (reviewer subagent). The table above is the baseline contract; <code>/execute</code> may refine the prose and adjust individual <code>[D]</code>/<code>[J]</code> assignments where a check is clearly mis-tagged, but must keep the total count ≥35, the bijective patterns↔eval mapping (FR-72), and every <code>[D]</code>-tagged check implemented in the script (FR-71). Group-skip rules (no <code>scripts/</code> → skip 10.E; no <code>reference/</code> → 10.C reference-only checks N/A; <code>--target generic</code> → skip 10.F) are part of the contract.</p>
+</section>
+
+<section id="edge-cases">
+<h2 id="edge-cases">11. Edge Cases</h2>
+<table>
+<thead><tr><th>#</th><th>Scenario</th><th>Condition</th><th>Expected Behavior</th></tr></thead>
+<tbody>
+<tr><td>E1</td><td>No scripts bundled</td><td>Skill has no <code>scripts/</code></td><td>Phase 6a skips the 10.E group; not a failure.</td></tr>
+<tr><td>E2</td><td>No reference files</td><td>Tier-1 utility, no <code>reference/</code></td><td>10.C reference-only checks (<code>c-references-*</code>, <code>c-reference-toc</code>, <code>c-progressive-disclosure</code>) are N/A; <code>c-body-size</code> still applies.</td></tr>
+<tr><td>E3</td><td>Source disagreement in patterns</td><td>e.g. "what+when" vs "when-only" description guidance; gerund vs verb-first naming</td><td><code>skill-patterns.md</code> records the disagreement AND the resolved rule rather than picking silently; the matching <code>skill-eval.md</code> check tests the resolved rule.</td></tr>
+<tr><td>E4</td><td>Codex-target skill</td><td>Author wants a Codex skill; <code>target_platform == codex</code></td><td>10.A frontmatter checks run against the open-standard required fields; <code>f-cc-*</code> checks skipped; <code>f-codex-sidecar</code> runs; Claude-Code-only fields are not flagged as missing.</td></tr>
+<tr><td>E5</td><td>Generic-target skill</td><td><code>--target generic</code> (ambiguous repo shape)</td><td>10.F entirely skipped; only the SKILLS-standard intersection runs.</td></tr>
+<tr><td>E6</td><td>Dogfooding</td><td><code>/feature-sdlc skill --from-feedback</code> run inside the pmos-toolkit repo targeting a pmos skill</td><td>Repo-shape detection sees <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> → <code>plugins/pmos-toolkit/skills/&lt;name&gt;/SKILL.md</code>, <code>target_platform: claude-code</code>; <code>/execute</code> reads pmos's <code>CLAUDE.md</code> for the canonical-path rule + version-bump policy. No conflict — the expected self-improvement path.</td></tr>
+<tr><td>E7</td><td>Deterministic-check unavailable</td><td><code>skill-eval-check.sh</code> can't run (no bash, exit 2)</td><td>The <code>[deterministic]</code> checks fall back to LLM-judging with a logged note; never silently skipped (FR-42).</td></tr>
+<tr><td>E8</td><td>Compact checkpoints in skill modes</td><td>3b/3c suppressed</td><td>The recurring compact checkpoint fires before Phase 6 (<code>/execute</code>) and Phase 7 (<code>/verify</code>) only — not before Phase 6a.</td></tr>
+<tr><td>E9</td><td>Old command invoked</td><td><code>/create-skill</code> or <code>/update-skills</code> after archival</td><td>"unknown skill"; <code>README.md</code> + <code>archive/README.md</code> redirect to <code>/feature-sdlc skill …</code>. No shim.</td></tr>
+<tr><td>E10</td><td><code>--from-retro</code> with no retro artifact</td><td>No <code>/retro</code> output exists</td><td>Error: <code>no /retro artifact found; pass feedback text or a file path</code>; exit 64 (FR-04).</td></tr>
+<tr><td>E11</td><td>Feedback with zero actionable findings</td><td>Input parses but yields no findings / no target skills</td><td>Phase 0c emits "no actionable findings in &lt;input&gt;" and exits cleanly — no downstream artifacts (FR-21).</td></tr>
+<tr><td>E12</td><td>Ambiguous target-skill set</td><td>A <code>/&lt;token&gt;</code> matching no installed skill, or findings with no skill named</td><td>Phase 0c <code>AskUserQuestion</code> to confirm/correct the set (FR-22).</td></tr>
+<tr><td>E13</td><td>Iteration 2 net-worse than iteration 1</td><td><code>|checks_failed(2)| &gt; |checks_failed(1)|</code> or a check that passed in 1 now fails</td><td>The post-cap dialog includes "Restore iteration 1" → <code>git reset</code> skill files to <code>iterations[2].pre_ref</code> (FR-45/47).</td></tr>
+<tr><td>E14</td><td><code>--no-worktree</code> in a skill mode</td><td>User passes <code>--no-worktree</code> with <code>skill …</code></td><td>Honoured exactly as in feature mode: state in launch cwd, <code>worktree_path: null</code>, drift check bypassed.</td></tr>
+<tr><td>E15</td><td>Resume a pre-v4 <code>state.yaml</code></td><td><code>--resume</code> against a v1/v2/v3 file</td><td>Existing v1→v2→v3 migrations run, then v3→v4 (add <code>pipeline_mode: feature</code>, bump version), all chat-logged; never blocks/prompts (FR-13, NFR-03).</td></tr>
+<tr><td>E16</td><td>Host repo <code>CLAUDE.md</code> silent on skill location</td><td>No explicit rule, no plugin manifest, no <code>.agents/</code></td><td><code>/execute</code> falls back to <code>.claude/skills/&lt;name&gt;/</code> (or platform equivalent) and notes the assumption; no hard failure (FR-31, NFR-05).</td></tr>
+<tr><td>E17</td><td>Reviewer returns a bad <code>check_id</code> set or an unverifiable <code>quote</code></td><td>Subagent output violates the FR-44 contract</td><td>Orchestrator hard-fails with the precise mismatch message → soft-phase failure dialog. (A <code>fail</code> with empty <code>quote</code> is downgraded to <code>pass</code>, not a hard-fail.)</td></tr>
+<tr><td>E18</td><td>Multiple plugins in the repo</td><td>&gt;1 <code>plugins/&lt;p&gt;/.claude-plugin/plugin.json</code></td><td>Phase 0d <code>AskUserQuestion</code> which plugin the new skill belongs to (FR-31).</td></tr>
+<tr><td>E19</td><td><code>--tier N</code> conflicts with the matrix</td><td>CLI <code>--tier</code> ≠ <code>skill-tier-matrix.md</code> result</td><td>CLI wins; log a divergence note in the <code>skill-tier-resolve</code> entry (FR-33).</td></tr>
+<tr><td>E20</td><td>Phase 6a re-invoke risks double-applying earlier tasks</td><td><code>/execute</code> re-invoked for an "Eval-remediation — iteration N" addendum</td><td>Relies on <code>/execute</code>'s existing task-level resume + the bumped task-status marker (FR-46): only tasks below the marker run; a task whose diff is already present is a no-op. <code>iterations[N].pre_ref</code> is the safety net for a manual reset.</td></tr>
+<tr><td>E21</td><td>Combined feedback doc has cross-skill conflicting changes</td><td>skill A's approved change would break skill B's contract</td><td>The per-skill sections make the conflict visible; <code>/grill</code> (2a) + <code>/spec</code>'s multi-role review surface it; resolution is a Decision-Log entry in the combined spec, not a silent pick.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="config-flags">
+<h2 id="config-flags">12. Configuration &amp; Flags</h2>
+<table>
+<thead><tr><th>Token / flag</th><th>Where</th><th>Effect</th></tr></thead>
+<tbody>
+<tr><td><code>skill</code> (subcommand)</td><td><code>/feature-sdlc</code> token 1</td><td>Selects <code>skill-new</code> (or <code>skill-feedback</code> with <code>--from-feedback</code>) — only under the FR-02 disambiguation.</td></tr>
+<tr><td><code>--from-feedback &lt;text|path&gt;</code></td><td><code>/feature-sdlc skill …</code></td><td>Selects <code>skill-feedback</code>; the value is inline text or a file path.</td></tr>
+<tr><td><code>--from-retro</code></td><td><code>/feature-sdlc skill --from-feedback</code> (or <code>/skill-sdlc --from-feedback</code>)</td><td>Resolves the feedback source to the newest <code>/retro</code> artifact.</td></tr>
+<tr><td><code>list</code> (subcommand)</td><td><code>/feature-sdlc</code> token 1</td><td>Unchanged — in-flight worktree listing.</td></tr>
+<tr><td><code>--tier N</code> / <code>--resume</code> / <code>--no-worktree</code> / <code>--format</code> / <code>--non-interactive</code> / <code>--interactive</code> / <code>--backlog id</code> / <code>--minimal</code></td><td>any mode</td><td>Unchanged semantics; all valid in skill modes too.</td></tr>
+<tr><td><code>--target claude-code|codex|generic</code></td><td><code>skill-eval-check.sh</code></td><td>Selects which platform-conditional checks run; default <code>generic</code> (intersection only).</td></tr>
+<tr><td><code>--selftest</code></td><td><code>skill-eval-check.sh</code></td><td>Cross-checks <code>skill-eval.md</code> ↔ the script for <code>[deterministic]</code> coverage; exit 1 on mismatch.</td></tr>
+</tbody>
+</table>
+<p>No environment variables, no <code>.pmos/settings.yaml</code> keys are added. <code>pipeline_mode</code> is derived from the CLI, never configured.</p>
+</section>
+
+<section id="testing-verification">
+<h2 id="testing-verification">13. Testing &amp; Verification Strategy</h2>
+
+<h3 id="test-unit">13.1 Unit tests</h3>
+<ul>
+<li><strong>Subcommand parser (FR-01/02/03/04/05):</strong> a table of <code>argv</code> strings → expected <code>(pipeline_mode, parsed_args)</code> or <code>(error, exit_code)</code>; assert each row. Cover: <code>skill</code> alone; <code>skill "quoted desc"</code>; <code>skill --from-feedback path</code>; <code>skill --from-feedback --from-retro</code>; <code>"skill that does X"</code> (→ feature description, NOT skill mode); <code>list</code>; <code>--resume skill</code> (→ warn, mode from state); <code>skill</code> with no desc (→ exit 64).</li>
+<li><strong>v3→v4 migration (FR-13, NFR-03):</strong> feed a v3 file (no <code>pipeline_mode</code>) → assert <code>schema_version: 4</code>, <code>pipeline_mode: feature</code>, the chat log line, phase ids unchanged, atomic write (no <code>.tmp</code> orphan). Feed a v4 file → no-op. Feed a v1 file → v1→v2→v3→v4 chain. Feed a v5 file → abort, exit 64.</li>
+<li><strong>Phase 0d resolvers (FR-30/31/32):</strong> synthetic repo fixtures — (a) <code>plugins/&lt;p&gt;/.claude-plugin/plugin.json</code> → <code>plugins/&lt;p&gt;/skills/&lt;name&gt;/</code>, <code>claude-code</code>; (b) <code>.agents/</code> + <code>agents/openai.yaml</code> → <code>.agents/skills/&lt;name&gt;/</code>, <code>codex</code>; (c) bare → <code>.claude/skills/&lt;name&gt;/</code>, <code>generic</code>, assumption noted; (d) host <code>CLAUDE.md</code> with an explicit rule → that rule wins; (e) two plugins → <code>AskUserQuestion</code>. Assert the confirmation prompt shows all three resolved values.</li>
+<li><strong>Net-worse predicate (FR-45):</strong> given <code>checks_failed(1)</code> and <code>checks_failed(2)</code> pairs → assert "Restore iteration 1" is offered iff <code>|2| &gt; |1|</code> or <code>2</code> has a check that passed in <code>1</code>.</li>
+<li><strong><code>skill-eval-check.sh --selftest</code> (FR-71):</strong> run against the real <code>skill-eval.md</code> → exit 0; against a deliberately-mismatched copy → exit 1.</li>
+</ul>
+
+<h3 id="test-integration">13.2 Integration tests</h3>
+<ul>
+<li><strong>Phase 6a TDD loop (FR-40..49):</strong> a synthetic skill with a known-bad SKILL.md (description embeds a step list → <code>b-desc-no-step-list</code> fails; body 820 lines → <code>c-body-size</code> fails). Run Phase 6a → assert: those two checks flagged (one <code>[J]</code>, one <code>[D]</code>); a <code>## Eval-remediation — iteration 1</code> task group appended to <code>03_plan</code> with one task per failed check; <code>/execute</code> re-invoked; re-score passes; <code>iterations[]</code> has one entry <code>n: 1</code> with <code>pre_ref</code> + <code>addendum_task_ids</code> + <code>result: pass</code>. Variant: force a check to still fail after iter 2 → assert the post-cap dialog; pick Accept-as-risk → assert <code>accepted_residuals[]</code> written. Variant: reviewer returns an unknown <code>check_id</code> → assert hard-fail with the FR-44 message.</li>
+<li><strong>/verify eval re-run (FR-50):</strong> on a skill-dev run, seed <code>accepted_residuals[]</code> with one check, leave it failing → assert <code>/verify</code> reports "KNOWN / accepted in Phase 6a", non-blocking, loud in the report + <code>/complete-dev</code> summary; introduce a new failure → assert it blocks; fix the accepted one → assert it's dropped from the residual set.</li>
+<li><strong>skill-feedback combined run (FR-20..26, D3-revised):</strong> a <code>/retro</code> paste-back naming two skills with three findings → assert Phase 0c parses via <code>retro-parser.md</code>, extracts the two-skill set, critiques each finding, surfaces a ≤4-batch approval, writes <code>0c_feedback_triage.html</code> with per-skill grouping; Phase 0d resolves a per-skill tier + the max; <code>/requirements</code> produces ONE combined doc with a per-skill section; <code>/execute</code> edits both SKILL.md files; <code>/complete-dev</code> produces one version bump + one changelog entry.</li>
+<li><strong>Feature-mode no-regression (NFR-04):</strong> a bare <code>/feature-sdlc &lt;idea&gt;</code> dry-run → assert <code>state.yaml</code> diff vs. 2.36.0 is exactly <code>schema_version: 4</code> + <code>pipeline_mode: feature</code>; the executed phases match the 2.36.0 set; 3b/3c gates still presented.</li>
+</ul>
+
+<h3 id="test-e2e">13.3 End-to-end / structural tests</h3>
+<ul>
+<li><strong>Linear renumber (FR-85):</strong> <code>grep '^## Phase' plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md</code> → assert the heading sequence is exactly <code>0, 0a, 0b, 0c, 0d, 1, 2, 2a, 3, 3a, 3b, 3c, 4, 5, 6, 6a, 7, 8, 8a, 9, 10</code>.</li>
+<li><strong>Archival (FR-91/92/93):</strong> <code>ls archive/skills/</code> shows <code>create-skill</code> + <code>update-skills</code>; <code>ls plugins/pmos-toolkit/skills/</code> shows neither (and shows <code>skill-sdlc</code>); <code>archive/README.md</code> exists and names <code>/feature-sdlc skill</code>; <code>feature-sdlc/reference/{retro-parser,triage-doc-template,seed-requirements-template}.md</code> exist and are referenced (not dangling) from the Phase 0c / Phase 2-seed prose; <code>create-skill/reference/spec-template.md</code> is gone (under <code>archive/</code> only, and not referenced by any live skill).</li>
+<li><strong>Manifest sync (FR-95):</strong> <code>diff &lt;(jq -r .version plugins/pmos-toolkit/.claude-plugin/plugin.json) &lt;(jq -r .version plugins/pmos-toolkit/.codex-plugin/plugin.json)</code> empty; same diff for the <code>/feature-sdlc</code> description string; <code>argument-hint</code> matches FR-06; <code>grep -i 'skill-authoring' CLAUDE.md</code> hits; <code>README.md</code> has the <code>/skill-sdlc</code> row + updated <code>/feature-sdlc</code> line.</li>
+<li><strong>Patterns ↔ eval bijection (FR-72):</strong> a check (in <code>/verify</code> and/or <code>skill-eval-check.sh --selftest</code>) that every <code>skill-patterns.md</code> §-rule lists ≥1 <code>check_id</code> and every <code>skill-eval.md</code> check names exactly one §-rule.</li>
+<li><strong><code>/skill-sdlc</code> forwarding (FR-80):</strong> invoke <code>/skill-sdlc "test desc"</code> → assert it immediately invokes <code>/feature-sdlc skill "test desc"</code> and does nothing else; SKILL.md ≤ ~20 lines; no learnings-load line.</li>
+</ul>
+
+<h3 id="test-verify-commands">13.4 Verification commands</h3>
+<pre>
+# linear renumber
+grep -n '^## Phase' plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md
+# manifest version sync
+diff &lt;(jq -r .version plugins/pmos-toolkit/.claude-plugin/plugin.json) \
+     &lt;(jq -r .version plugins/pmos-toolkit/.codex-plugin/plugin.json) &amp;&amp; echo SYNCED
+# skill-eval-check.sh self-test + a clean/dirty skill
+bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --selftest \
+     plugins/pmos-toolkit/skills/feature-sdlc        # exit 0 expected
+bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target generic \
+     plugins/pmos-toolkit/skills/skill-sdlc          # thin alias: D-checks pass, D-only
+# archival
+ls archive/skills/ ; ls plugins/pmos-toolkit/skills/ | grep -E 'create-skill|update-skills' || echo ARCHIVED
+# CLAUDE.md section
+grep -n 'Skill-authoring conventions' CLAUDE.md
+# /verify (the real gate)
+/pmos-toolkit:verify docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/02_spec.html
+</pre>
+</section>
+
+<section id="rollout-strategy">
+<h2 id="rollout-strategy">14. Rollout Strategy</h2>
+<p>No runtime feature flag — <code>/feature-sdlc skill</code> simply does not exist until the release lands. The change ships as a single minor version bump via <code>/complete-dev</code>.</p>
+<p><strong>Migration / sequencing order</strong> (the <code>/plan</code> stage turns this into ordered task groups):</p>
+<ol>
+<li>Write the four new reference files (<code>skill-patterns.md</code>, <code>skill-eval.md</code>, <code>skill-tier-matrix.md</code>, <code>repo-shape-detection.md</code>) + <code>tools/skill-eval-check.sh</code> + its self-test.</li>
+<li>Move <code>update-skills/reference/{retro-parser,triage-doc-template,seed-requirements-template}.md</code> → <code>feature-sdlc/reference/</code>; fix their internal refs.</li>
+<li>Edit <code>feature-sdlc/SKILL.md</code>: subcommand parsing (FR-01..06), Phase 0c/0d/6a, mode-conditioned gates, linear renumber (FR-85), <code>skill-patterns.md</code> citations at requirements/spec/execute/verify, the compact-checkpoint firing rules.</li>
+<li>Edit <code>feature-sdlc/reference/state-schema.md</code>: schema v4 (<code>pipeline_mode</code>, <code>skill_eval</code> substructure, mode-conditional <code>phases[]</code>, the v3→v4 migration block).</li>
+<li>Add <code>plugins/pmos-toolkit/skills/skill-sdlc/SKILL.md</code> (the thin alias).</li>
+<li>Move <code>create-skill/</code> + <code>update-skills/</code> → <code>archive/skills/</code>; drop <code>create-skill/reference/spec-template.md</code>; add <code>archive/README.md</code>.</li>
+<li>Update <code>README.md</code>; add the <code>## Skill-authoring conventions</code> section to <code>CLAUDE.md</code>.</li>
+<li>Bump both <code>plugin.json</code> files (minor, in one commit, versions synced; <code>/feature-sdlc</code> description + <code>argument-hint</code> updated, description byte-identical across both); bootstrap <code>## /feature-sdlc</code> in <code>~/.pmos/learnings.md</code>.</li>
+<li><code>/verify</code> (spec-compliance grading + the structural checks above + a feature-mode no-regression run + an idempotent <code>skill-eval.md</code> re-run on a sample skill) → <code>/complete-dev</code>.</li>
+</ol>
+<p><strong>Back-compat:</strong> the v3→v4 <code>state.yaml</code> migration is additive/on-read/silent-on-success; an in-flight 2.36.0 feature run resumes cleanly. The "old command → unknown skill" break for <code>/create-skill</code>/<code>/update-skills</code> is accepted (no shim) — the README + <code>archive/README.md</code> redirect.</p>
+<p><strong>Rollback:</strong> the change is a single branch; the worktree model makes a revert clean (drop the branch). No data migration to reverse — a v4 <code>state.yaml</code> read by an older <code>/feature-sdlc</code> would fail the schema-version check and refuse, which is the correct conservative behavior (the user re-checks out the new version).</p>
+</section>
+
+<section id="research-sources">
+<h2 id="research-sources">15. Research Sources</h2>
+<p>Industry / alternatives research was <strong>not re-run</strong> at this <code>/spec</code> stage — <code>01_requirements.html §Research Sources</code> already carries an exhaustive table (Anthropic skill-authoring best practices, <code>anthropics/skills</code> skill-creator, Claude Code "Extend Claude with skills", OpenAI Codex "Agent Skills" + <code>openai/skills</code>, <code>obra/superpowers</code> writing-skills + anthropic-best-practices.md, <code>travisvn/awesome-claude-skills</code> + practitioner writeups) and the design (D1–D15, G1–G15) is locked. The codebase research below grounds the FRs.</p>
+<table>
+<thead><tr><th>Source</th><th>Type</th><th>Key takeaway used in this spec</th></tr></thead>
+<tbody>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md</code> (2.36.0)</td><td>Existing code</td><td>Non-linear phase headings (0, 0.a, 0.b, 1, 2, 3, 3.b, 4.b, 4.c, 4.d, 5, 7, 8, 9, 10, 11, 13, 12) → the renumber target (FR-85). <code>--minimal</code> sentinel, folded-phase pattern, compact-checkpoint micro-phase (fires before wireframes/prototype/execute/verify), reviewer-input-contract (FR-50/51/52 chrome-strip → sections_found → quote-validation) — all reused; the 6a reviewer contract (FR-43/44) is the markdown-only sibling of FR-51/52.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/create-skill/SKILL.md</code> + <code>reference/spec-template.md</code></td><td>Existing code</td><td>Conventions 1–7: Save Location (pmos canonical path — moves to <code>CLAUDE.md</code>), Cross-Platform Adaptation (→ §D), Description Quality (≥5 trigger phrases, what+pipeline — → §B), Pipeline Awareness (→ §D), Standard Frontmatter (→ §A), Learning Integration (→ §D), Progress Tracking for 3+ phases (→ §D). Phase 7 canonical-path-enforcement → dropped as a phase (D5; host <code>CLAUDE.md</code> instead). Spec at <code>~/.pmos/skill-specs/</code> → dropped (D4). <code>spec-template.md</code> → dropped (D14, FR-92).</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/update-skills/SKILL.md</code> + <code>reference/{retro-parser,triage-doc-template,seed-requirements-template}.md</code></td><td>Existing code</td><td>Phase structure: parse (<code>retro-parser.md</code> verbatim) → per-finding critique (already-handled? / classification / recommendation / scope-hint) → triage doc → AskUserQuestion approval (≤4/batch) → group+auto-tier per skill → pipeline dispatch (one <code>/complete-dev</code> for the batch). Lifts directly into Phase 0c (FR-20..26) + the <code>skill-feedback</code> requirements seed; the three reference files move to <code>feature-sdlc/reference/</code> (FR-93). The triage-doc-header resume → replaced by the unified <code>state.yaml</code> resume (D12).</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/state-schema.md</code></td><td>Existing code</td><td>v3 field list; phase-identifiers+hardness; the v1→v2 (4-step additive) and v2→v3 (1-step cohort-marker) migration patterns + the folded-phase-failures dedup rule + the status-transition write contract — the template for the v4 migration (FR-13) and the new <code>skill_eval</code> substructure (FR-12). Confirmed the <code>mode</code> field name collision → D16 (<code>pipeline_mode</code>).</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/tools/</code> (absent) · <code>tools/audit-recommended.sh</code> · <code>_shared/html-authoring/assets/*.js</code></td><td>Existing code</td><td>No per-skill <code>tools/</code> convention yet; <code>audit-recommended.sh</code> is bash; Node is used only for real HTML/Markdown parsing (turndown). → <code>skill-eval-check.sh</code> is bash in a new <code>feature-sdlc/tools/</code> dir (D18, FR-71).</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/polish/SKILL.md</code> + <code>reference/rubric.md</code></td><td>Existing code</td><td>14-check binary rubric shape: per-check <code>{detection: regex|llm-judge, risk, scope, implementation}</code>; LLM-judge determinism contract (<code>temperature: 0</code>, output <code>{verdict, cited_spans:[{line,excerpt}], rationale}</code>, "fail with empty cited_spans → pass"); custom-checks loaded from a YAML file. → the <code>skill-eval.md</code> shape (§10), the FR-43 reviewer output schema, and NFR-02.</td></tr>
+<tr><td>This repo's <code>CLAUDE.md</code></td><td>Existing code</td><td>Current content = canonical-skill-path rule, plugin-manifest version-sync rule, <code>/complete-dev</code> release-entry rule. The new <code>## Skill-authoring conventions</code> section (FR-90) absorbs the pmos-specific bits removed from <code>/create-skill</code> and points at <code>skill-patterns.md</code>; the existing two rules stay (or get a "see also" cross-link).</td></tr>
+<tr><td><code>01_requirements.html §Research Sources</code> (carried)</td><td>External (already done)</td><td>Anthropic/Codex/agentskills.io/superpowers/awesome-claude-skills authoring guidance — the source material for <code>skill-patterns.md</code> §A–§E and the disagreements §D records (gerund vs verb-first naming; "what+when" vs "when-only" description; "no skill without a failing test first"). Not re-fetched here.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="review-log">
+<h2 id="review-log">16. Review Log</h2>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes Made</th></tr></thead>
+<tbody>
+<tr><td>0 (authoring)</td><td>Drafted from <code>01_requirements.html</code> (D1–D15, G1–G15) + codebase research; resolved OQ1→D17, OQ2→D18, OQ3→D19, OQ4→§10; surfaced + resolved the <code>mode</code>-field naming collision (D16); added D20–D22.</td><td>Initial spec written.</td></tr>
+<tr><td>1 (self-critique)</td><td>[Should-fix] §10 totals arithmetic wrong (was "38 — 22 [D] / 16 [J]"; actual 39 — 20 [D] / 19 [J]). [Should-fix] No FR for the <code>skill-feedback</code> <code>/requirements</code> seed (referenced by FR-93, never specified). [Nit] §10 intro "~38". Structural checklist + design critique otherwise pass; D20 (ASCII diagrams instead of <code>/diagram</code> SVG) flagged as a potential reviewer escalation — left as a Decision-Log entry pending user concurrence.</td><td>Fixed §10 totals + intro; added FR-27 (skill-feedback requirements seed).</td></tr>
+<tr><td>2 (folded simulate-spec — Tier 3 default-on)</td><td>4-pass adversarial scenario enumeration against the spec. Most adversarial scenarios were already covered by §11 (E1–E19). New gaps surfaced: (i) Phase 6a re-invoke double-apply risk → E20; (ii) cross-skill conflicting changes in a combined feedback run → E21. No scenario was found that the spec mishandled; no auto-apply patches beyond E20/E21 (added as edge cases, not contract changes). Fitness buckets — completeness: good (D1–D15/G1–G15/OQ1–4 all mapped); ambiguity: none material; testability: §13 commands are concrete; scope: single implementation plan.</td><td>Added E20, E21.</td></tr>
+</tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/02_spec.html</span>
+  </footer>
+</body>
+</html>

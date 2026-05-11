@@ -1,0 +1,22 @@
+{
+  "doc": "02_spec.html",
+  "title": "Skill development via /feature-sdlc — Spec",
+  "ids": [
+    "problem-statement",
+    "goals",
+    "non-goals",
+    "decision-log",
+    "personas-journeys",
+    "system-design",
+    "functional-requirements",
+    "non-functional-requirements",
+    "contracts",
+    "skill-eval-check-list",
+    "edge-cases",
+    "config-flags",
+    "testing-verification",
+    "rollout-strategy",
+    "research-sources",
+    "review-log"
+  ]
+}

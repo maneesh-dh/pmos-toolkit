@@ -269,4 +269,106 @@ Write all of these into the run folder:
 
 ---
 
-<!-- continued in Phases 4–9 below (T8) -->
+## Phase 4 — Reviewer critique
+
+Dispatch **one** reviewer subagent (Task tool; or run it sequentially inline if subagents are unavailable). The prompt MUST contain: the survey context object `{purpose, audience, time_budget_min, mode, max_questions, estimated_minutes}`; the full `survey.json` as text; and the contents (or, if the subagent can read files, the paths) of `reference/survey-best-practices.md` + `reference/question-antipatterns.md`. In non-interactive runs the prompt's first line is `[mode: non-interactive]`.
+
+**Return contract — specify it inside the prompt.** The subagent returns two markdown bodies:
+
+- **`question-eval.md` body** — one `## <question-id>` section **per question** (keyed by `question.id`; "Verdict: no issues" is allowed and expected when the question is clean), each containing the stem quoted, a verdict line (`Verdict: no issues` or `Verdict: N finding(s)`), then a findings table with columns `Severity | Defect | Message | Proposed fix`. Each finding is the structured shape: `target` (the question id, or a field like "options" / "scale"), `severity ∈ {blocker, should-fix, nit}`, `defect` (the catalog id or a short label), `message` (1–2 sentences — why it's a problem), `proposed_fix` (concrete — the rewritten stem / the added opt-out / the split into two items).
+- **`survey-eval.md` body** — one section each for **Structure & order** (funnel), **Length vs. budget**, **Mode fit**, **Scale balance**, **Accessibility**, **Ethics / PII**, **Intro / consent** — each with the same findings-table shape — plus an overall verdict line.
+
+**Parent side.** Write the two bodies to `survey-eval.md` and `question-eval.md` in the run folder (the `<skill>-eval` markdown convention). Then validate: `count(## <id> sections in question-eval.md) == count(questions in survey.json)`. On a mismatch, re-dispatch **once**, naming the missing ids; if still off, surface the gap to the user and proceed **without** auto-applying anything (E8, FR-32). If the subagent fails outright or returns malformed output: surface the failure, keep the committed draft, and offer (`AskUserQuestion`: `Proceed without review (Recommended)` / `Retry the reviewer pass`) — proceeding means warning that the survey is unreviewed; in non-interactive mode, proceed and log the failure (E7, FR-35).
+
+## Phase 5 — Apply the critique
+
+Present the findings via batched `AskUserQuestion` — group by category, at most 4 questions per call, **one question per finding**, the question text severity-tagged (`[Blocker] …` / `[Should-fix] …` / `[Nit] …`), options `Fix as proposed (Recommended)` / `Modify the fix` / `Skip this finding` / `Defer to a later pass` (per the `_shared/interactive-prompts.md` findings/dispositions protocol). In non-interactive mode, auto-pick `Fix as proposed` for `blocker` and `should-fix`, `Defer` for `nit`, logging each to the OQ buffer.
+
+Apply the chosen dispositions by **mutating `survey.json`** (never editing the rendered files), then re-derive `survey.html` / `survey.sections.json` / `preview.html` / `index.html` from it. Append a `## Dispositions` section to both `question-eval.md` and `survey-eval.md` recording each finding's disposition. `git commit -m "survey-design: apply review for <slug>"` (warn-and-continue if not a git repo). If the user defers every finding, record the deferrals in the `## Dispositions` sections and the run summary and commit the survey as-is (E9).
+
+## Phase 6 — Simulated-respondent pass
+
+Dispatch the simulated-respondent subagent **once per persona** — the default is **one** persona = the stated `audience`; derive a second persona only if the audience is clearly heterogeneous (D18). The prompt contains: the survey content (the rendered question text + options, or `survey.json` as text); the persona description; and a friction-walk rubric — *walk the survey question by question; for each, note friction, confusion, comprehension gaps, and any time pressure; estimate cumulative minutes; flag drop-off-risk points*. `[mode: …]` first line in non-interactive runs.
+
+**Return contract — in the prompt:** `{ persona, estimated_minutes, per_question: [{id, friction: [...], confusion: [...], comprehension_gaps: [...]}], dropoff_risk_points: [{after_id, reason}], overall_notes }` (JSON or markdown the parent can parse).
+
+**Parent side.** Write the report(s) to `simulation.md`. Derive a fix list — each item `{target_question_id_or_survey, problem, proposed_fix}`. Compare `estimated_minutes` to `time_budget_min`: if over, the fix list MUST include concrete **cut** proposals; if the user keeps over-budget questions, the Phase-9 summary prominently flags the expected drop-off + the overage (E10, FR-42). Present the fix list via batched `AskUserQuestion` (same protocol; options `Apply (Recommended)` / `Modify the fix` / `Skip this fix` / `Defer to a later pass`; `Apply` is recommended for clear comprehension/length fixes); in non-interactive mode auto-pick `Apply` for comprehension/length fixes, `Defer` otherwise, logging to the OQ buffer. Apply the chosen fixes to `survey.json`, re-derive all rendered artifacts, append a `## Dispositions` section to `simulation.md`, `git commit -m "survey-design: apply simulation fixes for <slug>"`. **Near the simulation results, state plainly that this pass is a heuristic stand-in that does NOT replace cognitive interviews or a soft launch** (FR-44 — it's a Non-Goal to replace fielded pretesting).
+
+## Phase 7 — Viewer
+
+Ensure `serve.js` (and `style.css` / `viewer.js` if `survey.html` uses them) are copied from `_shared/html-authoring/assets/` into the run folder's `assets/` (idempotent `cp -n`) (FR-50). Regenerate `index.html` via `_shared/html-authoring/index-generator.md` so its manifest now lists `survey.html`, `preview.html`, `survey-eval.md`, `question-eval.md`, `simulation.md`, and any `export/*` present (FR-51). Tell the user the view command: from the run folder, `node assets/serve.js` (then open the printed URL), or just open `preview.html` / `index.html` directly in a browser.
+
+## Phase 8 — Export
+
+**Skip entirely if `--skip-export` was passed** — end after Phase 7 (FR-64).
+
+Otherwise ask (`AskUserQuestion`, **multiSelect**): which platform(s) to emit import files for — options `Typeform`, `SurveyMonkey`, `Google Forms (Recommended)`, `Skip export` (and `Qualtrics — stretch` **only if** the `survey.qsf` transformer ships). A platform named in the initial context or via `--export` is pre-selected; the `(Recommended)` default is the named/`--export` platform, else `Google Forms` (lowest-friction import); in non-interactive mode with no `--export` and no named platform, auto-pick the single recommended platform.
+
+For each chosen platform, transform `survey.json` → the platform artifact using the recipe + type-mapping table in `reference/platform-export.md` (load it now). The transformers are **pure functions of `survey.json`** — the same `survey.json` produces byte-identical output (NFR-05). Emit into `export/` in the run folder:
+- **Typeform** → `export/typeform.json` (the Create-API body: `title`, `type`, `settings`, `welcome_screens[]`, `fields[]`, `logic[]`, `thankyou_screens[]`).
+- **SurveyMonkey** → `export/surveymonkey.json` (`title`, `language`, `pages[].questions[]` with `family`/`subtype`) **and** `export/surveymonkey-paste.txt` (the plain-text "paste your content" fallback — only `single_select` and `open_short` survive).
+- **Google Forms** → `export/build-google-form.gs` (an Apps Script using `FormApp.create()` + the relevant `add*Item()` calls).
+- **Qualtrics** (only if shipped) → `export/survey.qsf`.
+
+Each artifact MUST be structurally valid (the JSON parses; the `.gs` is syntactically valid JS). Map unsupported question types **down** per the mapping table (Google Forms: `nps` → `addScaleItem` 0–10; `ranking` → `addGridItem` 1..N; `matrix` / `forced_choice_grid` → `addGridItem`; `constant_sum` → N×`addTextItem` + a help-text note — SurveyMonkey and Typeform are native for rank/NPS/matrix); note **every** downgrade in `export/README.md`, and put a comment in the artifact itself for any meaning-changing downgrade.
+
+Write **`export/README.md`** with, per chosen platform: the import steps (Typeform: `curl -X POST https://api.typeform.com/forms -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @typeform.json`; SurveyMonkey: `POST /v3/surveys` with the JSON, or paste `surveymonkey-paste.txt` into the UI on a free plan; Google Forms: open script.google.com → New project → paste `build-google-form.gs` → Run → approve the prompt → the form URL is logged); the auth / plan requirements (Typeform: personal access token, `forms:write` scope; SurveyMonkey: OAuth token + a paid Team/Enterprise plan for API write; Google Forms: just sign-in authorization in the Apps Script editor); and the downgrade caveats.
+
+`git commit -m "survey-design: add <platforms> export for <slug>"` (warn-and-continue if not a git repo). If the user names an unsupported platform: list the supported set and offer the closest match, or just `survey.json` + `survey.html`; Qualtrics is not offered unless the transformer is implemented (E12, FR-65).
+
+## Phase 9 — Summary + capture learnings
+
+Print: the run-folder path; the list of commits made (or one line noting commits were skipped because the cwd isn't a git repo); links to every artifact (`survey.json`, `survey.html`, `preview.html`, `index.html`, `survey-eval.md`, `question-eval.md`, `simulation.md`, `export/*`); the view command; and — if the simulated estimate exceeded `time_budget_min` and over-budget questions were kept — a prominent drop-off / overage flag (E10, FR-42). In non-interactive runs, note the `_open_questions.md` path (NFR-06).
+
+Then run **## Capture Learnings** (below).
+
+---
+
+## Anti-Patterns (DO NOT)
+
+- **Don't edit the rendered HTML/JSON directly.** Mutate `survey.json` and re-derive `survey.html` / `survey.sections.json` / `preview.html` / `index.html` from it (D5).
+- **Don't guess a research purpose.** If the user can't articulate one, say a survey can't be designed without it and stop (FR-14, E2).
+- **Don't generate any catalogued anti-pattern.** Self-check every stem and option set against `reference/question-antipatterns.md` (FR-22).
+- **Don't claim "anonymous" while collecting an identifier.** `intro.anonymous: true` forbids any PII question; say "confidential" if you can re-identify.
+- **Don't prompt the user for variables already clear in the context** (FR-13). Infer first; ask only the genuine gaps.
+- **Don't dump reviewer / simulation findings as a wall of prose.** Always present them as batched, structured questions with `Fix / Modify / Skip / Defer` options.
+- **Don't run the reviewer pass in a loop "to be thorough."** One good pass; surface what it found and let the user decide (D20).
+- **Don't call platform APIs.** The skill emits import *files* and instructions — it never hits Typeform / SurveyMonkey / Google / Qualtrics (Non-Goal, NFR-01: no network).
+- **Don't overwrite an existing survey folder.** Dedupe the slug with `-2` / `-3` / … (FR-24, E4).
+- **Don't inline the `reference/*` files into SKILL.md.** Load them on demand in the phase that needs them (FR-73).
+
+## Release prerequisites
+
+- The canonical skill path is `plugins/pmos-toolkit/skills/survey-design/SKILL.md` — anywhere else and the skill silently doesn't register (lowercase-hyphenated dir name).
+- A **minor** version bump in **both** `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json`, kept byte-identical (the pre-push hook enforces sync).
+- The two manifests' `description` fields stay byte-identical to each other (this skill doesn't change the plugin description).
+- A README row under **### Utilities** (this is a standalone utility, not a pipeline stage).
+- The `description` frontmatter carries ≥ 5 user-spoken trigger phrases; the `argument-hint` enumerates every parsed flag.
+- The non-interactive block is inlined verbatim (the lint diffs the marked region against `_shared/non-interactive.md`); the findings/dispositions protocol is present in Phases 5 and 6.
+- A `## /survey-design` section header in `~/.pmos/learnings.md` (idempotent — append only if missing).
+- A CHANGELOG entry for the release.
+- The release entry point is `/complete-dev` (not the legacy `/push`).
+- No change to any `plugin.json` `skills` array — skills are auto-discovered from `plugins/pmos-toolkit/skills/`.
+
+## Capture Learnings
+
+At the end of a run, reflect on whether this session surfaced anything worth capturing under `## /survey-design` in `~/.pmos/learnings.md` — repeated friction (e.g. users overriding the same Recommended option), survey shapes the reviewer kept flagging, mode-inference mistakes, export-recipe gaps. Emit exactly one line: either the new learning appended under that header, or `No new learnings this session because <reason>`. Proposing zero learnings is a valid outcome.
+
+## Edge cases (single-glance index — behaviours are in the phase prose above)
+
+| # | Scenario | Behaviour |
+|---|---|---|
+| E1 | No argument at all | Ask the user for purpose + audience before anything else (Phase 1). |
+| E2 | Intake too thin — no purpose even after asking | State it can't design a survey without a research goal; stop (Phase 2). |
+| E3 | Existing-survey file unparseable | Report it; show what was extracted; offer to treat the text as free-text intake (Phase 1). |
+| E4 | Folder-slug collision | Append `-2` / `-3` / …; never overwrite (Phase 0). |
+| E5 | Mode genuinely ambiguous | Recommend `hybrid` and have the user confirm / pick (Phase 2). |
+| E6 | Reviewer finds nothing | Eval files say "no issues" with the rubric shown passed; proceed to simulation without forcing edits (Phase 4). |
+| E7 | Reviewer subagent fails / malformed | Surface failure; keep the committed draft; offer retry-or-proceed; non-interactive → proceed + log (Phase 4). |
+| E8 | Per-question count mismatch | Re-dispatch once naming the missing ids; if still off, surface the gap + proceed without auto-apply (Phase 4). |
+| E9 | User defers every finding | Record deferrals in the `## Dispositions` sections + the run summary; survey committed as-is (Phases 5–6). |
+| E10 | Length can't fit budget with the questions the user insists on | Field it anyway; prominently flag expected drop-off + the overage in the summary (Phases 3, 6, 9). |
+| E11 | Not in a git repo / commit fails | Write the artifacts; warn once that commits were skipped; continue (Phases 3, 5, 6, 8). |
+| E12 | Unsupported export platform named | List the supported set; offer the closest match or just `survey.json` + `survey.html`; Qualtrics not offered unless implemented (Phase 8). |
+| E13 | `.pmos/settings.yaml` missing | Default `docs_path = docs/pmos/`; warn once; proceed — do not run pipeline first-run setup (Phase 0). |
+| E14 | Skip logic targets an earlier section | Schema invariant rejects it; rewrite the jump forward or drop it and note the change (Phase 3). |

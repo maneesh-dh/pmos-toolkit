@@ -1,0 +1,9 @@
+[
+  {"id": "summary", "level": 2, "title": "1. Summary", "parent_id_or_null": null},
+  {"id": "static", "level": 2, "title": "2. Static verification", "parent_id_or_null": null},
+  {"id": "review", "level": 2, "title": "3. Code-quality review", "parent_id_or_null": null},
+  {"id": "compliance", "level": 2, "title": "4. Spec compliance", "parent_id_or_null": null},
+  {"id": "runtime", "level": 2, "title": "5. Runtime / integration verification", "parent_id_or_null": null},
+  {"id": "hardening", "level": 2, "title": "6. Test-suite hardening", "parent_id_or_null": null},
+  {"id": "gaps", "level": 2, "title": "7. Remaining issues for the user", "parent_id_or_null": null}
+]

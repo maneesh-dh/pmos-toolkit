@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>survey-design skill — Verification Review</title>
+  <link rel="stylesheet" href="../assets/style.css?v=2.36.0">
+  <script defer src="../assets/viewer.js?v=2.36.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">survey-design skill — Verification Review</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>Date:</strong> 2026-05-11 &nbsp;•&nbsp; <strong>Branch:</strong> <code>feat/survey-design-skill</code> &nbsp;•&nbsp; <strong>Verdict:</strong> PASS (with two documented action-required follow-ups)</p>
+
+<h2 id="summary">1. Summary</h2>
+<p>The <code>survey-design</code> skill (SKILL.md + 3 reference files + <code>assets/survey-preview.js</code> + static-check script + fixtures + release wiring to <code>2.36.0</code>) was verified against its spec, requirements, and plan. Static verification is fully green. A multi-angle review found one substantive defect (a skip-logic field-name mismatch in the preview engine) which was fixed and covered by a regression check in this pass. Two items remain <em>Unverified — action required</em>: the live <code>--non-interactive</code> integration run of the skill (a nested LLM-driven multi-phase invocation) and the manual <code>preview.html</code> browser walk (no browser in this environment). Both were explicitly deferred to manual follow-up by the plan (D-P3) and are surfaced below.</p>
+
+<h2 id="static">2. Static verification</h2>
+<table>
+<thead><tr><th>Check</th><th>Outcome</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td><code>tests/scripts/assert_survey_design_skill.sh</code></td><td>Verified</td><td><code>PASS: assert_survey_design_skill.sh</code>, exit 0 — SKILL.md shell sections, 7 quoted trigger phrases, non-interactive-block markers, 3 reference files non-trivial, A1–E6 catalog ids present with 35 detection-heuristic lines, platform coverage greps, survey-preview.js (no http(s), no ESM, ASCII-only, 12 type names, <code>#survey-data</code>, <code>skip_logic</code>, <code>on_value</code>, <code>node --check</code> clean), manifest versions byte-identical at 2.36.0, README + CHANGELOG carry the skill</td></tr>
+<tr><td><code>tools/audit-recommended.sh -- survey-design/SKILL.md</code></td><td>Verified</td><td><code>8 calls, 7 Recommended, 1 defer-only, 0 unmarked — PASS</code></td></tr>
+<tr><td><code>node --check assets/survey-preview.js</code></td><td>Verified</td><td>exit 0 (before and after the fix)</td></tr>
+<tr><td>Non-interactive block byte-identical to <code>_shared/non-interactive.md</code></td><td>Verified</td><td><code>diff</code> of the marked region empty</td></tr>
+<tr><td>Manifest version sync</td><td>Verified</td><td><code>diff</code> of the <code>"version"</code> lines in <code>.claude-plugin/plugin.json</code> vs <code>.codex-plugin/plugin.json</code> — identical, both <code>2.36.0</code></td></tr>
+<tr><td><code>tests/expected.yaml</code> parses</td><td>Verified</td><td><code>yaml.safe_load</code> ok</td></tr>
+</tbody>
+</table>
+
+<h2 id="review">3. Code-quality review</h2>
+<p>A review subagent read the spec §7/§9/§10/§11/§12 and all implementation files. Findings:</p>
+<ul>
+<li><strong>Medium — fixed this pass:</strong> <code>assets/survey-preview.js</code> <code>ruleMatches()</code> inspected only <code>rule.value</code>/<code>.when</code>/<code>.equals</code>; the canonical <code>survey.json</code> schema (SKILL.md Phase 3, <code>skip_logic.on_value</code>) names the trigger field <code>on_value</code> (scalar or array). A schema-conformant survey would fire conditional <code>skip_to</code>/<code>end_survey</code> jumps unconditionally on any answer. Fixed: <code>ruleMatches</code> now reads <code>on_value</code> first and is array-aware; legacy aliases kept as harmless fallbacks. Regression grep added to the assert script. Commit on branch.</li>
+<li><strong>Low — accepted:</strong> SKILL.md §3.3 enumerates time-costs for <code>ranking</code>/<code>constant_sum</code>/<code>statement</code> beyond the spec's condensed list — spec §9.1 calls the constants tunable and skill-resident, so this is an allowed elaboration, not a conflict.</li>
+<li><strong>Nit — left as-is:</strong> <code>survey-preview.js</code> thank-you fallback reads a non-schema top-level <code>survey.thankyou</code> after <code>intro.thankyou</code> — dead but harmless.</li>
+<li>No other defects: ASCII-only, no CDN/external refs, no <code>fetch</code>, DOM calls guarded, required-gate blocks Next, progress counts non-statement questions on the active path, all 12 question types rendered, consent gate + thank-you + answers-JSON toggle present.</li>
+</ul>
+
+<h2 id="compliance">4. Spec compliance</h2>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th><th>Outcome</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>7.1</td><td>Skill shell &amp; conventions</td><td>Verified</td><td>Canonical path <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code>; frontmatter <code>name</code>/<code>user-invocable: true</code>/<code>argument-hint</code> with all parsed flags; announce line; Platform Adaptation; non-interactive block inlined verbatim; Anti-Patterns / Release prerequisites / Capture Learnings sections; Phase 0 reads settings, no pipeline first-run setup. Asserted by the static script.</td></tr>
+<tr><td>7.2</td><td>Intake &amp; variable interpretation</td><td>Verified</td><td>SKILL.md Phase 1 (free-text / path / nothing) + Phase 2 (infer audience, time-budget, mode, optional cap; batched <code>AskUserQuestion</code> with <code>(Recommended)</code> defaults; audience defer-only/free-form; hard stop on no purpose). Covers E1–E3, FR-14.</td></tr>
+<tr><td>7.3</td><td>Initial design generation</td><td>Verified</td><td>SKILL.md Phase 3.1–3.7: survey.json schema + question object + 12-type enum + invariants; FR-21 time-cost constants; best-practices application + anti-pattern self-check; trim-to-budget; render survey.html (substrate) / preview.html (standalone) / survey-preview.js / assets / seed index.html; commit.</td></tr>
+<tr><td>7.4</td><td>Reviewer critique</td><td>Verified</td><td>SKILL.md Phase 4: one reviewer subagent, prompt carries context + survey.json + the two reference files + <code>[mode: ...]</code>; return contract for <code>question-eval.md</code> (one <code>## &lt;id&gt;</code> per question + Severity/Defect/Message/Proposed-fix table) and <code>survey-eval.md</code> (7 sections); parent validates <code>count(## &lt;id&gt;) == count(questions)</code> with one re-dispatch + surface-and-proceed; subagent-failure → <code>AskUserQuestion</code>. Phase 5 applies via batched Fix/Modify/Skip/Defer, mutates survey.json, re-renders, appends <code>## Dispositions</code>, commits.</td></tr>
+<tr><td>7.5</td><td>Simulated-respondent pass</td><td>Verified</td><td>SKILL.md Phase 6: per-persona dispatch (default one), friction-walk rubric, <code>{persona, estimated_minutes, per_question[], dropoff_risk_points[], overall_notes}</code> return, derived fix list, over-budget cut proposals, heuristic-stand-in disclaimer; batched apply; commit.</td></tr>
+<tr><td>7.6</td><td>Viewer</td><td>Verified</td><td>SKILL.md Phase 7: copy <code>serve.js</code> + substrate assets via <code>cp -n</code>, regenerate <code>index.html</code>, print <code>node assets/serve.js</code> view command.</td></tr>
+<tr><td>7.7</td><td>Export</td><td>Verified</td><td>SKILL.md Phase 8: <code>--skip-export</code> short-circuit; <code>AskUserQuestion</code> multiSelect Typeform / SurveyMonkey / Google Forms (Recommended) / Skip (Qualtrics gated on a shipped transformer); per-platform recipes citing <code>reference/platform-export.md</code>; map-down + <code>export/README.md</code> documenting downgrades + import steps + auth; commit. E12 (unsupported platform) handled.</td></tr>
+<tr><td>7.8</td><td>Reference directory</td><td>Verified</td><td>All 3 reference files present and non-trivial; <code>question-antipatterns.md</code> has A1–E6 each with a detection heuristic (35 heuristic lines); <code>platform-export.md</code> covers Typeform/SurveyMonkey/Google Forms + a QSF section + "MS Forms not supported"; loaded on demand per SKILL.md.</td></tr>
+<tr><td>9.1</td><td>survey.json schema</td><td>Verified</td><td>SKILL.md Phase 3 block matches spec §9.1: required top-level keys, full 12-type enum, all invariants restated (kebab-unique ids, anonymous⇒no PII, balanced scales, ordinal types never randomize, skip_logic forward-only, retrospective stems set <code>reference_period</code>, required sensitive items need <code>opt_out_options</code>). Adds <code>intro.thankyou</code> (harmless superset, consumed by preview.js).</td></tr>
+<tr><td>9.2</td><td>Reviewer subagent contract</td><td>Verified</td><td>Matches §9.2 — per-question section, verdict line, finding table, survey-level sections + overall verdict, parent-side count-match validation.</td></tr>
+<tr><td>9.3</td><td>Respondent subagent contract</td><td>Verified</td><td>Matches §9.3 return shape and per-question friction/confusion/comprehension fields + dropoff risk points + overall notes.</td></tr>
+<tr><td>9.4</td><td>Export transformer contracts</td><td>Verified</td><td>Typeform → <code>export/typeform.json</code> (Create-API body); SurveyMonkey → <code>export/surveymonkey.json</code> + <code>export/surveymonkey-paste.txt</code>; Google Forms → <code>export/build-google-form.gs</code>; Qualtrics stretch; downgrades in <code>export/README.md</code>; type-mapping tables in <code>platform-export.md</code> match the spec table. Recipes are prose (plan D-P5), not executable transformers — intentional.</td></tr>
+<tr><td>10.1</td><td>survey.html</td><td>Verified</td><td>SKILL.md Phase 3.6 specifies substrate-compliant rendering: template shape, <code>&lt;h3 id=...&gt;</code>, opt-out after <code>&lt;hr&gt;</code>, scales/matrix as <code>&lt;table&gt;</code>, metadata line, no inline script/style in <code>&lt;main&gt;</code>, cache-busted asset refs, <code>survey.sections.json</code> companion.</td></tr>
+<tr><td>10.2</td><td>preview.html + survey-preview.js</td><td>Verified (after fix)</td><td>preview.html described as standalone (inline <code>&lt;style&gt;</code>, inlined <code>&lt;script type="application/json" id="survey-data"&gt;</code>, <code>&lt;script src="survey-preview.js"&gt;</code>, no fetch/CDN). survey-preview.js handles all 12 types, consent gate, required-gate, "Question X of Y" over the active path, Back/Next, skip_logic (<code>on_value</code> scalar/array, <code>skip_to</code>/<code>end_survey</code>), thank-you + answers-JSON toggle, error screen. <code>node --check</code> clean.</td></tr>
+<tr><td>11</td><td>Edge cases E1–E14</td><td>Verified</td><td>SKILL.md "Edge cases" table covers all 14 with behaviours matching spec §11.</td></tr>
+<tr><td>12</td><td>Configuration &amp; flags</td><td>Verified</td><td><code>argument-hint</code> enumerates <code>--export</code> / <code>--skip-export</code> / <code>--format</code> / <code>--non-interactive</code> / <code>--interactive</code>; all parsed in Phase 0; time-cost constants in §3.3 match §12.</td></tr>
+</tbody>
+</table>
+
+<h2 id="runtime">5. Runtime / integration verification</h2>
+<table>
+<thead><tr><th>Item</th><th>Outcome</th><th>Detail</th></tr></thead>
+<tbody>
+<tr><td>Live <code>--non-interactive</code> integration run of <code>/survey-design</code> in a scratch repo (full artifact set + <code>question-eval.md</code> section-count match + <code>export/*</code> + per-stage commits + determinism re-export)</td><td>Unverified — action required</td><td>Requires a nested LLM-driven multi-phase invocation of the skill itself; not run in this environment. <code>tests/expected.yaml</code> records the property assertions. Plan D-P3 (static-check-first TDD) deferred this to a manual run; recommend running it before broad announcement.</td></tr>
+<tr><td>Manual <code>preview.html</code> browser walk (intro → answer one of every present type → required-gate blocks Next → skip-logic jump → "Question X of Y" updates → thank-you → answers-JSON toggle)</td><td>Unverified — action required</td><td>No browser available in this environment. <code>node --check</code> + a Node-DOM-stub <code>init()</code> smoke (run during /execute) are the substitutes. The <code>on_value</code> fix landed this pass should be confirmed in a real browser. Recommend a manual walk on the next survey generated by the skill.</td></tr>
+<tr><td>Google Forms spot-import of <code>export/build-google-form.gs</code></td><td>NA — alt-evidence</td><td>Optional; the Apps Script body is a prose-derived artifact per D-P5; reviewed structurally against <code>reference/platform-export.md</code>. Spot-import is a nice-to-have, not a release gate.</td></tr>
+</tbody>
+</table>
+<p>No deploy, DB migration, or API surface — this is plugin content, not a running service. Phases 4 sub-steps 3a–3e are NA on those grounds.</p>
+
+<h2 id="hardening">6. Test-suite hardening</h2>
+<p>Added a regression grep to <code>tests/scripts/assert_survey_design_skill.sh</code>: <code>survey-preview.js</code> must reference <code>on_value</code> (the canonical skip-logic field) — would have caught the Medium defect. Red-green confirmed by reasoning (pre-fix the engine had no <code>on_value</code> token; post-fix it does and the suite is green). No other coverage gap: every static contract from spec §13.1 is asserted; the property-based <code>expected.yaml</code> covers the integration-run assertions for when that run is performed.</p>
+
+<h2 id="gaps">7. Remaining issues for the user</h2>
+<ul>
+<li><strong>Action required:</strong> run <code>/survey-design "&lt;sample-brief&gt;" --non-interactive --export typeform,google-forms</code> against a scratch repo and check the full artifact set + per-stage commits + determinism, per <code>tests/expected.yaml</code>.</li>
+<li><strong>Action required:</strong> do the manual <code>preview.html</code> browser walk on the next generated survey, confirming the <code>on_value</code> skip-logic fix.</li>
+<li>No critical gaps. The skill is structurally complete and spec-faithful; <code>/complete-dev</code> may proceed.</li>
+</ul>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: verify/2026-05-11-review.html</span>
+  </footer>
+</body>
+</html>

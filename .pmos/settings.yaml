@@ -2,3 +2,4 @@ version: 1
 docs_path: docs/pmos/
 workstream: null
 current_feature: 2026-05-08_update-skills-complete-dev-merge
+output_format: html

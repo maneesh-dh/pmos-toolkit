@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grill Report — 01_requirements (survey-design hardening)</title>
+  <link rel="stylesheet" href="../assets/style.css?v=2.36.0">
+  <script defer src="../assets/viewer.js?v=2.36.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Grill Report — 01_requirements (survey-design hardening)</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>Depth:</strong> standard · <strong>Questions asked:</strong> 10 · <strong>Target:</strong> <code>docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/01_requirements.html</code></p>
+
+<section id="resolved">
+<h2 id="resolved">Resolved — decisions pinned this session</h2>
+<table>
+<thead><tr><th>#</th><th>Branch</th><th>Decision</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>F1 — Phase 4 architecture</td><td><strong>Phase 4 becomes a scored generate↔review refinement loop.</strong> Phase 3 generates → Phase 4 reviewer <em>evaluates only</em> (returns a numeric score + per-dimension findings + <em>recommended edits</em>; never mutates <code>survey.json</code>) → if the exit condition isn't met and iterations < 2, control returns to the <strong>generator</strong>, which regenerates the offending questions incorporating the reviewer's notes → re-review → repeat → on exit, Phase 5 surfaces the <em>residual</em> findings to the author for disposition as today. Single writer = the generator; the reviewer never writes questions.</td></tr>
+<tr><td>2</td><td>F1 — scored rubric</td><td>The reviewer produces a weighted score out of 100 across all eval dimensions (product-fit, structure/funnel, length-vs-budget, mode fit, scale balance, accessibility, ethics/PII, intro/consent). The existing <code>blocker</code>/<code>should-fix</code>/<code>nit</code> severities still tag individual findings (used for Phase-5 ordering and to prioritize what the loop fixes first). Exact weights ⇒ <code>/spec</code>.</td></tr>
+<tr><td>3</td><td>F1 — loop exit condition</td><td><strong>The loop exits on categorical conditions, not the score:</strong> when (a) zero product-fit FAILs AND (b) zero <code>blocker</code>-severity methodology findings remain — OR after 2 refinement iterations. The 0–100 score is computed and shown (progress signal: "72 → 91", and the loop uses point-weight to pick which findings to fix first) but never gates termination — a single LLM-judge score near a hard cutoff is too flappy to gate on. (Supersedes an earlier "≥90/100 gate" answer.)</td></tr>
+<tr><td>4</td><td>F1 — predictability check</td><td>Applies to <strong>both</strong> question kinds. Closed-ended: the reviewer writes a one-line <em>predicted answer distribution</em>; FAIL iff 1–2 options would plausibly absorb ~80%+. Open-ended: a yes/no judgment on whether <em>multiple distinct high-signal answers</em> are realistically expected; FAIL iff the open question would also collapse to 1–2 predictable themes. The written prediction is the evidence and goes in the product-fit block.</td></tr>
+<tr><td>5</td><td>F1 — product-fit FAIL ordering in Phase 5</td><td>A product-fit FAIL is the top tier in the dispositions batch: one "Kill or rewrite Q&lt;id&gt;? — &lt;rubric reason&gt;" question per FAIL (options Kill / Rewrite-as-proposed / Keep-with-reason / Defer), batched <strong>before</strong> <code>blocker</code> → <code>should-fix</code> → <code>nit</code> methodology findings.</td></tr>
+<tr><td>6</td><td>F3 — fail-loud, but tiered</td><td>Abort with the reinstall message <strong>only on hard-required assets</strong> (<code>survey-preview.js</code>, <code>style.css</code>, <code>viewer.js</code> — load-bearing for the artifacts the skill promises). <strong>Warn-and-skip-the-extra</strong> on convenience assets (<code>serve.js</code>, <code>html-to-md.js</code> + turndown bundle): missing those ⇒ no preview server / no <code>.md</code> sidecar, run continues. Keeps F3 consistent with the skill's warn-and-continue posture.</td></tr>
+<tr><td>7</td><td>F6 — keep the first-class type</td><td><code>multi_field_open</code> stays in scope as a real schema type (<code>schema_version → 2</code>), driving <code>estimated_minutes</code>, the preview render, and the per-platform export mapping (native where supported; N <code>open_short</code> items + a section-header explanation where not). Not downgraded to "just document the pattern."</td></tr>
+<tr><td>8</td><td>F8 — get the impact from the author</td><td>Add a Phase-2 intake variable: <em>what happens to the responses / what does the audience get</em>. The generated <code>intro.text</code> motivation line is built from that answer (honest by construction). Fallback when the author doesn't supply it ⇒ <code>/spec</code> (likely: restate <code>purpose</code> in respondent-benefit terms; no fabricated impact claim).</td></tr>
+<tr><td>9</td><td>Scope / tier</td><td>All 5 changes (F1, F3, F6, F7, F8) ship as one Tier-3 batch, as previously decided — same skill, mostly one file; <code>/spec</code> and <code>/plan</code> sequence F1 and F6 as the big tasks.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="open-deferred">
+<h2 id="open-deferred">Open / Deferred — to /spec</h2>
+<ul>
+<li>Exact dimension weights for the Phase-4 score (it's a progress signal, so calibration is low-stakes, but the weights need defining).</li>
+<li>The "regenerate with reviewer notes" pass — full re-run of Phase 3.4 scoped to flagged questions, or a targeted patch? How author-supplied questions are protected during regeneration (leaning: rewrite-only inside the loop, never auto-deleted; surfaced as a kill candidate to the author if unsalvageable).</li>
+<li><code>multi_field_open</code> time-cost constant (30s/field vs. a tuned smaller value).</li>
+<li>Where the per-iteration loop changelog lives (<code>question-eval.md</code> section vs. a new file).</li>
+</ul>
+</section>
+
+<section id="gaps-surfaced">
+<h2 id="gaps-surfaced">Gaps surfaced — requirements doc needs revision before /spec</h2>
+<ul>
+<li><strong>F1 sections are now partly wrong / under-spec'd.</strong> The doc says "fold three checks into the existing eval artifacts" and D3 says "a FAIL is surfaced as a candidate, doesn't auto-remove." Superseded: Phase 4 is a scored generate↔review loop, the reviewer is evaluate-only, the generator does all mutation, questions <em>do</em> get auto-rewritten inside the loop (author sees the residue + a changelog and can revert). <strong>D1, D2, D3, the Primary/Alternate/Error journeys, the F1 Success-Metrics row, and the F1 Goals bullet all need rewriting.</strong> The old Phase-3 "self-check against the rubric" step dissolves into "generator incorporates reviewer notes each loop iteration."</li>
+<li><strong>F8 scope grew</strong> — now includes a Phase-2 intake change, not just <code>survey-best-practices.md</code> + Phase-3.4 wording. Update F8's Goals bullet + Solution-Direction text.</li>
+<li><strong>F3 scope changed</strong> — from "any missing asset = abort" to the two-tier rule (hard-required ⇒ abort; convenience ⇒ warn-skip). Update F3's Goals bullet, Solution-Direction text, the error journey, and the edge-case table.</li>
+</ul>
+</section>
+
+<section id="recommended-next-step">
+<h2 id="recommended-next-step">Recommended next step</h2>
+<p>Revise <code>01_requirements.html</code> per the gaps above (rewrite the F1 sections + D1/D2/D3 + journeys around the scored generate↔review loop; widen F3 to the tiered rule; widen F8 to include the Phase-2 variable), re-confirm with the user, then proceed to <code>/spec</code> — the loop mechanics, rubric weights, and regeneration-pass details are spec-level and shouldn't be over-pinned in requirements.</p>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/grills/2026-05-11_01-requirements.html</span>
+  </footer>
+</body>
+</html>

@@ -68,10 +68,12 @@
 
 | skill | phase | status | artifact | timestamp |
 |---|---|---|---|---|
-| survey-design | requirements | pending | — | — |
+| survey-design | requirements | completed | `01_requirements.html` (revised post-grill) | 2026-05-11 |
+| survey-design | grill (on requirements) | completed | `grills/2026-05-11_01-requirements.html` | 2026-05-11 |
 | survey-design | spec | pending | — | — |
-| survey-design | grill | pending | — | — |
 | survey-design | plan | pending | — | — |
 | survey-design | execute | pending | — | — |
 | survey-design | verify | pending | — | — |
 | _(batch)_ | complete-dev | pending | — | — |
+
+**Grill reshaped F1 substantially** (Phase 4 → scored generate↔review refinement loop; reviewer evaluate-only; generator owns mutation; categorical exit, cap 2; product-fit checks for both open & closed questions) and grew F3 (two-tier abort) and F8 (Phase-2 intake variable for response-impact). `01_requirements.html` revised accordingly before /spec. See `grills/2026-05-11_01-requirements.html`.

@@ -1,0 +1,9 @@
+{
+  "artifact": "grills/2026-05-11_01-requirements.html",
+  "ids": [
+    {"id": "resolved", "level": 2, "title": "Resolved — decisions pinned this session", "parent_id": null},
+    {"id": "open-deferred", "level": 2, "title": "Open / Deferred — to /spec", "parent_id": null},
+    {"id": "gaps-surfaced", "level": 2, "title": "Gaps surfaced — requirements doc needs revision before /spec", "parent_id": null},
+    {"id": "recommended-next-step", "level": 2, "title": "Recommended next step", "parent_id": null}
+  ]
+}

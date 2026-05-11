@@ -1,0 +1,11 @@
+{
+  "doc": "msf-findings.html",
+  "title": "MSF findings — Skill development via /feature-sdlc",
+  "ids": [
+    "executive-summary",
+    "motivation",
+    "friction",
+    "satisfaction",
+    "assumptions"
+  ]
+}

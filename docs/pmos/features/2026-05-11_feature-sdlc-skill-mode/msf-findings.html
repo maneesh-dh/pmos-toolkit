@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>MSF findings — Skill development via /feature-sdlc</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.36.0">
+  <script defer src="assets/viewer.js?v=2.36.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">MSF findings — Skill development via /feature-sdlc</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>Date:</strong> 2026-05-11 · <strong>Source:</strong> <code>01_requirements.html</code> (Tier 3) · <strong>Mode:</strong> req-mode (text-only; no PSYCH scoring) · <strong>Recommendations only — the requirements doc is not edited.</strong></p>
+<p><em>Personas + journeys taken verbatim from the requirements doc's "Who experiences this?" and "User Journeys" sections. Flow ordering for the skill-dev pipeline is assumed to match the target phase map in <code>00_seed_brief.md</code>; flagged inline where an assumption drives a finding.</em></p>
+
+<section id="executive-summary">
+<h2 id="executive-summary">Executive Summary</h2>
+<table>
+<thead><tr><th>#</th><th>Priority</th><th>Finding</th><th>Effort</th></tr></thead>
+<tbody>
+<tr><td>R1</td><td>Must</td><td>Test the v3→v4 <code>state.yaml</code> resume migration against an actual <em>in-flight</em> feature-mode worktree fixture (mid-pipeline, not just a fresh one) — the renumber + <code>mode</code>-add is the single biggest regression risk for the Feature-developer persona.</td><td>M</td></tr>
+<tr><td>R2</td><td>Should</td><td>Make the <strong>Tier-1 skill path genuinely lightweight</strong> (short-form <code>/requirements</code> + <code>/spec</code>, no <code>/grill</code>, minimal gates). If authoring a 30-line utility skill still costs requirements→spec→plan→execute→verify→eval ceremony, authors will hand-write SKILL.md and bypass the orchestrator — defeating the consolidation. Partially OQ in the doc.</td><td>M</td></tr>
+<tr><td>R3</td><td>Should</td><td>Give <code>skill-eval-check.sh</code> / <code>skill-eval.md</code> an explicit <strong>target-platform input</strong> (Claude Code vs Codex vs generic SKILLS). Without it, Codex-target skills get false failures on Claude-Code-only frontmatter fields, and the "portable across SKILLS standard" goal isn't actually testable. The edge-cases table names the scenario but not the mechanism.</td><td>S</td></tr>
+<tr><td>R4</td><td>Should</td><td>Route model-invocation: add skill-authoring trigger phrases ("create a skill", "new slash command", "write a skill", "update this skill") to <code>/feature-sdlc</code>'s <code>description</code> so a user who'd have said "/create-skill" lands on <code>/feature-sdlc skill</code> without knowing the subcommand. The README pointer is a fallback, not a discovery path.</td><td>S</td></tr>
+<tr><td>R5</td><td>Should</td><td>Keep <code>[llm-judge]</code> checks few and ruthlessly well-specified, and require the reviewer's per-fail note to be a concrete edit instruction (not a vibe). The 2-iteration cap only works if one iteration can realistically clear a fail; subjective checks with vague feedback will routinely exhaust the loop and dump residuals on the author.</td><td>M</td></tr>
+<tr><td>R6</td><td>Should</td><td>Resolve OQ5 now: <strong>commit <code>00_seed_brief.md</code></strong> (it's already in the feature-folder commit). The requirements doc treats it as the authoritative phase-map source, so a resumed session in a fresh checkout must have it; "scratch" is not a safe option once a downstream artifact depends on it.</td><td>XS</td></tr>
+<tr><td>R7</td><td>Nice</td><td>Document the "run N times" workaround for multi-skill <code>/retro</code> output prominently in <code>/skill-sdlc</code> help text + the feedback-mode intro, so the Toolkit-maintainer persona isn't surprised by N worktrees / N <code>/complete-dev</code>s / N version bumps. The single-skill cut is sound; the surprise is the cost.</td><td>XS</td></tr>
+<tr><td>R8</td><td>Nice</td><td>In feedback mode, when Phase 0c critique says a finding is "already handled", show <em>where</em> (the SKILL.md line/section) in the keep/drop dialog — otherwise the author can't tell a real dedupe from a missed nuance and will tend to "keep" everything, inflating the change set and the resolved tier.</td><td>S</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="motivation">
+<h2 id="motivation">Motivation</h2>
+<ul>
+<li><strong>Skill author (new skill).</strong> Job: "turn a repeated prompt/workflow into a reliable skill and ship it." Strongly motivated when they already trust <code>/feature-sdlc</code> from feature work — the consolidation <em>raises</em> motivation (familiar pipeline, isolation, resume they didn't have). Risk to motivation: discovery — if they don't learn the <code>skill</code> subcommand exists, they either keep reaching for <code>/create-skill</code> (now "unknown skill") or hand-write. → R4.</li>
+<li><strong>Skill author (applying feedback).</strong> Job: "get the real problems from <code>/retro</code> fixed end-to-end with the audit trail intact." Motivation is high and the triage keep/drop gate + feature-folder artifact directly serve "audit trail". Mild demotivator: the mandatory tier confirmation + full pipeline for what may be a one-line wording fix to a SKILL.md. → R2 (shared with new-skill).</li>
+<li><strong>Feature developer.</strong> Not a new job — the requirement is "don't make my thing worse." Motivation is neutral-to-positive (cleaner phase numbers). The only thing that erodes it is a botched resume of an in-flight run after upgrade. → R1.</li>
+<li><strong>Toolkit maintainer.</strong> Job: "stop hand-syncing three pipeline implementations." Cleanly served (3→1). No motivation gap; the only friction is the multi-skill-feedback ergonomics. → R7.</li>
+</ul>
+</section>
+
+<section id="friction">
+<h2 id="friction">Friction</h2>
+<table>
+<thead><tr><th>Persona × journey</th><th>Friction</th><th>Where it bites</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>New-skill author · whole run</td><td>Doesn't know <code>/feature-sdlc skill …</code> exists; muscle memory is <code>/create-skill</code></td><td>Entry — before the pipeline even starts</td><td>R4: trigger phrases in <code>description</code>; argument-hint advertises <code>skill</code>; README + <code>archive/README.md</code> redirect (already planned, but reactive)</td></tr>
+<tr><td>New-skill author · Tier-1 utility</td><td>Full requirements→spec→plan→execute→verify→eval for a tiny skill feels disproportionate</td><td>Phase 0d (tier confirm) through Phase 7</td><td>R2: genuinely short-form Tier-1 path; the eval gate + <code>/verify</code> still run (correct) but everything upstream should collapse</td></tr>
+<tr><td>Feedback author · Phase 0c</td><td>"already handled" verdict with no pointer → can't trust the dedupe → keeps everything</td><td>Keep/drop triage dialog</td><td>R8: cite the SKILL.md location for each "already handled"</td></tr>
+<tr><td>Feedback author · multi-skill <code>/retro</code></td><td><code>/retro --last 5</code> surfaced fixes for 4 skills → 4 separate runs / worktrees / releases</td><td>Right after triage, when scope spans skills</td><td>R7: document the N-runs workaround up front; future batch mode is an explicit non-goal here</td></tr>
+<tr><td>Any author · Phase 6a eval loop</td><td>An <code>[llm-judge]</code> check keeps failing with vague feedback; 2 iterations exhausted</td><td>Phase 6a → forced Accept-as-risk / iterate / abort</td><td>R5: few, sharp <code>[llm-judge]</code> checks; reviewer fix-notes must be concrete edits</td></tr>
+<tr><td>Codex-target author · Phase 6a + Phase 7</td><td>Deterministic checks flag Claude-Code-only frontmatter as "missing" on a Codex skill</td><td><code>skill-eval-check.sh</code> run inside 6a and re-run in <code>/verify</code></td><td>R3: explicit target-platform input to the rubric + script</td></tr>
+<tr><td>Feature developer · upgrade with in-flight run</td><td>v3 <code>state.yaml</code> mid-pipeline; renumber + <code>mode</code>-add migration must not strand the cursor</td><td>First <code>/feature-sdlc --resume</code> after the upgrade</td><td>R1: test against an in-flight fixture, not just a fresh-init one; <code>/verify</code> covers it</td></tr>
+<tr><td>Any author · resumed fresh checkout</td><td>Spec/plan reference <code>00_seed_brief.md</code> for the phase map; if it's "scratch" it isn't there</td><td>Phase 4 / Phase 5 on a machine that didn't run Phase 0–2</td><td>R6: commit it (already committed); close OQ5 as "commit"</td></tr>
+</tbody>
+</table>
+<p><em>No-UI note:</em> the suppression of <code>/wireframes</code> and <code>/prototype</code> in skill-dev modes (D13) correctly removes a friction source — presenting those gates for a skill would be pure noise. No finding.</p>
+</section>
+
+<section id="satisfaction">
+<h2 id="satisfaction">Satisfaction</h2>
+<ul>
+<li><strong>"One obvious command, a pipeline I already trust."</strong> Fulfilled <em>iff</em> R4 lands — otherwise the command is obvious only to people who read the changelog.</li>
+<li><strong>"A killed session resumes exactly where it stopped."</strong> Fulfilled for skill-dev modes by reusing the existing machinery (D12) — the satisfaction depends on R1 (the migration that makes <em>existing</em> in-flight runs survive the upgrade) more than on the new modes, which start clean on v4.</li>
+<li><strong>"Concrete, checkable failures — I trust the skill will trigger and stay maintainable."</strong> Fulfilled only if <code>skill-eval.md</code>'s pass-conditions are unambiguous and the deterministic subset is large (Success Metrics already targets "every <code>[deterministic]</code> check covered by <code>skill-eval-check.sh</code>"). R5 is the risk: a rubric heavy on soft judgments produces "looks fine" by another name. The <code>/spec</code> stage owns nailing each pass-condition.</li>
+<li><strong>"A skill authored for a non-pmos repo works the same way."</strong> Fulfilled only with R3 — "portable" must be testable, not just asserted. Reassurance signal the author wants: the eval output saying which platform it scored against.</li>
+<li><strong>Toolkit maintainer:</strong> high satisfaction — "only <code>/feature-sdlc</code> contains pipeline-orchestration prose" is a concrete, gratifying end state. No shortfall.</li>
+</ul>
+</section>
+
+<section id="assumptions">
+<h2 id="assumptions">Assumptions Surfaced (for user verification)</h2>
+<ul>
+<li>The skill-dev pipeline runs phases in the <code>00_seed_brief.md</code> order (0 → 0a → 0b → 0c → 0d → 1 → 2 → 2a → 3a → 4 → 5 → 6 → 6a → 7 → 8 → 8a → 9 → 10); 3b/3c are not presented in skill-dev modes. R2/R8 assume this ordering.</li>
+<li>Tier-1 in the create-skill matrix still means a meaningfully shorter pipeline (not just "skip /grill"). R2 is moot if the matrix already collapses upstream phases for Tier 1.</li>
+<li>The reviewer subagent in Phase 6a receives the written SKILL.md (+ reference files) inline and returns structured per-check pass/fail + fix notes — i.e., it can produce concrete edit instructions, not just scores. R5 assumes this is the design intent (it is, per D10) and flags the quality bar on the <em>rubric</em>, not the mechanism.</li>
+<li>"already handled?" in Phase 0c is a per-finding classification the orchestrator computes against the current SKILL.md — R8 assumes the location is available to cite (it must be, to make the determination).</li>
+</ul>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/msf-findings.html</span>
+  </footer>
+</body>
+</html>

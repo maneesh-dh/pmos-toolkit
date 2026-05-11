@@ -1,0 +1,27 @@
+{
+  "artifact": "03_plan.html",
+  "ids": [
+    {"id": "overview", "level": 2, "title": "Overview", "parent_id": null},
+    {"id": "decision-log", "level": 2, "title": "Decision Log", "parent_id": null},
+    {"id": "code-study-notes", "level": 2, "title": "Code Study Notes", "parent_id": null},
+    {"id": "patterns-to-follow", "level": 3, "title": "Patterns to follow", "parent_id": "code-study-notes"},
+    {"id": "existing-code-to-reuse", "level": 3, "title": "Existing code to reuse", "parent_id": "code-study-notes"},
+    {"id": "constraints-discovered", "level": 3, "title": "Constraints discovered", "parent_id": "code-study-notes"},
+    {"id": "stack-signals", "level": 3, "title": "Stack signals", "parent_id": "code-study-notes"},
+    {"id": "prerequisites", "level": 2, "title": "Prerequisites", "parent_id": null},
+    {"id": "file-map", "level": 2, "title": "File Map", "parent_id": null},
+    {"id": "risks", "level": 2, "title": "Risks", "parent_id": null},
+    {"id": "tasks", "level": 2, "title": "Tasks", "parent_id": null},
+    {"id": "t1", "level": 3, "title": "T1: survey-best-practices.md — Product-fit section + rubric + WIIFM", "parent_id": "tasks"},
+    {"id": "t2", "level": 3, "title": "T2: SKILL.md — Phase 4 rewrite + dispositions + anti-patterns + edge-cases", "parent_id": "tasks"},
+    {"id": "t3", "level": 3, "title": "T3: SKILL.md — F8 response_impact + schema_version 2 + WIIFM", "parent_id": "tasks"},
+    {"id": "t4", "level": 3, "title": "T4: SKILL.md — F3 two-tier substrate-asset handling", "parent_id": "tasks"},
+    {"id": "t5", "level": 3, "title": "T5: SKILL.md — F7 cosmetic-finding filter", "parent_id": "tasks"},
+    {"id": "t6", "level": 3, "title": "T6: SKILL.md — F6 multi_field_open schema", "parent_id": "tasks"},
+    {"id": "t7", "level": 3, "title": "T7: platform-export.md — multi_field_open mapping", "parent_id": "tasks"},
+    {"id": "t8", "level": 3, "title": "T8: survey-preview.js — multi_field_open render", "parent_id": "tasks"},
+    {"id": "t9", "level": 3, "title": "T9: tests/expected.yaml — coverage + regression", "parent_id": "tasks"},
+    {"id": "tn", "level": 3, "title": "TN: Final Verification", "parent_id": "tasks"},
+    {"id": "review-log", "level": 2, "title": "Review Log", "parent_id": null}
+  ]
+}

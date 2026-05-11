@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>survey-design hardening — Implementation Plan</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.36.0">
+  <script defer src="assets/viewer.js?v=2.36.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">survey-design hardening — Implementation Plan</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>tier:</strong> 3 · <strong>type:</strong> enhancement · <strong>feature:</strong> update-skills-survey-design-fixes · <strong>spec_ref:</strong> 02_spec.html · <strong>requirements_ref:</strong> 01_requirements.html · <strong>date:</strong> 2026-05-11 · <strong>status:</strong> Draft · <strong>commit_cadence:</strong> per-task</p>
+
+<section id="overview">
+<h2 id="overview">Overview</h2>
+<p>Edit the existing <code>/survey-design</code> skill (prose + one JS file + a YAML test fixture) per spec §7's 24 FRs. Order: F1 first (the big Phase-4 rewrite — <code>reference/survey-best-practices.md</code> product-fit section + scoring rubric, then SKILL.md Phase 4 + dispositions ordering + anti-patterns); then the smaller SKILL.md edits that share that file (F3 two-tier asset handling, F7 cosmetic-finding filter, F8 Phase-2 variable + WIIFM); then F6 (schema type + export mapping + preview render + tests). One agent edits SKILL.md serially to avoid conflicts. No compiled code, no migrations, no deploy — verification is lint (<code>audit-recommended.sh</code> + non-interactive-block byte-match) plus a behavioral run of the skill against a reconstructed retro brief.</p>
+<p><strong>Done when:</strong> all of — <code>tools/audit-recommended.sh</code> on <code>SKILL.md</code> exits 0; the SKILL.md non-interactive-block region byte-matches <code>_shared/non-interactive.md</code>; <code>SKILL.md</code> Phase 4 describes the bounded generate↔review loop (≤2 iterations, categorical exit) and the reviewer evaluate-only return contract; the <code>type</code> enum includes <code>multi_field_open</code> and <code>schema_version</code> is 2; <code>reference/survey-best-practices.md</code> has a leading "Product fit" section with ≥2 worked PASS/FAIL examples and the 8-dimension 0–100 rubric (weights sum to 100); <code>reference/platform-export.md</code> has a <code>multi_field_open</code> mapping row for all three platforms; <code>assets/survey-preview.js</code> renders <code>multi_field_open</code>; <code>tests/expected.yaml</code> covers the new type; and a behavioral run of <code>/survey-design</code> on the reconstructed retro brief produces a <code>question-eval.md</code> with per-question product-fit verdicts + a refinement changelog and a <code>survey-eval.md</code> with a score and a research-goal-coverage section, with the loop having run ≤2 iterations.</p>
+<p><strong>Done-when walkthrough:</strong> Run <code>bash tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> → exit 0. Run the non-interactive-block diff (T2/TN command) → no diff. Open <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> → Phase 4 reads as the loop in spec §6.1, with the §6.2 reviewer dispatch contract and a "reviewer does not mutate survey.json" instruction; §3.2's type enum line lists <code>multi_field_open</code>; §3.1 shows <code>schema_version: 2</code> and an <code>intro.text</code> example with a WIIFM sentence. Open <code>reference/survey-best-practices.md</code> → first section is "Product fit (evaluate this first)" with the three binary checks + two worked examples; a "Scoring rubric" section lists the eight dimensions with weights 30/15/10/10/10/10/10/5. Open <code>reference/platform-export.md</code> → each platform's type-mapping table has a <code>multi_field_open</code> row. Then run <code>/survey-design</code> on the reconstructed retro brief (TN behavioral runbook): the run dispatches a reviewer subagent, writes <code>question-eval.md</code> (each <code>## q-id</code> leads with a "Product fit:" verdict line; a <code>## Refinement loop changelog</code> section exists) and <code>survey-eval.md</code> (leads with "Score: N/100 …" and a "Research-goal coverage / product fit" section); the previously-predictable question is FAILed on the predictability check with a written predicted-answer line and is either rewritten (changelog "### Iteration 1") or surfaced as a top-of-batch "Kill or rewrite Q&lt;id&gt;?" in Phase 5; the loop ran 1 or 2 iterations and exited on the categorical condition or the cap.</p>
+<p><strong>Execution order:</strong></p>
+<pre>
+T0 (prereqs — trivial for a markdown repo)
+  └─ T1  reference/survey-best-practices.md: Product-fit section + 0–100 rubric + intro-WIIFM requirement   [F1, F8 partial — FR-01, FR-02, FR-23]
+       └─ T2  SKILL.md Phase 4 full rewrite (loop + reviewer contract) + Phase 5/6 product-fit-FAIL-first ordering + Anti-Patterns + Edge-cases   [F1 — FR-03..FR-08]   (depends T1 for the rubric it references)
+            └─ T3  SKILL.md Phase 2: response_impact variable; Phase 3.1: intro.response_impact field + bumped schema_version + rewritten intro.text example; Phase 3.4: WIIFM-line requirement   [F8 — FR-21, FR-22, FR-23, FR-15 partial]   (depends T1 best-practices intro section, T2 reviewer intro/consent dimension)
+                 └─ T4  SKILL.md Phase 3.6 + Phase 7: two-tier substrate-asset handling; Platform-Adaptation + Edge-cases   [F3 — FR-09..FR-12]
+                      └─ T5  SKILL.md Phases 5 & 6: cosmetic-only definition + trailing "Noted, not asked:" line; Anti-Pattern note   [F7 — FR-19, FR-20]
+                           └─ T6  SKILL.md §3.2 type enum + question object: multi_field_open + fields array; §3.3: 30s/field; schema invariants; §3.1 schema_version=2 (if not already from T3)   [F6 — FR-13, FR-14, FR-15]
+                                ├─ T7  reference/platform-export.md: multi_field_open mapping rows + recipes per platform + README template downgrade note   [F6 — FR-16]
+                                ├─ T8  assets/survey-preview.js: multi_field_open render branch   [F6 — FR-17]
+                                └─ T9  tests/expected.yaml (+ fixture if needed): cover multi_field_open + the F8-no-structural-change regression   [F6 — FR-18; spec §14.4]
+                                     └─ TN  Final verification (lint + non-interactive-block diff + behavioral runbook from spec §14.2 + regression §14.4)
+</pre>
+<p>All SKILL.md-touching tasks (T2–T6) are sequential by file; T7/T8/T9 are <code>[P]</code> after T6.</p>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log">Decision Log</h2>
+<p>Architecture decisions inherited from <code>02_spec.html</code> §4 (D1–D15). Implementation-specific decisions made during planning:</p>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>P1</td><td>One agent edits <code>SKILL.md</code> serially across T2–T6 rather than splitting SKILL.md edits across parallel agents.</td><td>(a) parallel agents on disjoint section ranges; (b) one agent, sequential tasks</td><td>(b) — the F1 Phase-4 rewrite, F3 Phase-3.6/7 edits, F7 Phase-5/6 edits, F8 Phase-2/3.4 edits, and F6 §3.x edits all live in one 374-line file with cross-references (the reviewer's intro/consent dimension in Phase 4 must mention the F8 WIIFM check; the Edge-cases index gains rows from F1, F3, F6); serial editing keeps the cross-refs consistent and avoids merge churn.</td></tr>
+<tr><td>P2</td><td>TDD shape: T1–T4 and T6–T7 are <code>no — prose change</code> (markdown contracts, not code); T5 (<code>survey-preview.js</code>) is <code>yes — new-feature</code> with a tiny render-branch test if the repo has a JS test harness, else a manual render check; T8 (<code>tests/expected.yaml</code>) is itself the test artifact.</td><td>(a) force a red/green shape on every task; (b) prose tasks verified structurally + behaviorally, JS task gets a real test if a harness exists</td><td>(b) — per FR-105 (TDD-optional types: config/docs/prose); a "failing test" for "the Phase-4 section describes a loop" is theatre. The behavioral run of the skill in TN is the real proof for the prose changes.</td></tr>
+<tr><td>P3</td><td><code>schema_version</code> is bumped to 2 in T3 (alongside <code>intro.response_impact</code>) and T6 just confirms it's already 2 (idempotent edit); not bumped twice.</td><td>(a) bump in whichever task runs first, the other no-ops; (b) bump only in T6</td><td>(a) — T3 runs before T6 in the execution order and already edits §3.1; bumping there keeps the version change atomic with its first additive field. T6's §3.1 touch becomes a "confirm schema_version: 2" check.</td></tr>
+<tr><td>P4</td><td>The <code>multi_field_open</code> SurveyMonkey "native" claim is verified during T7 against current SurveyMonkey docs; if the <code>multiple_textbox</code>-family question type can't be confirmed to round-trip the labeled fields, T7 downgrades it to the same N-<code>open_short</code>-items-plus-header pattern as Typeform/Google Forms and notes that in the mapping table.</td><td>(a) assert native now; (b) verify at implementation time, downgrade if it doesn't pan out</td><td>(b) — spec D15 already left this open; better to confirm against live docs than ship an unverified "native" claim.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="code-study-notes">
+<h2 id="code-study-notes">Code Study Notes</h2>
+<p>Glossary inherited from <code>02_spec.html</code> — no new domain terms.</p>
+<h3 id="patterns-to-follow">Patterns to follow</h3>
+<ul>
+<li><code>plugins/pmos-toolkit/skills/wireframes/SKILL.md</code> / <code>plugins/pmos-toolkit/skills/prototype/SKILL.md</code> — the reviewer-subagent + bounded-self-refinement-loop (≤2 loops) shape; the Phase-4 rewrite (T2) follows it.</li>
+<li><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> Phase 3.4 "Generate NONE of the <code>reference/question-antipatterns.md</code> patterns — self-check …" — the existing self-check pattern; the product-fit rubric reference (T1/T2) sits beside it (and per FR-05 the existing anti-pattern self-check is unchanged).</li>
+<li><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> Phase 4 current text (reviewer dispatch, the <code>survey-eval.md</code>/<code>question-eval.md</code> two-body return contract, the per-question-count validation + one-re-dispatch on mismatch, the E7/E8 failure handling) — the rewrite (T2) preserves the validation + failure-handling machinery and extends the return contract.</li>
+<li><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> Phase 2 variable-interpretation block (the batched <code>AskUserQuestion</code> with a <code>&lt;!-- defer-only: free-form --&gt;</code>-tagged audience question) — T3 adds <code>response_impact</code> in the same shape.</li>
+<li><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> Phase 3.6 / Phase 7 <code>cp -n</code> blocks — T4 wraps these with the two-tier classification.</li>
+<li><code>plugins/pmos-toolkit/skills/survey-design/assets/survey-preview.js</code> — its existing per-<code>type</code> render dispatch (radio/checkbox/scale/matrix/grid/ranking/constant_sum/statement/open_short/open_long); T5 adds a <code>multi_field_open</code> case in the same style with the same accessibility bar (label-adjacent, ≥4.5:1, visible focus).</li>
+</ul>
+<h3 id="existing-code-to-reuse">Existing code to reuse</h3>
+<ul>
+<li><code>plugins/pmos-toolkit/skills/_shared/html-authoring/assets/{style.css,viewer.js,serve.js,html-to-md.js,turndown.umd.js,turndown-plugin-gfm.umd.js,LICENSE.turndown.txt}</code> — the substrate assets the skill <code>cp -n</code>s; T4 classifies them hard-required vs convenience (no edit to the assets themselves).</li>
+<li><code>plugins/pmos-toolkit/skills/_shared/non-interactive.md</code> — the canonical block inlined verbatim in SKILL.md; TN diffs the SKILL.md region against it (untouched by this change).</li>
+<li><code>tools/audit-recommended.sh</code> (repo root <code>tools/</code>) — the lint that greps SKILL.md <code>AskUserQuestion</code> call sites for the recommended/defer-only contract; T2/T3/T5/TN run it.</li>
+</ul>
+<h3 id="constraints-discovered">Constraints discovered</h3>
+<ul>
+<li>Canonical skill path is <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> — editing in place; do not move/rename.</li>
+<li>The SKILL.md non-interactive-block region (between <code>&lt;!-- non-interactive-block:start --&gt;</code> and <code>&lt;!-- non-interactive-block:end --&gt;</code>) must stay byte-identical to <code>_shared/non-interactive.md</code> — none of these tasks touch it; TN verifies.</li>
+<li>Every new <code>AskUserQuestion</code> in SKILL.md (the F8 <code>response_impact</code> ask in Phase 2; the F1 "Kill or rewrite Q&lt;id&gt;?" questions in Phase 5) must follow the recommended/defer-only contract — the <code>response_impact</code> ask is genuinely free-form, so it carries <code>&lt;!-- defer-only: free-form --&gt;</code> on the line immediately above the call; the kill/rewrite questions carry a <code>(Recommended)</code> option (per FR-07: "Rewrite-as-proposed (Recommended)" — the loop already recommends a rewrite).</li>
+<li><code>schema_version</code> is currently <code>1</code> in §3.1; bump to <code>2</code> exactly once (P3).</li>
+<li>SKILL.md <code>description</code> and <code>argument-hint</code> are unchanged (no new flags, no new trigger phrases) — keep them as-is; TN confirms they still meet the release prereqs (≥5 trigger phrases; every parsed flag in the hint).</li>
+<li>This repo's <code>tests/</code> for the skill is YAML expectations (<code>tests/expected.yaml</code>), not an executable JS test harness — so T5's "test" for the <code>survey-preview.js</code> branch is a manual render check (open a <code>preview.html</code> built from a survey with a <code>multi_field_open</code> question) unless a JS harness is found in Phase 2 (none observed).</li>
+</ul>
+<h3 id="stack-signals">Stack signals</h3>
+<ul>
+<li>No language manifest at repo root beyond the plugin marketplace structure; this is a Claude-Code plugin repo (markdown skills + a few vendored JS assets). Reference system: the pmos-toolkit plugin itself (the other 25 skills) — structural choices (loop shape, reviewer contract, anti-pattern wording, edge-case-index format) are justified against <code>/wireframes</code>, <code>/prototype</code>, and the current <code>survey-design</code> SKILL.md. No npm/python/go/etc. build; "tests" are the YAML expectation files + the repo's <code>tools/</code> shell lints.</li>
+</ul>
+</section>
+
+<section id="prerequisites">
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>On branch <code>feat/survey-design-fixes</code> (already created; the requirements/spec/grill docs are committed there).</li>
+<li>Working tree clean apart from this feature folder.</li>
+<li><code>node</code> available (for the optional <code>.md</code> sidecar regen and for opening <code>preview.html</code> via <code>serve.js</code> during the behavioral check).</li>
+<li>No running services needed — this is a docs/skill change.</li>
+</ul>
+</section>
+
+<section id="file-map">
+<h2 id="file-map">File Map</h2>
+<table>
+<thead><tr><th>Action</th><th>File</th><th>Responsibility</th><th>Task</th></tr></thead>
+<tbody>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/reference/survey-best-practices.md</code></td><td>Add leading "Product fit (evaluate this first)" section (3 binary checks + survey-wide coverage check + ≥2 worked examples); add the 0–100 scoring rubric (8 dims, weights, deduction sizes, composite formula, "informational only"); add the intro-WIIFM requirement to the intro section.</td><td>T1</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (Phase 4, Phases 5–6, Anti-Patterns, Edge-cases index)</td><td>Rewrite Phase 4 as the bounded generate↔review loop + the §6.2 reviewer dispatch contract + the §9 return contract (reviewer evaluate-only); Phase 5 dispositions ordering (product-fit FAILs first, with the kill/rewrite question shape); update the "don't run the reviewer in a loop" anti-pattern + add the "reviewer doesn't mutate survey.json" anti-pattern; add Edge-cases rows E1–E5.</td><td>T2</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (Phase 2, Phase 3.1, Phase 3.4)</td><td>Add the <code>response_impact</code> Phase-2 variable (free-form, defer-only-tagged); add <code>intro.response_impact</code> to the §3.1 schema; bump <code>schema_version</code> to 2; rewrite the §3.1 <code>intro.text</code> example to model the WIIFM sentence; add the WIIFM-line requirement to Phase 3.4; wire the reviewer's intro/consent dimension to flag its absence (cross-ref into T2's Phase-4 text).</td><td>T3</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (Phase 3.6, Phase 7, Platform-Adaptation, Edge-cases)</td><td>Wrap the <code>cp -n</code> blocks with the two-tier classification: hard-required (<code>survey-preview.js</code>, <code>style.css</code>, <code>viewer.js</code>) → abort with the exact reinstall message, no degraded artifact; convenience (<code>serve.js</code>, <code>html-to-md.js</code>, turndown trio) → one warning, skip the dependent extra, continue. Add the two Platform-Adaptation / Edge-cases rows.</td><td>T4</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (Phases 5 & 6, Anti-Patterns)</td><td>Define "cosmetic-only" (= severity <code>nit</code> AND wording/title polish with no methodological/product-fit impact); exclude such findings from the batched dispositions <code>AskUserQuestion</code>, list them in a trailing "Noted, not asked:" line, still record them in <code>## Dispositions</code>; add the note to the "don't dump findings as prose" anti-pattern.</td><td>T5</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (§3.2 type enum + question object, §3.3 time-costs, schema invariants, §3.1 schema_version confirm)</td><td>Add <code>multi_field_open</code> to the type enum and document the question object's <code>fields: [{id,label,placeholder}]</code> array; add <code>multi_field_open = 30s per field</code> to §3.3; add the <code>fields</code>-array invariants (≥1 field, kebab unique within question, no options/scale/rows/columns/constant_sum, skip_logic/screening null); confirm §3.1 <code>schema_version: 2</code>.</td><td>T6</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/reference/platform-export.md</code></td><td>Add a <code>multi_field_open</code> row to each platform's type-mapping table + the transformer recipe text per platform (D15/P4); add the downgrade note to the <code>export/README.md</code> template description.</td><td>T7</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/assets/survey-preview.js</code></td><td>Add a render branch for <code>multi_field_open</code>: the stem + help + one <code>&lt;label&gt;</code>+<code>&lt;input type="text"&gt;</code> per field, meeting the existing preview accessibility bar; include it in the question-counter and the "Question X of Y" logic the same way other question types are.</td><td>T8</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/survey-design/tests/expected.yaml</code> (and <code>tests/fixtures/sample-brief.txt</code> if a fixture is needed)</td><td>Add expectations covering: a survey containing a <code>multi_field_open</code> question parses and validates; its time-cost contribution is 30s × field-count; it appears in the <code>preview.html</code> render; at least one export downgrade (Google Forms → N short-answer items + header) is asserted. Add the F8 regression expectation: a survey with no <code>multi_field_open</code> and a brief stating response-impact produces the same artifact shape plus a WIIFM sentence in <code>intro.text</code>.</td><td>T9</td></tr>
+<tr><td>Test</td><td>(behavioral) reconstructed retro brief — a transient <code>tests/fixtures/retro-brief.txt</code> OR inline prompt</td><td>The trial-conversion-style survey from the retro session, including the "everyone says the analytics team" question, used for the TN F1 acceptance run.</td><td>TN</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="risks">
+<h2 id="risks">Risks</h2>
+<table>
+<thead><tr><th>#</th><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Severity</th><th>Mitigation</th><th>Mitigation in:</th></tr></thead>
+<tbody>
+<tr><td>R1</td><td>The Phase-4 rewrite (T2) is large enough to introduce an inconsistency with Phases 3, 5, 6 (e.g. the reviewer return-contract shape referenced in Phase 5 doesn't match what Phase 4 emits, or the Edge-cases index references a behavior the prose doesn't describe).</td><td>Medium</td><td>Medium</td><td>Medium</td><td>T2 rewrites Phase 4, Phases 5–6 dispositions, the Anti-Patterns, and the Edge-cases rows in one task so the cross-refs are written together; TN's behavioral run exercises the full Phase 3→4→5 path and would surface a mismatch.</td><td>T2, TN</td></tr>
+<tr><td>R2</td><td>The new <code>AskUserQuestion</code> call sites (F8 <code>response_impact</code> in Phase 2; F1 kill/rewrite in Phase 5) trip <code>audit-recommended.sh</code> (missing <code>(Recommended)</code> / missing <code>defer-only</code> tag).</td><td>Medium</td><td>Low</td><td>Low</td><td>The Constraints-discovered note pins the exact contract for each (<code>response_impact</code> → <code>&lt;!-- defer-only: free-form --&gt;</code>; kill/rewrite → "Rewrite-as-proposed (Recommended)"); T2/T3 follow it; T2/T3/T5 and TN run <code>audit-recommended.sh</code>.</td><td>T2, T3, T5, TN</td></tr>
+<tr><td>R3</td><td>SurveyMonkey turns out not to have a question type that round-trips <code>multi_field_open</code>'s labeled fields, leaving the "native" claim wrong.</td><td>Medium</td><td>Low</td><td>Low</td><td>P4: T7 verifies against live docs and downgrades to the N-<code>open_short</code>-items pattern if it can't confirm.</td><td>T7</td></tr>
+<tr><td>R4</td><td>The repo has no JS test harness, so the <code>survey-preview.js</code> change (T8) can only be checked by eye — a render bug could slip.</td><td>Low</td><td>Medium</td><td>Low</td><td>T8's verification is a concrete manual render check (build a <code>preview.html</code> from a 3-field <code>multi_field_open</code> survey, open it, confirm three labeled inputs accept text); T9's <code>expected.yaml</code> asserts the type appears in the render; TN re-runs the manual check as part of the F6 behavioral runbook.</td><td>T8, T9, TN</td></tr>
+<tr><td>R5</td><td>Bumping <code>schema_version</code> to 2 breaks a downstream consumer that hard-checks <code>== 1</code>.</td><td>Low</td><td>Low</td><td>Low</td><td>The only consumer is the skill itself, which is updated in the same change; spec NFR-04 + the §3.1 migration note state v1 surveys remain valid input. No external consumer exists.</td><td>T6</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="tasks">
+<h2 id="tasks">Tasks</h2>
+
+<p><strong>T0 (Prerequisite Check) — auto-generated, mandatory:</strong></p>
+<ul>
+<li>[ ] Confirm on branch <code>feat/survey-design-fixes</code>: <code>git branch --show-current</code> → <code>feat/survey-design-fixes</code>.</li>
+<li>[ ] Confirm working tree clean apart from the feature folder: <code>git status --porcelain</code> → only <code>docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/</code> entries (or empty).</li>
+<li>[ ] Confirm the lint exists: <code>test -x tools/audit-recommended.sh || ls tools/</code> (locate the actual lint entrypoint if the name differs).</li>
+<li>[ ] Read <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code>, <code>reference/survey-best-practices.md</code>, <code>reference/platform-export.md</code>, <code>assets/survey-preview.js</code>, <code>tests/expected.yaml</code> end-to-end before editing.</li>
+</ul>
+
+<h3 id="t1">T1: reference/survey-best-practices.md — Product-fit section + 0–100 rubric + intro-WIIFM requirement</h3>
+<p><strong>Goal:</strong> Add the methodology backbone the Phase-4 loop evaluates against.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-f1-loop</code> (FR-01, FR-02), <code>02_spec.html#fr-f8-intro</code> (FR-23), <code>02_spec.html#decision-log</code> (D8).</p>
+<p><strong>Depends on:</strong> none. <strong>Idempotent:</strong> yes. <strong>TDD:</strong> no — prose change (markdown contract; verified structurally + via TN behavioral run). <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/reference/survey-best-practices.md</code>.</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] Add a new <strong>leading</strong> section <code>## Product fit (evaluate this first)</code> at the top of the file's body (before the existing methodology sections) with: (a) the predictability check — closed-ended: write a one-line predicted answer distribution, FAIL iff 1–2 options would plausibly absorb ≳80%; open-ended: yes/no on whether multiple distinct high-signal answers are realistically expected, FAIL iff it collapses to 1–2 predictable themes; the written prediction is the evidence; (b) the load-bearing check — FAIL iff dropping the question would not change what the author learns relative to <code>purpose</code>; (c) the scope-match check — FAIL iff the question is framed broader or narrower than the actual scope implied by <code>purpose</code>/<code>audience</code>; (d) the survey-wide research-goal-coverage check — coverage gaps, redundant items, scope drift. Include ≥2 worked PASS/FAIL examples (one closed-ended FAIL like the retro's "everyone went to the analytics team" Q2 with its predicted distribution; one PASS).</li>
+<li>[ ] Add a <code>## Scoring rubric (0–100, informational)</code> section: the eight dimensions and weights — product-fit 30, structure/funnel 15, length-vs-budget 10, mode-fit 10, scale-balance 10, accessibility 10, ethics/PII 10, intro/consent 5 (sum 100); per-dimension deduction sizes for <code>blocker</code> (large) / <code>should-fix</code> (medium) / <code>nit</code> (small) with concrete percentages; the composite formula (composite = Σ weighted sub-scores, each sub-score = round(weight × (1 − weighted-deduction))); and a one-line statement: "the composite is informational and a progress signal only — it never gates the Phase-4 loop (the loop exit is categorical: zero product-fit FAILs + zero blocker-severity methodology findings, or the 2-iteration cap)."</li>
+<li>[ ] In the existing intro/consent guidance, add: the generated <code>intro.text</code> MUST include a persuasive respondent-motivation / WIIFM sentence built from the survey's <code>response_impact</code> when stated — concrete impact of their answers, audience-specific framing, kept honest (no fake scarcity, no fake urgency, no overclaiming); when <code>response_impact</code> is null, the WIIFM sentence is a benefit-framed restatement of <code>purpose</code> and MUST NOT assert a downstream action that wasn't stated.</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/reference/survey-best-practices.md && git commit -m "feat(survey-design,T1): product-fit rubric + 0–100 scoring + intro-WIIFM requirement"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -n "Product fit (evaluate this first)" plugins/pmos-toolkit/skills/survey-design/reference/survey-best-practices.md</code> — present, and it's the first <code>##</code> in the body.</li>
+<li><code>grep -nE "product-fit 30|structure.*15|accessibility 10|intro.*5" …survey-best-practices.md</code> — the eight weights are listed; sum them by eye = 100.</li>
+<li>Read the two worked examples — each has an explicit PASS/FAIL verdict and (for the FAIL) a written predicted answer line.</li>
+<li><code>grep -n "informational" …survey-best-practices.md</code> — the "never gates the loop" sentence is present.</li>
+</ul>
+<p><strong>Done when:</strong> the file has a leading "Product fit (evaluate this first)" section with the 4 checks + ≥2 worked examples, a "Scoring rubric" section with 8 weighted dimensions summing to 100 and a "never gates the loop" statement, and the intro section carries the WIIFM requirement; <code>git diff --stat</code> shows only this file changed.</p>
+<p><strong>Done-when walkthrough:</strong> open the file → the first body section is the product-fit rubric; scroll → the scoring-rubric section; the intro section now mentions the WIIFM line. A reviewer reading just this file could score any survey on product-fit and on the 8 dimensions without further instructions.</p>
+
+<h3 id="t2">T2: SKILL.md — Phase 4 rewrite (loop + reviewer contract) + Phase 5/6 ordering + Anti-Patterns + Edge-cases</h3>
+<p><strong>Goal:</strong> Replace the single-pass Phase 4 with the bounded generate↔review refinement loop and the reviewer evaluate-only contract; surface product-fit FAILs first in dispositions.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#system-design</code> (§6.1 loop, §6.2 dispatch), <code>02_spec.html#reviewer-return-contract</code> (§9), <code>02_spec.html#fr-f1-loop</code> (FR-03..FR-08), <code>02_spec.html#edge-cases</code> (E1–E5), <code>02_spec.html#decision-log</code> (D3, D7, D9–D13).</p>
+<p><strong>Depends on:</strong> T1 (the rubric the reviewer references). <strong>Idempotent:</strong> yes. <strong>TDD:</strong> no — prose change. <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (Phase 4 section; Phases 5–6; Anti-Patterns list; Edge-cases index).</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] Rewrite the <code>## Phase 4 — Reviewer critique</code> section as the loop in spec §6.1: per-iteration reviewer dispatch (the §6.2 contract — prompt contains the context object incl. <code>response_impact</code>, the full <code>survey.json</code>, the two reference files, and on iteration ≥2 the prior <code>question-eval.md</code>; <code>[mode: …]</code> first line in non-interactive runs; <strong>the reviewer does NOT write files and does NOT mutate <code>survey.json</code></strong> — it returns the two markdown bodies plus the machine block from spec §9); the parent parses the machine block; the categorical exit condition (<code>product_fit_fails == []</code> AND <code>blockers == []</code>); the 2-iteration cap; the targeted regeneration step (D9 — the GENERATOR regenerates only the flagged questions + directly-coupled ones, honoring D10 author-origin = rewrite-only, re-runs §3.5 trim-to-budget, appends <code>### Iteration N</code> to <code>question-eval.md</code>'s <code>## Refinement loop changelog</code>, re-derives the rendered artifacts; D12 if invalid); D13 malformed-reviewer handling (re-dispatch once naming gaps, then degrade-gracefully to Phase 5). Preserve the existing per-question-count validation (<code>count(## &lt;id&gt;) == count(questions)</code>, re-dispatch once on mismatch) and the existing reviewer-failure posture (keep the committed draft, proceed with a warning, non-interactive → log + proceed).</li>
+<li>[ ] Update the reviewer return-contract text: <code>question-eval.md</code> — each <code>## &lt;question-id&gt;</code> leads with a <code>**Product fit:**</code> line (the three PASS/FAIL verdicts + the written predicted-answer line, → "kill/rewrite candidate" when any FAIL), then the existing verdict line + the methodology/anti-pattern findings table; plus a trailing <code>## Refinement loop changelog</code> section (one <code>### Iteration N</code> table <code>| Q id | action | reviewer reason | score Δ |</code>, or "No regeneration — first review met the exit condition"). <code>survey-eval.md</code> — leads with <code>Score: N/100 (product-fit P/30, …)</code> and a <code>## Research-goal coverage / product fit</code> section, then the existing Structure&amp;order / Length-vs-budget / Mode-fit / Scale-balance / Accessibility / Ethics-PII / Intro-consent sections (each now also reporting its sub-score; the Intro-consent section flags a missing WIIFM sentence as a <code>should-fix</code> finding). Include the spec §9 machine-block YAML shape in the prompt instructions.</li>
+<li>[ ] Update <code>## Phase 5 — Apply the critique</code>: Phase 5 opens by summarizing the <code>## Refinement loop changelog</code> ("the loop ran N iteration(s); here's what changed"); then dispositions ordering — product-fit FAILs first, one <code>AskUserQuestion</code> per FAIL: <code>question</code> = "Kill or rewrite Q&lt;id&gt;? — &lt;rubric reason + predicted answer&gt;", <code>options</code> = <code>Rewrite as proposed (Recommended)</code> / <code>Kill the question</code> / <code>Keep with reason</code> / <code>Defer</code> (for an author-origin question the loop could only rewrite, "Keep with reason" is still offered) — then the existing methodology-findings batches blocker → should-fix → nit. (The cosmetic-only filter is added in T5.)</li>
+<li>[ ] Update the Anti-Patterns list: change "Don't run the reviewer pass in a loop 'to be thorough.' One good pass; …" to "The Phase-4 loop is bounded — cap 2 iterations, categorical exit — don't extend it, don't re-run it manually for extra polish." Add: "Don't have the reviewer mutate <code>survey.json</code> — it evaluates and recommends edits; only the generator applies them."</li>
+<li>[ ] Add Edge-cases index rows: E-loop-converges-early (iteration 1 meets the exit condition → no regeneration; changelog says "No regeneration"); E-loop-cap-hit (after 2 iterations a FAIL/blocker remains → loop stops; the residual FAIL is top-of-batch in Phase 5); E-author-origin-fail (author-supplied question still FAILs after 2 rewrites → never auto-killed; surfaced as a kill candidate); E-invalid-regen (regeneration produces invalid <code>survey.json</code> → re-derive once, else revert that iteration, keep last-valid, note in changelog, exit loop early to Phase 5); E-malformed-reviewer-midloop (re-dispatch once naming gaps, then skip auto-regenerate for the run, proceed to Phase 5 with what was returned). Renumber the existing index rows as needed (the index is a single-glance table).</li>
+<li>[ ] Run <code>bash tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> → exit 0 (the new Phase-5 kill/rewrite <code>AskUserQuestion</code> has a <code>(Recommended)</code> option).</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/SKILL.md && git commit -m "feat(survey-design,T2): Phase 4 = bounded generate↔review loop; reviewer evaluate-only; product-fit-FAIL-first dispositions"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> — exit 0.</li>
+<li><code>grep -nE "do(es)? not mutate survey\.json|evaluates and recommends" SKILL.md</code> — the reviewer-evaluate-only instruction is present in Phase 4 and the Anti-Patterns.</li>
+<li><code>grep -nE "2 iteration|cap|categorical" SKILL.md</code> — the bounded-loop wording is present.</li>
+<li><code>grep -n "Refinement loop changelog" SKILL.md</code> — referenced in Phase 4 and Phase 5.</li>
+<li><code>grep -n "Kill or rewrite" SKILL.md</code> — the Phase-5 product-fit-FAIL question is present with a <code>(Recommended)</code> option on the same/adjacent lines.</li>
+<li>The Edge-cases index table still parses (count the <code>|</code>-columns are consistent) and has the 5 new rows.</li>
+<li><code>diff &lt;(sed -n '/&lt;!-- non-interactive-block:start --&gt;/,/&lt;!-- non-interactive-block:end --&gt;/p' SKILL.md) &lt;(sed -n '/&lt;!-- non-interactive-block:start --&gt;/,/&lt;!-- non-interactive-block:end --&gt;/p' plugins/pmos-toolkit/skills/_shared/non-interactive.md)</code> — no diff (the block region is untouched).</li>
+</ul>
+<p><strong>Done when:</strong> SKILL.md Phase 4 reads as the spec §6.1 loop with the §6.2 dispatch contract and the §9 return contract incl. the "reviewer doesn't mutate survey.json" instruction; Phase 5 opens with the changelog summary and orders product-fit FAILs first with a <code>(Recommended)</code>-bearing kill/rewrite question; the Anti-Patterns and Edge-cases reflect the loop; <code>audit-recommended.sh</code> exits 0; the non-interactive-block region is byte-identical to <code>_shared/non-interactive.md</code>.</p>
+<p><strong>Done-when walkthrough:</strong> open SKILL.md → Phase 4 is the loop; Phase 5 starts with "summarize the refinement changelog" then the FAIL-first batch; the reviewer prompt text says "do not write files / do not mutate survey.json"; the Edge-cases table has the 5 new rows. Run the lint → exit 0. The TN behavioral run will confirm the loop actually behaves this way end-to-end.</p>
+
+<h3 id="t3">T3: SKILL.md — F8: response_impact variable + intro.response_impact + schema_version 2 + WIIFM example/requirement</h3>
+<p><strong>Goal:</strong> Capture "what happens to the responses" at intake and require a persuasive, honest WIIFM line in the generated intro.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-f8-intro</code> (FR-21..FR-24), <code>02_spec.html#survey-json-schema-v2</code> (FR-15, FR-22), <code>02_spec.html#decision-log</code> (D8 intro dimension).</p>
+<p><strong>Depends on:</strong> T1 (the best-practices intro WIIFM requirement it points at), T2 (the reviewer's intro/consent dimension that flags WIIFM absence). <strong>Idempotent:</strong> yes. <strong>TDD:</strong> no — prose change. <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (Phase 2; Phase 3.1; Phase 3.4).</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] Phase 2 (Variable interpretation): add <code>response_impact</code> — "what happens to the responses / what does the audience get out of it". Inferred from the brief if stated; otherwise asked via a free-form <code>AskUserQuestion</code> with the line <code>&lt;!-- defer-only: free-form --&gt;</code> immediately above the call (no auto-pickable default); if the author skips it, set <code>response_impact: null</code>. Add it to the "Record the resolved {…}" line so it flows into the Phase-4/Phase-6 subagent prompts.</li>
+<li>[ ] Phase 3.1: add <code>"response_impact": "…" | null</code> as an optional field inside the <code>intro</code> object in the authoritative schema; bump the top-level <code>"schema_version"</code> from <code>1</code> to <code>2</code>; rewrite the <code>intro.text</code> example string to model a WIIFM sentence (e.g. "Thanks for trying &lt;Product&gt;. We're working out which gaps to fix next — your answers (about 3 minutes) tell us which ones actually block people like you. Responses are confidential."). Add a one-line migration note under the schema: "<code>schema_version: 1</code> surveys are still valid input; the skill rewrites <code>schema_version</code> to <code>2</code> on the next re-derive; no v1 field is removed — the only additions are <code>intro.response_impact</code> and the <code>multi_field_open</code> type." (The <code>multi_field_open</code> bits land in T6; this note can mention both since T6 follows.)</li>
+<li>[ ] Phase 3.4 ("Build survey.json" / intro block): add to the intro/consent bullet: the generated <code>intro.text</code> MUST include a persuasive respondent-motivation / WIIFM sentence built from <code>response_impact</code> when non-null (concrete impact, audience-specific, honest — no fake scarcity/urgency, no overclaiming); when null, a benefit-framed restatement of <code>purpose</code> with no invented downstream-action claim. Cross-reference <code>reference/survey-best-practices.md</code>'s intro guidance (T1).</li>
+<li>[ ] Confirm (cross-task) that T2's Phase-4 reviewer intro/consent dimension text flags a missing WIIFM sentence as <code>should-fix</code> — if T2's text didn't already include it (it should), add it here.</li>
+<li>[ ] Run <code>bash tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> → exit 0 (the <code>response_impact</code> ask is correctly tagged <code>defer-only: free-form</code>, so it's a legitimate no-Recommended call).</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/SKILL.md && git commit -m "feat(survey-design,T3): F8 — response_impact intake variable + WIIFM intro requirement + schema_version 2"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -nB1 -i "response_impact" SKILL.md</code> — the Phase-2 ask has <code>&lt;!-- defer-only: free-form --&gt;</code> on the preceding line; <code>intro</code> in §3.1 has the field.</li>
+<li><code>grep -n '"schema_version": 2' SKILL.md</code> — present (was <code>1</code>).</li>
+<li><code>grep -n -i "WIIFM\|what.*answers.*tell us\|migration note" SKILL.md</code> — the intro example models a motivation sentence; the migration note is present.</li>
+<li><code>bash tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> — exit 0.</li>
+</ul>
+<p><strong>Done when:</strong> Phase 2 has the <code>response_impact</code> variable (correctly defer-only-tagged), Phase 3.1 has <code>intro.response_impact</code> + <code>schema_version: 2</code> + a WIIFM-modeling <code>intro.text</code> example + the v1→v2 migration note, Phase 3.4 requires the WIIFM sentence with the honesty constraint; <code>audit-recommended.sh</code> exits 0.</p>
+<p><strong>Done-when walkthrough:</strong> open SKILL.md → Phase 2 lists <code>response_impact</code> among the variables with the free-form ask; §3.1's schema shows <code>schema_version: 2</code> and an <code>intro</code> with <code>response_impact</code>; the <code>intro.text</code> example reads persuasively; Phase 3.4 spells out the WIIFM-line rule. TN's F8 behavioral check will confirm the ask fires and the generated intro carries the sentence.</p>
+
+<h3 id="t4">T4: SKILL.md — F3: two-tier substrate-asset handling (Phase 3.6 + Phase 7)</h3>
+<p><strong>Goal:</strong> Abort on missing hard-required assets; warn-and-skip on missing convenience ones.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-f3-assets</code> (FR-09..FR-12), <code>02_spec.html#edge-cases</code> (E6, E7), <code>02_spec.html#decision-log</code> (D4).</p>
+<p><strong>Depends on:</strong> T2 (so the Edge-cases index renumbering is coherent). <strong>Idempotent:</strong> yes. <strong>TDD:</strong> no — prose change. <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (Phase 3.6 render block; Phase 7 viewer block; Platform-Adaptation; Edge-cases index).</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] In Phase 3.6 (the <code>cp -n assets/*</code> step) and Phase 7 (the <code>cp -n serve.js …</code> step): before each copy, classify the source asset. <strong>Hard-required</strong> = <code>survey-preview.js</code> (the standalone preview engine, sibling of <code>preview.html</code>), <code>style.css</code>, <code>viewer.js</code> (referenced by <code>survey.html</code>). <strong>Convenience</strong> = <code>serve.js</code>, <code>html-to-md.js</code>, <code>turndown.umd.js</code>, <code>turndown-plugin-gfm.umd.js</code>, <code>LICENSE.turndown.txt</code>. If a hard-required source is absent → ABORT immediately with exactly <code>survey-design: missing substrate asset &lt;abs-path&gt; — reinstall the pmos-toolkit plugin</code> on stderr, exit non-zero, and do NOT write <code>survey.html</code>/<code>preview.html</code>/<code>index.html</code> or any further run-folder artifacts beyond what earlier phases already committed. If a convenience source is absent → emit one warning <code>survey-design: convenience asset &lt;path&gt; missing — skipping &lt;dependent feature&gt;</code> (no preview server when <code>serve.js</code> is missing; no <code>.md</code> sidecar when the turndown trio / <code>html-to-md.js</code> is missing), and continue — <code>survey.html</code>/<code>preview.html</code> are still produced.</li>
+<li>[ ] Update the Platform-Adaptation note (the bullet that currently mentions <code>cp -n</code> idempotence): add the two-tier behavior — hard-required missing → abort, convenience missing → warn-and-skip.</li>
+<li>[ ] Add two Edge-cases index rows: hard-required-asset-missing → abort with the reinstall message, no degraded artifact; convenience-asset-missing → one warning, skip the dependent extra, continue.</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/SKILL.md && git commit -m "feat(survey-design,T4): F3 — two-tier substrate-asset handling (abort hard-required, warn-skip convenience)"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -n "missing substrate asset" SKILL.md</code> — the exact abort message string is present in Phase 3.6 and Phase 7.</li>
+<li><code>grep -nE "hard-required|convenience" SKILL.md</code> — the two classes and their member lists are present.</li>
+<li><code>grep -n "convenience asset .* missing — skipping" SKILL.md</code> — the warn message is present.</li>
+<li>The Edge-cases index table parses and has the two new rows.</li>
+</ul>
+<p><strong>Done when:</strong> Phases 3.6 and 7 classify substrate assets two-tier, abort with the exact reinstall message on hard-required-missing (writing no degraded artifact), warn-and-skip on convenience-missing; Platform-Adaptation + Edge-cases reflect both branches.</p>
+<p><strong>Done-when walkthrough:</strong> open SKILL.md → Phase 3.6 lists the hard-required vs convenience assets and the abort/warn behaviors; the Edge-cases table has the two rows. TN's F3 check (rename <code>survey-preview.js</code> → abort; rename <code>serve.js</code> → warn+continue) confirms behavior.</p>
+
+<h3 id="t5">T5: SKILL.md — F7: cosmetic-finding filter in Phases 5 & 6</h3>
+<p><strong>Goal:</strong> Keep cosmetic-only nits out of the batched dispositions; list them in a trailing line.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-f7-cosmetic</code> (FR-19, FR-20), <code>02_spec.html#edge-cases</code> (E12), <code>02_spec.html#decision-log</code> (D6).</p>
+<p><strong>Depends on:</strong> T2 (Phase 5 was rewritten there; this layers the filter on top). <strong>Idempotent:</strong> yes. <strong>TDD:</strong> no — prose change. <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (Phases 5 & 6 dispositions; Anti-Patterns).</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] In Phase 5 and Phase 6 (the batched-<code>AskUserQuestion</code> dispositions text): define "cosmetic-only" = a finding whose <code>severity</code> is <code>nit</code> AND whose defect class is a wording/title polish with no methodological or product-fit impact. Such findings are EXCLUDED from the batched <code>AskUserQuestion</code> and instead listed in a single trailing chat line <code>Noted, not asked: &lt;Q-id or section&gt; — &lt;one-line polish suggestion&gt;; …</code>; they are still written into the <code>## Dispositions</code> section of <code>question-eval.md</code> / <code>survey-eval.md</code> / <code>simulation.md</code> with disposition "noted (cosmetic, not asked)".</li>
+<li>[ ] Update the Anti-Pattern "Don't dump reviewer / simulation findings as a wall of prose…" to add: "…and don't pad the dispositions batch with cosmetic-only nits — list those in a trailing 'Noted, not asked:' line."</li>
+<li>[ ] (Edge-cases) Confirm/add the E12 row: a question whose only finding is a cosmetic nit → verdict line "no issues (1 cosmetic note — see trailing list)"; the polish appears only in the trailing line + <code>## Dispositions</code>, not in the batch.</li>
+<li>[ ] Run <code>bash tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> → exit 0.</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/SKILL.md && git commit -m "feat(survey-design,T5): F7 — cosmetic-only findings listed not batched"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -n -i "cosmetic-only\|Noted, not asked" SKILL.md</code> — the definition + the trailing-line behavior are present in Phases 5 and 6.</li>
+<li><code>grep -n "noted (cosmetic, not asked)" SKILL.md</code> — the Dispositions-record wording is present.</li>
+<li><code>bash tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> — exit 0.</li>
+</ul>
+<p><strong>Done when:</strong> Phases 5 & 6 define cosmetic-only and route such findings to a trailing "Noted, not asked:" line (still recorded in <code>## Dispositions</code>); the relevant Anti-Pattern carries the note; the Edge-cases E12 row is present.</p>
+<p><strong>Done-when walkthrough:</strong> open SKILL.md → Phases 5/6 spell out the cosmetic-only carve-out. TN's F7 check confirms a cosmetic nit shows up only in the trailing line and in <code>## Dispositions</code>, not in the <code>AskUserQuestion</code> batch.</p>
+
+<h3 id="t6">T6: SKILL.md — F6 schema: multi_field_open type + fields array + 30s/field + invariants + schema_version 2 confirm</h3>
+<p><strong>Goal:</strong> Add the <code>multi_field_open</code> question type to the authoritative schema.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-f6-type</code> (FR-13, FR-14, FR-15), <code>02_spec.html#survey-json-schema-v2</code> (§10), <code>02_spec.html#decision-log</code> (D5, D14).</p>
+<p><strong>Depends on:</strong> T3 (which already bumped <code>schema_version</code> to 2). <strong>Idempotent:</strong> yes. <strong>TDD:</strong> no — prose change. <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (§3.2 type enum + question object; §3.3 time-costs; schema invariants; §3.1 confirm <code>schema_version: 2</code>).</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] §3.2: add <code>multi_field_open</code> to the <code>type</code> enum prose (a shared stem + one single-line free-text input per field; the recommended shape for "metrics by cadence"–style items — a labeled input per period). In the question-object documentation, add the <code>"fields": [ { "id": kebab, "label": string, "placeholder": string|null } ]</code> array (≥1 field); note <code>options</code>/<code>scale</code>/<code>rows</code>/<code>columns</code>/<code>constant_sum_total</code> are not used for this type and <code>opt_out_options</code> may still apply to the whole group.</li>
+<li>[ ] §3.3: add <code>multi_field_open = 30 per field</code> to the per-question-seconds list (each field counted like an <code>open_short</code>); <code>estimated_minutes</code> includes it.</li>
+<li>[ ] Schema invariants section: add — <code>fields</code> array length ≥ 1; field <code>id</code>s kebab-case and unique within the question; <code>multi_field_open</code> never carries <code>options</code>/<code>scale</code>/<code>rows</code>/<code>columns</code>/<code>constant_sum_total</code>; <code>skip_logic</code>/<code>screening</code> must be <code>null</code>/<code>false</code> for it (not a routable question).</li>
+<li>[ ] §3.1: confirm <code>"schema_version": 2</code> (already set in T3); confirm the migration note now mentions both <code>intro.response_impact</code> and the <code>multi_field_open</code> type.</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/SKILL.md && git commit -m "feat(survey-design,T6): F6 — multi_field_open question type + fields array + time-cost + invariants"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -n "multi_field_open" SKILL.md</code> — present in the §3.2 type enum, the question-object doc, §3.3, and the invariants.</li>
+<li><code>grep -n "fields.*id.*label.*placeholder\|30 per field" SKILL.md</code> — the array shape and the time-cost are documented.</li>
+<li><code>grep -n '"schema_version": 2' SKILL.md</code> — still 2 (T3 set it; T6 didn't regress it).</li>
+<li><code>grep -n "fields array length" SKILL.md</code> — the invariant is present.</li>
+</ul>
+<p><strong>Done when:</strong> §3.2's <code>type</code> enum includes <code>multi_field_open</code> with the <code>fields</code>-array documentation, §3.3 has its 30s/field constant, the invariants cover the <code>fields</code> rules, and §3.1 confirms <code>schema_version: 2</code> with a migration note naming both additions.</p>
+<p><strong>Done-when walkthrough:</strong> open SKILL.md §3 → the type enum lists <code>multi_field_open</code>; the question-object doc shows the <code>fields</code> array; §3.3 has the 30s/field line; the invariants list the new rules. T9's <code>expected.yaml</code> and TN's F6 behavioral check confirm the type actually parses, time-costs, renders, and exports.</p>
+
+<h3 id="t7">T7: reference/platform-export.md — multi_field_open mapping rows + recipes [P]</h3>
+<p><strong>Goal:</strong> Define how <code>multi_field_open</code> exports to Typeform / SurveyMonkey / Google Forms.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-f6-type</code> (FR-16), <code>02_spec.html#decision-log</code> (D15, P4).</p>
+<p><strong>Depends on:</strong> T6 (the type must exist in the schema). <strong>Idempotent:</strong> yes. <strong>TDD:</strong> no — prose change. <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/reference/platform-export.md</code>.</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] Verify (against current SurveyMonkey docs) whether a question type round-trips labeled multi-text-input fields (the <code>multiple_textbox</code>-style family). If yes → SurveyMonkey is native (each <code>field.label</code> → a textbox row); if not → downgrade like the others. Record the determination in the mapping table.</li>
+<li>[ ] Add a <code>multi_field_open</code> row to each platform's type-mapping table: Typeform → downgrade to N <code>short_text</code> fields preceded by a <code>statement</code> field naming the original grouped question (Typeform's API has no labeled-multi-input question); Google Forms → downgrade to N <code>addTextItem()</code>s preceded by an <code>addSectionHeaderItem()</code> naming the original; SurveyMonkey → native (per the determination above) or the same downgrade.</li>
+<li>[ ] Add the transformer recipe text for <code>multi_field_open</code> per platform (mirroring the existing per-type recipes — input shape from <code>survey.json</code>, output shape per platform, the section-header/statement text template for the downgrade case).</li>
+<li>[ ] Update the <code>export/README.md</code> template description in this file: for each platform that downgrades <code>multi_field_open</code>, the README lists the downgrade ("the &lt;grouped question&gt; was split into N short-answer items with a section header") and the artifact gets an in-comment note at the downgrade site.</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/reference/platform-export.md && git commit -m "feat(survey-design,T7): F6 — multi_field_open export mapping + recipes per platform"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -n "multi_field_open" plugins/pmos-toolkit/skills/survey-design/reference/platform-export.md</code> — present in all three platform mapping tables + the recipes + the README-template description.</li>
+<li>Read the Google Forms recipe row — it's "N <code>addTextItem</code> + <code>addSectionHeaderItem</code>" with the downgrade noted.</li>
+<li>The SurveyMonkey row states native-or-downgrade with the determination recorded.</li>
+</ul>
+<p><strong>Done when:</strong> all three platform type-mapping tables have a <code>multi_field_open</code> row; each has a transformer recipe; the <code>export/README.md</code> template description lists the downgrade for the platforms that downgrade.</p>
+<p><strong>Done-when walkthrough:</strong> open <code>platform-export.md</code> → search <code>multi_field_open</code> → it appears in each platform's mapping table with a recipe; the README template now mentions the downgrade. TN's F6 export check (run <code>--export</code> on a survey with the type) confirms the <code>.gs</code> emits a header + N text items with a downgrade comment.</p>
+
+<h3 id="t8">T8: assets/survey-preview.js — multi_field_open render branch [P]</h3>
+<p><strong>Goal:</strong> Render <code>multi_field_open</code> in the standalone <code>preview.html</code>.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-f6-type</code> (FR-17), <code>02_spec.html#rendered-artifact-changes</code> (§11).</p>
+<p><strong>Depends on:</strong> T6 (the schema). <strong>Idempotent:</strong> yes. <strong>TDD:</strong> yes — new-feature (a tiny render assertion if a JS harness exists; else the manual render check below — none observed in Phase 2, so manual). <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/assets/survey-preview.js</code>.</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] In the per-<code>type</code> render dispatch, add a <code>case 'multi_field_open':</code> branch: render the stem (as the question's heading element), the optional <code>help_text</code> (as a <code>&lt;p&gt;</code>), then for each entry in <code>question.fields</code> a row of <code>&lt;label for="&lt;q-id&gt;-&lt;field-id&gt;"&gt;&lt;field.label&gt;&lt;/label&gt;&lt;input type="text" id="&lt;q-id&gt;-&lt;field-id&gt;" placeholder="&lt;field.placeholder ?? ''&gt;"&gt;</code> — label-adjacent, the existing CSS classes the other text inputs use, visible focus (inherits from the page's <code>&lt;style&gt;</code>), ≥4.5:1 contrast (inherits). Append <code>opt_out_options</code> after a <code>&lt;hr&gt;</code> if present (same as other types). Count it as one question toward the "Question X of Y" counter exactly like the other types.</li>
+<li>[ ] Manual render check: build a tiny <code>survey.json</code> with one <code>multi_field_open</code> question (3 fields — Daily / Weekly / Monthly active users), wrap it in a <code>preview.html</code> per the §3.6 template (inline the JSON in the <code>&lt;script id="survey-data"&gt;</code> block, point <code>&lt;script src&gt;</code> at this file), open it (double-click or <code>node serve.js</code>), confirm: three labeled inputs render, each accepts typed text, the "Question X of Y" counter treats the group as one question, and (if <code>opt_out_options</code> were added) they render after the rule.</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/assets/survey-preview.js && git commit -m "feat(survey-design,T8): F6 — survey-preview.js renders multi_field_open"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -n "multi_field_open" plugins/pmos-toolkit/skills/survey-design/assets/survey-preview.js</code> — the case branch is present.</li>
+<li>The manual render check above passes (capture a screenshot for the TN record).</li>
+<li><code>node -e "require('./plugins/pmos-toolkit/skills/survey-design/assets/survey-preview.js')"</code> or a syntax check (<code>node --check …survey-preview.js</code>) — no syntax error.</li>
+</ul>
+<p><strong>Done when:</strong> <code>survey-preview.js</code> has a <code>multi_field_open</code> render branch producing labeled text inputs meeting the existing preview accessibility bar; <code>node --check</code> passes; the manual render check shows three working labeled inputs.</p>
+<p><strong>Done-when walkthrough:</strong> build a 3-field <code>multi_field_open</code> <code>preview.html</code>, open it → three labeled inputs, each typeable, counted as one question. TN re-runs this as part of the F6 behavioral runbook.</p>
+
+<h3 id="t9">T9: tests/expected.yaml (+ fixture) — cover multi_field_open + F8 regression [P]</h3>
+<p><strong>Goal:</strong> Lock the new type's behavior and the F8-no-structural-change invariant into the repo's expectation file.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-f6-type</code> (FR-18), <code>02_spec.html#testing-verification-strategy</code> (§14.4).</p>
+<p><strong>Depends on:</strong> T6 (schema), T7 (export mapping), T8 (render). <strong>Idempotent:</strong> yes. <strong>TDD:</strong> yes — this file IS the test artifact. <strong>Files:</strong> Modify <code>plugins/pmos-toolkit/skills/survey-design/tests/expected.yaml</code>; add <code>plugins/pmos-toolkit/skills/survey-design/tests/fixtures/multi-field-brief.txt</code> if the existing fixture set doesn't already exercise the type.</p>
+<p><strong>Steps:</strong></p>
+<ul>
+<li>[ ] Read the existing <code>tests/expected.yaml</code> shape; mirror it. Add expectations: (1) a survey JSON containing a <code>multi_field_open</code> question parses and passes the schema invariants; (2) its <code>estimated_minutes</code> contribution = 30 × len(fields) (assert against a concrete 3-field example: +90s); (3) the rendered <code>preview.html</code> contains one <code>&lt;input&gt;</code> per field with the field labels (assert the label strings appear); (4) at least one export downgrade is asserted — Google Forms: the <code>.gs</code> contains an <code>addSectionHeaderItem</code> + N <code>addTextItem</code> for the group, with a downgrade comment.</li>
+<li>[ ] Add the F8 regression expectation: given a brief that states response-impact and contains no <code>multi_field_open</code>, the produced <code>survey.json</code> has the same top-level structure as before (same keys) PLUS <code>intro.response_impact</code> non-null and an <code>intro.text</code> that contains a WIIFM sentence (assert a substring or a pattern); the artifact shape (sections list, question types) is unchanged.</li>
+<li>[ ] If a fixture brief is needed (the existing <code>sample-brief.txt</code> doesn't naturally produce a <code>multi_field_open</code> question), add <code>tests/fixtures/multi-field-brief.txt</code> — a short brief that asks for "current active-user counts at daily / weekly / monthly cadence" so the generator naturally reaches for <code>multi_field_open</code>.</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/survey-design/tests/ && git commit -m "test(survey-design,T9): cover multi_field_open + F8 no-structural-change regression"</code></li>
+</ul>
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -n "multi_field_open" plugins/pmos-toolkit/skills/survey-design/tests/expected.yaml</code> — the new expectations reference the type.</li>
+<li>If the repo has an expectation-runner, run it against the new fixture and confirm the new expectations pass; if not, the expectations are read-and-checked against the TN behavioral run's actual artifacts.</li>
+<li><code>grep -n -i "response_impact\|WIIFM\|regression" plugins/pmos-toolkit/skills/survey-design/tests/expected.yaml</code> — the F8 regression expectation is present.</li>
+</ul>
+<p><strong>Done when:</strong> <code>tests/expected.yaml</code> has expectations for the <code>multi_field_open</code> type's parse/time-cost/render/one-export-downgrade and the F8 no-structural-change regression; a fixture brief exists if one was needed; the expectation runner (if any) passes against the new fixture.</p>
+<p><strong>Done-when walkthrough:</strong> open <code>tests/expected.yaml</code> → the new <code>multi_field_open</code> and F8-regression blocks are present and reference concrete values (90s, the field labels, the <code>.gs</code> structure). If there's a runner, it goes green; otherwise TN checks the produced artifacts against these expectations.</p>
+
+<h3 id="tn">TN: Final Verification</h3>
+<p><strong>Goal:</strong> Verify the whole change end-to-end — static lint + the spec §14.2 behavioral runbook + the §14.4 regression guard.</p>
+<ul>
+<li>[ ] <strong>Lint:</strong> <code>bash tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> → exit 0. (If the repo's lint entrypoint differs, use it; locate via <code>ls tools/</code>.)</li>
+<li>[ ] <strong>Non-interactive-block byte-match:</strong> <code>diff &lt;(sed -n '/non-interactive-block:start/,/non-interactive-block:end/p' plugins/pmos-toolkit/skills/survey-design/SKILL.md) &lt;(sed -n '/non-interactive-block:start/,/non-interactive-block:end/p' plugins/pmos-toolkit/skills/_shared/non-interactive.md)</code> → no diff.</li>
+<li>[ ] <strong>Structural:</strong> SKILL.md Phase 4 reads as the spec §6.1 loop with the §6.2 dispatch + §9 return contract + the "reviewer doesn't mutate survey.json" instruction; §3.2 type enum lists <code>multi_field_open</code>; §3.1 shows <code>schema_version: 2</code> and a WIIFM-modeling <code>intro.text</code>; <code>reference/survey-best-practices.md</code> leads with "Product fit (evaluate this first)" + has the 8-dim rubric (weights sum 100); <code>reference/platform-export.md</code> has a <code>multi_field_open</code> row in all 3 platform tables; <code>assets/survey-preview.js</code> has the <code>multi_field_open</code> branch (<code>node --check</code> passes); <code>tests/expected.yaml</code> references the type. The SKILL.md <code>description</code> still has ≥5 trigger phrases and the <code>argument-hint</code> still enumerates every parsed flag (no new flags added).</li>
+<li>[ ] <strong>F1 behavioral (the headline acceptance check):</strong> reconstruct the retro brief — a trial-conversion exit survey for "people who started a trial in the last 30 days and did not upgrade", whose draft would naturally include a question like "When you hit a wall during the trial, who did you reach out to?" (the one the PM killed because everyone says "the analytics team"). Run <code>/survey-design</code> on it (interactive or with explicit answers). Confirm: a reviewer subagent is dispatched (its prompt says "do not write files / do not mutate survey.json"); <code>question-eval.md</code> exists with each <code>## q-id</code> leading with a <code>**Product fit:**</code> verdict line and a trailing <code>## Refinement loop changelog</code> section; the predictable question's predictability check is FAIL with a written predicted-answer line; the loop either rewrote it (changelog "### Iteration 1") or surfaced it as a top-of-batch "Kill or rewrite Q&lt;id&gt;?" with a <code>(Recommended)</code> rewrite option in Phase 5; <code>survey-eval.md</code> leads with "Score: N/100 (product-fit …)" and a "Research-goal coverage / product fit" section; the loop ran 1 or 2 iterations and exited on the categorical condition or the cap. Capture the two eval files for the record.</li>
+<li>[ ] <strong>F3 behavioral:</strong> temporarily rename <code>plugins/pmos-toolkit/skills/survey-design/assets/survey-preview.js</code> aside; run the skill; confirm it aborts with exactly <code>survey-design: missing substrate asset &lt;path&gt; — reinstall the pmos-toolkit plugin</code> and wrote no <code>survey.html</code>/<code>preview.html</code>; restore the file. Then temporarily rename <code>plugins/pmos-toolkit/skills/_shared/html-authoring/assets/serve.js</code> aside; run the skill; confirm one warning + a completed run with <code>survey.html</code>/<code>preview.html</code> present and no preview-server line; restore.</li>
+<li>[ ] <strong>F6 behavioral:</strong> author a survey with one <code>multi_field_open</code> question (3 fields: daily/weekly/monthly); confirm <code>estimated_minutes</code> includes 90s for it; open <code>preview.html</code> → three labeled inputs that accept text; run <code>--export typeform,surveymonkey,google-forms</code>; confirm the Google Forms <code>.gs</code> emits a section header + 3 <code>addTextItem</code>s with a downgrade comment, <code>export/README.md</code> lists the downgrade, and SurveyMonkey is native-or-downgraded per T7's determination.</li>
+<li>[ ] <strong>F7 behavioral:</strong> in a run where the reviewer produces a cosmetic-only nit (e.g. a section-title polish), confirm it's absent from the batched <code>AskUserQuestion</code>, present in the trailing "Noted, not asked:" line, and recorded in <code>## Dispositions</code> with disposition "noted (cosmetic, not asked)".</li>
+<li>[ ] <strong>F8 behavioral:</strong> run with a brief that doesn't state response impact → confirm Phase 2 asks the free-form <code>response_impact</code> question; answer it → confirm <code>intro.text</code> contains a WIIFM sentence built from the answer and <code>survey.json :: intro.response_impact</code> holds it. Re-run skipping the question → confirm <code>response_impact: null</code> and the WIIFM sentence is a <code>purpose</code>-restatement with no invented downstream-action claim.</li>
+<li>[ ] <strong>Backward-compat (§14.4):</strong> feed a hand-written <code>schema_version: 1</code> <code>survey.json</code> as the path argument → confirm it parses, the skill proceeds, and the re-derived <code>survey.json</code> is <code>schema_version: 2</code>.</li>
+<li>[ ] <strong>Regression (§14.4):</strong> a survey with NO <code>multi_field_open</code> and a brief that DOES state response impact produces the same artifact shape as before (same sections list, same question types) plus the WIIFM sentence — i.e. F8 changes intro copy only, not structure. (This is what T9's regression expectation asserts; confirm the run agrees.)</li>
+<li>[ ] <strong>Cleanup:</strong> remove any temporary fixture/run folders created for the behavioral checks that aren't meant to be committed (the <code>tests/fixtures/multi-field-brief.txt</code> from T9 IS committed; ad-hoc <code>survey-design/</code> run folders under <code>docs/pmos/</code> created purely for the F1/F6 checks are removed unless you want to keep one as an example). Restore any temporarily-renamed assets.</li>
+<li>[ ] <strong>Done-when walkthrough:</strong> trace each clause of the plan's Done-when line through the running skill (the lint exits 0; the block diff is empty; Phase 4 is the loop; the type enum has <code>multi_field_open</code>; <code>schema_version: 2</code>; the best-practices product-fit + rubric sections; the export mapping rows; the preview render; the test expectations; and the F1 behavioral run produced the expected <code>question-eval.md</code>/<code>survey-eval.md</code> with ≤2 loop iterations).</li>
+<li>[ ] Commit any cleanup: <code>git add -A &amp;&amp; git commit -m "test(survey-design,TN): final verification — lint + behavioral runbook + regression"</code> (if there's anything to commit beyond the per-task commits).</li>
+</ul>
+<p><strong>This task IS the plan's TN per FR-26 — single implicit phase, verified once at the end. /verify (the pipeline's next stage) re-runs the multi-agent code review + interactive QA on top of this.</strong></p>
+</section>
+
+<section id="review-log">
+<h2 id="review-log">Review Log</h2>
+<p>Detailed loop-by-loop findings would live in <code>03_plan_review.md</code> if review loops produced any. This plan was reviewed once by the author against the structural + design checklists at write time (no findings beyond the four Decision-Log entries already captured); the /grill pass on the upstream requirements (see <code>grills/2026-05-11_01-requirements.html</code>) did the adversarial heavy lifting before /spec, so Phase-4 loop 1 here was clean.</p>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes Made</th></tr></thead>
+<tbody>
+<tr><td>1 (self-review at write time)</td><td>None beyond the 4 implementation decisions (P1–P4) already in the Decision Log.</td><td>Captured P1–P4; no task restructuring needed.</td></tr>
+</tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/03_plan.html</span>
+  </footer>
+</body>
+</html>

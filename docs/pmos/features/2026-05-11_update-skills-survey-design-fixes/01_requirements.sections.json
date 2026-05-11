@@ -1,0 +1,25 @@
+{
+  "artifact": "01_requirements.html",
+  "ids": [
+    {"id": "problem", "level": 2, "title": "Problem", "parent_id": null},
+    {"id": "who-experiences-this", "level": 3, "title": "Who experiences this?", "parent_id": "problem"},
+    {"id": "why-now", "level": 3, "title": "Why now?", "parent_id": "problem"},
+    {"id": "goals-non-goals", "level": 2, "title": "Goals & Non-Goals", "parent_id": null},
+    {"id": "goals", "level": 3, "title": "Goals", "parent_id": "goals-non-goals"},
+    {"id": "non-goals", "level": 3, "title": "Non-Goals (explicit scope cuts)", "parent_id": "goals-non-goals"},
+    {"id": "user-experience-analysis", "level": 2, "title": "User Experience Analysis", "parent_id": null},
+    {"id": "motivation", "level": 3, "title": "Motivation", "parent_id": "user-experience-analysis"},
+    {"id": "friction-points", "level": 3, "title": "Friction Points", "parent_id": "user-experience-analysis"},
+    {"id": "satisfaction-signals", "level": 3, "title": "Satisfaction Signals", "parent_id": "user-experience-analysis"},
+    {"id": "solution-direction", "level": 2, "title": "Solution Direction", "parent_id": null},
+    {"id": "user-journeys", "level": 2, "title": "User Journeys", "parent_id": null},
+    {"id": "primary-journey-happy-path", "level": 3, "title": "Primary Journey (Happy Path)", "parent_id": "user-journeys"},
+    {"id": "alternate-journeys", "level": 3, "title": "Alternate Journeys", "parent_id": "user-journeys"},
+    {"id": "error-journeys", "level": 3, "title": "Error Journeys", "parent_id": "user-journeys"},
+    {"id": "empty-states-edge-cases", "level": 3, "title": "Empty States & Edge Cases", "parent_id": "user-journeys"},
+    {"id": "design-decisions", "level": 2, "title": "Design Decisions", "parent_id": null},
+    {"id": "success-metrics", "level": 2, "title": "Success Metrics", "parent_id": null},
+    {"id": "research-sources", "level": 2, "title": "Research Sources", "parent_id": null},
+    {"id": "open-questions", "level": 2, "title": "Open Questions", "parent_id": null}
+  ]
+}

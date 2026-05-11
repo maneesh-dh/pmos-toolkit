@@ -74,7 +74,7 @@
 | survey-design | plan | completed | `03_plan.html` (9 tasks + TN) | 2026-05-11 |
 | survey-design | execute | completed | `03_plan.html` → `execute/summary.md` (T1–T9 + TN; 10 per-task commits on `feat/survey-design-fixes`) | 2026-05-11 |
 | survey-design | verify | completed | `verify/2026-05-11-review.html` (PASS — static + structural; behavioral runbook deferred to first `/survey-design` use) | 2026-05-11 |
-| _(batch)_ | complete-dev | in-progress | — | 2026-05-11 |
+| _(batch)_ | complete-dev | completed | merged `feat/survey-design-fixes` → `main` (ff); bumped 2.36.0→2.37.0 (both manifests); changelog entry; tagged `v2.37.0`; pushed origin + github + github-work | 2026-05-11 |
 
 **Paused after /plan, before /execute (user request, 2026-05-11).** To resume: re-run `/update-skills docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/00_triage.md` — it detects this triage doc's `v=1` header marker and resumes from the first `pending` pipeline-status row (execute), skipping triage Phases 2–7. Or just run `/execute` directly against `03_plan.html`. All five approved changes (F1/F3/F6/F7/F8) are fully specced + planned; nothing left to decide before implementation.
 

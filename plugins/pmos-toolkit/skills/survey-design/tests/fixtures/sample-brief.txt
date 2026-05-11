@@ -1,0 +1,9 @@
+We just looked at our Q1 numbers and a lot of people who started a free trial
+of our project-management app didn't upgrade to a paid plan, and we don't really
+know why. I want a survey we can send to people who started a trial in the last
+30 days and did not upgrade. I'd like to both understand what happened in their
+own words (what they were trying to do, where it fell down, what they ended up
+using instead) and get some structured read on the usual suspects -- price,
+missing features, too hard to set up, just evaluating, not the right time. Keep
+it short, about 5 minutes max, these are busy people. We'd want to put this in
+Google Forms so the support team can send it out.

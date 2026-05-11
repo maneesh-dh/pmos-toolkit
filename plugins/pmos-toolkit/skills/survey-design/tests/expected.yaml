@@ -1,0 +1,76 @@
+# Property-based expectations for a --non-interactive run of fixtures/sample-brief.txt.
+# Mirrors the polish/ and diagram/ skill test layout: the harness here is a human or
+# /verify reading these properties against the generated artifacts -- there is no JS/Python
+# test runner for skill content in this repo (plan decision D-P3). LLM-generated question
+# wording is non-deterministic, so nothing below asserts on specific stems/options.
+
+fixture: fixtures/sample-brief.txt
+invocation: "/survey-design '<contents of fixtures/sample-brief.txt>' --non-interactive --export typeform,google-forms"
+
+# 1. The run folder docs/pmos/survey-design/<YYYY-MM-DD>_<slug>/ must contain:
+artifacts_present:
+  - survey.json
+  - survey.html
+  - survey.sections.json
+  - preview.html
+  - survey-preview.js
+  - index.html
+  - survey-eval.md
+  - question-eval.md
+  - simulation.md
+  - _open_questions.md          # non-interactive run -> OQ aggregator
+
+# 2. survey.json properties:
+survey_json:
+  parses: true                  # python3 -m json.tool survey.json >/dev/null
+  required_keys:                 # top-level keys that must exist
+    - schema_version
+    - title
+    - purpose
+    - mode
+    - audience
+    - time_budget_min
+    - estimated_minutes
+    - intro
+    - sections
+  mode_in: [generative, evaluative, hybrid]
+  expected_mode: hybrid          # the brief asks to both understand and get a structured read
+  ids_kebab_case_unique: true    # every section id and question id; no dupes
+  anonymous_implies_no_pii: true # if intro.anonymous == true, no question collects a direct identifier
+
+# 3. eval artifacts:
+question_eval:
+  section_count_equals_question_count: true   # count('## <id>' headings) == count(questions in survey.json)
+  every_question_id_is_a_heading: true
+survey_eval:
+  has_survey_level_sections: true             # structure/order, length, mode-fit, scale-balance, accessibility, ethics/PII, intro/consent
+simulation:
+  has_estimated_minutes: true
+  has_heuristic_standin_disclaimer: true      # states the sim does NOT replace cognitive interviews / a soft launch
+
+# 4. survey.html / preview.html:
+survey_html:
+  passes_heading_ids_check: true              # tests/scripts/assert_heading_ids.sh
+  no_inline_script_or_style_in_main: true
+preview_html:
+  no_http_references: true
+  has_inline_survey_data_json: true           # <script type="application/json" id="survey-data"> whose JSON parses
+survey_preview_js:
+  node_check_passes: true
+
+# 5. export (--export typeform,google-forms):
+export:
+  present:
+    - export/typeform.json        # parses as JSON
+    - export/build-google-form.gs # node --check passes (syntactically valid JS)
+    - export/README.md            # mentions Typeform + Google Forms + auth + downgrades
+  absent:
+    - export/surveymonkey-paste.txt   # SurveyMonkey was not selected
+  determinism: true               # re-running export on the same survey.json yields byte-identical export/typeform.json
+
+# 6. git:
+commits_present:                  # subjects (substring match) in the scratch repo's git log
+  - "survey-design: initial draft"
+  - "survey-design: apply review"
+  - "survey-design: apply simulation fixes"
+  - "survey-design: add typeform,google-forms export"

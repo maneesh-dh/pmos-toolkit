@@ -1,5 +1,19 @@
 # Changelog
 
+## pmos-toolkit 2.36.0 — 2026-05-11
+
+### What's new
+
+- **`/survey-design`** — new standalone utility that turns a rough research intent (or an existing survey) into a fielded-ready survey. It interprets the design variables (audience, time budget, mode generative/evaluative/hybrid, optional question cap), generates a sectioned `survey.json` applying baked-in survey-methodology best practices and avoiding a built-in anti-pattern catalog (A1–E6, with detection signals), then runs a reviewer-critique pass and a simulated-respondent friction walk — each surfacing findings as batched, structured `Fix / Modify / Skip / Defer` questions — and renders a substrate-compliant `survey.html`, a standalone fillable `preview.html` (works on `file://`), a viewer `index.html`, and per-stage commits. Phase 8 emits import files for **Typeform** (`typeform.json` Create-API body), **SurveyMonkey** (`surveymonkey.json` + a plain-text paste fallback), and **Google Forms** (`build-google-form.gs` Apps Script), with unsupported types mapped down and every downgrade documented in `export/README.md`. Reference material lives in the skill's `reference/` directory (`survey-best-practices.md`, `question-antipatterns.md`, `platform-export.md`), loaded on demand.
+
+### Breaking changes
+
+None.
+
+### Migration
+
+None — additive. New skill auto-discovered from `plugins/pmos-toolkit/skills/`.
+
 ## pmos-toolkit 2.26.0 — 2026-05-08
 
 ### What's new

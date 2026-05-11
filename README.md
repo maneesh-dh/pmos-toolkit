@@ -86,6 +86,7 @@ pmos-toolkit/
 |-------|-------------|
 | `/pmos-toolkit:create-skill` | Create a new skill via the requirements → spec → [grill] → plan → implement → /verify pipeline; cross-platform conventions, project save paths, mandatory /verify gate. |
 | `/pmos-toolkit:diagram` | Generate a single SVG vector diagram from a free-form description — brainstorms 2–3 framings, drafts, and self-evaluates against a hybrid SVG-metrics + vision rubric |
+| `/pmos-toolkit:survey-design` | Design a methodologically sound survey from a rough intent (or refine an existing one) — generates a sectioned `survey.json`, runs a reviewer-critique pass + a simulated-respondent friction walk, renders a fillable `preview.html`, and emits import files for Typeform / SurveyMonkey / Google Forms |
 | `/pmos-toolkit:design-crit` | Critique an application URL, wireframes, or prototype on overall UX — captures flow screenshots via packaged Playwright script, evaluates against a Nielsen + WCAG 2.2 + visual + Gestalt + journey-friction rubric, runs a PSYCH/MSF pass, and synthesises prioritized recommendations |
 | `/pmos-toolkit:mac-health` | Diagnose battery drain, orphaned processes, browser extension leaks, and cleanup opportunities |
 
@@ -96,7 +97,7 @@ pmos-toolkit/
                    optional bridges (UI features)    optional enhancers                  optional validator
 ```
 
-`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/feature-sdlc`, `/update-skills`, `/diagram`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
+`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/feature-sdlc`, `/update-skills`, `/diagram`, `/survey-design`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
 
 ## Install
 

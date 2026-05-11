@@ -25,7 +25,7 @@ This skill is a **standalone utility** — it is not a pipeline stage. It writes
 
 The skill loads these from its own `reference/` directory only when the relevant phase needs them — keep them out of working context otherwise (progressive disclosure):
 
-- `reference/survey-best-practices.md` — the methodological backbone applied in Phase 3 generation and Phase 4 critique (structure/flow, question types, scales, length/burden, generative-vs-evaluative, bias reduction, question-writing rules, accessibility, ethics/PII).
+- `reference/survey-best-practices.md` — the methodological backbone applied in Phase 3 generation and the Phase 4 refinement loop (the leading **"Product fit (evaluate this first)"** section + the 0–100 scoring rubric, then structure/flow, question types, scales, length/burden, generative-vs-evaluative, bias reduction, question-writing rules, accessibility, ethics/PII).
 - `reference/question-antipatterns.md` — the A1–E6 anti-pattern catalog, each entry with a concrete detection signal; the generator (Phase 3) must produce none of these, the reviewer (Phase 4) walks every question against the catalog.
 - `reference/platform-export.md` — per-platform import mechanisms, artifact schemas, and the full type-mapping tables the Phase-8 transformer recipes cite.
 
@@ -269,20 +269,62 @@ Write all of these into the run folder:
 
 ---
 
-## Phase 4 — Reviewer critique
+## Phase 4 — Reviewer refinement loop
 
-Dispatch **one** reviewer subagent (Task tool; or run it sequentially inline if subagents are unavailable). The prompt MUST contain: the survey context object `{purpose, audience, time_budget_min, mode, max_questions, estimated_minutes}`; the full `survey.json` as text; and the contents (or, if the subagent can read files, the paths) of `reference/survey-best-practices.md` + `reference/question-antipatterns.md`. In non-interactive runs the prompt's first line is `[mode: non-interactive]`.
+Phase 4 is a **bounded generate↔review loop** — at most **2 iterations**, with a **categorical** exit — not a single pass. Each iteration: dispatch a reviewer subagent to *evaluate* the current `survey.json`; if it returns zero product-fit FAILs **and** zero blocker-severity methodology findings, the loop is done; otherwise the **generator** (this skill, not the reviewer) regenerates only the flagged questions and re-derives the artifacts, then loops. After 2 iterations the loop stops regardless, and any residual FAIL/blocker is carried into Phase 5 as a top-of-batch decision. **The reviewer evaluates and recommends edits; it never writes files and never mutates `survey.json` — only the generator applies edits.**
 
-**Return contract — specify it inside the prompt.** The subagent returns two markdown bodies:
+### 4.1 Reviewer dispatch contract (per iteration)
 
-- **`question-eval.md` body** — one `## <question-id>` section **per question** (keyed by `question.id`; "Verdict: no issues" is allowed and expected when the question is clean), each containing the stem quoted, a verdict line (`Verdict: no issues` or `Verdict: N finding(s)`), then a findings table with columns `Severity | Defect | Message | Proposed fix`. Each finding is the structured shape: `target` (the question id, or a field like "options" / "scale"), `severity ∈ {blocker, should-fix, nit}`, `defect` (the catalog id or a short label), `message` (1–2 sentences — why it's a problem), `proposed_fix` (concrete — the rewritten stem / the added opt-out / the split into two items).
-- **`survey-eval.md` body** — one section each for **Structure & order** (funnel), **Length vs. budget**, **Mode fit**, **Scale balance**, **Accessibility**, **Ethics / PII**, **Intro / consent** — each with the same findings-table shape — plus an overall verdict line.
+Dispatch **one** reviewer subagent (Task tool; or run it sequentially inline if subagents are unavailable). The prompt MUST contain:
+- the survey context object `{purpose, audience, time_budget_min, mode, max_questions, estimated_minutes, response_impact}`;
+- the full **current** `survey.json` as text;
+- the contents (or, if the subagent can read files, the paths) of `reference/survey-best-practices.md` + `reference/question-antipatterns.md` — the reviewer evaluates against that file's **"Product fit (evaluate this first)"** section *first* (the three binary per-question checks + the survey-wide research-goal-coverage check), then the methodology sections, then the anti-pattern catalog;
+- on iteration ≥ 2, the prior iteration's `question-eval.md` (so the reviewer can see what was flagged and whether the regeneration fixed it).
+In non-interactive runs the prompt's first line is `[mode: non-interactive]`. The prompt MUST state explicitly: **"Do not write any files. Do not modify `survey.json`. Return the two markdown bodies plus the machine block below; the parent applies edits."**
 
-**Parent side.** Write the two bodies to `survey-eval.md` and `question-eval.md` in the run folder (the `<skill>-eval` markdown convention). Then validate: `count(## <id> sections in question-eval.md) == count(questions in survey.json)`. On a mismatch, re-dispatch **once**, naming the missing ids; if still off, surface the gap to the user and proceed **without** auto-applying anything (E8, FR-32). If the subagent fails outright or returns malformed output: surface the failure, keep the committed draft, and offer (`AskUserQuestion`: `Proceed without review (Recommended)` / `Retry the reviewer pass`) — proceeding means warning that the survey is unreviewed; in non-interactive mode, proceed and log the failure (E7, FR-35).
+### 4.2 Reviewer return contract — specify it inside the prompt
+
+The subagent returns **two markdown bodies and one machine block**.
+
+**`question-eval.md` body** — one `## <question-id>` section **per question** (keyed by `question.id`; a clean question is expected and allowed). Each section, in order:
+1. a **`**Product fit:**`** lead line — the three binary verdicts and their evidence: `predictability: PASS|FAIL — <predicted answer distribution / expected themes>`, `load-bearing: PASS|FAIL — <one line>`, `scope-match: PASS|FAIL — <one line>`. Any FAIL ⇒ append `→ kill/rewrite candidate`.
+2. the methodology verdict line (`Verdict: no issues` or `Verdict: N finding(s)`), with the stem quoted;
+3. the findings table — columns `Severity | Defect | Message | Proposed fix`; each finding the structured shape `{target` (the question id, or a field like "options" / "scale")`, severity ∈ {blocker, should-fix, nit}, defect` (the catalog id or a short label)`, message` (1–2 sentences)`, proposed_fix` (concrete)`}`.
+
+Plus, once at the end of the file, a `## Refinement loop changelog` section: one `### Iteration N` table per regeneration round — columns `| Q id | action | reviewer reason | score Δ |` (`action` ∈ {`rewritten`, `replaced`, `cut`, `kept (flag carried to Phase 5)`, `reverted`}); or, if the first review met the exit condition, the single line `No regeneration — first review met the exit condition.`
+
+**`survey-eval.md` body** — leads with `Score: N/100 (product-fit P/30, structure S/15, length L/10, mode M/10, scale Sc/10, accessibility A/10, ethics E/10, intro I/5)` computed per the `reference/survey-best-practices.md` "Scoring rubric" — **informational only, a progress signal, never an exit threshold** (the loop exit is categorical, see 4.3). Then a `## Research-goal coverage / product fit` section (coverage gaps, redundancy, scope drift — the survey-wide checks). Then one section each for **Structure & order** (funnel), **Length vs. budget**, **Mode fit**, **Scale balance**, **Accessibility**, **Ethics / PII**, **Intro / consent** — each with the same findings-table shape *and* its own `sub-score: x/weight` line. The **Intro / consent** section flags a missing persuasive WIIFM sentence in `intro.text` as a `should-fix` finding (see `reference/survey-best-practices.md` §1 intro guidance). Ends with an overall verdict line.
+
+**Machine block** (a fenced ```yaml``` block the parent parses):
+```yaml
+score: 80
+sub_scores: { product_fit: 12, structure: 15, length: 10, mode: 10, scale: 7.5, accessibility: 10, ethics: 10, intro: 5 }
+product_fit_fails: [ { id: q-who-reached-out, checks: [predictability, load-bearing], reason: "open-ended collapses to 'the analytics team'; doesn't address why the wall blocked the upgrade", recommend: cut } ]
+blockers: [ ]              # methodology findings at severity=blocker, each {id, defect, message, proposed_fix}
+recommended_edits: [ ]     # the flat list of {id, action, proposed_fix} the generator should apply this iteration
+```
+
+### 4.3 Parent side — per iteration
+
+1. **Validate & handle reviewer failure.** Check `count(## <id> sections in question-eval.md) == count(questions in survey.json)` and that the machine block parses. On a count mismatch or a malformed/missing machine block, re-dispatch **once** naming the gaps; if still off, surface it, **skip auto-regeneration for this run**, keep the committed draft, and degrade to Phase 5 with what was returned — in interactive mode offer (`AskUserQuestion`: `Proceed without further review (Recommended)` / `Retry the reviewer pass`); in non-interactive mode proceed and log (E7, E8, FR-32, FR-35).
+2. **Write** the two bodies to `survey-eval.md` and `question-eval.md` in the run folder (overwrite each iteration; the `## Refinement loop changelog` is cumulative across iterations).
+3. **Exit check (categorical).** If `product_fit_fails == []` **and** `blockers == []` → the loop is done; go to Phase 5. The `score` is **not** consulted.
+4. **Cap check.** If this was iteration 2 → stop; go to Phase 5 carrying every residual `product_fit_fails` and `blockers` entry forward as Phase-5 top-of-batch decisions. Note in the changelog: `### Iteration 2 — cap reached; <n> item(s) carried to Phase 5`.
+5. **Regenerate (targeted).** Otherwise the **generator** regenerates **only** the questions in `recommended_edits` plus any directly-coupled question (a follow-up depending on a rewritten stem, an `nps` open-follow-up, a screening item whose `skip_logic` references a changed question) — **never the whole survey**. Honor **D10**: an *author-supplied* question (one parsed in from an existing-survey file or explicitly dictated by the user) is **rewritten only, never auto-cut** — if the reviewer recommends `cut` for it, the generator does its best rewrite instead and flags it `kept (flag carried to Phase 5)` if it still FAILs. Re-run §3.5 trim-to-budget, re-derive `survey.html` / `survey.sections.json` / `preview.html` / `index.html`, append `### Iteration N` to the changelog, and loop back to 4.1.
+   - **D12 — invalid regeneration.** If the regenerated `survey.json` violates a §3.2 schema invariant, re-derive once; if still invalid, **revert that iteration** (keep the last valid `survey.json`), note `### Iteration N — reverted (regeneration produced invalid survey.json)` in the changelog, and exit the loop early to Phase 5.
 
 ## Phase 5 — Apply the critique
 
-Present the findings via batched `AskUserQuestion` — group by category, at most 4 questions per call, **one question per finding**, the question text severity-tagged (`[Blocker] …` / `[Should-fix] …` / `[Nit] …`), options `Fix as proposed (Recommended)` / `Modify the fix` / `Skip this finding` / `Defer to a later pass` (per the `_shared/interactive-prompts.md` findings/dispositions protocol). In non-interactive mode, auto-pick `Fix as proposed` for `blocker` and `should-fix`, `Defer` for `nit`, logging each to the OQ buffer.
+**Open with the loop summary.** State plainly: "the refinement loop ran N iteration(s)", summarize each iteration from the `## Refinement loop changelog`, and say whether it exited on the categorical condition or hit the 2-iteration cap.
+
+Then present the remaining findings as batched interactive questions (per the `_shared/interactive-prompts.md` findings/dispositions protocol), in this order:
+
+1. **Product-fit FAILs first** — one `AskUserQuestion` per residual product-fit FAIL (the items the loop couldn't/didn't auto-resolve, plus any author-supplied question the loop only rewrote):
+   - `question`: `Kill or rewrite Q<id>? — <which checks FAILed + the predicted answer / collapsing theme>`
+   - `options`: `Rewrite as proposed (Recommended)` / `Kill the question` / `Keep with reason` / `Defer to a later pass` — `Kill the question` is offered even for an author-supplied question (the loop won't auto-kill those, but the *user* may); `Keep with reason` records an explicit override.
+2. then the methodology findings in batches by severity — `blocker` → `should-fix` → `nit`, at most 4 questions per call, one question per finding, severity-tagged (`[Blocker] …` / `[Should-fix] …` / `[Nit] …`), options `Fix as proposed (Recommended)` / `Modify the fix` / `Skip this finding` / `Defer to a later pass`.
+
+In non-interactive mode: auto-pick `Rewrite as proposed` for product-fit FAILs, `Fix as proposed` for `blocker` and `should-fix`, `Defer` for `nit`, logging each to the OQ buffer.
 
 Apply the chosen dispositions by **mutating `survey.json`** (never editing the rendered files), then re-derive `survey.html` / `survey.sections.json` / `preview.html` / `index.html` from it. Append a `## Dispositions` section to both `question-eval.md` and `survey-eval.md` recording each finding's disposition. `git commit -m "survey-design: apply review for <slug>"` (warn-and-continue if not a git repo). If the user defers every finding, record the deferrals in the `## Dispositions` sections and the run summary and commit the survey as-is (E9).
 
@@ -332,7 +374,8 @@ Then run **## Capture Learnings** (below).
 - **Don't claim "anonymous" while collecting an identifier.** `intro.anonymous: true` forbids any PII question; say "confidential" if you can re-identify.
 - **Don't prompt the user for variables already clear in the context** (FR-13). Infer first; ask only the genuine gaps.
 - **Don't dump reviewer / simulation findings as a wall of prose.** Always present them as batched, structured questions with `Fix / Modify / Skip / Defer` options.
-- **Don't run the reviewer pass in a loop "to be thorough."** One good pass; surface what it found and let the user decide (D20).
+- **The Phase-4 loop is bounded — cap 2 iterations, categorical exit.** Don't extend it past 2, don't re-run it manually "for extra polish", and don't gate it on the 0–100 score (that score is a progress signal, not a threshold) (D20).
+- **Don't have the reviewer mutate `survey.json`.** The reviewer evaluates and recommends edits; only the generator (the skill itself) applies them and re-derives the artifacts.
 - **Don't call platform APIs.** The skill emits import *files* and instructions — it never hits Typeform / SurveyMonkey / Google / Qualtrics (Non-Goal, NFR-01: no network).
 - **Don't overwrite an existing survey folder.** Dedupe the slug with `-2` / `-3` / … (FR-24, E4).
 - **Don't inline the `reference/*` files into SKILL.md.** Load them on demand in the phase that needs them (FR-73).
@@ -372,3 +415,8 @@ At the end of a run, reflect on whether this session surfaced anything worth cap
 | E12 | Unsupported export platform named | List the supported set; offer the closest match or just `survey.json` + `survey.html`; Qualtrics not offered unless implemented (Phase 8). |
 | E13 | `.pmos/settings.yaml` missing | Default `docs_path = docs/pmos/`; warn once; proceed — do not run pipeline first-run setup (Phase 0). |
 | E14 | Skip logic targets an earlier section | Schema invariant rejects it; rewrite the jump forward or drop it and note the change (Phase 3). |
+| E15 | Phase-4 loop converges on iteration 1 | No regeneration; `## Refinement loop changelog` says "No regeneration — first review met the exit condition" (Phase 4.3). |
+| E16 | Phase-4 loop hits the 2-iteration cap with a residual FAIL/blocker | Loop stops; the residual product-fit FAIL(s)/blocker(s) are carried to Phase 5 as top-of-batch "Kill or rewrite Q<id>?" decisions (Phase 4.3 step 4, Phase 5). |
+| E17 | An author-supplied question still FAILs product-fit after 2 rewrites | Never auto-cut (D10); the generator does its best rewrite, flags it `kept (flag carried to Phase 5)`, and Phase 5 surfaces it as a kill candidate the *user* may kill (Phase 4.3 step 5). |
+| E18 | Targeted regeneration produces an invalid `survey.json` | Re-derive once; if still invalid, revert that iteration, keep the last valid `survey.json`, note `### Iteration N — reverted` in the changelog, exit the loop early to Phase 5 (Phase 4.3, D12). |
+| E19 | Reviewer returns malformed output mid-loop | Re-dispatch once naming the gaps; if still malformed, skip auto-regeneration for the run, keep the committed draft, degrade to Phase 5 (interactive: offer proceed/retry; non-interactive: proceed + log) (Phase 4.3 step 1, E7). |

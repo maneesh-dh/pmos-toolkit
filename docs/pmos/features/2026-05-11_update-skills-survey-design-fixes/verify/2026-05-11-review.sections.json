@@ -1,0 +1,17 @@
+{
+  "artifact": "2026-05-11-review.html",
+  "ids": [
+    {"id": "summary", "level": 2, "title": "Summary", "parent_id": null},
+    {"id": "static-verification", "level": 2, "title": "Phase 2 — Static Verification", "parent_id": null},
+    {"id": "code-quality-review", "level": 2, "title": "Phase 3 — Code-Quality Review (self, single agent)", "parent_id": null},
+    {"id": "deploy-integration", "level": 2, "title": "Phase 4 — Deploy & Integration", "parent_id": null},
+    {"id": "requirements-compliance", "level": 2, "title": "Phase 5 — 4a. Requirements Compliance (01_requirements.html)", "parent_id": null},
+    {"id": "spec-compliance", "level": 2, "title": "Phase 5 — 4b. Spec Compliance (02_spec.html)", "parent_id": null},
+    {"id": "plan-compliance", "level": 2, "title": "Phase 5 — 4c. Plan Compliance (03_plan.html)", "parent_id": null},
+    {"id": "ux-polish", "level": 2, "title": "Phase 5 — 4d. Wireframe & UX Polish", "parent_id": null},
+    {"id": "gap-report", "level": 2, "title": "Phase 5 — 4e. Gap Report", "parent_id": null},
+    {"id": "tests-added", "level": 2, "title": "Phase 6 — Test Hardening", "parent_id": null},
+    {"id": "final-pass", "level": 2, "title": "Phase 7 — Final Compliance Pass", "parent_id": null},
+    {"id": "conclusion", "level": 2, "title": "Conclusion", "parent_id": null}
+  ]
+}

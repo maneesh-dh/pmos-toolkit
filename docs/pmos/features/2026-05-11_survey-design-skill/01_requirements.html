@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>survey-design skill — Requirements</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.35.0">
+  <script defer src="assets/viewer.js?v=2.35.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">survey-design skill — Requirements</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="meta" data-pmos-section="meta">
+<p><strong>Date:</strong> 2026-05-11<br>
+<strong>Last updated:</strong> 2026-05-11<br>
+<strong>Status:</strong> Draft<br>
+<strong>Tier:</strong> 3 — Feature<br>
+<strong>Pipeline:</strong> driven by <code>/feature-sdlc</code> on branch <code>feat/survey-design-skill</code></p>
+</section>
+
+<section id="problem" data-pmos-section="problem">
+<h2 id="problem">Problem</h2>
+<p>Product managers and builders frequently need to run surveys — to understand user problems, validate hypotheses, or measure satisfaction — but most are not trained survey methodologists. <strong>The result is surveys riddled with leading questions, double-barreled items, unbalanced scales, missing opt-outs, and bloated length</strong>, which produce biased or unusable data. Today there is no assistant in the toolkit that takes a rough survey intent and turns it into a methodologically sound, ready-to-field instrument.</p>
+
+<h3 id="who-experiences-this">Who experiences this?</h3>
+<p>The primary persona is a <strong>product manager or founder/builder designing a survey for their own users</strong> — comfortable writing prose, familiar with their product domain, but <strong>not a research-methods expert</strong>. They typically reach for Google Forms, Typeform, or SurveyMonkey and start typing questions directly into the platform. A secondary persona is <strong>someone with an existing survey they want a second opinion on</strong> before sending it out.</p>
+
+<h3 id="why-now">Why now?</h3>
+<p>The pmos-toolkit already ships PM-facing skills for the requirements→spec→plan pipeline, plus design/critique utilities. <strong>Survey design is a high-frequency PM task with a well-established best-practice literature</strong> (Pew, Dillman, Krosnick, NN/g) that is straightforward to encode as a generation + critique loop — the same shape as the toolkit's other "generate, critique with a reviewer subagent, refine" skills. There is also now a stable HTML-authoring substrate (<code>_shared/html-authoring/</code>) the skill can reuse for the survey artifact and its viewer.</p>
+</section>
+
+<section id="goals-non-goals" data-pmos-section="goals-non-goals">
+<h2 id="goals-non-goals">Goals &amp; Non-Goals</h2>
+
+<h3 id="goals">Goals</h3>
+<ul>
+<li>A PM can go from a paragraph of intent (or an existing survey) to a <strong>fielding-ready, methodologically reviewed survey</strong> in one skill invocation — measured by the run producing a committed <code>survey.html</code> plus critique artifacts plus at least one platform-import file.</li>
+<li>The generated survey <strong>respects the audience and time budget the user specified</strong> — measured by the simulated-respondent pass reporting an estimated completion time within the user's stated budget (or the skill flagging the overage and proposing cuts).</li>
+<li>Common framing anti-patterns are <strong>caught and fixed before the user fields the survey</strong> — measured by the question-eval critique enumerating every question and the apply-step resolving each finding (fix / modify / skip-with-reason / defer).</li>
+<li>The survey is <strong>adapted to its research mode</strong> (generative / evaluative / hybrid) — measured by the design's question-type mix matching the mode (open-ended-heavy for generative, closed/comparable for evaluative).</li>
+<li>The user can <strong>view and walk the survey before fielding it</strong> — measured by an <code>index.html</code> viewer + local serve script that renders the survey as an interactive, fillable preview.</li>
+<li>The survey can be <strong>moved into a real platform without re-typing it</strong> — measured by the skill emitting a valid import artifact for the chosen platform (Typeform / SurveyMonkey / Google Forms).</li>
+</ul>
+
+<h3 id="non-goals">Non-Goals</h3>
+<ul>
+<li>NOT actually creating the survey in the third-party platform via live API calls — because that needs the user's API tokens and per-platform auth setup; the skill emits an import-ready file and instructions, and the user runs the import. (May be revisited later.)</li>
+<li>NOT handling survey <strong>distribution, sampling panels, recruitment, or quota management</strong> — because that is a fielding/operations concern, not survey <em>design</em>; the skill stops at "ready to field."</li>
+<li>NOT <strong>analyzing survey responses</strong> after fielding — because that is a separate downstream activity; this skill ends at survey creation.</li>
+<li>NOT supporting <strong>conjoint / MaxDiff / advanced experimental designs</strong> in v1 — because they need specialist tooling and statistical setup beyond a question-list generator; the skill may suggest them but will not author them.</li>
+<li>NOT a general form builder — because the scope is research surveys specifically; payment forms, registration forms, and quizzes are out of scope.</li>
+</ul>
+</section>
+
+<section id="ux-analysis" data-pmos-section="ux-analysis">
+<h2 id="ux-analysis">User Experience Analysis</h2>
+
+<h3 id="motivation">Motivation</h3>
+<ul>
+<li><strong>Job to be done:</strong> "I need to learn something from my users, and I want the survey to give me trustworthy answers — without me having to become a survey-methods expert first."</li>
+<li><strong>Importance / urgency:</strong> Moderate-to-high and recurring. A badly designed survey wastes the respondents' goodwill (you usually get one shot at a given audience) and produces decisions based on noise. PMs feel the cost acutely after the fact ("the data was useless").</li>
+<li><strong>Alternatives:</strong> Type questions straight into Google Forms/Typeform (no review); copy a template from a blog post (generic, not fitted to the question); ask a research colleague to review (slow, not always available); read a best-practices article and self-edit (high effort, easy to miss things). The skill competes on "expert review, instantly, fitted to your exact intent."</li>
+</ul>
+
+<h3 id="friction-points">Friction Points</h3>
+<table>
+<thead><tr><th>Friction point</th><th>Cause</th><th>Mitigation</th></tr></thead>
+<tbody>
+<tr><td>"I don't know what to tell it / what counts as 'enough' context."</td><td>Open-ended intake; user unsure what variables matter.</td><td>Skill interprets what it can from the prose, then asks <em>only the gaps</em> via a small, structured AskUserQuestion batch (audience, time budget, mode, optional question cap).</td></tr>
+<tr><td>"It generated a survey but I don't trust it / it feels generic."</td><td>No visible reasoning; looks like any AI output.</td><td>Explicit reviewer-subagent critique step with a named rubric (overall-survey + per-question anti-patterns), surfaced to the user finding-by-finding before changes are applied.</td></tr>
+<tr><td>"Is this actually short enough? Will my users finish it?"</td><td>Length/burden is invisible until someone tries it.</td><td>Simulated-respondent pass that walks the survey as the target persona and reports estimated time, confusion points, and language gaps — with proposed cuts.</td></tr>
+<tr><td>"Now I have to retype all of this into Typeform."</td><td>The artifact is a document, not a survey.</td><td>Export step generates a platform-native import file (Typeform Create-API JSON / SurveyMonkey API JSON + paste fallback / Google Forms Apps Script).</td></tr>
+<tr><td>"I can't picture what respondents will see."</td><td>Static doc doesn't convey the experience.</td><td><code>index.html</code> viewer + local serve script renders an interactive, fillable preview.</td></tr>
+<tr><td>"I changed my mind mid-way and lost the earlier version."</td><td>Edits overwrite without history.</td><td>Each stage (initial draft, post-critique, post-simulation) is its own git commit.</td></tr>
+</tbody>
+</table>
+
+<h3 id="satisfaction-signals">Satisfaction Signals</h3>
+<ul>
+<li>The user reads the critique and thinks "oh — yeah, that question <em>was</em> double-barreled" — the skill taught them something.</li>
+<li>The estimated completion time comes back under their budget, or the skill clearly shows what to cut to get there.</li>
+<li>The import file opens in their platform and produces a recognisable survey with minimal cleanup.</li>
+<li>The user fields the survey with confidence rather than vague unease.</li>
+</ul>
+</section>
+
+<section id="solution-direction" data-pmos-section="solution-direction">
+<h2 id="solution-direction">Solution Direction</h2>
+<p>A new <strong>pmos-toolkit skill, <code>survey-design</code></strong>, living at <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code>, that reuses the toolkit's shared substrate (<code>.pmos/settings.yaml</code> for <code>docs_path</code>, <code>_shared/html-authoring/</code> for the artifact + viewer + serve script, the platform-adaptation and non-interactive conventions, the interactive-prompts helper). It ships a <code>reference/</code> directory containing the baked-in research: a survey best-practices guide, a question-framing anti-pattern catalog (with BAD→FIXED examples and detection heuristics), and a per-platform export/import guide.</p>
+
+<p><strong>Runtime shape</strong> (the skill's phases, at a behavior level — exact phase boundaries are the spec's job):</p>
+<ol>
+<li><strong>Intake.</strong> The user provides initial context — free text describing the survey they want, and/or a path to an existing survey to refine.</li>
+<li><strong>Variable interpretation.</strong> The skill extracts what it can from the context: intended audience, time-to-complete budget, survey mode (generative = understand problems / evaluative = validate a hypothesis / hybrid), and an optional max-question cap. For each variable it can't confidently infer, it asks via a single batched AskUserQuestion call (one question per variable).</li>
+<li><strong>Initial design.</strong> The skill generates a survey: a short intro, logical sections, and questions within each section — applying the best-practices reference (funnel order, balanced scales, opt-outs, mode-appropriate question-type mix, length budget). It writes <code>survey.html</code> (readable + interactive preview) under <code>{docs_path}/survey-design/{YYYY-MM-DD}_&lt;survey-slug&gt;/</code> and commits it.</li>
+<li><strong>Reviewer critique.</strong> A single reviewer subagent is dispatched with both rubrics. It returns two files: <code>survey-eval.md</code> (overall-survey critique — structure, ordering, length/burden, mode fit, accessibility, ethics/PII) and <code>question-eval.md</code> (every question evaluated against the anti-pattern catalog, with the specific defect, severity, and a proposed rewrite). The skill surfaces findings to the user in batched AskUserQuestion calls (Fix as proposed / Modify / Skip / Defer per finding).</li>
+<li><strong>Apply critique.</strong> The skill applies the user's dispositions to <code>survey.html</code> and commits.</li>
+<li><strong>Simulated-respondent pass.</strong> The skill walks the survey in the voice of the target persona, capturing friction, confusion, language-comprehension gaps, time-to-complete estimate, and drop-off risk. It produces a fix list and asks the user — via batched AskUserQuestion — which fixes to apply. On confirmation it applies them and commits.</li>
+<li><strong>Viewer.</strong> The skill generates an <code>index.html</code> viewer for the survey folder and a light local serve script (reusing the <code>_shared/html-authoring/</code> <code>serve.js</code> / <code>viewer.js</code> / <code>index-generator.md</code> pattern), so the user can open the survey in a browser and walk it.</li>
+<li><strong>Export.</strong> The skill asks the user which platform to target (Typeform / SurveyMonkey / Google Forms; Qualtrics offered as a documented stretch). It generates the import-conducive artifact for that platform and a short "how to import" note, and commits.</li>
+</ol>
+
+<p><strong>Why a generate→critique→simulate→export loop</strong> (rather than a one-shot generator): survey quality is dominated by defects that are obvious in review but easy to miss while drafting; a dedicated critique pass with a named rubric is how the toolkit's other skills get reliability, and the simulated-respondent pass adds the "did anyone actually try it" check that catches length and comprehension problems a static rubric won't.</p>
+</section>
+
+<section id="user-journeys" data-pmos-section="user-journeys">
+<h2 id="user-journeys">User Journeys</h2>
+
+<h3 id="primary-journey">Primary Journey (happy path) — design a new survey</h3>
+<ol>
+<li>PM runs <code>/survey-design</code> with a paragraph: "I want to understand why trial users don't convert. Audience: people who started a trial in the last 30 days and didn't upgrade. Should take ~3 minutes."</li>
+<li>The skill confirms it read: audience = recent non-converting trial users; time budget = ~3 min; mode = it infers <strong>generative</strong> (understanding "why") but asks to confirm; question cap = none stated. The user confirms mode = generative.</li>
+<li>The skill generates a ~7-question survey: a one-line intro, a screening confirmation, an open-ended "what were you hoping to accomplish", a closed "which of these got in your way" (forced-choice yes/no per item per the catalog), an open "what would have changed your mind", a single satisfaction-with-trial scale, and an optional closing free-text. Writes <code>survey.html</code>, commits "survey-design: initial draft for trial-conversion".</li>
+<li>The reviewer subagent returns: <code>survey-eval.md</code> says the screening item should come first and the satisfaction scale is unbalanced; <code>question-eval.md</code> flags Q4 as double-barreled ("price and complexity") and Q3 as slightly leading. The skill surfaces 4 findings; the user picks Fix-as-proposed on three and Modify on one (rewords it themselves).</li>
+<li>The skill applies the dispositions, commits "survey-design: apply review for trial-conversion".</li>
+<li>The simulated-respondent pass walks it as "Maya, a trial user who churned": estimates 2m40s, flags that "onboarding friction" is jargon, suggests Q2 and Q5 could merge. The skill asks which of the 3 fixes to apply; the user takes 2. Applies, commits "survey-design: apply simulation fixes for trial-conversion".</li>
+<li>The skill generates <code>index.html</code> + serve script; tells the user <code>node assets/serve.js</code> (or equivalent) to view it.</li>
+<li>The skill asks which platform; user picks Google Forms. The skill writes <code>export/build-google-form.gs</code> + <code>export/README.md</code> with the paste-and-run instructions, commits "survey-design: add Google Forms export for trial-conversion".</li>
+<li>The skill prints a summary: folder path, commit list, the import file, and the viewer command.</li>
+</ol>
+
+<h3 id="alternate-journeys">Alternate Journeys</h3>
+<ul>
+<li><strong>Refine an existing survey.</strong> The user passes a path to an existing survey (an <code>.html</code>/<code>.md</code>/pasted text). The skill parses it into its internal model, runs variable interpretation (asking only for what the existing survey doesn't make clear), then enters at the reviewer-critique step rather than generating from scratch. All later steps proceed normally.</li>
+<li><strong>Evaluative survey.</strong> Intake mode = evaluative. The generated design leans on closed, comparable items (rating scales, NPS/CSAT where appropriate, A/B-able wording), fewer open-ended items, and the critique rubric weights comparability and scale balance more heavily.</li>
+<li><strong>Hybrid survey.</strong> Mode = hybrid: a generative section (open exploration) followed by an evaluative section (closed measurement), with the funnel-order rule applied across the boundary.</li>
+<li><strong>Question cap set.</strong> The user caps at, say, 8 questions. If the generated design would exceed it, the skill prioritises and trims to the cap, and the simulated pass reports against the cap.</li>
+<li><strong>Skip the export.</strong> The user declines to export (just wants the design + viewer). The skill ends after the viewer step.</li>
+<li><strong>Non-interactive run.</strong> Invoked with <code>--non-interactive</code> (e.g. from <code>/feature-sdlc</code> or a script): the skill picks the recommended option at every gate, logs deferred questions to an open-questions sidecar, and still produces all artifacts.</li>
+</ul>
+
+<h3 id="error-journeys">Error Journeys</h3>
+<ul>
+<li><strong>Intake too thin to proceed.</strong> The context is one vague sentence with no audience and no purpose. The skill asks the variable-interpretation questions; if the user still can't say what the survey is <em>for</em>, the skill states it cannot design a survey without a research goal and stops (rather than guessing).</li>
+<li><strong>Existing survey can't be parsed.</strong> The provided file isn't recognisably a survey. The skill says so, shows what it could extract, and offers to treat the content as free-text intake instead.</li>
+<li><strong>Reviewer subagent fails or returns malformed output.</strong> The skill surfaces the failure, keeps the committed draft, and offers to retry the critique or proceed without it (with a warning that the survey is unreviewed).</li>
+<li><strong>Not in a git repo / dirty tree.</strong> The skill's commits are best-effort: if the working tree isn't a git repo, it writes the artifacts and warns that it couldn't commit; it does not refuse to produce the survey.</li>
+<li><strong>Export platform not chosen / unsupported.</strong> If the user names a platform the skill doesn't support, it lists the supported set and offers the closest match (or a generic structured <code>survey.json</code> + the readable HTML).</li>
+<li><strong>Length can't fit the budget.</strong> If even the trimmed design exceeds the time budget for the questions the user insists on keeping, the skill fields the survey anyway but prominently flags the expected drop-off and the overage.</li>
+</ul>
+
+<h3 id="empty-states-edge-cases">Empty States &amp; Edge Cases</h3>
+<table>
+<thead><tr><th>Scenario</th><th>Condition</th><th>Expected behavior</th></tr></thead>
+<tbody>
+<tr><td>No initial context at all</td><td>User runs <code>/survey-design</code> with no argument</td><td>Skill asks for the survey's purpose + audience before doing anything else.</td></tr>
+<tr><td>Survey slug collision</td><td>A folder for today's date + slug already exists</td><td>Skill disambiguates (e.g. <code>-2</code> suffix) or asks; never silently overwrites a prior survey folder.</td></tr>
+<tr><td>Mode genuinely ambiguous</td><td>Context supports both "understand" and "validate"</td><td>Skill proposes hybrid and asks the user to confirm or pick one.</td></tr>
+<tr><td>Reviewer finds nothing</td><td>The draft is already clean</td><td>Critique files say "no findings" with the rubric checklist shown as passed; skill proceeds to simulation without forcing edits.</td></tr>
+<tr><td>User defers every finding</td><td>All critique findings → Defer</td><td>Findings recorded in an open-questions section of the survey doc; the survey is committed as-is with the deferrals visible.</td></tr>
+<tr><td><code>.pmos/settings.yaml</code> missing</td><td>First run in a repo with no pmos setup</td><td>Skill runs the shared first-run setup (or falls back to a sensible default <code>docs_path</code>) before resolving the survey folder.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="design-decisions" data-pmos-section="design-decisions">
+<h2 id="design-decisions">Design Decisions</h2>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>D1</td><td>Skill lives in <code>pmos-toolkit</code> and reuses the shared substrate (settings, html-authoring, platform-adaptation, non-interactive, interactive-prompts).</td><td>(a) pmos-toolkit + reuse substrate; (b) pmos-toolkit but mostly standalone; (c) new standalone plugin.</td><td>It's a PM-facing generate→critique→refine skill — exactly the toolkit's wheelhouse. Reusing the substrate gives the artifact viewer, serve script, and convention compliance for free.</td></tr>
+<tr><td>D2</td><td>Runtime survey artifacts go under <code>{docs_path}/survey-design/{YYYY-MM-DD}_&lt;slug&gt;/</code>, NOT under the pipeline's <code>features/</code> tree.</td><td>(a) <code>survey-design/&lt;date&gt;_&lt;slug&gt;/</code>; (b) <code>features/&lt;date&gt;_&lt;slug&gt;/</code> like pipeline skills.</td><td>User explicitly wants a dedicated <code>survey-design/</code> namespace; surveys aren't pipeline features and shouldn't pollute the features index.</td></tr>
+<tr><td>D3</td><td>One reviewer subagent producing two output files (<code>survey-eval.md</code>, <code>question-eval.md</code>).</td><td>(a) one subagent, two files; (b) two parallel subagents; (c) inline critique, no subagent.</td><td>The two critiques share context (the same survey, the same research); one subagent is cheaper and avoids divergence, while two files keeps overall vs. per-question concerns cleanly separated as the user wants.</td></tr>
+<tr><td>D4</td><td><code>survey.html</code> is both a readable spec and an interactive, fillable preview (single file, styled via the html-authoring substrate).</td><td>(a) readable + interactive; (b) readable static only; (c) also emit <code>survey.json</code>.</td><td>The user wants to experience the survey, and the simulated-respondent pass benefits from a walkable artifact. (Whether to <em>also</em> persist a canonical <code>survey.json</code> is D5.)</td></tr>
+<tr><td>D5</td><td>The skill maintains the survey as a structured internal model and persists it as <code>survey.json</code> alongside <code>survey.html</code>; exporters transform from the JSON, not by re-parsing HTML. <em>(Recommended; surfaced for review.)</em></td><td>(a) persist <code>survey.json</code> as canonical; (b) HTML-only, exporters re-parse it.</td><td>Re-parsing HTML to export is fragile; a small canonical JSON model makes the three exporters and the interactive preview trivial to derive. Cost: one more file in the folder. (If review rejects this, fall back to HTML-only.)</td></tr>
+<tr><td>D6</td><td>Export targets: Typeform (Create-API JSON), SurveyMonkey (POST /v3/surveys JSON + plain-text paste fallback), Google Forms (Apps Script <code>.gs</code>). Qualtrics <code>.qsf</code> documented as a stretch, not built in v1.</td><td>(a) the three above + Qualtrics stretch; (b) all four first-class; (c) Google Forms + Typeform only.</td><td>These three have the cleanest "generate a file → import" stories and cover the platforms PMs actually use; Qualtrics is enterprise-only so it's a documented stretch; SurveyMonkey's API is paid-plan-gated, hence the paste fallback.</td></tr>
+<tr><td>D7</td><td>The skill emits import-ready files + instructions; it does NOT call platform APIs directly.</td><td>(a) emit files only; (b) optionally call APIs with user-supplied tokens.</td><td>Live API calls need per-platform auth setup the skill can't assume; file + instructions is the low-friction, universally-applicable path. Could be added later.</td></tr>
+<tr><td>D8</td><td>The baked-in research ships as a <code>reference/</code> directory inside the skill (best-practices guide, anti-pattern catalog, platform export guide), loaded on demand — not inlined into <code>SKILL.md</code>.</td><td>(a) separate <code>reference/</code> files; (b) everything inline in SKILL.md.</td><td>The research is large; progressive disclosure keeps SKILL.md scannable and lets the reviewer subagent be handed the catalog directly.</td></tr>
+<tr><td>D9</td><td>Commits at each stage (initial draft, post-critique, post-simulation, post-export), best-effort — warn but don't refuse if not in a git repo.</td><td>(a) best-effort commits, warn on failure; (b) require a git repo; (c) no commits.</td><td>The user explicitly wants per-stage commits for history, but the skill shouldn't be unusable outside a repo.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="success-metrics" data-pmos-section="success-metrics">
+<h2 id="success-metrics">Success Metrics</h2>
+<table>
+<thead><tr><th>Metric</th><th>Baseline</th><th>Target</th><th>Measurement</th></tr></thead>
+<tbody>
+<tr><td>Run completeness</td><td>n/a (new)</td><td>A successful run always produces: <code>survey.html</code>, <code>survey-eval.md</code>, <code>question-eval.md</code>, an <code>index.html</code> viewer, and (unless the user opts out) one export file.</td><td>Presence of the files after a run; checked in <code>/verify</code> smoke.</td></tr>
+<tr><td>Critique coverage</td><td>n/a</td><td><code>question-eval.md</code> references every question in the survey by id/number; no question is silently un-reviewed.</td><td>Count of evaluated questions == count of survey questions.</td></tr>
+<tr><td>Time-budget fidelity</td><td>n/a</td><td>The simulated-respondent estimate is within the user's stated budget, or the overage is explicitly flagged with proposed cuts.</td><td>Estimate vs. budget reported in the simulation output.</td></tr>
+<tr><td>Import success</td><td>n/a</td><td>The emitted artifact imports into the target platform and produces a recognisable survey (manual check during dev; documented limitations per platform).</td><td>Spot-check during <code>/verify</code> on at least one platform.</td></tr>
+<tr><td>Convention compliance</td><td>n/a</td><td>SKILL.md and the HTML artifacts pass the toolkit's release prereqs (canonical skill path, heading IDs, description quality, manifest sync, README row).</td><td><code>/verify</code> + pre-push hook.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="research-sources" data-pmos-section="research-sources">
+<h2 id="research-sources">Research Sources</h2>
+<table>
+<thead><tr><th>Source</th><th>Type</th><th>Key takeaway</th></tr></thead>
+<tbody>
+<tr><td>Pew Research — <a href="https://www.pewresearch.org/writing-survey-questions/">Writing Survey Questions</a></td><td>External / methodology</td><td>Canonical practitioner reference: wording effects, open vs. closed, question-order contrast/assimilation, acquiescence, randomization, sensitive-topic techniques — with concrete % swings.</td></tr>
+<tr><td>Dillman, Smyth &amp; Christian — <em>Internet, Phone, Mail, and Mixed-Mode Surveys: The Tailored Design Method</em></td><td>External / book</td><td>Foundational on minimizing respondent burden, instruction placement, item-in-a-series formatting, mode-tailored design.</td></tr>
+<tr><td>Krosnick &amp; Presser — "Question and Questionnaire Design" (Handbook of Survey Research)</td><td>External / academic</td><td>Scale points, labeling, acquiescence, satisficing, forced-choice vs. select-all, ordering effects.</td></tr>
+<tr><td>NN/g — <a href="https://www.nngroup.com/articles/survey-best-practices/">Writing Good Survey Questions</a>, <a href="https://www.nngroup.com/articles/keep-online-surveys-short/">Keep Surveys Short</a></td><td>External / UX</td><td>Mostly closed-ended, no behavior prediction, balanced scales, MECE options, opt-outs, optional questions, respectful wording; surveys for quantitative attitudinal data only.</td></tr>
+<tr><td>SurveyMonkey — <a href="https://www.surveymonkey.com/learn/survey-best-practices/5-common-survey-mistakes-ruin-your-data/">5 Common Survey Mistakes</a>; <a href="https://www.surveymonkey.com/curiosity/survey_questions_and_completion_rates/">Question count vs. completion</a></td><td>External / vendor</td><td>Leading/loaded/double-barreled/absolutes/jargon with BAD→FIXED; drop-off rises sharply per added question up to ~15 then flattens; ~10–15 questions is the sweet spot.</td></tr>
+<tr><td>Qualtrics — <a href="https://www.qualtrics.com/articles/strategy-research/double-barreled-question/">Double-Barreled Questions</a>, <a href="https://www.qualtrics.com/articles/strategy-research/survey-bias/">Survey Bias Types</a>, <a href="https://www.qualtrics.com/support/survey-platform/survey-module/editing-questions/question-types-guide/question-types-overview/">Question Types</a></td><td>External / vendor</td><td>Bias catalog (acquiescence, social desirability, demand characteristics, recall, order); question-type reference (matrix, slider, rank, constant sum, semantic differential, NPS).</td></tr>
+<tr><td>MeasuringU — <a href="https://measuringu.com/rating-scales/">15 Rating Scales Explained</a>, <a href="https://measuringu.com/sata-vs-yes-no-forced-choice/">Select-all vs. forced choice</a></td><td>External / research</td><td>Balanced labels, midpoint inclusion criteria, forced-choice yes/no beats "select all that apply" for prevalence.</td></tr>
+<tr><td>Pew — <a href="https://www.pewresearch.org/methods/2019/05/09/when-online-survey-respondents-only-select-some-that-apply/">"Select all that apply" study</a></td><td>External / methodology</td><td>CATA under-reports vs. forced-choice yes/no; satisficing; use forced choice when prevalence matters.</td></tr>
+<tr><td>UMich Cross-Cultural Survey Guidelines — <a href="https://ccsg.isr.umich.edu/chapters/pretesting/cognitive-interviewing/">Cognitive Interviewing</a>; Blair &amp; Conrad, POQ — sample size for cognitive pretesting</td><td>External / methodology</td><td>Pretesting sequence: expert review → cognitive interviews (iterative, ~5–15) → soft launch (~50–100 / 5–10%); iteration beats sample size. (Informs the skill's "simulated respondent" pass as a lightweight stand-in.)</td></tr>
+<tr><td>WCAG 2.1 AA / <a href="https://www.qualtrics.com/support/survey-platform/survey-module/survey-tools/check-survey-accessibility/">Qualtrics survey accessibility</a></td><td>External / standards</td><td>Radio adjacent to label, alt text for question images, "Question X of Y" over graphical progress bars, self-paced, sufficient contrast.</td></tr>
+<tr><td>Typeform — <a href="https://www.typeform.com/developers/create/reference/create-form/">Create API: create form</a></td><td>External / API docs</td><td><code>POST /forms</code> takes a full form JSON (<code>fields[]</code>, <code>welcome_screens</code>, <code>thankyou_screens</code>, <code>logic</code>, <code>settings</code>); needs a personal access token with <code>forms:write</code>.</td></tr>
+<tr><td>SurveyMonkey — <a href="https://github.com/SurveyMonkey/public_api_docs/blob/main/includes/_surveys.md">Surveys API</a>, <a href="https://github.com/SurveyMonkey/public_api_docs/blob/main/includes/_questions.md">Questions API</a>; <a href="https://help.surveymonkey.com/en/surveymonkey/create/importing-surveys/">Importing surveys</a></td><td>External / API docs</td><td><code>POST /v3/surveys</code> with nested <code>pages[].questions[]</code> builds the whole survey in one call (paid-plan API); the only no-code import is plain-text paste (MC + single-textbox only) → ship a paste fallback.</td></tr>
+<tr><td>Google Apps Script — <a href="https://developers.google.com/apps-script/reference/forms/form">FormApp / Form class</a>; <a href="https://developers.google.com/workspace/forms/api/reference/rest/v1/forms/batchUpdate">Forms REST batchUpdate</a></td><td>External / API docs</td><td>No native bulk-import UI; the practical path is a generated Apps Script using <code>FormApp.create()</code> + <code>add*Item()</code> (MultipleChoice, Checkbox, List, Text, ParagraphText, Scale, Grid, SectionHeader, PageBreak…). Gaps: no native NPS/ranking, limited logic.</td></tr>
+<tr><td>Qualtrics — <a href="https://www.qualtrics.com/support/survey-platform/survey-module/survey-tools/import-and-export-surveys/">Import/Export surveys</a> (QSF)</td><td>External / API docs</td><td>QSF is plain JSON (<code>SurveyEntry</code> + <code>SurveyElements[]</code>); importable via UI or <code>POST /survey-definitions?format=qsf</code>. Enterprise-only — documented stretch target.</td></tr>
+<tr><td>Existing pmos-toolkit skills (<code>plugins/pmos-toolkit/skills/</code>) — <code>create-skill</code>, <code>diagram</code>, <code>polish</code>, <code>msf-req</code>, <code>_shared/html-authoring/</code></td><td>Existing code</td><td>Patterns to follow: generate→reviewer-subagent-critique→refine loop; <code>reference/</code> for baked research; HTML artifact + <code>viewer.js</code>/<code>serve.js</code>/<code>index-generator.md</code>; <code>_shared/interactive-prompts.md</code>; platform-adaptation + non-interactive blocks; release prereqs (canonical skill path, manifest version sync, README row).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="open-questions" data-pmos-section="open-questions">
+<h2 id="open-questions">Open Questions</h2>
+<table>
+<thead><tr><th>#</th><th>Question</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Should the skill persist a canonical <code>survey.json</code> alongside <code>survey.html</code> (D5), or keep HTML as the single source and have exporters re-parse it? (Recommendation: persist JSON — to be confirmed in spec.)</td></tr>
+<tr><td>2</td><td>Auto-tier of the skill artifact in <code>/create-skill</code> terms — almost certainly Tier 3 (multi-phase, reviewer subagent, AskUserQuestion gates, reference dir); confirm in spec so the right conventions (non-interactive block, findings protocol) are applied.</td></tr>
+<tr><td>3</td><td>How interactive must <code>survey.html</code> actually be — full fillable form with state, or "visually shows controls but not wired"? (Affects whether the simulated-respondent pass reads the HTML or the JSON model.)</td></tr>
+<tr><td>4</td><td>Does the simulated-respondent pass run as a subagent (cleaner context isolation) or inline? (Leaning inline, since it needs the same survey context the main agent has — but the spec should decide.)</td></tr>
+<tr><td>5</td><td>For the export step — should the skill offer to generate <em>multiple</em> platform files in one run if the user wants, or strictly one per invocation? (User's brief says "where would they want to export" — singular — but multi is cheap.)</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="review-log" data-pmos-section="review-log">
+<h2 id="review-log">Review Log</h2>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes made</th></tr></thead>
+<tbody>
+<tr><td>0 (initial draft)</td><td>—</td><td>Initial Tier 3 requirements written from the user's brief + three research streams (best practices, anti-patterns, platform import) + a 4-question design clarification.</td></tr>
+</tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_survey-design-skill/01_requirements.html</span>
+  </footer>
+</body>
+</html>

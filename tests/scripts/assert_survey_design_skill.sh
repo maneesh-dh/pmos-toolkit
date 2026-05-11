@@ -61,7 +61,7 @@ fi
 # --- survey-preview.js ---
 if [ -f "$PREVIEW" ]; then
   ! grep -Eq 'https?://' "$PREVIEW" || note "$PREVIEW: contains http(s):// reference (NFR-02: no CDN/external refs)"
-  ! grep -Eq '(^|[^a-zA-Z])(import|export)[[:space:]]' "$PREVIEW" || note "$PREVIEW: uses ES module import/export (must be a plain <script src>)"
+  ! grep -Eq '^[[:space:]]*(import|export)[[:space:]]' "$PREVIEW" || note "$PREVIEW: uses ES module import/export statements (must be a plain <script src>)"
   ! LC_ALL=C grep -qP '[^\x00-\x7F]' "$PREVIEW" 2>/dev/null || note "$PREVIEW: contains non-ASCII bytes (must be ASCII-only)"
   grep -q 'survey-data' "$PREVIEW" || note "$PREVIEW: does not reference the #survey-data element"
   grep -q 'skip_logic' "$PREVIEW" || note "$PREVIEW: does not handle skip_logic"

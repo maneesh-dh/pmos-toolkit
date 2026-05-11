@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grill Report — 01_requirements (feature-sdlc-skill-mode)</title>
+  <link rel="stylesheet" href="../assets/style.css?v=2.36.0">
+  <script defer src="../assets/viewer.js?v=2.36.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Grill Report — 01_requirements (feature-sdlc-skill-mode)</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>Artifact:</strong> <code>01_requirements.html</code> · <strong>Depth:</strong> deep · <strong>Questions asked:</strong> 15 · <strong>Date:</strong> 2026-05-11</p>
+
+<section id="resolved">
+<h2 id="resolved">Resolved (new / clarified decisions, beyond the 15 locked ones)</h2>
+<table>
+<thead><tr><th>#</th><th>Branch</th><th>Resolution</th></tr></thead>
+<tbody>
+<tr><td>G1</td><td>Host-repo skill location</td><td>Phase 0d detects repo shape (plugin manifest / <code>.agents/</code> / <code>.claude/skills/</code>), proposes the matching path, confirms once, records in <code>state.yaml</code>; fallback <code>.claude/skills/&lt;name&gt;/</code> with a noted assumption.</td></tr>
+<tr><td>G2</td><td>Subcommand token parsing</td><td>Token 1 is the mode selector only when it is exactly <code>skill</code> <strong>and</strong> (sole token | next token is a recognized flag | remainder is one quoted arg); else it is a feature description. Same rule as <code>list</code>.</td></tr>
+<tr><td>G3</td><td>Phase 6a rollback safety</td><td><code>/execute</code> records a git ref per eval iteration in <code>state.yaml.phases.skill_eval.iterations[]</code> (+ that iteration's pass/fail set); after the cap, if iteration 2 is net-worse, "restore iteration 1" is the first option in the Accept-as-risk dialog.</td></tr>
+<tr><td>G4</td><td><code>/skill-sdlc</code> wrapper body</td><td>~15 lines: frontmatter (name + skill-authoring trigger phrases for model-invocation routing) + body = "alias; immediately invoke <code>/feature-sdlc</code> with arguments <code>skill &lt;verbatim args&gt;</code>; do nothing else." Zero logic duplication.</td></tr>
+<tr><td>G5</td><td>Renumber blast radius</td><td>Schema v4 = add top-level <code>mode</code> ∈ {feature, skill-new, skill-feedback} (default <code>feature</code> on read of a v3 file; additive / on-read / chat-logged) + optional <code>phases.skill_eval.iterations[]</code> (skill-dev only). Phase ids stay name-based; the renumber is prose-only, no migration. <em>(Closes OQ1.)</em></td></tr>
+<tr><td>G6</td><td><code>skill-patterns.md</code> entry point</td><td>One standing constraints reference cited (not copied) at <code>/requirements</code> (→ acceptance criteria), <code>/spec</code> (→ FRs), <code>/execute</code> (→ authoring ref), <code>/verify</code>+6a (→ conformance via <code>skill-eval.md</code>, its 1:1 binary mirror).</td></tr>
+<tr><td>G7</td><td>Codex / target plumbing</td><td>Phase 0d also resolves <code>target_platform</code> (claude-code | codex | generic) by repo-shape detection + confirmation; threaded as a param; <code>skill-eval-check.sh --target &lt;…&gt;</code> (default <code>generic</code> = SKILLS intersection).</td></tr>
+<tr><td>G8</td><td>Tier-1 path</td><td>Short-form <code>/requirements</code> → skip <code>/grill</code> + <code>/creativity</code> → short-form <code>/spec</code> → <code>/plan</code> → <code>/execute</code> → Phase 6a eval (still runs) → <code>/verify</code> (non-skippable) → <code>/complete-dev</code>; folded <code>/msf-req</code> runs but brief.</td></tr>
+<tr><td>G9</td><td>Phase 6a reviewer contract (markdown)</td><td>Reviewer gets raw SKILL.md (+ ref files) + the <code>[llm-judge]</code> checks (each with stable <code>check_id</code>); returns <code>{check_id, verdict, fix_note (concrete edit, required on fail), quote (≥40-char verbatim from the file the check targets)}</code> per check; parent validates <code>check_id</code> set-equality + substring-greps each <code>quote</code> (FR-52-style hard-fail). Deterministic subset via <code>skill-eval-check.sh</code>. No HTML / <code>sections.json</code>.</td></tr>
+<tr><td><strong>G10</strong></td><td><strong><code>--from-feedback</code> scope — revises D3</strong></td><td><strong>skill-feedback is multi-skill</strong>: one combined <code>01_requirements</code> → <code>02_spec</code> → <code>/plan</code> → <code>/execute</code> (touches N SKILL.md files) → Phase 6a (each skill scored) → <code>/verify</code> → <code>/complete-dev</code> (one version bump / changelog entry). The "single-skill only" decision and the "NOT building a multi-skill batch mode" non-goal are <strong>dropped</strong>. Phase 0c extracts + confirms the <em>set</em> of target skills (from text tokens / <code>--from-retro</code> output, which resolves to the newest <code>/retro</code> artifact). MSF-R7 (run-N-times note) is moot.</td></tr>
+<tr><td>G11</td><td>Multi scope + combined tier</td><td>skill-new = one skill per run; skill-feedback = multi. Combined run's tier = <strong>max</strong> of per-skill resolved tiers; Phase 0d shows per-skill tiers + the resolved max for confirmation.</td></tr>
+<tr><td>G12</td><td><code>/complete-dev</code> in non-pmos repos</td><td>Phase 8 (skill-dev) delegates wholly to <code>/complete-dev</code>, which degrades gracefully (skips changelog/version/deploy steps the repo lacks; pushes only if a remote exists). Hardening <code>/complete-dev</code> for arbitrary repos = explicit non-goal + edge-case row.</td></tr>
+<tr><td>G13</td><td>Body-size check vs orchestrators</td><td><code>skill-eval.md</code> body-size check is graduated: ≤500 = pass; ~500–800 with good progressive disclosure = pass-with-note; &gt;~800 = fail. Plus an "orchestrator / meta-skill" acknowledgement (expected larger; check asks "should anything here be in a reference file" not raw count). Reflexive self-edits are fine — worktree-isolated, rubric files read at run start.</td></tr>
+<tr><td>G14</td><td>Phase 6a → <code>/execute</code> handoff</td><td>Orchestrator appends failures to <code>03_plan</code> as an "Eval-remediation — iteration N" task group (per check: <code>fix_note</code> + <code>quote</code> + deterministic-check command), bumps a marker, re-invokes <code>/execute</code>; its task-level resume picks up only the new tasks; <code>iterations[]</code> records the addendum task ids + pre-iteration git ref. Plan stays the single source of work.</td></tr>
+<tr><td>G15</td><td>Accept-as-risk → <code>/verify</code></td><td>Phase 6a writes accepted residuals to <code>state.yaml.phases.skill_eval.accepted_residuals[]</code> (check_id + fix_note + ack timestamp). <code>/verify</code> re-runs <code>skill-eval.md</code> fresh; an accepted-and-still-failing check is reported "KNOWN / accepted in Phase 6a" — <strong>non-blocking</strong>, but surfaced loudly in the verification report + <code>/complete-dev</code> summary. A <em>newly</em>-failing check blocks normally; a previously-accepted-now-passing check is dropped.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="open-deferred">
+<h2 id="open-deferred">Open / Deferred (carried to /spec)</h2>
+<ul>
+<li><strong>OQ2</strong> — does Phase 0d's now-three-way detection (tier / skill-location / target_platform) get extracted to <code>reference/repo-shape-detection.md</code> + <code>reference/skill-tier-matrix.md</code>, or stay inline in <code>/feature-sdlc</code>? <code>/spec</code> decides (extraction looks likely now).</li>
+<li><strong>OQ3</strong> — <code>skill-eval-check.sh</code> bash vs node — <code>/spec</code>/<code>/plan</code>, based on what <code>tools/</code> already uses.</li>
+<li><strong>OQ4</strong> — <code>/skill-sdlc</code> own learnings section vs rides on <code>/feature-sdlc</code>'s — minor; <code>/spec</code>.</li>
+<li>The exact <code>skill-eval.md</code> check list (~35–40, the <code>[deterministic]</code>/<code>[llm-judge]</code> split, 1:1 with <code>skill-patterns.md</code>) — <code>/spec</code> owns it; the patterns guide is its source.</li>
+<li><strong>OQ1 and OQ5 are now closed</strong> (no phase-id rename map; commit <code>00_seed_brief.md</code> — already committed).</li>
+</ul>
+</section>
+
+<section id="gaps-surfaced">
+<h2 id="gaps-surfaced">Gaps surfaced (fold into the revised requirements / spec)</h2>
+<ul>
+<li><strong>Doc rewrite needed:</strong> D3 and the "no multi-skill batch" non-goal must be rewritten per G10/G11; MSF-R7 removed; <code>skill-patterns.md</code>'s three separate mentions reworded to "one file, three roles" per G6.</li>
+<li>The compact-checkpoint parenthetical ("before 3b/3c/6/7") should note that in skill-dev modes 3b/3c are suppressed → effectively before 6 and 7 only.</li>
+<li>Deterministic-check unavailability: if <code>skill-eval-check.sh</code> can't run on the platform, <code>[deterministic]</code> checks fall back to LLM-judging with a <strong>logged note</strong> — don't silently skip.</li>
+<li><code>archive/README.md</code> should redirect <code>/create-skill</code> / <code>/update-skills</code> users to <code>/feature-sdlc skill …</code>.</li>
+<li><code>skill-patterns.md</code> distribution: ships inside the pmos-toolkit plugin's <code>feature-sdlc/reference/</code>; other-repo users get it via plugin install (acceptable; standalone publish = possible follow-up).</li>
+<li>Add an edge-case row for the <strong>dogfooding</strong> path: <code>/feature-sdlc skill --from-feedback</code> run inside the pmos-toolkit repo to edit a pmos skill works via repo-shape detection (sees <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code>) + reads pmos's <code>CLAUDE.md</code> for the canonical-path + version-bump policy.</li>
+</ul>
+</section>
+
+<section id="recommended-next-step">
+<h2 id="recommended-next-step">Recommended next step</h2>
+<p>Revise <code>01_requirements.html</code> to fold in G1–G15 — especially the D3 reversal (multi-skill feedback) and the <code>skill-patterns.md</code> "one file, three roles" wording — and update the Open Questions table (close OQ1 + OQ5; keep OQ2–4). Then proceed to <code>/spec</code>, which turns G1–G15 into concrete FRs and owns the <code>skill-eval.md</code> check list.</p>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/grills/2026-05-11_01_requirements.html</span>
+  </footer>
+</body>
+</html>

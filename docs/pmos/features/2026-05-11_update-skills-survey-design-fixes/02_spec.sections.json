@@ -1,0 +1,32 @@
+{
+  "artifact": "02_spec.html",
+  "ids": [
+    {"id": "problem-statement", "level": 2, "title": "1. Problem Statement", "parent_id": null},
+    {"id": "goals", "level": 2, "title": "2. Goals", "parent_id": null},
+    {"id": "non-goals", "level": 2, "title": "3. Non-Goals", "parent_id": null},
+    {"id": "decision-log", "level": 2, "title": "4. Decision Log", "parent_id": null},
+    {"id": "personas-journeys", "level": 2, "title": "5. Personas & Journeys", "parent_id": null},
+    {"id": "system-design", "level": 2, "title": "6. System Design — the Phase-4 loop", "parent_id": null},
+    {"id": "loop-flow", "level": 3, "title": "6.1 Loop flow", "parent_id": "system-design"},
+    {"id": "reviewer-dispatch", "level": 3, "title": "6.2 Reviewer dispatch contract", "parent_id": "system-design"},
+    {"id": "functional-requirements", "level": 2, "title": "7. Functional Requirements", "parent_id": null},
+    {"id": "fr-f1-loop", "level": 3, "title": "7.1 F1 — Phase-4 refinement loop & product-fit rubric", "parent_id": "functional-requirements"},
+    {"id": "fr-f3-assets", "level": 3, "title": "7.2 F3 — two-tier substrate-asset handling", "parent_id": "functional-requirements"},
+    {"id": "fr-f6-type", "level": 3, "title": "7.3 F6 — multi_field_open question type", "parent_id": "functional-requirements"},
+    {"id": "fr-f7-cosmetic", "level": 3, "title": "7.4 F7 — cosmetic-finding filter", "parent_id": "functional-requirements"},
+    {"id": "fr-f8-intro", "level": 3, "title": "7.5 F8 — persuasive intro from author-supplied impact", "parent_id": "functional-requirements"},
+    {"id": "non-functional-requirements", "level": 2, "title": "8. Non-Functional Requirements", "parent_id": null},
+    {"id": "reviewer-return-contract", "level": 2, "title": "9. Reviewer subagent return contract", "parent_id": null},
+    {"id": "survey-json-schema-v2", "level": 2, "title": "10. survey.json schema v2", "parent_id": null},
+    {"id": "rendered-artifact-changes", "level": 2, "title": "11. Rendered-artifact changes", "parent_id": null},
+    {"id": "edge-cases", "level": 2, "title": "12. Edge Cases", "parent_id": null},
+    {"id": "config-flags", "level": 2, "title": "13. Configuration & Feature Flags", "parent_id": null},
+    {"id": "testing-verification-strategy", "level": 2, "title": "14. Testing & Verification Strategy", "parent_id": null},
+    {"id": "t-static", "level": 3, "title": "14.1 Static / structural checks", "parent_id": "testing-verification-strategy"},
+    {"id": "t-behavioral", "level": 3, "title": "14.2 Behavioral checks", "parent_id": "testing-verification-strategy"},
+    {"id": "t-commands", "level": 3, "title": "14.3 Verification commands", "parent_id": "testing-verification-strategy"},
+    {"id": "t-regression", "level": 3, "title": "14.4 Regression guard", "parent_id": "testing-verification-strategy"},
+    {"id": "rollout-strategy", "level": 2, "title": "15. Rollout Strategy", "parent_id": null},
+    {"id": "research-sources", "level": 2, "title": "16. Research Sources", "parent_id": null}
+  ]
+}

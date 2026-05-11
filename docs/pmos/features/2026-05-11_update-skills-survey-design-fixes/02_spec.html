@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>survey-design hardening — Spec</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.36.0">
+  <script defer src="assets/viewer.js?v=2.36.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">survey-design hardening — Spec</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>tier:</strong> 3 · <strong>type:</strong> enhancement · <strong>feature:</strong> update-skills-survey-design-fixes · <strong>date:</strong> 2026-05-11 · <strong>status:</strong> Draft · <strong>requirements:</strong> <code>docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/01_requirements.html</code></p>
+<p><em>Adapted Tier-3 template: this is a skill-prose change (no compiled code, no API/DB/frontend). §9 = reviewer subagent return contract; §10 = <code>survey.json</code> schema v2; §11 = rendered-artifact changes. Architecture/sequence diagrams (§6) are textual — the "system" is the phase flow inside one SKILL.md.</em></p>
+
+<section id="problem-statement">
+<h2 id="problem-statement">1. Problem Statement</h2>
+<p>The first production run of <code>/survey-design</code> shipped a fieldable survey but the Phase-4 reviewer caught only methodology nits — an experienced PM had to manually surface six structural problems (predictable answers, non-load-bearing questions, scope-mismatched framing, redundancy). Plus: the generated intro doesn't motivate respondents; the skill silently degrades on missing substrate assets; cosmetic findings crowd the dispositions batch; and there's no question type for "metrics by cadence" items. Primary success metric: a re-run on the retro's original brief has the Phase-4 loop flag-and-handle the predictable / non-load-bearing / scope-mismatched questions on its own (vs. 0 of 6 caught today).</p>
+</section>
+
+<section id="goals">
+<h2 id="goals">2. Goals</h2>
+<table>
+<thead><tr><th>#</th><th>Goal</th><th>Success Metric</th></tr></thead>
+<tbody>
+<tr><td>G1</td><td>Phase 4 becomes a scored generate↔review refinement loop; reviewer evaluates-only, generator owns mutation; product-fit is the headline dimension.</td><td>Re-run on the retro brief; <code>question-eval.md</code> shows per-question product-fit verdicts + a refinement changelog; <code>survey-eval.md</code> shows the score progression; the predictable Q2-class question is rewritten or surfaced as a kill candidate without the author raising it.</td></tr>
+<tr><td>G2</td><td>Loop terminates deterministically and bounded.</td><td>Exits on the categorical condition (zero product-fit FAILs + zero <code>blocker</code>s) or after ≤2 regeneration iterations; never gated on the flappy score; changelog records the iteration count.</td></tr>
+<tr><td>G3</td><td>Missing substrate assets fail loud on hard-required, warn-degrade on convenience.</td><td>Remove <code>survey-preview.js</code> → skill aborts with the reinstall message; remove <code>serve.js</code> → skill warns + skips the preview server, continues; <code>survey.html</code>/<code>preview.html</code> still produced.</td></tr>
+<tr><td>G4</td><td><code>multi_field_open</code> question type round-trips schema → preview → export on all 3 platforms.</td><td>Sample survey with the type: renders in <code>preview.html</code>; exports native-or-downgraded with the downgrade noted in <code>export/README.md</code>; <code>schema_version</code> is 2.</td></tr>
+<tr><td>G5</td><td>Cosmetic-only findings don't crowd the Phase-5/6 dispositions batch.</td><td>Inspect the batched <code>AskUserQuestion</code>: zero severity-<code>nit</code>-AND-cosmetic items; they appear in a trailing "Noted, not asked:" line; still in <code>## Dispositions</code>.</td></tr>
+<tr><td>G6</td><td>Generated intro carries a persuasive, honest respondent-motivation line built from author-supplied impact.</td><td>Phase-2 intake has the new variable; generated <code>intro.text</code> has a WIIFM line derived from it (or a benefit-framed restatement of <code>purpose</code> when unsupplied — never a fabricated impact claim); reviewer's intro/consent check flags absence.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="non-goals">
+<h2 id="non-goals">3. Non-Goals</h2>
+<ul>
+<li>Google-Forms "Submit greyed out" guard (the <code>setCollectEmail</code>/<code>setLimitOneResponsePerUser</code> footgun) — because the example <code>.gs</code> recipe is already clean; the generator improvised the bad settings (triage F2, skipped).</li>
+<li>Extra prose about the inline simulation being weaker than the subagent pass — the existing FR-44 note suffices (triage F4, skipped).</li>
+<li>Phase-1 intake special-casing for unreachable external context (e.g. a Notion URL behind a disconnected MCP) (triage F5, skipped).</li>
+<li>Redesigning the Phase-6 simulated-respondent pass, the export transformers beyond the <code>multi_field_open</code> mapping, or the non-interactive contract.</li>
+<li>A self-contained fallback HTML renderer for the missing-asset case — abort/warn instead.</li>
+</ul>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log">4. Decision Log</h2>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>D1</td><td>Product-fit lives in the existing <code>survey-eval.md</code>/<code>question-eval.md</code> as their leading section; no new artifact, no second reviewer dispatch.</td><td>(a) separate <code>product-fit.md</code>; (b) fold in</td><td>(b) — carried from requirements; one place to look, findings lead so they're seen first.</td></tr>
+<tr><td>D2</td><td>Two scoring layers: per-question binary product-fit verdict + a reviewer-wide weighted 0–100 score.</td><td>(a) binary only; (b) score only; (c) both</td><td>(c) — binary maps to kill/rewrite per question; the 0–100 is a progress signal and a fix-priority ordering input.</td></tr>
+<tr><td>D3</td><td>Reviewer evaluates only; the generator owns every <code>survey.json</code> mutation; bounded loop; author dispositions the residue + sees a changelog.</td><td>(a) reviewer mutates; (b) no auto-fix; (c) evaluate+recommend / generator applies / bounded loop</td><td>(c) — carried from requirements; single writer, no self-grading theatre, author stays in control.</td></tr>
+<tr><td>D4</td><td>Two-tier missing-asset handling — abort on hard-required, warn-degrade on convenience.</td><td>(a) abort on any; (b) two-tier; (c) warn everywhere</td><td>(b) — carried from requirements; abort when you can't deliver the contract, warn when you can't deliver an extra.</td></tr>
+<tr><td>D5</td><td><code>multi_field_open</code> is a first-class schema type with a defined per-platform downgrade; <code>schema_version</code> → 2 (additive, backward-compatible).</td><td>(a) document the labeled-open_short-group pattern only; (b) first-class type</td><td>(b) — carried from requirements; one declarative shape drives time-estimate, preview render, and export mapping.</td></tr>
+<tr><td>D6</td><td>"Cosmetic-only" = severity <code>nit</code> AND a wording/title polish with no methodological or product-fit impact; listed, not asked.</td><td>(a) drop; (b) keep, sort last; (c) trailing line</td><td>(c) — carried from requirements.</td></tr>
+<tr><td>D7</td><td>Loop exit is categorical (zero product-fit FAILs + zero <code>blocker</code>s) or the 2-iteration cap; the 0–100 score never gates termination.</td><td>(a) hard ≥90 gate; (b) score-gate confirmed twice/banded; (c) categorical</td><td>(c) — carried from requirements; a single LLM-judge score near a cutoff is flappy.</td></tr>
+<tr><td>D8</td><td>Score dimension weights: product-fit 30, structure/funnel 15, length-vs-budget 10, mode-fit 10, scale-balance 10, accessibility 10, ethics/PII 10, intro/consent 5 (= 100). Per-dimension score = 100 × (1 − weighted-deduction); weighted-deduction tuned in <code>reference/survey-best-practices.md</code> (blocker = large deduction, should-fix = medium, nit = small). The composite is informational only.</td><td>(a) equal weights; (b) product-fit-heavy weighting</td><td>(b) — product-fit is the headline gap this change exists to close, so it carries the largest single weight; the rest are roughly even because they were already adequately handled. Since the score doesn't gate (D7), exact calibration is low-stakes — these are defaults the implementer may tune.</td></tr>
+<tr><td>D9</td><td>The loop's regeneration step is <em>targeted</em>: the generator regenerates only the flagged questions (plus directly-coupled ones — an <code>nps</code> follow-up, a <code>skip_logic</code> target), keeping the rest of <code>survey.json</code> byte-stable except where edits cascade (id renames, skip-logic retargets); it re-runs §3.5 trim-to-budget afterward.</td><td>(a) full Phase-3.4 re-run each iteration; (b) targeted regeneration of flagged questions</td><td>(b) — a full re-run would churn questions the reviewer was happy with and make the changelog unreadable; targeted keeps diffs minimal and the changelog precise.</td></tr>
+<tr><td>D10</td><td>Question provenance is tracked in transient skill state (not persisted in the final <code>survey.json</code>): a question is <code>author</code>-origin (the author supplied or insisted on it) or <code>generated</code>. Inside the loop, <code>author</code>-origin questions are rewrite-only — never auto-killed; if one still FAILs product-fit after 2 iterations it's surfaced as a kill candidate in Phase 5. <code>generated</code> questions may be auto-killed by the loop (removed from <code>survey.json</code>), recorded in the changelog so the author can revert in Phase 5.</td><td>(a) loop may kill anything; (b) loop never kills, only rewrites; (c) loop may kill generated questions but never author-origin ones</td><td>(c) — protects coverage the author explicitly wanted while still letting the loop drop a genuinely dead generated question; the changelog + Phase-5 review keep it reversible.</td></tr>
+<tr><td>D11</td><td>The refinement changelog is a <code>## Refinement loop changelog</code> section appended to <code>question-eval.md</code> — one <code>### Iteration N</code> subsection with a table <code>| Q id | action (rewrote / killed / added) | reviewer reason | score Δ |</code>. Not a new file.</td><td>(a) new <code>refinement-log.md</code>; (b) section in <code>question-eval.md</code></td><td>(b) — consistent with D1 (the eval artifacts are the single place to look); the changelog is meaningless without the per-question verdicts it sits next to.</td></tr>
+<tr><td>D12</td><td>Loop iteration produces an invalid <code>survey.json</code> → re-derive once; if still schema-invalid, abandon that iteration's regeneration, keep the last-valid <code>survey.json</code>, note <code>iteration N: regeneration produced invalid survey.json (&lt;invariant&gt;), reverted</code> in the changelog, exit the loop early to Phase 5.</td><td>(a) hard-abort the skill; (b) revert the bad iteration, keep last-valid, exit loop early</td><td>(b) — the author should still get the best valid survey produced so far; aborting throws away good work over a regeneration bug.</td></tr>
+<tr><td>D13</td><td>Reviewer returns malformed output mid-loop (missing a product-fit verdict, or no score) → re-dispatch once naming the gaps (same as today's per-question-count-mismatch handling); if still malformed, skip the auto-regenerate for the run and proceed to Phase 5 with whatever verdicts/findings did come through; non-interactive → log and proceed.</td><td>(a) hard-abort; (b) re-dispatch once then degrade-gracefully</td><td>(b) — mirrors the skill's existing reviewer-failure posture (keep the committed draft, proceed with a warning).</td></tr>
+<tr><td>D14</td><td><code>multi_field_open</code> time cost = 30s per field (each field counted like an <code>open_short</code>); plus the question's own intro/read overhead is zero (the stem read is amortized into the first field).</td><td>(a) 30s/field; (b) a smaller per-field value (shared context)</td><td>(a) — keeps the constant consistent with <code>open_short</code> and errs toward over-estimating burden, which is the safer direction for budget trimming.</td></tr>
+<tr><td>D15</td><td><code>multi_field_open</code> export: native on platforms that have a multi-textbox-style question type (SurveyMonkey's <code>multiple_textbox</code> family if confirmed at implementation time); Typeform and Google Forms have no equivalent → downgrade to N <code>open_short</code> items preceded by a <code>statement</code>/section-header that names the original grouped question. Every downgrade noted in <code>export/README.md</code> and commented in the artifact.</td><td>(a) downgrade everywhere; (b) native where available, downgrade elsewhere</td><td>(b) — preserve the grouped UX where the platform allows it; the implementer verifies SurveyMonkey support during /execute and downgrades if it doesn't pan out.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="personas-journeys">
+<h2 id="personas-journeys">5. Personas & Journeys</h2>
+<p><strong>5.1 Survey author (primary)</strong> — a PM/researcher/founder running <code>/survey-design</code>; wants the reviewer to catch product-fit problems, a persuasive intro, and a clean dispositions flow. <strong>5.2 Survey respondent (secondary)</strong> — the audience of the generated survey; needs a reason to participate and questions worth answering. Journeys are in <code>01_requirements.html</code> §User Journeys (primary loop walk-through, alternates, error paths) — not duplicated here.</p>
+</section>
+
+<section id="system-design">
+<h2 id="system-design">6. System Design — the Phase-4 loop</h2>
+<h3 id="loop-flow">6.1 Loop flow (textual)</h3>
+<pre>
+Phase 3  generate survey.json  (per reference/survey-best-practices.md; no product-fit self-grade)
+   │
+   ▼
+Phase 4  iteration i := 1
+   │   reviewer subagent (fresh context) evaluates survey.json →
+   │     - composite 0–100 score + per-dimension sub-scores
+   │     - per-dimension findings, each {target, severity ∈ {blocker,should-fix,nit}, defect, message, proposed_fix}
+   │     - per-question product-fit verdict {predictable: PASS|FAIL + predicted-answer line, load_bearing: PASS|FAIL, scope_match: PASS|FAIL}
+   │     - recommended edits (rewritten stems / "kill q-id" / added opt-outs)
+   │   write survey-eval.md (leads with score + research-goal-coverage section)
+   │   write question-eval.md (each ## q-id leads with the product-fit verdict + prediction)
+   │
+   ├── exit condition met?  (no product-fit FAIL on any question  AND  no blocker-severity methodology finding)
+   │      yes ─────────────────────────────► go to Phase 5
+   │      no, and i &lt; 2:
+   │          generator regenerates the flagged questions (targeted, D9), respecting D10 (author-origin = rewrite-only),
+   │          re-runs §3.5 trim-to-budget, appends "### Iteration i" to question-eval.md's changelog
+   │          → re-derive survey.html / preview.html / etc.  (if invalid: D12)
+   │          i := i + 1 ; loop back to "reviewer subagent ..."
+   │      no, and i == 2:  (cap hit)
+   │          go to Phase 5 with the residual FAILs as top-of-batch kill/rewrite candidates
+   │
+   ▼
+Phase 5  open with the changelog summary → dispositions batch (product-fit FAILs first, then blocker→should-fix→nit; cosmetic-only in a trailing "Noted, not asked:" line)
+</pre>
+<h3 id="reviewer-dispatch">6.2 Reviewer dispatch contract</h3>
+<p>One reviewer subagent per iteration (Task tool, or sequential inline when subagents are unavailable — same prompt, same return contract, just no fresh-context isolation; the existing Platform-Adaptation note already covers this). The prompt MUST contain: the survey context object <code>{purpose, audience, response_impact, time_budget_min, mode, max_questions, estimated_minutes}</code>; the full <code>survey.json</code> as text; the contents (or paths, if the subagent can read files) of <code>reference/survey-best-practices.md</code> + <code>reference/question-antipatterns.md</code>; and (iteration ≥ 2) the prior iteration's <code>question-eval.md</code> so the reviewer can see what changed. In non-interactive runs the prompt's first line is <code>[mode: non-interactive]</code>. The reviewer does NOT write any file and does NOT mutate <code>survey.json</code> — it returns the two markdown bodies (<code>survey-eval.md</code>, <code>question-eval.md</code>) plus a machine-readable findings/verdicts/recommended-edits block the parent parses to drive the loop.</p>
+</section>
+
+<section id="functional-requirements">
+<h2 id="functional-requirements">7. Functional Requirements</h2>
+<h3 id="fr-f1-loop">7.1 F1 — Phase-4 refinement loop &amp; product-fit rubric</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-01</td><td><code>reference/survey-best-practices.md</code> gains a new <em>leading</em> section "Product fit (evaluate this first)" defining: (a) the predictability check — closed-ended: the reviewer writes a one-line predicted answer distribution, FAIL iff 1–2 options would plausibly absorb ≳80%; open-ended: a yes/no on whether multiple distinct high-signal answers are realistically expected, FAIL iff it collapses to 1–2 predictable themes; (b) the load-bearing check — FAIL iff dropping the question would not change what the author learns relative to <code>purpose</code>; (c) the scope-match check — FAIL iff the question is framed broader or narrower than the actual scope of the topic implied by <code>purpose</code>/<code>audience</code>; (d) the survey-wide research-goal-coverage check — coverage gaps, redundant items, scope drift. Includes ≥2 worked PASS/FAIL examples.</td></tr>
+<tr><td>FR-02</td><td><code>reference/survey-best-practices.md</code> defines the 0–100 scoring rubric: the eight dimensions and weights per D8; per-dimension deduction sizes for blocker/should-fix/nit; the composite formula. States explicitly that the composite is informational and never gates the loop.</td></tr>
+<tr><td>FR-03</td><td>SKILL.md Phase 4 is rewritten as the loop in §6.1: per-iteration reviewer dispatch (§6.2 contract); the categorical exit condition; the 2-iteration cap; the targeted regeneration step (D9) honoring author-origin protection (D10); the changelog append (D11); re-derivation of rendered artifacts each iteration; the D12/D13 failure handling.</td></tr>
+<tr><td>FR-04</td><td>The reviewer return contract is updated: <code>question-eval.md</code> has one <code>## &lt;question-id&gt;</code> section per question, each <em>leading</em> with a "Product fit" block — the three PASS/FAIL verdicts + the written predicted-answer line — then the existing verdict line + the methodology/anti-pattern findings table. <code>survey-eval.md</code> <em>leads</em> with "Score: N/100 (product-fit P/30, structure S/15, …)" and a "Research-goal coverage / product fit" section, then the existing Structure&amp;order / Length-vs-budget / Mode-fit / Scale-balance / Accessibility / Ethics-PII / Intro-consent sections (each now also reporting its sub-score). The parent still validates <code>count(## &lt;id&gt; in question-eval.md) == count(questions in survey.json)</code> and re-dispatches once on mismatch (existing behavior, retained).</td></tr>
+<tr><td>FR-05</td><td>The OLD Phase-3.4 step "Generate NONE of the … patterns — self-check … before committing" KEEPS the anti-pattern self-check, but the product-fit self-grade is NOT added there — product-fit is evaluated only by the reviewer in the loop. (The requirements doc's "remove the Phase-3 self-check" wording refers to not adding a product-fit self-check; the existing anti-pattern self-check is unchanged.)</td></tr>
+<tr><td>FR-06</td><td><code>question-eval.md</code> gains a trailing <code>## Refinement loop changelog</code> section: one <code>### Iteration N</code> per regeneration pass with a table <code>| Q id | action | reviewer reason | score Δ |</code>; if zero regeneration iterations ran, the section reads "No regeneration — first review met the exit condition." Phase 5 opens by summarizing this section.</td></tr>
+<tr><td>FR-07</td><td>SKILL.md Phase 5 dispositions ordering: product-fit FAILs first — one <code>AskUserQuestion</code> per FAIL, "Kill or rewrite Q&lt;id&gt;? — &lt;rubric reason + predicted answer&gt;", options Kill / Rewrite-as-proposed / Keep-with-reason / Defer (for an <code>author</code>-origin question that the loop could only rewrite, "Keep-with-reason" is still offered) — then methodology findings batched blocker → should-fix → nit. The "what the loop changed" summary precedes the batch.</td></tr>
+<tr><td>FR-08</td><td>Anti-Patterns list updated: the existing "Don't run the reviewer pass in a loop 'to be thorough.'" entry becomes "The Phase-4 loop is bounded — cap 2 iterations, categorical exit — don't extend it, don't re-run it manually for extra polish." Add: "Don't have the reviewer mutate <code>survey.json</code> — it evaluates and recommends; the generator applies." Edge-case index gains rows for: loop converges before iteration 2; loop hits the cap unresolved; iteration produces invalid <code>survey.json</code>; reviewer malformed mid-loop.</td></tr>
+</tbody>
+</table>
+<h3 id="fr-f3-assets">7.2 F3 — two-tier substrate-asset handling</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-09</td><td>SKILL.md Phase 3.6 and Phase 7: before each <code>cp -n</code> of a substrate asset, classify it. <strong>Hard-required</strong> = <code>survey-preview.js</code> (sibling of <code>preview.html</code>), <code>style.css</code>, <code>viewer.js</code> (referenced by <code>survey.html</code>). <strong>Convenience</strong> = <code>serve.js</code>, <code>html-to-md.js</code>, <code>turndown.umd.js</code>, <code>turndown-plugin-gfm.umd.js</code>, <code>LICENSE.turndown.txt</code>.</td></tr>
+<tr><td>FR-10</td><td>If a hard-required source asset is absent: ABORT immediately with exactly <code>survey-design: missing substrate asset &lt;abs-path&gt; — reinstall the pmos-toolkit plugin</code> on stderr, exit non-zero; do NOT write <code>survey.html</code> / <code>preview.html</code> / <code>index.html</code>; do NOT leave a partial run folder beyond what earlier phases already committed.</td></tr>
+<tr><td>FR-11</td><td>If a convenience source asset is absent: emit one warning <code>survey-design: convenience asset &lt;path&gt; missing — skipping &lt;dependent feature&gt;</code> (no preview server for <code>serve.js</code>; no <code>.md</code> sidecar for the turndown trio / <code>html-to-md.js</code>), continue the run. <code>survey.html</code> / <code>preview.html</code> are still produced.</td></tr>
+<tr><td>FR-12</td><td>Platform-Adaptation notes + the Edge-cases index (E13-adjacent) updated with both branches: a row for hard-required-missing → abort, and a row for convenience-missing → warn-and-skip.</td></tr>
+</tbody>
+</table>
+<h3 id="fr-f6-type">7.3 F6 — <code>multi_field_open</code> question type</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-13</td><td>§3.2 <code>type</code> enum gains <code>multi_field_open</code>. The question object for it carries a shared <code>stem</code>, optional <code>help_text</code>, <code>required</code>, and a new <code>fields: [{ "id": kebab, "label": string, "placeholder": string|null }]</code> array (≥1 field; all <code>id</code>s kebab-case, unique within the question; the question's own <code>id</code> remains unique across the survey). Each field is a single-line free-text input. <code>options</code>/<code>scale</code>/<code>rows</code>/<code>columns</code>/<code>constant_sum_total</code> are not used for this type; <code>opt_out_options</code> may still apply (e.g. "Not applicable" for the whole group).</td></tr>
+<tr><td>FR-14</td><td>§3.3 time-cost constants gain <code>multi_field_open = 30s per field</code> (per D14). <code>estimated_minutes</code> computation includes it.</td></tr>
+<tr><td>FR-15</td><td><code>survey.json</code> <code>schema_version</code> is bumped to <code>2</code>. §3.1 documents the migration: a <code>schema_version: 1</code> survey is still valid input (no v1-specific behavior removed); the skill rewrites <code>schema_version</code> to 2 on the next re-derive. Schema invariants section updated to cover the <code>fields</code>-array rules in FR-13.</td></tr>
+<tr><td>FR-16</td><td><code>reference/platform-export.md</code>: add a <code>multi_field_open</code> row to each platform's type-mapping table per D15 — SurveyMonkey native if the <code>multiple_textbox</code>-style family is confirmed at implementation time (else downgrade); Typeform and Google Forms downgrade to N <code>open_short</code> items preceded by a <code>statement</code>/section-header naming the original grouped question. Add the transformer recipe text for each. The downgrade is noted in the <code>export/README.md</code> template (per affected platform) and gets an in-artifact comment.</td></tr>
+<tr><td>FR-17</td><td><code>survey.html</code> renders <code>multi_field_open</code> as the stem (<code>&lt;h3&gt;</code>) + help text + a small <code>&lt;table&gt;</code> or labeled input list, one row per field (label + an empty input box, since <code>survey.html</code> is the read-only render). <code>assets/survey-preview.js</code> renders it in <code>preview.html</code> as a working labeled-input group (one <code>&lt;label&gt;</code>+<code>&lt;input type="text"&gt;</code> per field, mobile-first, label-adjacent, ≥4.5:1 contrast, visible focus — matching the existing preview accessibility bar). The companion <code>survey.sections.json</code> still enumerates the question's <code>&lt;h3&gt;</code>.</td></tr>
+<tr><td>FR-18</td><td><code>tests/expected.yaml</code> (and any test fixtures) updated so the type's presence, time-cost, render, and at least one export downgrade are covered.</td></tr>
+</tbody>
+</table>
+<h3 id="fr-f7-cosmetic">7.4 F7 — cosmetic-finding filter</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-19</td><td>SKILL.md Phases 5 and 6: define "cosmetic-only" = a finding whose <code>severity</code> is <code>nit</code> AND whose <code>defect</code> class is a wording/title polish with no methodological or product-fit impact. Such findings are EXCLUDED from the batched <code>AskUserQuestion</code> dispositions and instead listed in a single trailing chat line <code>Noted, not asked: &lt;Q-id or section&gt; — &lt;one-line polish suggestion&gt;; …</code>. They are still written into the <code>## Dispositions</code> section of <code>question-eval.md</code> / <code>survey-eval.md</code> / <code>simulation.md</code> with disposition "noted (cosmetic, not asked)".</td></tr>
+<tr><td>FR-20</td><td>The Anti-Pattern "Don't dump reviewer / simulation findings as a wall of prose…" gains: "…and don't pad the dispositions batch with cosmetic-only nits — list those in a trailing 'Noted, not asked:' line."</td></tr>
+</tbody>
+</table>
+<h3 id="fr-f8-intro">7.5 F8 — persuasive intro from author-supplied impact</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-21</td><td>SKILL.md Phase 2 (Variable interpretation) gains a variable <code>response_impact</code> — "what happens to the responses / what does the audience get out of it". Inferred from the brief if stated; otherwise asked via a free-form <code>AskUserQuestion</code> tagged <code>&lt;!-- defer-only: free-form --&gt;</code> (no auto-pickable default). If the author skips it, set <code>response_impact: null</code>.</td></tr>
+<tr><td>FR-22</td><td><code>survey.json</code> §3.1: <code>intro</code> gains an optional <code>response_impact: string|null</code> field (the author's answer, verbatim or lightly edited) for traceability. <code>schema_version</code> stays 2 (this rides along with FR-15's bump).</td></tr>
+<tr><td>FR-23</td><td><code>reference/survey-best-practices.md</code> intro section + SKILL.md Phase 3.4: the generated <code>intro.text</code> MUST include a persuasive respondent-motivation / WIIFM sentence built from <code>response_impact</code> when non-null — concrete impact of their answers, audience-specific framing, honest (no fake scarcity, no fake urgency, no overclaiming). When <code>response_impact</code> is null, the WIIFM sentence is a benefit-framed restatement of <code>purpose</code> ("we're working out which X matters — your answers tell us which") and MUST NOT assert a specific downstream action that wasn't stated. The §3.1 <code>intro.text</code> example is rewritten to model the non-null case.</td></tr>
+<tr><td>FR-24</td><td>The reviewer's Intro/consent dimension (in <code>survey-eval.md</code>) flags absence of a WIIFM sentence as a <code>should-fix</code> finding contributing to that dimension's sub-score; the Phase-4 loop's regeneration step will add it if it's missing and the dimension is below par.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="non-functional-requirements">
+<h2 id="non-functional-requirements">8. Non-Functional Requirements</h2>
+<table>
+<thead><tr><th>ID</th><th>Category</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>NFR-01</td><td>Bounded cost</td><td>The Phase-4 loop dispatches at most 3 reviewer subagents per run (iteration 1, optional iteration 2, plus the at-most-one re-dispatch on a malformed return). It never loops unbounded.</td></tr>
+<tr><td>NFR-02</td><td>Determinism (export)</td><td>The <code>multi_field_open</code> transformers remain pure functions of <code>survey.json</code> — same input → byte-identical output (consistent with the existing NFR for transformers).</td></tr>
+<tr><td>NFR-03</td><td>No network</td><td>Unchanged — the skill still emits import files and instructions, never calls platform APIs.</td></tr>
+<tr><td>NFR-04</td><td>Backward compatibility</td><td>A pre-change <code>survey.json</code> (<code>schema_version: 1</code>, no <code>response_impact</code>, no <code>multi_field_open</code>) is still a valid input; refining it produces a <code>schema_version: 2</code> output with no behavior loss.</td></tr>
+<tr><td>NFR-05</td><td>Accessibility</td><td>The <code>multi_field_open</code> preview render meets the same bar the rest of <code>preview.html</code> already meets (label-adjacent controls, ≥4.5:1 contrast, visible focus, no graphical-only progress).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="reviewer-return-contract">
+<h2 id="reviewer-return-contract">9. Reviewer subagent return contract (the "API" of this feature)</h2>
+<p>The reviewer returns three things to the parent (as markdown bodies + one fenced block the parent parses):</p>
+<pre>
+# 1. survey-eval.md body
+Score: 87/100  (product-fit 24/30, structure 13/15, length 9/10, mode 9/10, scale 8/10, accessibility 9/10, ethics 9/10, intro 6/5→capped 5/5)
+## Research-goal coverage / product fit
+&lt;does the question set answer `purpose`? coverage gaps? redundancy? scope drift? — findings table, same shape as below&gt;
+## Structure &amp; order   (sub-score X/15)   …findings table…
+## Length vs budget    (sub-score X/10)   …
+## Mode fit            (sub-score X/10)   …
+## Scale balance       (sub-score X/10)   …
+## Accessibility       (sub-score X/10)   …
+## Ethics / PII        (sub-score X/10)   …
+## Intro / consent     (sub-score X/5)    …  (flags missing WIIFM sentence as should-fix)
+&lt;overall verdict line&gt;
+
+# 2. question-eval.md body  — one section per question
+## q-recent-moment
+**Product fit:** predictable: FAIL — predicted: ~75% → "the analytics team"; load-bearing: PASS; scope-match: PASS  →  kill/rewrite candidate
+Verdict: 2 finding(s)
+| Severity | Defect | Message | Proposed fix |
+| blocker | product-fit:predictable | … | rewrite to ask &lt;X&gt; / or cut |
+| nit | A3 | … | … |
+…(one section per question)…
+## Refinement loop changelog        ← present, written/extended by the GENERATOR each iteration, not the reviewer
+### Iteration 1
+| Q id | action | reviewer reason | score Δ |
+| q-recent-moment | rewrote | predictable answers | +6 |
+
+# 3. machine block the parent parses to drive the loop
+```yaml
+score: 87
+sub_scores: { product_fit: 24, structure: 13, length: 9, mode: 9, scale: 8, accessibility: 9, ethics: 9, intro: 5 }
+product_fit_fails: [ q-recent-moment ]                # questions with any product-fit FAIL
+blockers: [ q-recent-moment ]                          # questions/sections with a blocker-severity methodology finding
+recommended_edits:
+  - target: q-recent-moment
+    action: rewrite          # rewrite | kill | add_opt_out | …
+    detail: "Ask: 'In the last 30 days, which of these did you do when you hit a wall?' with options […]"
+```
+</pre>
+<p>Exit condition (parent-side): <code>product_fit_fails == []</code> AND <code>blockers == []</code> → done. Else if iteration &lt; 2 → generator applies <code>recommended_edits</code> (honoring D10), re-derive, append changelog, re-dispatch. Else → Phase 5 with <code>product_fit_fails</code> as top-of-batch kill/rewrite questions.</p>
+</section>
+
+<section id="survey-json-schema-v2">
+<h2 id="survey-json-schema-v2">10. survey.json schema v2 (the data model)</h2>
+<pre>
+schema_version: 2                       # was 1
+intro: { …existing fields…, response_impact: string|null }   # NEW optional field (F8)
+question (new type):
+  { "id": kebab, "type": "multi_field_open", "stem": string, "help_text": string|null,
+    "required": bool, "reference_period": string|null, "screening": false, "skip_logic": null,
+    "fields": [ { "id": kebab-unique-within-question, "label": string, "placeholder": string|null } ],  # ≥1
+    "opt_out_options": [ … ]            # optional, applies to the whole group
+  }
+time-cost: multi_field_open = 30s × len(fields)
+invariants added:
+  - fields array length ≥ 1; field ids kebab-case and unique within the question
+  - multi_field_open never carries options/scale/rows/columns/constant_sum_total
+  - skip_logic / screening must be null/false for multi_field_open (it's not a routable question)
+migration v1 → v2: a v1 survey is valid input as-is; the skill writes schema_version: 2 on next re-derive;
+  no v1 field is removed; the only additions are intro.response_impact and the multi_field_open type.
+</pre>
+</section>
+
+<section id="rendered-artifact-changes">
+<h2 id="rendered-artifact-changes">11. Rendered-artifact changes</h2>
+<ul>
+<li><code>survey.html</code> — renders <code>multi_field_open</code> (stem + help + table/labeled-input-list, one row per field); intro section renders the new WIIFM sentence as part of <code>intro.text</code> (no structural change — it's inside the existing intro paragraph).</li>
+<li><code>preview.html</code> / <code>assets/survey-preview.js</code> — <code>survey-preview.js</code> gains a render branch for <code>multi_field_open</code> (labeled <code>&lt;input type="text"&gt;</code> per field) meeting the existing accessibility bar; nothing else changes. The <code>survey-preview.js</code> file remains <code>cp -n</code>'d from the skill's <code>assets/</code> — and per F3 it is now a <strong>hard-required</strong> asset (abort if its source is missing).</li>
+<li><code>survey-eval.md</code> / <code>question-eval.md</code> — new leading sections (score; product-fit verdicts) + the <code>## Refinement loop changelog</code> section in <code>question-eval.md</code>; <code>## Dispositions</code> now also records cosmetic "noted, not asked" items.</li>
+<li><code>index.html</code> — no shape change; regenerated each phase as today (its manifest already lists the eval/changelog-bearing files).</li>
+<li><code>export/*</code> + <code>export/README.md</code> — a <code>multi_field_open</code> mapping per platform; README lists the downgrade where it applies.</li>
+</ul>
+</section>
+
+<section id="edge-cases">
+<h2 id="edge-cases">12. Edge Cases</h2>
+<table>
+<thead><tr><th>#</th><th>Scenario</th><th>Condition</th><th>Expected Behavior</th></tr></thead>
+<tbody>
+<tr><td>E1</td><td>First review meets the exit condition</td><td>iteration 1: no product-fit FAIL, no blocker</td><td>No regeneration; changelog reads "No regeneration — first review met the exit condition."; Phase 5 surfaces only should-fix/nit residue.</td></tr>
+<tr><td>E2</td><td>Loop hits the 2-iteration cap unresolved</td><td>after iteration 2 a product-fit FAIL or a blocker remains</td><td>Loop stops; the unresolved item(s) are top-of-batch in Phase 5 (kill/rewrite for FAILs); changelog shows both attempts.</td></tr>
+<tr><td>E3</td><td>Author-origin question keeps FAILing product-fit</td><td>a question the author supplied still FAILs after 2 rewrite attempts</td><td>Never auto-killed; surfaced in Phase 5 as "Kill or rewrite Q&lt;id&gt;?" (the author decides); changelog notes "rewrite-only (author-origin)".</td></tr>
+<tr><td>E4</td><td>Regeneration produces an invalid <code>survey.json</code></td><td>schema-invariant violation after a loop iteration's edits</td><td>Re-derive once; if still invalid → abandon that iteration, keep last-valid <code>survey.json</code>, note "iteration N: regeneration produced invalid survey.json (&lt;invariant&gt;), reverted" in the changelog, exit loop early to Phase 5.</td></tr>
+<tr><td>E5</td><td>Reviewer returns malformed output mid-loop</td><td>missing a product-fit verdict / no score / unparseable machine block</td><td>Re-dispatch once naming the gaps; if still malformed → skip auto-regenerate for the run, proceed to Phase 5 with what was returned; non-interactive → log + proceed.</td></tr>
+<tr><td>E6</td><td>Hard-required substrate asset missing</td><td><code>survey-preview.js</code> / <code>style.css</code> / <code>viewer.js</code> source absent</td><td>Abort with <code>survey-design: missing substrate asset &lt;path&gt; — reinstall the pmos-toolkit plugin</code>; no degraded artifact written.</td></tr>
+<tr><td>E7</td><td>Convenience substrate asset missing</td><td><code>serve.js</code> / turndown trio / <code>html-to-md.js</code> source absent</td><td>One warning; skip the dependent extra (preview server / <code>.md</code> sidecar); continue; <code>survey.html</code>/<code>preview.html</code> still produced.</td></tr>
+<tr><td>E8</td><td><code>multi_field_open</code> with one field</td><td><code>fields</code> has length 1</td><td>Valid; behaves like a labeled <code>open_short</code>; time cost = 30s; exports as one short-answer item.</td></tr>
+<tr><td>E9</td><td>v1 survey re-refined</td><td>input <code>survey.json</code> has <code>schema_version: 1</code></td><td>Valid; skill writes <code>schema_version: 2</code> on next re-derive; no behavior loss.</td></tr>
+<tr><td>E10</td><td>Author skips <code>response_impact</code></td><td>the new Phase-2 variable is left unanswered</td><td><code>response_impact: null</code>; WIIFM sentence is a benefit-framed restatement of <code>purpose</code>; no fabricated downstream-action claim.</td></tr>
+<tr><td>E11</td><td>Pure-generative survey (no closed-ended questions)</td><td>all questions <code>open_long</code>/<code>open_short</code></td><td>Predictability check applies in its open-ended form (multiple-high-signal-themes judgment); load-bearing + scope-match apply normally.</td></tr>
+<tr><td>E12</td><td>Question has only a cosmetic finding</td><td>reviewer's sole note on Q&lt;id&gt; is a <code>nit</code> wording polish</td><td>Q&lt;id&gt; verdict "no issues (1 cosmetic note — see trailing list)"; the polish appears only in the "Noted, not asked:" line + <code>## Dispositions</code>; not in the batch.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="config-flags">
+<h2 id="config-flags">13. Configuration &amp; Feature Flags</h2>
+<p>None. No new flags; no env vars. (The Phase-4 cap of 2 iterations is a constant in the prose, not a flag.) The existing <code>--export</code> / <code>--skip-export</code> / <code>--format</code> / <code>--non-interactive</code>/<code>--interactive</code> flags are unchanged.</p>
+</section>
+
+<section id="testing-verification-strategy">
+<h2 id="testing-verification-strategy">14. Testing &amp; Verification Strategy</h2>
+<h3 id="t-static">14.1 Static / structural checks</h3>
+<ul>
+<li><code>tools/audit-recommended.sh</code> (or equivalent lint) still passes — every new <code>AskUserQuestion</code> (the F8 <code>response_impact</code> ask, the F7-filtered batch, the F1 kill/rewrite questions) follows the recommended/defer-only contract; the <code>response_impact</code> ask carries the <code>&lt;!-- defer-only: free-form --&gt;</code> tag.</li>
+<li>The non-interactive block region in <code>SKILL.md</code> still byte-matches <code>_shared/non-interactive.md</code> (untouched by this change).</li>
+<li><code>SKILL.md</code> argument-hint and description unchanged (no new flags; trigger phrases unchanged) — verify they still meet the release prereqs (≥5 trigger phrases, every parsed flag in the hint).</li>
+<li>Markdown well-formedness of the rewritten Phase 4 / Phase 3.6 / Phase 2 sections; the Edge-cases index table parses.</li>
+</ul>
+<h3 id="t-behavioral">14.2 Behavioral checks (run the skill)</h3>
+<ul>
+<li><strong>F1 acceptance:</strong> run <code>/survey-design</code> on a brief reconstructed from the retro session (the trial-conversion-style survey with the "everyone says the analytics team" question). Confirm: iteration-1 <code>question-eval.md</code> marks that question's predictability check FAIL with a written predicted distribution; the loop either rewrites it (changelog "### Iteration 1") or, if it can't, surfaces it as a top-of-batch "Kill or rewrite Q&lt;id&gt;?" in Phase 5; <code>survey-eval.md</code> shows a score and a research-goal-coverage section; the loop ran ≤2 iterations and exited on the categorical condition (or the cap).</li>
+<li><strong>F1 reviewer-evaluate-only:</strong> confirm the reviewer subagent prompt instructs "do not write files / do not mutate survey.json"; confirm <code>survey.json</code> mtime doesn't change across a reviewer dispatch (only across a generator regeneration).</li>
+<li><strong>F3 hard-required:</strong> temporarily rename <code>plugins/pmos-toolkit/skills/survey-design/assets/survey-preview.js</code>; run the skill; confirm it aborts with the exact reinstall message and writes no <code>survey.html</code>/<code>preview.html</code>. Restore the file.</li>
+<li><strong>F3 convenience:</strong> temporarily rename <code>_shared/html-authoring/assets/serve.js</code>; run the skill; confirm one warning + a completed run with <code>survey.html</code>/<code>preview.html</code> present, no preview server line. Restore.</li>
+<li><strong>F6:</strong> author a small survey with one <code>multi_field_open</code> question (3 fields: daily/weekly/monthly); confirm <code>estimated_minutes</code> includes 90s for it; open <code>preview.html</code> and confirm three labeled inputs render and accept text; run <code>--export typeform,surveymonkey,google-forms</code>; confirm Google Forms <code>.gs</code> emits a section header + 3 <code>addTextItem</code>s with a downgrade comment, <code>export/README.md</code> lists the downgrade, and SurveyMonkey is native-or-downgraded per what the platform actually supports.</li>
+<li><strong>F7:</strong> in a run where the reviewer produces a cosmetic-only nit (e.g. a section-title polish), confirm it's absent from the batched <code>AskUserQuestion</code> and present in the trailing "Noted, not asked:" line and in <code>## Dispositions</code>.</li>
+<li><strong>F8:</strong> run with a brief that doesn't state response impact; confirm Phase 2 asks the free-form <code>response_impact</code> question; answer it; confirm <code>intro.text</code> contains a WIIFM sentence built from the answer and <code>survey.json :: intro.response_impact</code> holds it. Re-run skipping the question; confirm <code>response_impact: null</code> and the WIIFM sentence is a purpose-restatement with no invented downstream claim.</li>
+<li><strong>Backward-compat:</strong> feed a hand-written <code>schema_version: 1</code> <code>survey.json</code> as the path argument; confirm it parses, the skill proceeds, and the re-derived <code>survey.json</code> is <code>schema_version: 2</code>.</li>
+</ul>
+<h3 id="t-commands">14.3 Verification commands (exact)</h3>
+<pre>
+# static
+bash plugins/pmos-toolkit/skills/survey-design/../../../tools/audit-recommended.sh plugins/pmos-toolkit/skills/survey-design/SKILL.md   # or the repo's actual lint entrypoint
+git diff --stat main -- plugins/pmos-toolkit/skills/survey-design/                                 # review the surface of the change
+node -e "JSON.parse(require('fs').readFileSync('docs/pmos/.../survey.json','utf8'))"                # any generated survey.json parses
+# behavioral (manual, per 14.2) — the runbook is the 14.2 list; capture survey-eval.md / question-eval.md / export/README.md for the F1/F6 checks
+git -c core.fileMode=false status --porcelain                                                     # F3 abort leaves no partial run folder beyond committed phases
+</pre>
+<h3 id="t-regression">14.4 Regression guard</h3>
+<ul>
+<li>Existing <code>tests/expected.yaml</code> assertions still pass after the <code>multi_field_open</code> additions (FR-18) — the type addition is additive.</li>
+<li>A survey with NO <code>multi_field_open</code> and a brief that DOES state response impact produces the same artifact shape as before plus the WIIFM sentence — i.e. F8 doesn't change structure, only intro copy.</li>
+</ul>
+</section>
+
+<section id="rollout-strategy">
+<h2 id="rollout-strategy">15. Rollout Strategy</h2>
+<p>This is a skill-prose change with no runtime service. Rollout = <code>/complete-dev</code>: merge <code>feat/survey-design-fixes</code> to <code>main</code>, minor version bump in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> and <code>.codex-plugin/plugin.json</code> (byte-identical, pre-push hook enforces), README row stays under "### Utilities" (no new row needed — wording may get a small update for the loop), CHANGELOG entry, <code>## /survey-design</code> header already exists in <code>~/.pmos/learnings.md</code>, tag the release, push to all remotes. No feature flag, no migration job — the <code>schema_version</code> 1→2 migration is automatic on the next re-derive of any survey. Rollback = revert the merge commit; v2 surveys remain readable by the reverted skill only insofar as it ignores the new fields (a v1 skill would not understand <code>multi_field_open</code> — but it also wouldn't have generated one, so in practice rollback is clean for everything except a survey a user hand-edited to use the new type, which is an acceptable edge).</p>
+</section>
+
+<section id="research-sources">
+<h2 id="research-sources">16. Research Sources</h2>
+<table>
+<thead><tr><th>Source</th><th>Type</th><th>Key Takeaway</th></tr></thead>
+<tbody>
+<tr><td><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code> (374 lines)</td><td>Existing code</td><td>Change surfaces: Phase 2 (variables), Phase 3.1–3.6 (schema, type enum, time-costs, generation, render+cp -n), Phase 4 (reviewer — full rewrite), Phases 5–6 (dispositions), Phase 7 (cp -n), Anti-Patterns, Edge-cases index.</td></tr>
+<tr><td><code>reference/survey-best-practices.md</code> (165 lines)</td><td>Existing code</td><td>Currently methodology-led; gains a leading "Product fit" section + the 0–100 scoring rubric + an intro-WIIFM requirement.</td></tr>
+<tr><td><code>reference/question-antipatterns.md</code> (278 lines)</td><td>Existing code</td><td>A1–E6 catalog, orthogonal to product-fit — unchanged; the reviewer walks it after the product-fit pass.</td></tr>
+<tr><td><code>reference/platform-export.md</code> (252 lines)</td><td>Existing code</td><td>Per-platform recipes + type-mapping tables; gains a <code>multi_field_open</code> row + recipe per platform. The example Google-Forms <code>.gs</code> is already clean re: the F2 footgun.</td></tr>
+<tr><td><code>assets/survey-preview.js</code></td><td>Existing code</td><td>Standalone preview engine; gains a <code>multi_field_open</code> render branch. Becomes a hard-required asset under F3.</td></tr>
+<tr><td><code>tests/expected.yaml</code>, <code>tests/fixtures/sample-brief.txt</code></td><td>Existing code</td><td>Test surface; updated for the new type.</td></tr>
+<tr><td>Other pmos skills' reviewer-subagent + bounded-self-refinement loops (<code>/wireframes</code>, <code>/prototype</code>: ≤2 loops)</td><td>Pattern precedent</td><td>The Phase-4 loop follows the same shape (reviewer subagent, cap ≤2, evaluate-then-refine) — adopt the pattern, don't reinvent.</td></tr>
+<tr><td><code>01_requirements.html</code> + <code>grills/2026-05-11_01-requirements.html</code> + <code>00_triage.md</code> (this feature folder)</td><td>This feature</td><td>Requirements (revised post-grill), the pinned design decisions, and the origin triage.</td></tr>
+</tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_update-skills-survey-design-fixes/02_spec.html</span>
+  </footer>
+</body>
+</html>

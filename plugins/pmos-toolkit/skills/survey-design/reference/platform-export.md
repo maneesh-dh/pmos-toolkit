@@ -2,11 +2,13 @@
 
 Loaded on demand by `/survey-design` Phase 8. The per-platform **type-mapping tables** here are what the Phase-8 transformer recipes (in `SKILL.md`) cite when they turn `survey.json` into a platform artifact. The transformers are deterministic recipes (same `survey.json` → same output bytes), not a runtime API call — the skill never hits a survey platform's API; it emits an import file plus an `export/README.md` with the import steps and auth requirements.
 
-`survey.json` question `type` enum referenced below: `single_select`, `multi_select`, `forced_choice_grid`, `rating`, `nps`, `dichotomous`, `open_short`, `open_long`, `ranking`, `matrix`, `constant_sum`, `statement`.
+`survey.json` question `type` enum referenced below: `single_select`, `multi_select`, `forced_choice_grid`, `rating`, `nps`, `dichotomous`, `open_short`, `open_long`, `ranking`, `matrix`, `constant_sum`, `multi_field_open`, `statement`.
+
+> **`multi_field_open` — labeled multi-input.** A shared stem + one single-line free-text input per `fields[]` entry (`{id,label,placeholder}`). Some platforms have a native "multiple textboxes" question that round-trips the field labels; others don't, and the canonical downgrade is **N short-answer items preceded by a section-header / statement block** naming the original grouped question, with each `field.label` becoming a separate item title. Per-platform: SurveyMonkey → **native** (`open_ended` / `multi`, `answers.rows[]` = the field labels); Qualtrics → **native** (`Matrix` / `TE` text-entry matrix, `Answers` = the field labels); Typeform → **downgrade** (no labeled-multi-input field); Google Forms → **downgrade** (no native multi-textbox item).
 
 > **Qualtrics is documented here for completeness, but the v1 transformer is a stretch.** If no `survey.qsf` transformer ships, the Phase-8 `AskUserQuestion` must not offer Qualtrics as a choice. The QSF section below lets a later iteration add it without re-researching. Microsoft Forms is intentionally **not** supported — no usable programmatic import path (see the note at the end).
 
-Recommended emitted artifacts: Typeform → `export/typeform.json`; SurveyMonkey → `export/surveymonkey.json` **plus** `export/surveymonkey-paste.txt`; Google Forms → `export/build-google-form.gs`; Qualtrics (if shipped) → `export/survey.qsf`. Always also write `export/README.md`.
+Recommended emitted artifacts: Typeform → `export/typeform.json`; SurveyMonkey → `export/surveymonkey.json` **plus** `export/surveymonkey-paste.txt`; Google Forms → `export/build-google-form.gs`; Qualtrics (if shipped) → `export/survey.qsf`. Always also write `export/README.md`. `export/README.md` lists every downgrade per chosen platform — including, for any platform that downgrades a `multi_field_open` question (Typeform, Google Forms), a line like "the *<grouped question stem>* was split into N short-answer items preceded by a section header" — and a meaning-changing downgrade is also flagged as a comment in the artifact itself at the downgrade site.
 
 ---
 
@@ -69,6 +71,7 @@ There is **no CSV import**.
 | `ranking` | `ranking` | native |
 | `matrix` | `matrix` | native; rows → matrix rows, scale points → matrix columns |
 | `constant_sum` | `number` per item + a `statement` explaining "must total N" | **downgrade** — Typeform has no native constant-sum; document it |
+| `multi_field_open` | a `statement` field naming the grouped question, then one `short_text` field per `field` (title = `field.label`, `properties.description` = `field.placeholder`) | **downgrade** — Typeform has no labeled-multi-input field; the statement carries the original stem; comment the downgrade in `export/README.md` |
 | `statement` | `statement` | native |
 | `opt_out_options` / `other_option` | `allow_other_choice` and/or an extra choice | native on `multiple_choice` |
 | `skip_logic` | `logic[]` entry on the source field's `ref` | `action:"jump"` to `target_section_id`'s first field, or to the thank-you screen for `end_survey` |
@@ -128,6 +131,7 @@ A meaning-changing downgrade (e.g. `constant_sum`) is also flagged as a comment 
 | `ranking` | `matrix` / `ranking` (`forced_ranking:true`) | native |
 | `matrix` | `matrix` / `single` (or `rating` for a numeric scale) | native; rows → `answers.rows[]`, scale points → `answers.choices[]` |
 | `constant_sum` | `open_ended` / `numerical`, one per item + `validation.sum` = total | **downgrade** — emulated with numeric items summing to the target; document it |
+| `multi_field_open` | `open_ended` / `multi` (multiple-textboxes), `answers.rows[]` = the `fields[]` labels | **native** — SurveyMonkey's multiple-textbox question round-trips the labeled inputs; one question, one heading = the stem |
 | `statement` | `presentation` / `descriptive_text` | native |
 
 **Auth / limits.** OAuth 2.0 Bearer; the app needs the "Create/modify surveys" scope. **API access requires a paid plan (Team Advantage / Enterprise) — not free/basic.** Free dev-portal apps: 120 calls/min, 500/day. If the user is on a free plan, the paste-import fallback (`export/surveymonkey-paste.txt`, MC + single-textbox only) is the only no-code path — `export/README.md` must say so. README snippet: `curl -X POST https://api.surveymonkey.com/v3/surveys -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" -d @surveymonkey.json`.
@@ -181,6 +185,7 @@ function buildSurvey() {
 | `ranking` | `addGridItem` (rows = items, columns = ranks 1..N) | **downgrade** — no native ranking; a grid emulates "rank each"; note it |
 | `matrix` | `addGridItem` (rows = items, columns = scale points) | native via grid |
 | `constant_sum` | one `addTextItem` per item + a help-text note "must total N" | **downgrade** — no native constant-sum; can't enforce the sum in Forms; note it |
+| `multi_field_open` | `addSectionHeaderItem().setTitle(<stem>)`, then one `addTextItem().setTitle(<field.label>).setHelpText(<field.placeholder>)` per `field` | **downgrade** — Google Forms has no native multi-textbox item; the section header carries the original stem; comment the downgrade in the `.gs` and list it in `export/README.md` |
 | `statement` | `addSectionHeaderItem` | native (display only) |
 | section break | `addPageBreakItem().setTitle(...)` | one page break per `survey.json` section after the first |
 | `skip_logic` | `createChoice(value, JUMP_TO_PAGE)` on a multiple-choice item | only "go to section based on answer" on multiple-choice/dropdown; `end_survey` → `FormApp.PageNavigationType.SUBMIT` |
@@ -229,6 +234,7 @@ Every downgrade (NPS → scale, ranking → grid, constant-sum → text items) i
 | `ranking` | `RO` | native |
 | `matrix` | `Matrix` / `Likert` | native |
 | `constant_sum` | `CS` | native |
+| `multi_field_open` | `Matrix` / `TE` (text-entry matrix), `Answers` = the `fields[]` labels (single text column) | **native** — Qualtrics's text-entry matrix round-trips the labeled inputs |
 | `statement` | `DB` | native |
 
 QSF maps every `survey.json` type natively — that's why it's the "completeness" reference even though the v1 transformer is a stretch.

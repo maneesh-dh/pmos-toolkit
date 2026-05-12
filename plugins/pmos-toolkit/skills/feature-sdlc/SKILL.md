@@ -1,15 +1,15 @@
 ---
 name: feature-sdlc
-description: End-to-end SDLC orchestrator that turns an initial idea (text or doc) into a shipped feature by sequentially driving the full pmos-toolkit pipeline — worktree creation, requirements, grill, optional MSF/creativity/wireframes/prototype, spec, optional simulate-spec, plan, execute, verify, and complete-dev — auto-tiering each stage and persisting resumable state inside the worktree. Use when the user says "build this feature end-to-end", "run the full SDLC", "take this idea through to ship", "feature-sdlc this", "/feature-sdlc", or "drive the pipeline for me".
+description: End-to-end SDLC orchestrator. `/feature-sdlc <idea>` turns an initial idea (text or doc) into a shipped feature by sequentially driving the full pmos-toolkit pipeline — worktree + branch, requirements, grill, optional MSF/creativity/wireframes/prototype, spec, plan, execute, verify, complete-dev — auto-tiering each stage and persisting resumable state in the worktree. `/feature-sdlc skill <description>` and `/feature-sdlc skill --from-feedback <text|path|--from-retro>` drive the same pipeline to author or revise skills, scoring each against a binary skill-eval rubric (Phase 6a) before merge. `/feature-sdlc list` shows in-flight feature worktrees. Use when the user says "build this feature end-to-end", "run the full SDLC", "take this idea through to ship", "feature-sdlc this", "/feature-sdlc", "drive the pipeline for me", "create a skill", "author a new skill", "build me a slash command", "turn this workflow into a skill", "apply this retro feedback to the skill", or "process this skill feedback end-to-end".
 user-invocable: true
-argument-hint: "<initial idea text | path to brief/doc> [--tier 1|2|3] [--resume] [--no-worktree] [--minimal] [--format <html|md|both>] [--non-interactive | --interactive] [--backlog <id>] [list]"
+argument-hint: "[skill [--from-feedback]] <description|idea> [--from-retro] [--tier 1|2|3] [--resume] [--no-worktree] [--format html|md|both] [--non-interactive | --interactive] [--backlog <id>] [--minimal] | list"
 ---
 
 # Feature SDLC
 
-Top-level orchestrator that drives the full pmos-toolkit pipeline from initial idea to shipped feature. Creates a git worktree + branch, runs `/requirements → /grill → [/msf-req | /creativity | /wireframes | /prototype] → /spec → [/simulate-spec] → /plan → /execute → /verify → /complete-dev` sequentially, auto-tiers each stage, and persists resumable state inside the worktree.
+Top-level orchestrator that drives the full pmos-toolkit pipeline from an initial idea (or a skill-authoring task) through to ship. Creates a git worktree + branch, runs `/requirements → /grill → [/msf-req | /creativity | /wireframes | /prototype] → /spec → [/simulate-spec] → /plan → /execute → /verify → /complete-dev` sequentially, auto-tiers each stage, and persists resumable state inside the worktree. In a **skill mode** (`/feature-sdlc skill …`) the same pipeline authors or revises a skill — the UI gates (wireframes/prototype) are suppressed, and a binary skill-eval gate (Phase 6a) replaces them; see `reference/skill-patterns.md` (the authoring guide) and `reference/skill-eval.md` (the rubric).
 
-**Announce at start:** "Using feature-sdlc — orchestrating the full SDLC pipeline for this feature."
+**Announce at start:** "Using feature-sdlc — orchestrating the full SDLC pipeline for this feature." (In a skill mode: "…for this skill.")
 
 ## Pipeline position
 

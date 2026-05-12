@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-05-12 — pmos-toolkit 2.38.0: skill development via /feature-sdlc (skill modes, skill-eval rubric, /skill-sdlc alias)
+
+Folds skill authoring into the same SDLC spine everything else uses. `/create-skill` and `/update-skills` are retired — building or revising a skill now runs the full worktree-isolated, resumable, gated `/feature-sdlc` pipeline (requirements → spec → plan → execute → eval → verify → complete-dev), and every skill is scored against a binary rubric before it can merge.
+
+### What's new
+
+- **`/feature-sdlc skill <description>` builds a new skill end-to-end.** It runs the same pipeline as a feature: git worktree + branch, resumable `state.yaml`, auto-tiering, compact checkpoints — then adds a skill-eval gate before merge. `/feature-sdlc skill --from-feedback <file|text>` (or `--from-retro`) drives the same pipeline to apply feedback or retro findings to one or more existing skills in a single combined run.
+- **`/skill-sdlc` — a thin alias** for `/feature-sdlc skill …`. Triggers on "create a skill", "build me a slash command", "author a new skill", "apply this retro feedback to the skill", etc. It forwards verbatim; all the logic lives in `/feature-sdlc`.
+- **A research-grounded skill-authoring guide + binary eval rubric.** `reference/skill-patterns.md` (§A frontmatter · §B description & triggering · §C structure & progressive disclosure · §D body & content · §E scripts & tooling · §F platform-conditional frontmatter) is the single source of truth for how a good skill is written; `reference/skill-eval.md` mirrors it 1:1 as a 39-check pass/fail rubric (20 deterministic + 19 LLM-judge). `/feature-sdlc skill`'s requirements / spec / execute / verify stages all cite the guide; `/create-skill`'s old prose "Conventions" checklist is superseded (the three pmos-specific bits — canonical path, manifest version-sync, release entry point — live in `CLAUDE.md`).
+- **`skill-eval-check.sh` — a bundled deterministic-check runner.** `plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh [--target claude-code|codex|generic] [--selftest] <skill-dir>` runs the 20 deterministic checks and prints a TSV verdict (exit 0 all-pass / 1 a-check-failed / 2 invocation error). `--selftest` asserts the check-list ↔ rubric bijection. The 19 LLM-judge checks run via a reviewer subagent with a verbatim-quote contract.
+- **A TDD-style skill-eval refinement loop (new Phase 6a).** After `/execute`, the skill is scored; failing checks become a `## Eval-remediation` task block appended to the plan, `/execute` re-runs (task-level resume), and it re-scores — up to 2 iterations, then a categorical decision (accept residuals as known risk / iterate manually / restore iteration 1 / abort). `/verify` re-runs the rubric fresh and reconciles against any accepted residuals. Nothing passes silently.
+- **New skill-mode phases.** `0c /feedback-triage` (parse a retro/feedback source → per-finding critique vs the current skill → approve/modify/skip/defer → triage doc → combined per-skill requirements seed) and `0d /skill-tier-resolve` (resolve skill tier, on-disk location, and target platform — host CLAUDE.md/AGENTS.md/GEMINI.md rule > plugin manifest > `.agents/` > `.claude/skills/` — with a single consolidated confirmation).
+
+### Changed
+
+- **`/feature-sdlc`'s phases are renumbered linearly:** `0, 0a, 0b, 0c, 0d, 1, 2, 2a, 3, 3a, 3b, 3c, 4, 5, 6, 6a, 7, 8, 8a, 9, 10`. Feature mode behaves exactly as before — the new `0c/0d/6a` phases only run in skill modes.
+- **`state.yaml` is schema v4** — additive over v3: a `pipeline_mode` field (`feature` / `skill-new` / `skill-feedback`), a `skill_eval` substructure (per-iteration results + accepted residuals), and a mode-conditional `phases[]` set. Existing v1/v2/v3 state files auto-migrate on `--resume`.
+- **`/create-skill` and `/update-skills` are archived** to `archive/skills/` (with `archive/skills/README.md` explaining the merge and where each old phase lives now); their reusable reference files moved into `feature-sdlc/reference/`. The README rows for both now redirect to the archive; `CLAUDE.md` gains a `## Skill-authoring conventions` section.
+
+### References
+
+- Requirements: `docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/01_requirements.html`
+- Spec: `docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/02_spec.html`
+- Plan: `docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/03_plan.html`
+- Verification report: `docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/verify/2026-05-12-review.html`
+- Archive: `archive/skills/README.md`
+
 ## 2026-05-11 — pmos-toolkit 2.37.0: survey-design hardening (Phase-4 refinement loop, multi_field_open, two-tier assets)
 
 Acts on the retro from the first `/survey-design` session (the skill shipped in 2.36.0): rebuilds the reviewer pass as a bounded refinement loop with a product-fit rubric, adds a new question type, hardens substrate-asset handling, declutters dispositions, and adds a persuasive-intro intake variable. Five fixes (F1, F3, F6, F7, F8) approved out of 8 surfaced; F2/F4/F5 skipped with reasons (see the triage doc). Driven via `/update-skills`.

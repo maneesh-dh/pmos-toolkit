@@ -49,8 +49,9 @@ pmos-toolkit/
 
 | Skill | Description |
 |-------|-------------|
-| `/pmos-toolkit:feature-sdlc` | End-to-end SDLC orchestrator — turns an initial idea into a shipped feature by sequentially driving requirements → grill → optional gates → spec → simulate-spec → plan → execute → verify → complete-dev. Auto-tiers, creates worktree + branch via `EnterWorktree` (with `cd <worktree> && claude --resume` handoff if the harness can't enter inline), persists resumable state inside the worktree, surfaces compact checkpoints before heavy phases. `/feature-sdlc list` shows in-flight features across all `feat/*` worktrees |
-| `/pmos-toolkit:update-skills` | Ingest feedback (raw text or `/retro` paste-back), triage proposed changes per skill with user approval, then run the requirements -> spec -> (grill) -> plan -> execute -> verify pipeline (auto-tiered per skill) sequentially. Use when you want retro/feedback turned into shipped changes end-to-end |
+| `/pmos-toolkit:feature-sdlc` | End-to-end SDLC orchestrator — turns an initial idea into a shipped feature by sequentially driving requirements → grill → optional gates → spec → simulate-spec → plan → execute → verify → complete-dev. Auto-tiers, creates worktree + branch via `EnterWorktree` (with `cd <worktree> && claude --resume` handoff if the harness can't enter inline), persists resumable state inside the worktree, surfaces compact checkpoints before heavy phases. `/feature-sdlc list` shows in-flight features across all `feat/*` worktrees. `/feature-sdlc skill <description>` / `/feature-sdlc skill --from-feedback <…>` drive the same pipeline to author a new skill or apply feedback to existing skill(s), scoring each against a binary eval rubric before merge |
+| `/pmos-toolkit:skill-sdlc` | Thin alias for `/feature-sdlc skill …` — create a new skill or apply retro/feedback to existing skill(s) via the full SDLC pipeline |
+| `/pmos-toolkit:update-skills` | _Archived in 2.38.0 — superseded by `/feature-sdlc skill --from-feedback`; see `archive/skills/README.md`_ |
 
 ### Pipeline enhancers (optional)
 
@@ -84,7 +85,7 @@ pmos-toolkit/
 
 | Skill | Description |
 |-------|-------------|
-| `/pmos-toolkit:create-skill` | Create a new skill via the requirements → spec → [grill] → plan → implement → /verify pipeline; cross-platform conventions, project save paths, mandatory /verify gate. |
+| `/pmos-toolkit:create-skill` | _Archived in 2.38.0 — superseded by `/feature-sdlc skill <description>` (or the `/skill-sdlc` alias); see `archive/skills/README.md`_ |
 | `/pmos-toolkit:diagram` | Generate a single SVG vector diagram from a free-form description — brainstorms 2–3 framings, drafts, and self-evaluates against a hybrid SVG-metrics + vision rubric |
 | `/pmos-toolkit:survey-design` | Design a methodologically sound survey from a rough intent (or refine an existing one) — generates a sectioned `survey.json`, runs a reviewer-critique pass + a simulated-respondent friction walk, renders a fillable `preview.html`, and emits import files for Typeform / SurveyMonkey / Google Forms |
 | `/pmos-toolkit:design-crit` | Critique an application URL, wireframes, or prototype on overall UX — captures flow screenshots via packaged Playwright script, evaluates against a Nielsen + WCAG 2.2 + visual + Gestalt + journey-friction rubric, runs a PSYCH/MSF pass, and synthesises prioritized recommendations |
@@ -97,7 +98,7 @@ pmos-toolkit/
                    optional bridges (UI features)    optional enhancers                  optional validator
 ```
 
-`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/create-skill`, `/feature-sdlc`, `/update-skills`, `/diagram`, `/survey-design`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
+`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/feature-sdlc`, `/skill-sdlc`, `/diagram`, `/survey-design`, `/design-crit`, `/mac-health` are standalone — invoke them at any point.
 
 ## Install
 
@@ -148,7 +149,7 @@ For pushing changes, use the project-scoped `/push` slash command. It walks pre-
 
 ## Adding New Skills
 
-Use `/pmos-toolkit:create-skill` inside a session, or manually:
+Use `/pmos-toolkit:feature-sdlc skill <description>` (or the `/skill-sdlc` alias) inside a session, or manually:
 
 1. Create `plugins/pmos-toolkit/skills/<skill-name>/SKILL.md` with the required frontmatter:
 

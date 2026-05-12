@@ -7,30 +7,45 @@ argument-hint: "[skill [--from-feedback]] <description|idea> [--from-retro] [--t
 
 # Feature SDLC
 
-Top-level orchestrator that drives the full pmos-toolkit pipeline from an initial idea (or a skill-authoring task) through to ship. Creates a git worktree + branch, runs `/requirements → /grill → [/msf-req | /creativity | /wireframes | /prototype] → /spec → [/simulate-spec] → /plan → /execute → /verify → /complete-dev` sequentially, auto-tiers each stage, and persists resumable state inside the worktree. In a **skill mode** (`/feature-sdlc skill …`) the same pipeline authors or revises a skill — the UI gates (wireframes/prototype) are suppressed, and a binary skill-eval gate (Phase 6a) replaces them; see `reference/skill-patterns.md` (the authoring guide) and `reference/skill-eval.md` (the rubric).
+Top-level orchestrator that drives the full pmos-toolkit pipeline from an initial idea (or a skill-authoring task) through to ship. Creates a git worktree + branch, runs `/requirements → [/grill] → [/creativity] → [/wireframes → /prototype] → /spec → /plan → /execute → /verify → /complete-dev → [/retro]` sequentially, auto-tiers each stage, and persists resumable state inside the worktree. The `skill` subcommand picks a **skill mode** — `/feature-sdlc skill <description>` (`skill-new`) or `/feature-sdlc skill --from-feedback <text|path|--from-retro>` (`skill-feedback`) — driving the same pipeline to author or revise a skill: the UI gates (wireframes/prototype) are not presented, `skill-feedback` adds a `/feedback-triage` phase, both add a `/skill-tier-resolve` phase and a binary skill-eval gate (Phase 6a) before merge. `/skill-sdlc` is a thin alias for `/feature-sdlc skill`. See `reference/skill-patterns.md` (the authoring guide) and `reference/skill-eval.md` (the rubric).
 
 **Announce at start:** "Using feature-sdlc — orchestrating the full SDLC pipeline for this feature." (In a skill mode: "…for this skill.")
 
 ## Pipeline position
 
 ```
-/feature-sdlc (this skill)
-    └─> [worktree + slug]
-        └─> /requirements
+/feature-sdlc (this skill)        — three run modes; the subcommand picks one (FR-02):
+    └─> [worktree + slug]            • bare  /feature-sdlc <idea>            → pipeline_mode = feature
+        └─> [feedback-triage]        • /feature-sdlc skill <description>     → pipeline_mode = skill-new
+        └─> [skill-tier-resolve]     • /feature-sdlc skill --from-feedback <text|path|--from-retro> → skill-feedback
+        └─> /requirements            (/skill-sdlc … is a thin alias for /feature-sdlc skill …)
               └─> [/grill]                        # Tier 2+, skip if --non-interactive
-              └─> [/msf-req]                      # Tier 3 mandatory, Tier 2 optional
-              └─> [/creativity]                   # always optional
-              └─> [/wireframes]                   # if frontend feature
-                    └─> [/prototype]              # optional after wireframes
+              └─> [/creativity]                   # always optional, all modes
+              └─> [/wireframes]                   # feature mode only — if frontend feature
+                    └─> [/prototype]              # feature mode only — optional after wireframes
         └─> /spec
-              └─> [/simulate-spec]                # Tier 3 mandatory, Tier 2 optional
         └─> /plan
         └─> /execute
+        └─> [/skill-eval]                         # skill modes only — binary rubric gate (Phase 6a)
         └─> /verify
         └─> /complete-dev
+        └─> [/retro]                              # optional
 ```
 
-`/feature-sdlc` is a top-level orchestrator, not a pipeline stage. Standalone — invoke at the moment you have an idea and want to ship it end-to-end.
+**Mode × phase (paraphrase of spec §6.1):**
+
+| Phase | `feature` | `skill-new` | `skill-feedback` |
+|---|---|---|---|
+| `0c` /feedback-triage | — | — | ✓ (hard) |
+| `0d` /skill-tier-resolve | — | ✓ (infra) | ✓ (infra) |
+| `2a` /grill · `3a` /creativity | ✓ | ✓ | ✓ |
+| `3b` /wireframes · `3c` /prototype | ✓ | — | — |
+| `6a` /skill-eval | — | ✓ (hard) | ✓ (hard) |
+| everything else (`/requirements`…`/complete-dev`, `/retro`) | ✓ | ✓ | ✓ |
+
+(`/msf-req` and `/simulate-spec` are folded inside `/requirements` and `/spec` respectively — no longer orchestrator phases.)
+
+`/feature-sdlc` is a top-level orchestrator, not a pipeline stage. Standalone — invoke at the moment you have an idea (or a skill to author/revise) and want to ship it end-to-end.
 
 ## Platform Adaptation
 
@@ -697,15 +712,16 @@ Print the full pipeline-status table from `00_pipeline.html` (or `00_pipeline.md
 
 ## Release prerequisites
 
-(Surfaced here per Convention 13 + FR-RELEASE / spec §15 G11 so the next `/push` (or `/complete-dev`) is not surprising.)
+(Surfaced here per Convention 13 + FR-94 / spec §7.11 so the next `/complete-dev` is not surprising. `/complete-dev` is the canonical release skill — not the legacy `/push`.)
 
-- README row added under **Pipeline / Orchestrators** (alongside `/update-skills`); standalone-line updated to include `/feature-sdlc`.
-- Next release will require a **minor** version bump in BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json` (versions must stay in sync — pre-push hook enforces).
-- **Plugin.json description sync (FR-RELEASE.iii):** the skill description fields in both manifests must be byte-identical.
-- **Argument-hint matches parsed flags (FR-RELEASE.i):** the `argument-hint:` frontmatter must enumerate every flag actually parsed in Phase 0 (`--tier`, `--resume`, `--no-worktree`, `--format`, `--non-interactive`, `--interactive`, `--backlog`).
-- **Natural-trigger phrases (FR-RELEASE.ii):** the `description:` field must include ≥5 user-spoken phrases. Current set: "build this feature end-to-end", "run the full SDLC", "take this idea through to ship", "feature-sdlc this", "/feature-sdlc", "drive the pipeline for me".
-- **Learnings header bootstrap:** add `## /feature-sdlc` section header to `~/.pmos/learnings.md` (idempotent — only append if missing).
-- No new schema files outside this skill's own `reference/state-schema.md`. No `plugin.json` `skills` array changes (skills auto-discovered from directory).
+- **README** — add a `/skill-sdlc` row under "Pipeline orchestrators"; update the `/feature-sdlc` row + the bottom standalone line + the pipeline-flow note to mention the `skill` subcommand; **remove** the `/update-skills` row from "Pipeline orchestrators" and the `/create-skill` row from "Utilities" (both are archived — point at `archive/skills/README.md`).
+- **Both `plugin.json` manifests** — a **minor** version bump (2.37.0 → 2.38.0) in BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json`, in one commit, versions kept in sync (pre-push hook enforces). The manifests carry **no per-command description fields**, so FR-95's "byte-identical description" requirement is satisfied vacuously — the `SKILL.md` frontmatter `description` is the single source of truth. (If a future manifest format adds per-command descriptions, mirror this frontmatter — decision P5.)
+- **`argument-hint` frontmatter** enumerates every parsed token/flag (FR-06): `skill`, `--from-feedback`, `--from-retro`, `--tier`, `--resume`, `--no-worktree`, `--format`, `--non-interactive`, `--interactive`, `--backlog`, `--minimal`, `list`.
+- **`description` frontmatter** carries ≥5 user-spoken trigger phrases spanning both modes (FR-RELEASE.ii / FR-95): "build this feature end-to-end", "run the full SDLC", "take this idea through to ship", "feature-sdlc this", "/feature-sdlc", "drive the pipeline for me", plus the skill-authoring ones — "create a skill", "author a new skill", "build me a slash command", "turn this workflow into a skill", "apply this retro feedback to the skill", "process this skill feedback end-to-end".
+- **`archive/skills/`** — `archive/skills/create-skill/` and `archive/skills/update-skills/` exist (the two old skills, moved verbatim via `git mv`), with an `archive/skills/README.md` explaining the merge. `ls plugins/pmos-toolkit/skills/` shows **neither** `create-skill` nor `update-skills`, but **does** show `skill-sdlc`.
+- **`CLAUDE.md`** — gains a `## Skill-authoring conventions` section (the pmos-specific bits: canonical `plugins/pmos-toolkit/skills/<name>/SKILL.md` path, synced `plugin.json` bump, `/complete-dev` as release entry — the generic conventions live in `reference/skill-patterns.md`).
+- **Learnings header bootstrap** — add a `## /feature-sdlc` section header to `~/.pmos/learnings.md` (idempotent — only append if missing). **No separate `## /skill-sdlc` header** — the alias rides on `/feature-sdlc`'s learnings (D19 / FR-81).
+- No new schema files outside this skill's own `reference/state-schema.md`. No `plugin.json` `skills`-array changes (skills auto-discovered from directory).
 
 ## Anti-Patterns (DO NOT)
 
@@ -718,4 +734,7 @@ Print the full pipeline-status table from `00_pipeline.html` (or `00_pipeline.md
 7. **Treating `--non-interactive` as "skip /grill silently".** The skill must log `phase: grill / status: skipped-non-interactive / reason: --non-interactive flag` so the user knows what was skipped on review.
 8. **Resuming from a state file with stale artifact paths.** On resume (Phase 0b), validate every recorded artifact path still exists; if any required artifact is missing, surface to user before continuing — do not re-invoke a phase silently.
 9. **Conflating `--tier` override with per-child auto-tiering.** `--tier` sets the orchestrator's expected scope (drives gates) AND is passed to children that accept it (`/requirements`, `/spec`, `/plan`). Children may auto-tier-escalate; log divergence in `child_tier_divergence` rather than overriding.
-10. **Skipping `/verify` because `/execute` looked clean.** Non-skippable per pipeline contract; no opt-out at any tier.
+10. **Skipping `/verify` because `/execute` looked clean.** Non-skippable per pipeline contract; no opt-out at any tier — and in skill modes, neither is **Phase 6a `/skill-eval`** (peer of `/verify`).
+11. **Letting the Phase 6a reviewer make edits.** The reviewer **scores and reports only** — `/execute` (Phase 6) is the sole writer of the skill (D10). A reviewer that "fixes while reviewing" makes the eval result unreproducible and the writer/reviewer separation meaningless.
+12. **Treating Phase 6a's "accept residuals as known risk" as a silent pass.** Residuals are recorded in `state.yaml.phases.skill-eval.skill_eval.accepted_residuals[]`, re-checked by `/verify`, and surfaced loudly in both the `/verify` report and the `/complete-dev` summary. Accepting a residual is a logged decision, not a way to make the gate go away. And do not exceed the 2-iteration remediation cap — past it, the only exits are accept / iterate-manually / restore-iteration-1 / abort.
+13. **Inferring the run mode from the seed text.** `pipeline_mode` comes from the explicit `skill` subcommand (FR-02), never from sniffing whether the idea "sounds like a skill". A bare `/feature-sdlc <text>` is always `feature` mode, even if the text describes a skill.

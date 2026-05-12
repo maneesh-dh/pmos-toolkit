@@ -551,6 +551,8 @@ On missing-skill: soft-variant missing-skill dialog.
 
 Invoke `/pmos-toolkit:spec` with `<feature_folder>/01_requirements.{html,md}` (resolved primary) and `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n` and `[output_format: <resolved>]\n`.
 
+**In skill modes (FR-61):** prepend a line citing `reference/skill-patterns.md` — `/spec` is the generic skill (there is no skill-aware spec template, D14/FR-92), so `skill-patterns.md §A–§F` flows in as requirements: the spec must turn the cited §-sections into concrete FRs (one or more FR per applicable §), so the resulting `03_plan` tasks are testable against them.
+
 After completion:
 
 - Capture artifact path: `<feature_folder>/02_spec.{html,md}` (resolve via `_shared/resolve-input.md` `phase=spec`).
@@ -574,7 +576,9 @@ Run the **compact checkpoint** first — `/execute` is heavy (TDD task-by-task i
 
 Invoke `/pmos-toolkit:execute` with the plan. **`/execute` does not accept `--tier`** — it derives tier from the plan's frontmatter.
 
-In **skill modes**, `/execute` is also the **sole writer of the skill** — it creates/edits the `SKILL.md` at the `skill_location` path resolved in Phase 0d, and any `reference/`/`tools/` files. The Phase 6a reviewer (below) never edits — it scores and reports only (D10).
+In **skill modes**, `/execute` is also the **sole writer of the skill** — it creates/edits the `SKILL.md` at the `skill_location` path resolved in Phase 0d, and any `reference/`/`tools/` files. The Phase 6a reviewer (below) never edits — it scores and reports only (D10). Prepend a line citing `reference/skill-patterns.md` as the implementation reference (the `03_plan` tasks were written against the FRs derived from it in Phase 4 — `/execute` consults the patterns file for the *shape* of the change). `/execute` also honours the **host repo's `CLAUDE.md`** for repo-policy bits that are deliberately NOT in `skill-patterns.md` — the canonical skill path, the manifest version-sync rule, the release-entry rule — see the pointer below.
+
+> **Where the conventions live:** `reference/skill-patterns.md` carries the *generic, repo-agnostic* skill-authoring conventions (frontmatter, description triggering, progressive disclosure, body content, scripts, platform-conditional frontmatter — §A–§F). This repo's **`CLAUDE.md ## Skill-authoring conventions`** carries the *pmos-specific* bits: the canonical `plugins/pmos-toolkit/skills/<name>/SKILL.md` path, the synced `plugin.json` version bump, and `/complete-dev` as the release entry point (FR-62). `/execute` (and the Phase 6a + `/verify` evaluators) must satisfy both.
 
 On resume, `/execute` has its own task-level resume semantics — orchestrator re-invokes fresh and `/execute` detects its own state from the worktree's git history + plan-status markers. Per FR-CHILD-RESUME / spec §15 G2. (In skill modes this also covers re-running for a Phase-6a remediation addendum — `/execute`'s task-level resume picks up only the new `## Eval-remediation — iteration N` tasks.)
 
@@ -630,7 +634,15 @@ On failure (reviewer-validation hard-fail, `/execute` re-run failure, etc.): sof
 
 Run the **compact checkpoint** first — `/verify` is heavy (multi-agent code review + interactive QA + spec compliance grading).
 
-Invoke `/pmos-toolkit:verify` with the spec path. **`/verify` is non-skippable per the pipeline contract — no Skip option, ever, in any mode** (Anti-pattern #10 in spec §12; mirrored below). In skill modes, `/verify` additionally re-runs `reference/skill-eval.md` fresh and reconciles against `accepted_residuals[]` (wired in the citation pass — FR-50/51/52).
+Invoke `/pmos-toolkit:verify` with the spec path. **`/verify` is non-skippable per the pipeline contract — no Skip option, ever, in any mode** (Anti-pattern #10 in spec §12; mirrored below) (FR-52).
+
+**In skill modes**, prepend a line directing `/verify` to additionally:
+
+- **Re-run `reference/skill-eval.md` fresh** (which scores the skill against `reference/skill-patterns.md §A–§F` — re-run `feature-sdlc/tools/skill-eval-check.sh` for the `[D]` half + a fresh reviewer pass for the `[J]` half — a final idempotent gate, independent of Phase 6a's run) and **reconcile against `state.yaml.phases.skill-eval.skill_eval.accepted_residuals[]`** (FR-50):
+  - a residual that is *still failing* → report as `KNOWN / accepted in Phase 6a` — **non-blocking, but surfaced loudly** in the `/verify` report **and** carried into the `/complete-dev` summary;
+  - a check that is *newly failing* (not in `accepted_residuals[]`) → **blocks normally**, like any other `/verify` failure;
+  - a check that was *previously accepted but now passes* → dropped from the residual set (update `state.yaml`).
+- **Best-effort grade the detectable host-repo release prereqs (FR-51), gracefully degrading** if a thing isn't present: manifest version-sync (only if two `plugin.json` manifests exist), a README row for the new/edited skill, changelog presence. These are surfaced as findings in the `/verify` report, not hard blocks (the release-prereq enforcement lives in `/complete-dev`).
 
 `/verify` does not accept `--tier`.
 

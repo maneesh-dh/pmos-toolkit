@@ -10,3 +10,7 @@ argument-hint: "[--from-feedback] <description|feedback> [--from-retro] [--tier 
 This skill is a thin alias. It runs no logic of its own.
 
 Immediately invoke `/pmos-toolkit:feature-sdlc` with the arguments `skill` followed by the verbatim arguments passed to `/skill-sdlc` — e.g. `/skill-sdlc "a skill that lints YAML"` → `/pmos-toolkit:feature-sdlc skill "a skill that lints YAML"`; `/skill-sdlc --from-feedback path/to/retro.md` → `/pmos-toolkit:feature-sdlc skill --from-feedback path/to/retro.md`. Do nothing else — all skill-dev logic, the worktree, the resume model, the eval loop, and the learnings capture live in `/feature-sdlc`.
+
+## Platform Adaptation
+
+This skill has no platform-specific behavior of its own — it forwards verbatim to `/feature-sdlc skill …`, which handles all platform adaptation, subagents, and the resume model.

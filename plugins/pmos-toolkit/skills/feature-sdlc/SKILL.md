@@ -53,11 +53,22 @@ This skill has multiple phases. Create one task per phase using your agent's tas
 
 ## Phase 0: Pipeline setup + Load Learnings
 
-### Phase 0 Subcommand Dispatch (FR-L01)
+### Phase 0 Subcommand Dispatch (FR-01, FR-02, FR-03, FR-04, FR-05, FR-L01)
 
-Before running pipeline-setup, check the argument string for the `list` subcommand:
+Before running pipeline-setup, resolve `pipeline_mode ∈ {feature, skill-new, skill-feedback}` from the argument string. This is independent of the `mode ∈ {interactive, non-interactive}` resolution in the non-interactive block below — both are computed at Phase 0 entry; do not conflate them.
 
-- If the argument string matches `^list(\s|$)` (i.e., the first positional arg is the literal word `list`), short-circuit: skip pipeline-setup, skip Phase 0.a, skip Phase 0.b, run the list logic below, exit 0.
+**Token-1 disambiguation (FR-02).** Token 1 of the argument string is the *subcommand selector* — i.e., the literal word `skill` or `list` — **only when** it is exactly `skill` or `list` **and** one of: (a) it is the sole token; (b) the next token is a recognised flag (`--from-feedback`, `--from-retro`, `--tier`, `--resume`, `--no-worktree`, `--format`, `--non-interactive`, `--interactive`, `--backlog`, `--minimal`); (c) the remainder is exactly one quoted argument. Otherwise token 1 is the first word of a feature description (e.g., `/feature-sdlc list of recently changed files` → `feature` mode, seed = the whole string). Never infer the run mode from seed text — the subcommand is explicit.
+
+**Dispatch:**
+
+- **`--resume` present (FR-05):** ignore any subcommand token entirely — `pipeline_mode` is read from `state.yaml` (set on the original run). If both `--resume` and a subcommand token are present → stderr warn `subcommand ignored on --resume; mode read from state.yaml` and continue with the state-file value. (No `list` short-circuit on `--resume` — `--resume` always means "resume a pipeline".)
+- **`list` selector (FR-L01):** short-circuit — skip pipeline-setup, skip Phase 0.a, skip Phase 0.b, run the list logic below, exit 0. (`pipeline_mode` is irrelevant here.)
+- **`skill` selector, no further description (FR-03):** stderr `usage: /feature-sdlc skill <description> | /feature-sdlc skill --from-feedback <text|path|--from-retro>`; exit 64.
+- **`skill --from-feedback <source>` (FR-04):** `pipeline_mode = skill-feedback`. `<source>` is a quoted text blob, a file path, or `--from-retro`. `--from-retro` resolves to the newest `/retro` artifact (per the `/retro` skill's output location); if none found → stderr `no /retro artifact found; pass feedback text or a file path`, exit 64. `skill --from-feedback` with neither a source nor `--from-retro` → the FR-03 usage error, exit 64.
+- **`skill <description>` (no `--from-feedback`):** `pipeline_mode = skill-new`; the description is the seed for Phase 2 `/requirements`.
+- **bare (no subcommand selector):** `pipeline_mode = feature`; the whole argument string (minus recognised flags) is the feature seed.
+
+**NFR-07 — log line.** On Phase 0 entry, log to chat `pipeline_mode: <m> (source: cli|state)` (`cli` for a fresh run, `state` on `--resume`) — analogous to the `mode: <mode> (source: …)` line emitted by the non-interactive block; keep both lines.
 
 ### `list` logic (FR-L02–L07)
 
@@ -187,8 +198,9 @@ END { emit_pending() }
 `{tier}` is set from (in precedence order):
 
 1. `--tier N` flag if passed.
-2. After Phase 3 `/requirements` completes — read its auto-tier output.
-3. Until Phase 3 completes, gate-recommendation logic uses Tier-3 conservative defaults.
+2. **In skill modes only** — the tier resolved by Phase 0d (`/skill-tier-resolve`) from `reference/skill-tier-matrix.md` (for `skill-feedback`: per-skill tiers, run tier = max). This runs *before* `/requirements`, so it's the early-phase default in skill modes. A `--tier N` flag still overrides it (logging a divergence note per E19).
+3. After `/requirements` completes — read its auto-tier output.
+4. Until the above resolves, gate-recommendation logic uses Tier-3 conservative defaults.
 
 Per FR-TIER-SCOPE / spec §15 G8: `{tier}` drives BOTH child-skill `--tier` passthrough (only for children that accept it: `/requirements`, `/spec`, `/plan`) AND orchestrator gate logic (Phases 3.b grill, 4.b creativity, 4.c wireframes, 4.d prototype, 13 retro). Phases 4.a (msf-req) and 6 (simulate-spec) were removed in v2.34.0 — folded into /requirements (Phase 5.5) and /spec (Phase 6.5) respectively. Child skills retain the right to auto-tier-escalate; if a child reports a different tier, log to `state.yaml.phases.<X>.child_tier_divergence` and continue — do not override the child.
 

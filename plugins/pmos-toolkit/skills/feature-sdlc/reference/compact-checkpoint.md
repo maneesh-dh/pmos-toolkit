@@ -8,13 +8,12 @@ The exit contract is precise (per FR-PAUSE / spec §15 G1) — without that prec
 
 ## When the checkpoint fires
 
-Before each of these phases (per spec §5 Phase 2 trigger list):
+Mode-dependent (FR-40 / spec E8):
 
-- `wireframes` (Phase 4.c)
-- `prototype` (Phase 4.d)
-- `simulate-spec` (Phase 6)
-- `execute` (Phase 8)
-- `verify` (Phase 9)
+- **feature mode:** before `wireframes` (Phase 3b), `prototype` (Phase 3c), `execute` (Phase 6), `verify` (Phase 7).
+- **skill modes (`skill-new` / `skill-feedback`):** before `execute` (Phase 6) and `verify` (Phase 7) **only** — Phases 3b/3c are not presented in skill modes, and Phase 6a (`skill-eval`) is light (scoring), so no checkpoint fires before 6a.
+
+(The former `simulate-spec` phase was a trigger pre-v2.34.0; it has since been folded into `/spec`.)
 
 Phases not listed here run without a checkpoint — their context cost is light enough that interrupting flow is the bigger cost.
 
@@ -73,7 +72,7 @@ The platform-aware variant of `/pmos-toolkit:feature-sdlc` comes from `_shared/p
 - No thrown error or stack trace.
 - No further phases run.
 
-The next invocation of the skill (with `--resume`, or no-arg in a worktree containing a `paused` state.yaml) re-enters at Phase 0.b, surfaces the status table, and resumes from the paused phase. Resuming re-invokes the child skill from scratch — orchestrator state is phase-level only; child task-level resume is the child's responsibility (per spec §15 G2).
+The next invocation of the skill (with `--resume`, or no-arg in a worktree containing a `paused` state.yaml) re-enters at Phase 0b, surfaces the status table, and resumes from the paused phase. Resuming re-invokes the child skill from scratch — orchestrator state is phase-level only; child task-level resume is the child's responsibility (per spec §15 G2).
 
 ---
 
@@ -128,10 +127,10 @@ Emission rules:
 
 1. The block is emitted exactly once per `--resume` invocation, BEFORE the orchestrator surfaces any new prompt or dispatches the next child skill.
 2. The status table includes all non-`pending` phases plus the next pending phase (same rule as the in-chat short-form table from `pipeline-status-template.md`).
-3. The "Folded-phase failures (N)" line uses the same N-counting and same per-failure format as the Phase-11 emission (FR-29 / D34); when N=0 across all phases, omit the entire subsection.
+3. The "Folded-phase failures (N)" line uses the same N-counting and same per-failure format as the Phase-9 emission (FR-29 / D34); when N=0 across all phases, omit the entire subsection.
 4. The "Open questions index" line is emitted only when `open_questions_log[]` is non-empty.
 
-This single-block contract is what /feature-sdlc Phase 0.b and Phase 11 both render; they share this template.
+This single-block contract is what /feature-sdlc Phase 0b and Phase 9 both render; they share this template.
 
 ---
 

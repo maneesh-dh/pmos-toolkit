@@ -44,7 +44,7 @@ These instructions use Claude Code tool names. In other environments:
 - **Non-interactive contract:** the canonical `<!-- non-interactive-block -->` below inlines the contract from `_shared/non-interactive.md` byte-for-byte (audit-recommended.sh greps for it).
 - **Platform-aware strings:** the resume command in `reference/compact-checkpoint.md` and the `[mode: <current-mode>]` subagent prefix use the per-platform `execute_invocation` mapping in `_shared/platform-strings.md`.
 - **Out-of-options replies in any structured ask:** see `_shared/structured-ask-edge-cases.md`. Do not silently pick on the user's behalf.
-- **Worktree creation fails (no git, detached HEAD, dirty tree, branch collision):** see Phase 0.a — surface the precise git error, offer `--no-worktree` fallback, or trigger the branch-collision dialog.
+- **Worktree creation fails (no git, detached HEAD, dirty tree, branch collision):** see Phase 0a — surface the precise git error, offer `--no-worktree` fallback, or trigger the branch-collision dialog.
 - **Child skill missing:** see Phase 0 step "Missing-skill detection" and `reference/failure-dialog.md` — present an explicit dialog (Skip / Abort / Pause-to-install). Hard skills omit Skip.
 
 ## Track Progress
@@ -62,7 +62,7 @@ Before running pipeline-setup, resolve `pipeline_mode ∈ {feature, skill-new, s
 **Dispatch:**
 
 - **`--resume` present (FR-05):** ignore any subcommand token entirely — `pipeline_mode` is read from `state.yaml` (set on the original run). If both `--resume` and a subcommand token are present → stderr warn `subcommand ignored on --resume; mode read from state.yaml` and continue with the state-file value. (No `list` short-circuit on `--resume` — `--resume` always means "resume a pipeline".)
-- **`list` selector (FR-L01):** short-circuit — skip pipeline-setup, skip Phase 0.a, skip Phase 0.b, run the list logic below, exit 0. (`pipeline_mode` is irrelevant here.)
+- **`list` selector (FR-L01):** short-circuit — skip pipeline-setup, skip Phase 0a, skip Phase 0b, run the list logic below, exit 0. (`pipeline_mode` is irrelevant here.)
 - **`skill` selector, no further description (FR-03):** stderr `usage: /feature-sdlc skill <description> | /feature-sdlc skill --from-feedback <text|path|--from-retro>`; exit 64.
 - **`skill --from-feedback <source>` (FR-04):** `pipeline_mode = skill-feedback`. `<source>` is a quoted text blob, a file path, or `--from-retro`. `--from-retro` resolves to the newest `/retro` artifact (per the `/retro` skill's output location); if none found → stderr `no /retro artifact found; pass feedback text or a file path`, exit 64. `skill --from-feedback` with neither a source nor `--from-retro` → the FR-03 usage error, exit 64.
 - **`skill <description>` (no `--from-feedback`):** `pipeline_mode = skill-new`; the description is the seed for Phase 2 `/requirements`.
@@ -98,7 +98,7 @@ Inline `_shared/pipeline-setup.md` (relative to the skills directory) to:
 
 1. Read `.pmos/settings.yaml`. If missing → run Section A first-run setup before proceeding.
 2. Set `{docs_path}` from `settings.docs_path`.
-3. Resolve `{feature_folder}` for this run: `{docs_path}/features/{YYYY-MM-DD}_<slug>/`. The `<slug>` is derived in Phase 0.a (worktree + slug); placeholder until then.
+3. Resolve `{feature_folder}` for this run: `{docs_path}/features/{YYYY-MM-DD}_<slug>/`. The `<slug>` is derived in Phase 0a (worktree + slug); placeholder until then.
 4. If `settings.workstream` is non-null → load `~/.pmos/workstreams/{workstream}.md` and pass through to every child skill (each child loads workstream itself; we just don't unload it).
 5. Read `~/.pmos/learnings.md` if present; note any entries under `## /feature-sdlc` and factor them into your approach. Skill body wins on conflict; surface conflicts to user before applying.
 
@@ -202,28 +202,27 @@ END { emit_pending() }
 3. After `/requirements` completes — read its auto-tier output.
 4. Until the above resolves, gate-recommendation logic uses Tier-3 conservative defaults.
 
-Per FR-TIER-SCOPE / spec §15 G8: `{tier}` drives BOTH child-skill `--tier` passthrough (only for children that accept it: `/requirements`, `/spec`, `/plan`) AND orchestrator gate logic (Phases 3.b grill, 4.b creativity, 4.c wireframes, 4.d prototype, 13 retro). Phases 4.a (msf-req) and 6 (simulate-spec) were removed in v2.34.0 — folded into /requirements (Phase 5.5) and /spec (Phase 6.5) respectively. Child skills retain the right to auto-tier-escalate; if a child reports a different tier, log to `state.yaml.phases.<X>.child_tier_divergence` and continue — do not override the child.
+Per FR-TIER-SCOPE / spec §15 G8: `{tier}` drives BOTH child-skill `--tier` passthrough (only for children that accept it: `/requirements`, `/spec`, `/plan`) AND orchestrator gate logic (Phases 2a grill, 3a creativity, 3b wireframes, 3c prototype, 8a retro). The former `msf-req` and `simulate-spec` phases were removed in v2.34.0 — folded into /requirements (its Phase 5.5) and /spec (its Phase 6.5) respectively. Child skills retain the right to auto-tier-escalate; if a child reports a different tier, log to `state.yaml.phases.<X>.child_tier_divergence` and continue — do not override the child.
 
 ### `--minimal` flag + `_minimal_active` sentinel (new in v2.34.0 per W17)
 
-If `--minimal` is present in the argument string, set the directive `_minimal_active = true` (a boolean the orchestrator carries through the run). At Phase 4.b (creativity), Phase 4.c (wireframes), Phase 4.d (prototype), and Phase 13 (retro), if `_minimal_active` is true, the orchestrator MUST log `[orchestrator] phase_minimal_skip: <phase-id>` to chat and proceed to the next phase WITHOUT issuing the `AskUserQuestion` for that gate. The `AskUserQuestion` for those four soft gates is contingent on `_minimal_active` being false.
+If `--minimal` is present in the argument string, set the directive `_minimal_active = true` (a boolean the orchestrator carries through the run). At Phase 3a (creativity), Phase 3b (wireframes), Phase 3c (prototype), and Phase 8a (retro), if `_minimal_active` is true, the orchestrator MUST log `[orchestrator] phase_minimal_skip: <phase-id>` to chat and proceed to the next phase WITHOUT issuing the gate prompt for that gate. Those four soft-gate prompts are contingent on `_minimal_active` being false. (In skill modes, 3b/3c are already not presented — see Phase 3 — so `--minimal` there only affects 3a creativity and 8a retro.)
 
 This is a sentinel short-circuit at the orchestrator level (per spec D29 / W17). It does NOT use the canonical-block classifier — the gates are never issued, so they are never seen by audit-recommended.sh. `--minimal` is user-explicit (a flag the user passes deliberately) so it does not violate Anti-pattern #4's "auto-running optional stages" rule.
 
-Hard phases (`/requirements`, `/spec`, `/plan`, `/execute`, `/verify`, `/complete-dev`) are NOT affected by `--minimal`. The flag only short-circuits the four enumerated soft gates.
+Hard phases (`/requirements`, `/spec`, `/plan`, `/execute`, `/verify`, `/complete-dev`, and — in skill modes — `/feedback-triage` and `/skill-eval`) are NOT affected by `--minimal`. The flag only short-circuits the four enumerated soft gates.
 
 ### Missing-skill detection
 
 When a child skill invocation returns "skill not found" / "unknown skill" platform error, present the missing-skill dialog from `reference/failure-dialog.md`. Hard phases omit Skip; soft phases include it. Pause-to-install writes `status: paused, paused_reason: missing_skill, missing_skill: <name>` and exits per the Pause contract.
 
-## Phase 0.a: Worktree + Slug + Branch
+## Phase 0a: Worktree + Slug + Branch
 
 **Skip if `--no-worktree` was passed** — record `worktree_path: null, branch: null` in `state.yaml` and continue in cwd. (Dirty-tree case: still refuse — see (c) below — even with `--no-worktree`, since `/execute` will commit to the current branch.)
 
 ### Step 1 — Derive slug
 
 Apply `reference/slug-derivation.md` rules to the initial-context input. Surface the proposed slug via `AskUserQuestion`:
-
 ```
 question: "Proposed feature slug: <slug>. Confirm or edit?"
 options:
@@ -248,7 +247,7 @@ Before `git worktree add`, the skill MUST run all six checks below and, on any c
 On (1)–(3) failure: abort with the precise git error and the suggested fix above.
 
 On (4) OR (5) OR (6) collision, present a single `AskUserQuestion`:
-- **Use existing branch / worktree (Recommended)** — enters Phase 0.b resume mode if state.yaml is present in the existing worktree path; otherwise initializes state.yaml fresh on top of the existing branch with `state.notes` annotated `"reused-existing-branch:<reason>"`.
+- **Use existing branch / worktree (Recommended)** — enters Phase 0b resume mode if state.yaml is present in the existing worktree path; otherwise initializes state.yaml fresh on top of the existing branch with `state.notes` annotated `"reused-existing-branch:<reason>"`.
 - **Pick new slug (-N suffix)** — appends `-2`, `-3`, ... to the slug and re-runs the unified pre-flight (idempotent).
 - **Abort** — exit 64 with the surfaced collision details.
 
@@ -287,9 +286,9 @@ Then call /feature-sdlc --resume in the new session.
 
 Substitute `<ABS_PATH>` (canonical realpath) in both occurrences — no other interpolation.
 
-**`--no-worktree` bypass (FR-W05):** if the user passed `--no-worktree`, this entire Step 3 (and Steps 1–2 of Phase 0.a) is skipped; state path is `./.pmos/feature-sdlc/state.yaml` in the launch cwd; `state.worktree_path: null`, `state.branch: null`. Drift check is bypassed (FR-R03).
+**`--no-worktree` bypass (FR-W05):** if the user passed `--no-worktree`, this entire Step 3 (and Steps 1–2 of Phase 0a) is skipped; state path is `./.pmos/feature-sdlc/state.yaml` in the launch cwd; `state.worktree_path: null`, `state.branch: null`. Drift check is bypassed (FR-R03).
 
-## Phase 0.b: Resume detection
+## Phase 0b: Resume detection
 
 **Skip if `--resume` was NOT passed AND no `.pmos/feature-sdlc/state.yaml` exists in the current worktree.**
 
@@ -309,20 +308,22 @@ When state.yaml is present:
 
    **Observability (NFR-06):** before the comparison, log to chat the line `drift check: realpath(pwd)=<a> realpath(state.worktree_path)=<b> result=<pass|fail>` so users can debug unexpected refusals.
 
-2. **Schema-version check (FR-R04, FR-R05, see `reference/state-schema.md`):**
-   - `state.schema_version > 3` → abort: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`. Exit 64.
-   - `state.schema_version < 3` AND drift check passed → auto-migrate by setting `schema_version: 3` (FR-S04 — single-step idempotent migration); emit chat log line `migration: state.schema vN → v3 (cohort-marker bump only; no field changes)`. Apply the v2 atomic write protocol.
-   - `state.schema_version == 3` → no migration.
-3. **Validate recorded artifact paths.** For every `phases[].artifact_path` that's non-null, check that the file exists. On any missing required artifact, print the list to chat and `AskUserQuestion`: **Continue anyway (treat as orphaned)** / **Abort**.
+2. **Schema-version check (FR-R04, FR-R05, FR-13, see `reference/state-schema.md`):**
+   - `state.schema_version > 4` → abort: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`. Exit 64.
+   - `state.schema_version < 4` AND drift check passed → run the v1→v2→v3→v4 migration chain in order (each step additive/idempotent; pre-2.34.0 files still elide the `msf-req`/`simulate-spec` phase ids before the v4 step — see "Auto-migration of pre-2.34.0 state files" below). The v3→v4 step sets `schema_version: 4` and `pipeline_mode: feature` if absent (D16) and emits the chat log line `migration: state.schema v3 → v4 (added: pipeline_mode=feature; cohort-marker bump)`. Apply the atomic temp-then-rename write protocol; on `rename(2)` failure surface the failure dialog (NFR-08).
+   - `state.schema_version == 4` → no migration.
+3. **Validate recorded artifact paths.** For every `phases[].artifact_path` that's non-null, check that the file exists. On any missing required artifact, print the list to chat and ask the user how to proceed.
+<!-- defer-only: ambiguous -->
+   `AskUserQuestion` — **Continue anyway (treat as orphaned)** / **Abort**.
 4. **Print status table** to chat from `00_pipeline.{html,md}` short-form (3 columns: phase | status | artifact). This table is **presentational, not interrogative** — see Anti-pattern below.
-5. **Resume cursor:** find the first `phases[]` entry whose status is in `{paused, failed, pending, in_progress}` and jump to that phase. If a `paused` or `failed` entry is found first, surface the corresponding dialog (`reference/compact-checkpoint.md` for compact-paused; `reference/failure-dialog.md` for failed/failure-paused).
-6. **Skip Phases 0.a and 1** — worktree, slug, and state.yaml already exist.
+5. **Resume cursor:** find the first `phases[]` entry whose status is in `{paused, failed, pending, in_progress}` and jump to that phase. The cursor is **mode-agnostic** — it scans whatever `phases[]` the original run wrote (which is mode-conditional per FR-11: `feature`, `skill-new`, `skill-feedback` each have their own `phases[]` set — see `reference/state-schema.md`); `pipeline_mode` is read back from `state.yaml`, not re-derived (FR-05). If a `paused` or `failed` entry is found first, surface the corresponding dialog (`reference/compact-checkpoint.md` for compact-paused; `reference/failure-dialog.md` for failed/failure-paused).
+6. **Skip Phases 0a and 1** (and Phase 0c/0d if the mode includes them — they are normal phases recorded in `phases[]`, so the cursor handles them) — worktree, slug, and state.yaml already exist.
 
 The resume status table is **presentational**, not interrogative — followed by at most a single structured ask (continue / abort) when needed. The orchestrator has no review/refinement loops of its own; every refinement is owned by a child skill. Per spec §15 G9.
 
 ### Resume Status panel folded-phase failure re-emit (T12b)
 
-When emitting the Resume Status panel per `reference/compact-checkpoint.md` (T4 deliverable), include the same `Folded-phase failures (N)` subsection format used in Phase 11 (above). Read `state.yaml.phases.<x>.folded_phase_failures[]` across all phases; emit the subsection only when N≥1; otherwise omit. Per FR-52/FR-53 — the user must see the failure history at every resume so they can decide whether to retry, manually patch, or abort.
+When emitting the Resume Status panel per `reference/compact-checkpoint.md` (T4 deliverable), include the same `Folded-phase failures (N)` subsection format used in Phase 9 (below). Read `state.yaml.phases.<x>.folded_phase_failures[]` across all phases; emit the subsection only when N≥1; otherwise omit. Per FR-52/FR-53 — the user must see the failure history at every resume so they can decide whether to retry, manually patch, or abort.
 
 ### Auto-migration of pre-2.34.0 state files
 
@@ -333,18 +334,71 @@ Two phase IDs were removed in v2.34.0:
 
 When `--resume` reads a pre-2.34.0 `state.yaml` carrying these phase entries, transparently elide them on read (do NOT block, do NOT prompt). The resume cursor advances to the next non-elided phase. See `reference/state-schema.md` Schema v2 auto-migration block for the exact 4-step idempotent migration contract. This back-compat handling is silent on a clean migration; if migration fails (e.g., `rename(2)` error per NFR-08), surface the failure dialog.
 
+## Phase 0c: /feedback-triage (skill-feedback only)
+
+**Runs only when `pipeline_mode == skill-feedback`** (in `feature` and `skill-new` it does not run — a mode-conditional by-design omission, not a skipped gate). Hardness: **hard** — its only clean exit is "no actionable findings / no in-scope skills"; the approval gate is mandatory. Resume: a normal phase (D12) — re-enter from the persisted `0c_feedback_triage.html` draft if present.
+
+**Goal:** turn raw feedback into an approved, per-skill change set + a per-skill tier, persisted as `{feature_folder}/0c_feedback_triage.html`, which Phase 2 (`/requirements`) then seeds from.
+
+1. **Parse the feedback input into findings (FR-20).** Dispatch by input shape:
+   - It's a `/retro` paste-back (or `--from-retro` resolved to one) → parse it verbatim via `reference/retro-parser.md` into the canonical finding shape.
+   - It's a file path → read the file, then detect findings (a structured list → parse it; free prose → LLM-extract).
+   - It's an inline text blob → LLM-extract into the same finding shape.
+   The finding shape: `{skill, severity, one_line, evidence (≤2 lines), proposed_fix (verbatim from input)}`.
+
+2. **Resolve the in-scope skill set (FR-21, FR-22).** Map each finding's named skill to the installed-skill list (the host repo's `plugins/*/skills/<name>/SKILL.md`, plus any `.agents/` / `.claude/skills/` per `reference/repo-shape-detection.md`). For ambiguous / unrecognised skill names:
+<!-- defer-only: ambiguous -->
+   `AskUserQuestion` — present the candidates and let the user map or drop each. **Zero findings OR zero in-scope skills → exit clean with no artifacts** (log `Phase 0c: no actionable findings; nothing to do` and end the run — there is no skill work to drive).
+
+3. **Per-finding critique (FR-23).** For each finding, against the target skill's *current* `SKILL.md` plus only the reference files it cites (do not read the whole `reference/` tree), produce: `already_handled ∈ {yes, no, partial}` · `classification ∈ {bug, ux-friction, new-capability, nit}` · `recommendation ∈ {apply, modify, skip, defer}` + a one-line rationale · `scope_hint ∈ {small, medium, large}`.
+
+4. **Keep/drop approval — Findings Presentation Protocol (FR-24).** One approval prompt per finding (batch ≤4 per call), in finding order:
+<!-- defer-only: ambiguous -->
+   `AskUserQuestion` — options **Apply as recommended** / **Modify** (user supplies replacement text next turn) / **Skip — drop with reason** / **Defer**. If there are >20 findings, first issue one prompt:
+<!-- defer-only: ambiguous -->
+   `AskUserQuestion` — **Filter to blockers + friction only (Recommended)** / **Review all N**. Platform fallback (no interactive tool): emit a numbered findings table with a `disposition` column for the user to fill in.
+
+5. **Persist the triage doc (FR-25).** Write `{feature_folder}/0c_feedback_triage.html` via the HTML substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/` — companion `0c_feedback_triage.sections.json`, asset prefix `assets/`, `?v=<plugin-version>` cache-bust, kebab-case `<h2>`/`<h3>` IDs, index regen — reusing the structure of `reference/triage-doc-template.md`: sections **Findings (parsed)** / **Critique** / **Disposition log** / **Approved changes by skill** / **Per-skill tier**. Record `feedback_source` (resolved input path or `<inline-text>`) and `target_skills: [<name>,…]` on the `feedback-triage` entry in `state.yaml`, with `artifact_path: 0c_feedback_triage.html`. Mixed-format `.md` sidecar when `output_format=both`.
+
+6. **Hand-off to Phase 2 (FR-27).** The Phase 2 `/requirements` invocation in skill-feedback mode is seeded from `reference/seed-requirements-template.md` — **self-contained, per-skill** (approved findings verbatim + trimmed current-`SKILL.md` excerpts + a one-paragraph proposed direction + out-of-scope + constraints, with `reference/skill-patterns.md` cited as the standing acceptance criteria) — producing **one combined `01_requirements.{html,md}` with a per-skill section**, not one doc per skill.
+
+On failure: hard-phase failure dialog from `reference/failure-dialog.md` (no Skip).
+
+## Phase 0d: /skill-tier-resolve (skill modes only)
+
+**Runs only when `pipeline_mode ∈ {skill-new, skill-feedback}`** (feature mode: not run — by-design omission). Hardness: **infra** — a setup/detection phase like `worktree`/`init-state`; no merge effect of its own.
+
+**Goal:** one repo-shape pass yields three values, all recorded on the `skill-tier-resolve` entry in `state.yaml` (FR-14):
+
+1. **Tier** — via `reference/skill-tier-matrix.md`. In `skill-new`, tier from the described skill's expected shape. In `skill-feedback`, **per-skill tier** from each approved-change-set's size, and the **run tier = max** across skills, shown with the per-skill breakdown (G11). `--tier N` on the CLI overrides the matrix (FR-33) and logs a divergence note to `state.yaml.phases.skill-tier-resolve.child_tier_divergence` (E19) — the matrix recommendation is not silently dropped.
+2. **Skill location** — via `reference/repo-shape-detection.md`'s four-rung chain (host `CLAUDE.md`/`AGENTS.md`/`GEMINI.md` rule > `plugins/<p>/.claude-plugin/plugin.json` [if multiple plugins → the prompt below] > `.agents/` > `.claude/skills/`).
+3. **Target platform** — `claude-code` / `codex` / `generic` per the same reference file's three outcomes.
+
+If the repo has multiple candidate plugins for rung 2:
+<!-- defer-only: ambiguous -->
+`AskUserQuestion` — present the plugin list and ask which one owns the new/edited skill. (E18.)
+
+**Confirmation (FR-34).** A single consolidated ask before proceeding:
+<!-- defer-only: ambiguous -->
+`AskUserQuestion` — `"Detected: tier <N> (<reasons>); skill location <path>; target platform <p>. Confirm or edit?"` options **Confirm all (Recommended)** / **Edit tier** / **Edit location** / **Edit platform**. On any edit, re-prompt for that value, then re-confirm.
+
+`{tier}` (the run tier) is passed down to `/requirements`, `/spec`, `/plan` via the existing `--tier <N>` passthrough.
+
+On failure: surface the failure dialog (infra phase — Retry / Pause / Abort).
+
 ## Phase 1: Initialize state
 
-**Skip if Phase 0.b entered resume mode.**
+**Skip if Phase 0b entered resume mode.**
 
 Atomically (per `reference/pipeline-status-template.md` Update protocol):
 
 1. Write `.pmos/feature-sdlc/state.yaml` from the schema in `reference/state-schema.md`:
-   - `schema_version: 3` (v3 per FR-S01 — pure cohort-marker bump over v2; structural fields unchanged from v2).
-   - top-level fields populated from Phases 0/0.a (slug, mode, started_at = now, last_updated = now, worktree_path = realpath(<abs-worktree-path>) per `_shared/canonical-path.md` — `null` when `--no-worktree` (FR-S02), branch — `null` when `--no-worktree`, feature_folder).
-   - `tier: null` (set after Phase 3 unless `--tier` was passed).
-   - `current_phase: requirements` (the next phase to run).
-   - `phases[]` populated in declared order from `state-schema.md` "Phase identifiers + hardness", every status `pending`. Each entry initialized with `started_at: null` AND `folded_phase_failures: []`. The `retro` phase entry MUST be present (between `complete-dev` and `final-summary`).
+   - `schema_version: 4` (FR-10 — adds `pipeline_mode`, the `skill_eval` substructure, and mode-conditional `phases[]`; additive over v3).
+   - `pipeline_mode: <feature | skill-new | skill-feedback>` — the value resolved by the Phase 0 subcommand dispatch (D16). Distinct from `mode ∈ {interactive, non-interactive}`, which is also set here.
+   - top-level fields populated from Phases 0/0a (slug, mode, started_at = now, last_updated = now, worktree_path = realpath(<abs-worktree-path>) per `_shared/canonical-path.md` — `null` when `--no-worktree` (FR-S02), branch — `null` when `--no-worktree`, feature_folder).
+   - `tier: null` (set after Phase 2 `/requirements` — or, in skill modes, after Phase 0d `/skill-tier-resolve` — unless `--tier` was passed).
+   - `current_phase: <first phase of this mode's `phases[]`>` (the next phase to run — `requirements` in feature mode; `skill-tier-resolve` in `skill-new`; `feedback-triage` in `skill-feedback`).
+   - `phases[]` populated in declared order from `state-schema.md` "Phase identifiers + hardness", **mode-conditional per FR-11** (feature = the 2.36.0 set; `skill-new` = that set − `{wireframes, prototype}` + `{skill-tier-resolve, skill-eval}`; `skill-feedback` = the `skill-new` set + `{feedback-triage}` inserted after `init-state`), every status `pending`. Each entry initialized with `started_at: null` AND `folded_phase_failures: []`. The `retro` phase entry MUST be present (between `complete-dev` and `final-summary`) in every mode.
    - `open_questions_log: []`.
 
 ### Phase status-transition write contract (FR-57; T13)
@@ -369,9 +423,14 @@ The `started_at` write is the cursor `/execute` and folded apply-loops use to de
    - **Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `00_pipeline.md` via `bash node <feature_folder>/assets/html-to-md.js 00_pipeline.html > 00_pipeline.md`.
 3. Print the in-chat short-form status table.
 
-## Phase 2: Compact checkpoint (recurring micro-phase)
+## Compact checkpoint (recurring micro-phase)
 
-**Not a phase that runs once — invoked before each of:** `wireframes` (4.c), `prototype` (4.d), `execute` (8), `verify` (9). See `reference/compact-checkpoint.md` for the exact `AskUserQuestion` shape and the three-part Pause-resumable exit contract (FR-PAUSE / spec §15 G1). (Phase 6 simulate-spec is no longer a checkpoint trigger — it was folded into /spec in v2.34.0.)
+**Not a numbered phase — invoked before a heavy phase, mode-dependent (FR-40 / E8):**
+
+- **feature mode:** before `wireframes` (3b), `prototype` (3c), `execute` (6), `verify` (7).
+- **skill modes (`skill-new` / `skill-feedback`):** before `execute` (6) and `verify` (7) **only** — 3b/3c are suppressed in skill modes, and Phase 6a (`skill-eval`) is light (scoring), so no checkpoint fires before 6a.
+
+See `reference/compact-checkpoint.md` for the exact prompt shape and the three-part Pause-resumable exit contract (FR-PAUSE / spec §15 G1). (The former simulate-spec phase is no longer a checkpoint trigger — folded into /spec in v2.34.0.)
 
 Skills cannot trigger `/compact` directly — only the user can. The checkpoint surfaces the choice; "Pause" exits cleanly so the user can `/compact` and re-run with `--resume`.
 
@@ -385,23 +444,29 @@ After every phase end (pass / fail / skip / pause), do all three atomically — 
 
 A failed update of any one of these three breaks the resume contract. Rolling back the partial write is the implementor's responsibility.
 
-## Phase 3: /requirements (hard)
+## Phase 2: /requirements (hard)
 
-Invoke `/pmos-toolkit:requirements` with the initial-context as seed. Pass `[mode: <current-mode>]\n` as the first line of the child prompt (per FR-06). Pass `--tier <N>` if `{tier}` is set.
+Invoke `/pmos-toolkit:requirements` with the seed for this mode:
 
-Pass `--backlog <id>` through if it was given to `/feature-sdlc`.
+- **feature:** the initial-context.
+- **skill-new:** the `skill <description>` text (from the Phase 0 dispatch).
+- **skill-feedback:** the **combined per-skill seed** built in Phase 0c from `reference/seed-requirements-template.md` (one self-contained section per in-scope skill) — see Phase 0c step 6 and the Phase-2 skill-patterns wiring below.
+
+Pass `[mode: <current-mode>]\n` and `[output_format: <resolved>]\n` as the first lines of the child prompt (per FR-06). Pass `--tier <N>` if `{tier}` is set (it is, in skill modes — Phase 0d resolved it). Pass `--backlog <id>` through if it was given to `/feature-sdlc`.
+
+**In skill modes** (FR-61 — fuller wiring in the citation pass): prepend a line citing `reference/skill-patterns.md` as the standing acceptance criteria — "the produced/revised skill must conform to `skill-patterns.md §A–§F`".
 
 After completion:
 
-- Capture artifact path: `<feature_folder>/01_requirements.{html,md}` (resolve via `_shared/resolve-input.md` `phase=requirements` to find whichever extension the child wrote based on the resolved `output_format`). Write to `state.yaml.phases.requirements.artifact_path`.
-- Read auto-tier from the requirements doc frontmatter; if `{tier}` was unset, set it now. If `{tier}` was set and the auto-tier differs, log `child_tier_divergence: <orchestrator=<N>, child=<M>>` and continue (do not override).
+- Capture artifact path: `<feature_folder>/01_requirements.{html,md}` (resolve via `_shared/resolve-input.md` `phase=requirements` to find whichever extension the child wrote based on the resolved `output_format`). Write to `state.yaml.phases.requirements.artifact_path`. In skill-feedback mode this is the single combined doc with a per-skill section.
+- Read auto-tier from the requirements doc frontmatter; if `{tier}` was unset, set it now. If `{tier}` was already set (always so in skill modes), and the auto-tier differs, log `child_tier_divergence: <orchestrator=<N>, child=<M>>` and continue (do not override).
 - If `mode == non-interactive`, locate the child's OQ artifact (per the canonical non-interactive block conventions) and append to `state.yaml.open_questions_log[]`.
 
 On failure: present the hard-phase failure dialog from `reference/failure-dialog.md`. No Skip option. Anti-pattern #10 (in spec §12) applies — `/verify` is non-skippable; same principle for hard phases here.
 
-## Phase 3.b: /grill (soft, mandatory at Tier 2+, auto-skip in --non-interactive)
+## Phase 2a: /grill (soft, mandatory at Tier 2+, auto-skip in --non-interactive)
 
-**Skip if `{tier}` is 1.**
+**Skip if `{tier}` is 1.** Runs in all modes (the requirements doc is grilled the same way whether it describes a feature or a skill).
 
 **Auto-skip if `mode == non-interactive`** with explicit chat log line — never silent. The line must read:
 
@@ -424,10 +489,13 @@ After completion:
 
 On failure: soft-phase failure dialog from `reference/failure-dialog.md` (Skip option SHOWN).
 
-## Phase 4.b: /creativity gate (soft)
+## Phase 3: Enhancement gates
+
+A container for the optional enhancement stages — `3a` (/creativity, all modes), `3b` (/wireframes, **feature mode only**), `3c` (/prototype, **feature mode only**). In `skill-new` / `skill-feedback` the orchestrator does not present `3b`/`3c` (a skill has no UI to wireframe or prototype) — it logs `[orchestrator] skill-mode: 3b/3c suppressed (no UI)` and proceeds to Phase 4. This is a **mode-conditional by-design non-presentation** — like `--minimal`'s short-circuit, not a silent skip of a presented gate (Anti-Pattern #4 still holds). `3a` is presented in all modes (Recommended Skip).
+
+## Phase 3a: /creativity gate (soft, all modes)
 
 `AskUserQuestion`:
-
 ```
 question: "Run /creativity for non-obvious improvement ideas?"
 options:
@@ -439,9 +507,9 @@ Always optional; Recommended is always Skip. User can opt in.
 
 On Run: invoke `/pmos-toolkit:creativity` with the requirements doc. On missing-skill: soft-variant missing-skill dialog.
 
-## Phase 4.c: /wireframes gate (soft, always-ask per FR-FRONTEND-GATE)
+## Phase 3b: /wireframes gate (feature mode only; soft, always-ask per FR-FRONTEND-GATE)
 
-The gate is **always presented** per FR-FRONTEND-GATE / spec §15 G6 — never silent skip.
+**Not presented in skill modes** — see Phase 3 above. In feature mode, the gate is **always presented** per FR-FRONTEND-GATE / spec §15 G6 — never silent skip.
 
 **Tier-1 override (FR-TIER-SCOPE):** at Tier 1, `(Recommended)` is always `Skip wireframes` regardless of the heuristic — Tier 1 (bug fix) does not warrant wireframes even when UI keywords appear. The gate is still presented; only the recommendation changes.
 
@@ -457,16 +525,15 @@ options:
   - Skip wireframes                    # (Recommended) on frontend-negative
 ```
 
-Before invoking `/pmos-toolkit:wireframes`, run the **compact checkpoint** (Phase 2) — this is a heavy phase.
+Before invoking `/pmos-toolkit:wireframes`, run the **compact checkpoint** (the recurring micro-phase) — this is a heavy phase.
 
 On missing-skill: soft-variant missing-skill dialog.
 
-## Phase 4.d: /prototype gate (soft)
+## Phase 3c: /prototype gate (feature mode only; soft)
 
-**If Phase 4.c was Skipped, this gate STILL presents but with `Skip (Recommended)` since there are no wireframes to prototype.** Per FR-FRONTEND-GATE / spec §15 G6 ("by extension 4.d") — never silent skip, even when the input artifact is missing. The user can still pick Run if they want a prototype built directly from the spec.
+**Not presented in skill modes** — see Phase 3 above. In feature mode: **if Phase 3b was Skipped, this gate STILL presents but with `Skip (Recommended)` since there are no wireframes to prototype.** Per FR-FRONTEND-GATE / spec §15 G6 ("by extension 3c") — never silent skip, even when the input artifact is missing. The user can still pick Run if they want a prototype built directly from the spec.
 
 `AskUserQuestion`:
-
 ```
 question: "Build a clickable prototype on top of the wireframes?"
 options:
@@ -476,11 +543,11 @@ options:
 
 Always optional; Recommended is always Skip.
 
-Before invoking `/pmos-toolkit:prototype`, run the **compact checkpoint**.
+Before invoking `/pmos-toolkit:prototype`, run the **compact checkpoint** (the recurring micro-phase).
 
 On missing-skill: soft-variant missing-skill dialog.
 
-## Phase 5: /spec (hard)
+## Phase 4: /spec (hard)
 
 Invoke `/pmos-toolkit:spec` with `<feature_folder>/01_requirements.{html,md}` (resolved primary) and `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n` and `[output_format: <resolved>]\n`.
 
@@ -493,7 +560,7 @@ No compact checkpoint before this phase — `/spec` context is moderate.
 
 On failure: hard-phase failure dialog (no Skip).
 
-## Phase 7: /plan (hard)
+## Phase 5: /plan (hard)
 
 Invoke `/pmos-toolkit:plan` with `<feature_folder>/02_spec.{html,md}` (resolved primary; the spec is the source of truth; `/plan` will resolve the feature folder from settings + `--feature` if needed). Pass `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n` and `[output_format: <resolved>]\n`.
 
@@ -501,29 +568,75 @@ After completion: capture `<feature_folder>/03_plan.{html,md}` (resolve via `_sh
 
 On failure: hard-phase failure dialog.
 
-## Phase 8: /execute (hard)
+## Phase 6: /execute (hard)
 
 Run the **compact checkpoint** first — `/execute` is heavy (TDD task-by-task implementation).
 
 Invoke `/pmos-toolkit:execute` with the plan. **`/execute` does not accept `--tier`** — it derives tier from the plan's frontmatter.
 
-On resume, `/execute` has its own task-level resume semantics — orchestrator re-invokes fresh and `/execute` detects its own state from the worktree's git history + plan-status markers. Per FR-CHILD-RESUME / spec §15 G2.
+In **skill modes**, `/execute` is also the **sole writer of the skill** — it creates/edits the `SKILL.md` at the `skill_location` path resolved in Phase 0d, and any `reference/`/`tools/` files. The Phase 6a reviewer (below) never edits — it scores and reports only (D10).
+
+On resume, `/execute` has its own task-level resume semantics — orchestrator re-invokes fresh and `/execute` detects its own state from the worktree's git history + plan-status markers. Per FR-CHILD-RESUME / spec §15 G2. (In skill modes this also covers re-running for a Phase-6a remediation addendum — `/execute`'s task-level resume picks up only the new `## Eval-remediation — iteration N` tasks.)
 
 Cite `_shared/phase-boundary-handler.md` as the related phase-boundary handshake pattern (used by `/execute` between its internal phases — not reused directly here).
 
 On failure: hard-phase failure dialog.
 
-## Phase 9: /verify (hard, non-skippable)
+## Phase 6a: /skill-eval (skill modes only)
+
+**Runs only when `pipeline_mode ∈ {skill-new, skill-feedback}`** — immediately after Phase 6 (`/execute`), before Phase 7 (`/verify`). Hardness: **hard** — a non-skippable quality gate; "accept residuals as known risk" is a documented exit, not a skip; peer of `/verify`. No compact checkpoint fires before 6a (scoring is light); the checkpoint fires before 6 and before 7 only.
+
+**Iteration bookkeeping (FR-41).** Before iteration `n`, record `state.yaml.phases.skill-eval.skill_eval.iterations[n].pre_ref = HEAD` (a git sha). For `n: 1`, `pre_ref` = HEAD after `/execute` Phase 6 completed. For `n: 2`, `pre_ref` = HEAD before iteration 2's remediation commits land. ("Restore iteration 1" — see FR-47 — `git reset` the skill files only to `iterations[2].pre_ref`.)
+
+**Scoring (one iteration):**
+
+1. **Deterministic half (FR-42).** Run `feature-sdlc/tools/skill-eval-check.sh --target <target_platform> <skill_dir>` (the platform resolved in Phase 0d; `<skill_dir>` the location from Phase 0d). It emits a TSV of `check_id\tverdict\tevidence` for the `[D]` checks and exits 0 (all pass) / 1 (≥1 fail) / 2 (script error). On exit 2 — or no bash, or a missing coreutils dep — the `[D]` checks **fall back to LLM-judge** with the logged note `skill-eval-check.sh unavailable (<reason>); <N> deterministic checks fell back to LLM-judge` — never silently skipped (E7).
+2. **LLM-judge half (FR-43).** Dispatch a reviewer subagent with: the raw `SKILL.md` text; the raw content of each `reference/` file (path-labelled); and the `[J]` check list from `reference/skill-eval.md` (each: `check_id`, the rule text, the *why*, the *how-to-verify*, the pass-condition). The reviewer **makes no edits** (D10 — `/execute` is the only writer). It runs at `temperature: 0` and returns a JSON array — one object per check, **exactly** the given `check_id` set: `{check_id, verdict: 'pass'|'fail', fix_note: '<concrete edit; required & non-empty on fail>', quote: '<≥40-char verbatim substring of the file the check is about; required>'}`. A `fail` whose `quote` is empty or not a verbatim substring of the named file is **treated as `pass`** (FR-43).
+3. **Orchestrator-side validation (FR-44 — the reviewer does NOT self-validate).** (a) The returned `check_id` set must equal the `[J]` set declared in `skill-eval.md` — any miss/extra → hard-fail `reviewer returned check_ids that do not match skill-eval.md: missing=[…], extra=[…]`. (b) Substring-grep every `quote` against the actual file it names — any miss → hard-fail `reviewer quote not found in <file>: <quote-prefix-30char>…`. On any hard-fail, pause with the soft-phase failure dialog (E17).
+4. **Compose the iteration result.** `checks_failed(n)` = the union of failed `[D]` verdicts and failed (validated) `[J]` verdicts. Log `skill-eval iteration N: <p> passed, <f> failed [<ids>]` (NFR-07). Record `iterations[n].{checks_failed, result}`.
+
+**Remediation loop (FR-45, FR-46).**
+
+- If `checks_failed(n)` is empty → 6a completes: `iterations[n].result = pass`, `accepted_residuals[]` stays empty (FR-49). Proceed to Phase 7.
+- Else if iteration count `< 2` → append a `## Eval-remediation — iteration N` task group to `03_plan.{html,md}` — one task per failed check: the `fix_note`, the `quote`, and for `[D]` checks the exact `skill-eval-check.sh` re-run command. Bump the plan's task-status marker. Record `iterations[N].{addendum_task_ids, pre_ref=HEAD}`. Re-invoke Phase 6 `/execute` (its task-level resume picks up only the new tasks — E20), then re-score (next iteration).
+- **Net-worse guard (FR-45):** iteration N is *net-worse* than N−1 if `|checks_failed(N)| > |checks_failed(N−1)|` **OR** `checks_failed(N)` contains a check that passed in N−1. If iteration 2 is net-worse than iteration 1, the post-cap dialog below gains a **Restore iteration 1** option (`git reset` the skill files only to `iterations[2].pre_ref` — E13).
+
+**Cap = 2 remediation iterations (FR-47).** After iteration 2 (or sooner if all pass), if checks still fail:
+<!-- defer-only: ambiguous -->
+`AskUserQuestion` — **Accept residuals as known risk** (→ append to `accepted_residuals[]` with `{check_id, fix_note, acked_at}`; handed to `/verify` as known — FR-48) / **Iterate manually** (user edits the skill, re-run Phase 6a) / **Restore iteration 1** (only offered if iteration 2 was net-worse) / **Abort** — no silent pass (G15).
+
+**Control flow (§6.2, paraphrased):**
+```
+/execute (Phase 6) done ──► iter 1: score = [D] check + [J] reviewer
+                                │
+                       all pass ─┴─ some fail
+                          │            │
+                          ▼            ▼  (iter count < 2?)
+                      Phase 7      yes ─┴─ no
+                                    │        │
+                       append "Eval-remediation — iter N" tasks    user prompt:
+                       to 03_plan, re-run /execute, re-score        Accept residuals / Iterate manually
+                                    │                               / Restore iter 1 (if net-worse) / Abort
+                                    └──────────┐                          │
+                                          (next iter)            Accept ─┴─ Abort
+                                                                    │
+                                                                    ▼
+                                                          accepted_residuals[] → Phase 7
+```
+
+On failure (reviewer-validation hard-fail, `/execute` re-run failure, etc.): soft-phase failure dialog from `reference/failure-dialog.md`.
+
+## Phase 7: /verify (hard, non-skippable)
 
 Run the **compact checkpoint** first — `/verify` is heavy (multi-agent code review + interactive QA + spec compliance grading).
 
-Invoke `/pmos-toolkit:verify` with the spec path. **`/verify` is non-skippable per the pipeline contract — no Skip option, ever** (Anti-pattern #10 in spec §12; mirrored below).
+Invoke `/pmos-toolkit:verify` with the spec path. **`/verify` is non-skippable per the pipeline contract — no Skip option, ever, in any mode** (Anti-pattern #10 in spec §12; mirrored below). In skill modes, `/verify` additionally re-runs `reference/skill-eval.md` fresh and reconciles against `accepted_residuals[]` (wired in the citation pass — FR-50/51/52).
 
 `/verify` does not accept `--tier`.
 
 On failure: hard-phase failure dialog (Retry / Pause / Abort — no Skip).
 
-## Phase 10: /complete-dev (hard)
+## Phase 8: /complete-dev (hard)
 
 Invoke `/pmos-toolkit:complete-dev` to merge, capture learnings into CLAUDE.md/AGENTS.md, regenerate changelog, bump versions, deploy per repo norms, tag release, and push to all remotes.
 
@@ -531,23 +644,11 @@ Invoke `/pmos-toolkit:complete-dev` to merge, capture learnings into CLAUDE.md/A
 
 On failure: hard-phase failure dialog.
 
-## Phase 11: Final summary
-
-**Folded-phase failure surfacing (FR-29, FR-52, D17, D34, T12b):** read every `state.yaml.phases.<x>.folded_phase_failures[]`. If any non-empty across all phases: emit a `## Folded-phase failures (N)` subsection per `reference/pipeline-status-template.md` (T3 deliverable) BEFORE the OQ index, where N is the total count across all phases. Format per spec §11.3: `[<phase>] <folded-skill> crashed: <error_excerpt> (ts: <ts>)` — one line per failure entry. If all `folded_phase_failures[]` arrays are empty: omit the subsection entirely (no decoration, no "_(none)_").
-
-Print the full pipeline-status table from `00_pipeline.html` (or `00_pipeline.md` sidecar in mixed-format mode), plus:
-
-- Branch + tag info from `/complete-dev` output.
-- Links to every artifact (`01_requirements.{html,md}`, `02_spec.{html,md}`, `03_plan.{html,md}`, plus child-skill sidecars). Use the resolver substrate (or `<feature_folder>/index.html`'s inlined manifest) to find each artifact's actual on-disk extension.
-- If `state.yaml.open_questions_log[]` is non-empty: write `<feature_folder>/00_open_questions_index.html` with one section per logged child skill (path + deferred count) per FR-OQ-INDEX / spec §15 G4. Apply the same write-phase rules as `00_pipeline.html` (atomic write, asset prefix `assets/`, cache-bust, heading IDs, no `sections.json` companion per runbook edge case row 3, index regen). Mixed-format sidecar emitted as `00_open_questions_index.md` when `output_format=both`. Link to the HTML primary in the chat summary.
-- Final one-liner: `Pipeline complete for <slug>. Branch feat/<slug> merged to main and tagged via /complete-dev.`
-
-## Phase 13: /retro gate (soft, Recommended=Skip; new in v2.34.0 per W7)
+## Phase 8a: /retro gate (soft, Recommended=Skip; new in v2.34.0 per W7)
 
 After `/complete-dev` lands the release, surface an optional retro gate. The default is Skip — most users ship and move on; retro is opt-in for sessions that surfaced patterns worth analyzing across this and prior runs.
 
 `AskUserQuestion`:
-
 ```
 question: "Run /retro to capture cross-session learnings before closing the pipeline?"
 options:
@@ -561,13 +662,24 @@ options:
     description: Log to OQ index; user runs /retro later.
 ```
 
-**Auto-skip if `_minimal_active` is true** per Phase 0 `--minimal` directive (T11). Log `[orchestrator] phase_minimal_skip: retro` to chat and proceed to Phase 11 final-summary without issuing the AskUserQuestion.
+**Auto-skip if `_minimal_active` is true** per Phase 0 `--minimal` directive. Log `[orchestrator] phase_minimal_skip: retro` to chat and proceed to Phase 9 final-summary without issuing the gate prompt.
 
-On Run: invoke `/pmos-toolkit:retro` with the appropriate flags. The retro phase entry in `state.yaml.phases.retro` is initialized by Phase 1 fresh-init (per state-schema.md v2). On Defer: append a stub entry to `state.yaml.open_questions_log[]` so /feature-sdlc Phase 11 surfaces the deferral.
+On Run: invoke `/pmos-toolkit:retro` with the appropriate flags. The retro phase entry in `state.yaml.phases.retro` is initialized by Phase 1 fresh-init (per `reference/state-schema.md`). On Defer: append a stub entry to `state.yaml.open_questions_log[]` so /feature-sdlc Phase 9 surfaces the deferral.
 
 On missing-skill: soft-variant missing-skill dialog from `reference/failure-dialog.md`. Skip option is the Recommended default.
 
-## Phase 12: Capture Learnings
+## Phase 9: Final summary
+
+**Folded-phase failure surfacing (FR-29, FR-52, D17, D34, T12b):** read every `state.yaml.phases.<x>.folded_phase_failures[]`. If any non-empty across all phases: emit a `## Folded-phase failures (N)` subsection per `reference/pipeline-status-template.md` (T3 deliverable) BEFORE the OQ index, where N is the total count across all phases. Format per spec §11.3: `[<phase>] <folded-skill> crashed: <error_excerpt> (ts: <ts>)` — one line per failure entry. If all `folded_phase_failures[]` arrays are empty: omit the subsection entirely (no decoration, no "_(none)_").
+
+Print the full pipeline-status table from `00_pipeline.html` (or `00_pipeline.md` sidecar in mixed-format mode), plus:
+
+- Branch + tag info from `/complete-dev` output.
+- Links to every artifact (`01_requirements.{html,md}`, `02_spec.{html,md}`, `03_plan.{html,md}`, plus, in `skill-feedback` mode, `0c_feedback_triage.{html,md}`, plus child-skill sidecars). Use the resolver substrate (or `<feature_folder>/index.html`'s inlined manifest) to find each artifact's actual on-disk extension.
+- If `state.yaml.open_questions_log[]` is non-empty: write `<feature_folder>/00_open_questions_index.html` with one section per logged child skill (path + deferred count) per FR-OQ-INDEX / spec §15 G4. Apply the same write-phase rules as `00_pipeline.html` (atomic write, asset prefix `assets/`, cache-bust, heading IDs, no `sections.json` companion per runbook edge case row 3, index regen). Mixed-format sidecar emitted as `00_open_questions_index.md` when `output_format=both`. Link to the HTML primary in the chat summary.
+- Final one-liner: `Pipeline complete for <slug>. Branch feat/<slug> merged to main and tagged via /complete-dev.`
+
+## Phase 10: Capture Learnings
 
 **This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory) now. Reflect on whether this session surfaced anything worth capturing about `/feature-sdlc` itself — gate prompts that misfired, resume-state edges, child-skill missing-dialog mistakes, places `--tier` propagation got confused, paused-state recovery friction. Proposing zero learnings is a valid outcome; the gate is that the reflection happens, not that an entry is written.
 
@@ -586,12 +698,12 @@ On missing-skill: soft-variant missing-skill dialog from `reference/failure-dial
 ## Anti-Patterns (DO NOT)
 
 1. **Triggering `/compact` from the skill.** The harness does not allow it. Surface a checkpoint, write `paused-resumable` state if the user picks Pause, and exit cleanly. Pretending it auto-compacts is a lie that breaks the resume contract.
-2. **Skipping the worktree step "because the user knows what they're doing".** Worktree is mandatory unless `--no-worktree` is explicitly passed. Auto-skipping when the user is already on a branch loses isolation and corrupts the resume state file's location semantics. The four worktree edge cases (a) not-a-repo, (b) detached HEAD, (c) dirty tree, (d) branch already exists — all handled in Phase 0.a — are non-bypassable; do not auto-stash, auto-rename, or auto-delete to make them go away.
+2. **Skipping the worktree step "because the user knows what they're doing".** Worktree is mandatory unless `--no-worktree` is explicitly passed. Auto-skipping when the user is already on a branch loses isolation and corrupts the resume state file's location semantics. The four worktree edge cases (a) not-a-repo, (b) detached HEAD, (c) dirty tree, (d) branch already exists — all handled in Phase 0a — are non-bypassable; do not auto-stash, auto-rename, or auto-delete to make them go away.
 3. **Dispatching child skills with a "see the state file" prompt.** Each child gets a self-contained brief (initial context for `/requirements`; full requirements doc path for `/spec`; etc.). Child skills must not reach into `state.yaml` — that file is the orchestrator's private state.
-4. **Auto-running optional stages without the gate.** `/creativity`, `/wireframes`, `/prototype` each have an explicit `AskUserQuestion` gate. Recommended-default is fine; silent run is not. (`/msf-req` and `/simulate-spec` no longer have orchestrator gates — they are folded inside `/requirements` Phase 5.5 and `/spec` Phase 6.5 respectively, default-on at Tier 3.) Note: `--minimal`-driven Skip on the four soft gates (creativity, wireframes, prototype, retro) is user-explicit and does not violate this rule — see Phase 0 `_minimal_active` directive.
-5. **Frontend-detection by LLM gut-feel.** Use `reference/frontend-detection.md` heuristics deterministically; surface uncertainty via `AskUserQuestion` rather than guessing. The gate is always presented (FR-FRONTEND-GATE).
+4. **Auto-running optional stages without the gate.** `/creativity`, `/wireframes`, `/prototype` each have an explicit interactive gate prompt. Recommended-default is fine; silent run is not. (`/msf-req` and `/simulate-spec` no longer have orchestrator gates — they are folded inside `/requirements` Phase 5.5 and `/spec` Phase 6.5 respectively, default-on at Tier 3.) Note: `--minimal`-driven Skip on the four soft gates (creativity, wireframes, prototype, retro) is user-explicit and does not violate this rule — see the `_minimal_active` directive. Likewise, skill-mode's **non-presentation** of Phases 3b/3c (a skill has no UI), and the fact that Phase 0c runs only in `skill-feedback` and Phases 0d/6a only in skill modes, are **mode-conditional by-design omissions** keyed off `pipeline_mode` — not silent skips of presented gates.
+5. **Frontend-detection by LLM gut-feel.** Use `reference/frontend-detection.md` heuristics deterministically; surface uncertainty via a structured prompt rather than guessing. The gate is always presented (FR-FRONTEND-GATE).
 6. **Forgetting to update `state.yaml` after a child-skill completion.** Every phase end must atomically (a) update `state.yaml`, (b) regenerate `00_pipeline.html` (and the `.md` sidecar when `output_format=both`), (c) print the in-chat status table. Skipping any of these breaks resume.
 7. **Treating `--non-interactive` as "skip /grill silently".** The skill must log `phase: grill / status: skipped-non-interactive / reason: --non-interactive flag` so the user knows what was skipped on review.
-8. **Resuming from a state file with stale artifact paths.** On resume (Phase 0.b), validate every recorded artifact path still exists; if any required artifact is missing, surface to user before continuing — do not re-invoke a phase silently.
+8. **Resuming from a state file with stale artifact paths.** On resume (Phase 0b), validate every recorded artifact path still exists; if any required artifact is missing, surface to user before continuing — do not re-invoke a phase silently.
 9. **Conflating `--tier` override with per-child auto-tiering.** `--tier` sets the orchestrator's expected scope (drives gates) AND is passed to children that accept it (`/requirements`, `/spec`, `/plan`). Children may auto-tier-escalate; log divergence in `child_tier_divergence` rather than overriding.
 10. **Skipping `/verify` because `/execute` looked clean.** Non-skippable per pipeline contract; no opt-out at any tier.

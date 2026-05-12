@@ -6,12 +6,12 @@ Single source of truth for the resumable pipeline state file written at `<worktr
 
 ## schema_version
 
-`schema_version: 2` is the current version. Files written by /feature-sdlc < 2.34.0 carry `schema_version: 1` and are auto-migrated on read (see "Schema v2 migration" below).
+`schema_version: 4` is the current version (added with the `/feature-sdlc skill` modes). Older files are auto-migrated on read, in order, through the chain `v1 → v2 → v3 → v4` (each step additive/idempotent — see the per-version "auto-migration block" sections below). Files written by /feature-sdlc < 2.34.0 carry `schema_version: 1`; files from the 2.34.0–2.37.x cohort carry `2` or `3`.
 
-**Migration policy** (per FR-SCHEMA / spec §15 G3):
+**Migration policy** (per FR-SCHEMA / FR-13 / spec §15 G3):
 
-- `state.schema_version > current code's max supported` → abort with: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`.
-- `state.schema_version < current code's max` → auto-migrate by default-filling additive fields; log every migration to chat as `migration: state.schema vM → vN (added: <fields>)`.
+- `state.schema_version > current code's max supported` (i.e., `> 4`) → abort with: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`.
+- `state.schema_version < current code's max` → run each migration step in version order; each is additive (default-fill new fields, never remove/rename/reshape) and idempotent; log every step to chat as `migration: state.schema vM → vN (added: <fields>)`. The pre-2.34.0 phase-id elision (`msf-req`/`simulate-spec` dropped on read — see "Auto-migration of pre-2.34.0 state files" in SKILL.md) runs *before* the v4 step.
 - Same version → no migration.
 
 Pipeline runs are short-lived (days, not years) so destructive migrations are not anticipated; if ever needed, bump the major schema number and refuse-not-migrate from that boundary.
@@ -22,17 +22,18 @@ Pipeline runs are short-lived (days, not years) so destructive migrations are no
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `schema_version` | int | yes | Always 1 in v1. |
+| `schema_version` | int | yes | `1` in v1 … `4` in v4 (the current version). |
 | `slug` | string | yes | LLM-derived kebab-case identifier (per `slug-derivation.md`). |
-| `tier` | int (1\|2\|3) \| null | yes | Set when known (either `--tier` flag or after `/requirements` Phase 3 auto-tier). `null` until then. |
-| `mode` | string | yes | `interactive` or `non-interactive`. Resolved per the canonical non-interactive block at Phase 0. |
+| `pipeline_mode` | string | yes (v4+) | `feature`, `skill-new`, or `skill-feedback`. Resolved by the Phase 0 subcommand dispatch (FR-02). **Distinct from `mode`** — the naming-collision resolution: `mode` keeps its `interactive`/`non-interactive` meaning; `pipeline_mode` is the run-kind selector. Drives the mode-conditional `phases[]` membership (below). Defaults to `feature` when reading a v1–v3 file. |
+| `tier` | int (1\|2\|3) \| null | yes | Set when known: `--tier` flag, or — in skill modes — Phase 0d `/skill-tier-resolve`, or — otherwise — after `/requirements` auto-tier. `null` until then. |
+| `mode` | string | yes | `interactive` or `non-interactive`. Resolved per the canonical non-interactive block at Phase 0. (Untouched by v4 — see `pipeline_mode` above for the run-kind selector.) |
 | `started_at` | string (ISO-8601) | yes | First creation timestamp. Never updated. |
 | `last_updated` | string (ISO-8601) | yes | Updated on every status change. |
 | `current_phase` | string | yes | The phase id currently being executed or the most recent paused/failed one. Matches one of the `phases[].id` values below. |
 | `worktree_path` | string (abs path) \| null | yes | Absolute path of the worktree directory. `null` only when `--no-worktree` was passed. |
 | `branch` | string \| null | yes | Branch name (typically `feat/<slug>`). `null` only when `--no-worktree`. |
 | `feature_folder` | string (abs path) | yes | Resolved per `_shared/pipeline-setup.md` Section A — `<docs_path>/features/<YYYY-MM-DD>_<slug>/`. Child skills' artifacts land here. |
-| `phases` | list | yes | One entry per pipeline phase, in declared order. See below. |
+| `phases` | list | yes | One entry per pipeline phase, in declared order — **membership is mode-conditional** (per `pipeline_mode`, FR-11; see "Mode-conditional `phases[]` membership (v4)" below). See entry shape below. |
 | `open_questions_log` | list | yes | Initialized `[]`. Appended to in `--non-interactive` mode after each child phase. See entry shape below. |
 
 ---
@@ -56,31 +57,78 @@ Every entry has at minimum:
 | `child_tier_divergence` | string \| null | Free-form note when child reports a different tier. |
 | `missing_skill` | string \| null | Set when `paused_reason: missing_skill` — names the missing child skill. |
 | `folded_phase_failures` | list | (v2) Append-only list of folded-skill failure records — `{folded_skill, error_excerpt, ts}`. Empty `[]` until a folded child crashes. See "Schema v2" below for dedup rule. |
+| `feedback_source` | string \| null | (v4) On the `feedback-triage` entry only — the resolved feedback input: a file path, `<inline-text>`, or `--from-retro:<artifact>`. |
+| `target_skills` | list \| null | (v4) On the `feedback-triage` entry only — the in-scope skill names the triage produced approved changes for. |
+| `resolved_tier` / `skill_location` / `target_platform` | int / string / string \| null | (v4) On the `skill-tier-resolve` entry only — the three values that phase resolves (tier; the skill's on-disk location; `claude-code`/`codex`/`generic`). |
+| `per_skill_tiers` | object \| null | (v4) On the `skill-tier-resolve` entry, skill-feedback only — `{<skill-name>: <tier-int>}`; the run `tier` is the max. |
+| `skill_eval` | object \| null | (v4) On the `skill-eval` entry only — the eval-iteration substructure (see "`skill_eval` substructure (v4)" below). |
 
 ### Phase identifiers + hardness
 
-In declared execution order (matches spec §5):
+In declared execution order. Membership is mode-conditional (see below); a `—` in the column means the phase is absent from that mode's `phases[]`.
 
-- `setup` — **infra** (always run; no failure dialog beyond pipeline-setup's own).
-- `worktree` — **infra** (worktree creation; G7 dialog handled inline).
-- `init-state` — **infra** (write state.yaml + 00_pipeline.md).
-- `requirements` — **hard** (Skip option HIDDEN in failure dialog).
-- `grill` — **soft** (Skip option SHOWN; also auto-skipped in `--non-interactive` per FR-TIER-SCOPE / spec §15 G8).
-- `msf-req` — **soft**.
-- `creativity` — **soft**.
-- `wireframes` — **soft**.
-- `prototype` — **soft**.
-- `spec` — **hard**.
-- `simulate-spec` — **soft**.
-- `plan` — **hard**.
-- `execute` — **hard**.
-- `verify` — **hard**.
-- `complete-dev` — **hard**.
-- `retro` — **soft** (v2; gate per FR-34 with `Recommended=Skip`).
-- `final-summary` — **infra**.
-- `capture-learnings` — **infra**.
+| id | hardness | feature | skill-new | skill-feedback | notes |
+|---|---|---|---|---|---|
+| `setup` | infra | ✓ | ✓ | ✓ | always run; no failure dialog beyond pipeline-setup's own |
+| `worktree` | infra | ✓ | ✓ | ✓ | worktree creation; G7 dialog inline |
+| `init-state` | infra | ✓ | ✓ | ✓ | write state.yaml + 00_pipeline.{html,md} |
+| `feedback-triage` | **hard** | — | — | ✓ | **new in v4 (D22).** Only clean exit is "no actionable findings / no in-scope skills"; the approval gate is mandatory → hard. |
+| `skill-tier-resolve` | **infra** | — | ✓ | ✓ | **new in v4 (D22).** A setup/detection phase like `worktree`/`init-state`. |
+| `requirements` | hard | ✓ | ✓ | ✓ | Skip HIDDEN in failure dialog |
+| `grill` | soft | ✓ | ✓ | ✓ | Skip SHOWN; auto-skipped in `--non-interactive` |
+| `creativity` | soft | ✓ | ✓ | ✓ | gate, Recommended=Skip |
+| `wireframes` | soft | ✓ | — | — | feature mode only |
+| `prototype` | soft | ✓ | — | — | feature mode only |
+| `spec` | hard | ✓ | ✓ | ✓ | |
+| `plan` | hard | ✓ | ✓ | ✓ | |
+| `execute` | hard | ✓ | ✓ | ✓ | |
+| `skill-eval` | **hard** | — | ✓ | ✓ | **new in v4 (D22).** A non-skippable quality gate; "accept residuals as known risk" is a documented exit, not a skip; peer of `verify`. |
+| `verify` | hard | ✓ | ✓ | ✓ | non-skippable |
+| `complete-dev` | hard | ✓ | ✓ | ✓ | |
+| `retro` | soft | ✓ | ✓ | ✓ | gate, Recommended=Skip |
+| `final-summary` | infra | ✓ | ✓ | ✓ | |
+| `capture-learnings` | infra | ✓ | ✓ | ✓ | |
 
-The compact checkpoint (`compact-checkpoint.md`) is a recurring micro-phase, not a `phases[]` entry — it is invoked before phases `wireframes`, `prototype`, `simulate-spec`, `execute`, `verify` and writes its pause record into the *next* phase's entry (see `compact-checkpoint.md`).
+(The removed `msf-req` and `simulate-spec` phase ids — present in pre-2.34.0 state files — are elided on read before the v4 migration step; they are not in any mode's fresh-init `phases[]`.)
+
+#### Mode-conditional `phases[]` membership (v4)
+
+At fresh init (`/feature-sdlc` Phase 1), `phases[]` is built per `pipeline_mode` (D21/FR-11):
+
+- **`feature`** — the 2.36.0 set, all `id` labels unchanged:
+  `setup, worktree, init-state, requirements, grill, creativity, wireframes, prototype, spec, plan, execute, verify, complete-dev, retro, final-summary, capture-learnings`.
+- **`skill-new`** — that set **minus** `{wireframes, prototype}` **plus** `{skill-tier-resolve, skill-eval}`, in order:
+  `setup, worktree, init-state, skill-tier-resolve, requirements, grill, creativity, spec, plan, execute, skill-eval, verify, complete-dev, retro, final-summary, capture-learnings`.
+- **`skill-feedback`** — the `skill-new` set **plus** `{feedback-triage}` inserted **after `init-state`** (before `skill-tier-resolve`).
+
+The resume cursor scans whatever `phases[]` contains — it is **mode-agnostic** (`pipeline_mode` is read back from the state file, never re-derived from a subcommand on `--resume` — FR-05). `current_phase` at fresh init is the first phase of the mode's set (`requirements` in feature; `skill-tier-resolve` in `skill-new`; `feedback-triage` in `skill-feedback`).
+
+The compact checkpoint (`compact-checkpoint.md`) is a recurring micro-phase, not a `phases[]` entry. It is invoked before `wireframes`, `prototype`, `execute`, `verify` in feature mode; before `execute` and `verify` only in skill modes (3b/3c not present; `skill-eval` is light — no checkpoint before it). It writes its pause record into the *next* phase's entry (see `compact-checkpoint.md`).
+
+#### `skill_eval` substructure (v4)
+
+On the `skill-eval` phase entry only (FR-12):
+
+```yaml
+skill_eval:
+  iterations:
+    - n: 1
+      pre_ref: <git sha — HEAD after /execute Phase 6 completed>
+      addendum_task_ids: [T26a, T26b]      # the "## Eval-remediation — iteration 1" tasks appended to 03_plan (absent if iter 1 passed clean)
+      checks_failed: [c-body-size, b-desc-has-when]
+      result: fail                          # pass | fail
+    - n: 2
+      pre_ref: <git sha — HEAD before iteration 2's remediation commits>
+      addendum_task_ids: [T26c]
+      checks_failed: []
+      result: pass
+  accepted_residuals:                       # populated only by the post-cap "Accept residuals as known risk" disposition
+    - check_id: d-flowcharts-justified
+      fix_note: "<the reviewer's concrete-edit note, verbatim>"
+      acked_at: <ISO-8601>
+```
+
+`iterations[0]` is implicit (the initial `/execute` Phase 6 build); the first recorded entry is `n: 1`. `iterations[n].pre_ref` is HEAD *before* iteration n's remediation commits — so "Restore iteration 1" (offered only when iteration 2 was net-worse) `git reset`s the skill files to `iterations[2].pre_ref`. All writes to this substructure use the atomic temp-then-rename protocol (D31).
 
 ### Status enum
 
@@ -170,13 +218,38 @@ If the drift check fails (the v2 file is not in the worktree it claims), `/featu
 
 ---
 
-## Worked example (Tier-3 mid-pipeline pause)
+## Schema v4 (added 2026-05-11)
+
+v4 is **additive over v3** — no field removals, no renames, no reshape. It is the schema for the `/feature-sdlc skill` modes. v3 (and v1/v2, via the chain) files are auto-migrated on read.
+
+### What's new in v4
+
+1. **Top-level `pipeline_mode`** — `feature` / `skill-new` / `skill-feedback` (D16). Distinct from `mode ∈ {interactive, non-interactive}` — the naming-collision resolution.
+2. **Mode-conditional `phases[]` membership** (FR-11) — see "Mode-conditional `phases[]` membership (v4)" above. The skill-dev phase ids (`feedback-triage`, `skill-tier-resolve`, `skill-eval`) are only ever added by a fresh skill-mode init — never retrofitted onto an older file.
+3. **Three new phase ids + hardness** (D22) — `feedback-triage` (hard), `skill-tier-resolve` (infra), `skill-eval` (hard). Only present when the run mode includes them.
+4. **New optional per-phase fields** — `feedback_source` / `target_skills` (on `feedback-triage`); `resolved_tier` / `skill_location` / `target_platform` / `per_skill_tiers` (on `skill-tier-resolve`); the `skill_eval` substructure (on `skill-eval`). The existing `child_tier_divergence` field is reused for the `--tier`-vs-matrix divergence (E19).
+
+### v3 → v4 auto-migration block (4 steps, idempotent)
+
+Performed on read whenever `state.schema_version < 4` AND the drift check has passed (the pre-2.34.0 `msf-req`/`simulate-spec` elision runs first if the file is that old):
+
+1. **Set `schema_version: 4`.**
+2. **Set `pipeline_mode: feature`** if absent (every pre-v4 file was a feature run).
+3. **`phases[]` unchanged** — the skill-dev phase ids are only ever added by a fresh skill-mode init, never retrofitted; a migrated v3 file keeps its existing feature-mode phase set.
+4. **Emit chat log line:** `migration: state.schema v3 → v4 (added: pipeline_mode=feature; cohort-marker bump)`.
+
+`schema_version > 4` → abort: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`, exit 64. On a v1 file, the full `v1 → v2 → v3 → v4` chain runs in order (each step's block above).
+
+---
+
+## Worked example A — feature mode (Tier-3 mid-pipeline pause)
 
 Captures every field for an `--resume`-ready pause. The pipeline ran cleanly through `requirements` and `grill`, paused at the compact checkpoint before `wireframes`.
 
 ```yaml
-schema_version: 1
+schema_version: 4
 slug: oauth-refresh-tokens
+pipeline_mode: feature
 tier: 3
 mode: interactive
 started_at: 2026-05-09T14:22:11Z
@@ -216,10 +289,6 @@ phases:
     artifact_path: grills/2026-05-09_01_requirements.md
     started_at: 2026-05-09T14:35:04Z
     completed_at: 2026-05-09T14:42:18Z
-  - id: msf-req
-    hardness: soft
-    status: skipped
-    artifact_path: null
   - id: creativity
     hardness: soft
     status: skipped
@@ -238,9 +307,6 @@ phases:
   - id: spec
     hardness: hard
     status: pending
-  - id: simulate-spec
-    hardness: soft
-    status: pending
   - id: plan
     hardness: hard
     status: pending
@@ -252,6 +318,137 @@ phases:
     status: pending
   - id: complete-dev
     hardness: hard
+    status: pending
+  - id: final-summary
+    hardness: infra
+    status: pending
+  - id: capture-learnings
+    hardness: infra
+    status: pending
+open_questions_log: []
+```
+
+---
+
+## Worked example B — skill-feedback mode (mid-pipeline, one eval iteration done)
+
+A `/feature-sdlc skill --from-feedback <retro-paste>` run that triaged feedback for two skills (`/polish`, `/wireframes`), tiered the run at 3 (max of per-skill 2 and 3), ran requirements→spec→plan→execute, did one `skill-eval` remediation iteration (one residual accepted), and is now in `verify`.
+
+```yaml
+schema_version: 4
+slug: polish-wireframes-feedback
+pipeline_mode: skill-feedback
+tier: 3
+mode: interactive
+started_at: 2026-05-11T09:01:00Z
+last_updated: 2026-05-11T11:40:00Z
+current_phase: verify
+worktree_path: /Users/example/code/agent-skills-polish-wireframes-feedback
+branch: feat/polish-wireframes-feedback
+feature_folder: /Users/example/code/agent-skills-polish-wireframes-feedback/docs/pmos/features/2026-05-11_polish-wireframes-feedback
+phases:
+  - id: setup
+    hardness: infra
+    status: completed
+    artifact_path: null
+    started_at: 2026-05-11T09:01:00Z
+    completed_at: 2026-05-11T09:01:02Z
+  - id: worktree
+    hardness: infra
+    status: completed
+    artifact_path: null
+    started_at: 2026-05-11T09:01:02Z
+    completed_at: 2026-05-11T09:01:20Z
+  - id: init-state
+    hardness: infra
+    status: completed
+    artifact_path: 00_pipeline.html
+    started_at: 2026-05-11T09:01:20Z
+    completed_at: 2026-05-11T09:01:21Z
+  - id: feedback-triage
+    hardness: hard
+    status: completed
+    artifact_path: 0c_feedback_triage.html
+    started_at: 2026-05-11T09:01:21Z
+    completed_at: 2026-05-11T09:18:40Z
+    feedback_source: --from-retro:.pmos/retros/2026-05-10_run.html
+    target_skills: [polish, wireframes]
+  - id: skill-tier-resolve
+    hardness: infra
+    status: completed
+    artifact_path: null
+    started_at: 2026-05-11T09:18:40Z
+    completed_at: 2026-05-11T09:20:05Z
+    resolved_tier: 3
+    skill_location: plugins/pmos-toolkit/skills
+    target_platform: claude-code
+    per_skill_tiers: {polish: 2, wireframes: 3}
+  - id: requirements
+    hardness: hard
+    status: completed
+    artifact_path: 01_requirements.html
+    started_at: 2026-05-11T09:20:05Z
+    completed_at: 2026-05-11T09:42:00Z
+  - id: grill
+    hardness: soft
+    status: completed
+    artifact_path: grills/2026-05-11_01_requirements.html
+    started_at: 2026-05-11T09:42:00Z
+    completed_at: 2026-05-11T10:01:00Z
+  - id: creativity
+    hardness: soft
+    status: skipped
+    artifact_path: null
+  - id: spec
+    hardness: hard
+    status: completed
+    artifact_path: 02_spec.html
+    started_at: 2026-05-11T10:01:00Z
+    completed_at: 2026-05-11T10:25:00Z
+  - id: plan
+    hardness: hard
+    status: completed
+    artifact_path: 03_plan.html
+    started_at: 2026-05-11T10:25:00Z
+    completed_at: 2026-05-11T10:40:00Z
+  - id: execute
+    hardness: hard
+    status: completed
+    artifact_path: null
+    started_at: 2026-05-11T10:40:00Z
+    completed_at: 2026-05-11T11:15:00Z
+  - id: skill-eval
+    hardness: hard
+    status: completed
+    artifact_path: null
+    started_at: 2026-05-11T11:15:00Z
+    completed_at: 2026-05-11T11:32:00Z
+    skill_eval:
+      iterations:
+        - n: 1
+          pre_ref: a1b2c3d4
+          addendum_task_ids: [T18a, T18b]
+          checks_failed: [c-body-size, d-flowcharts-justified]
+          result: fail
+        - n: 2
+          pre_ref: e5f6a7b8
+          addendum_task_ids: []
+          checks_failed: [d-flowcharts-justified]
+          result: fail
+      accepted_residuals:
+        - check_id: d-flowcharts-justified
+          fix_note: "The /wireframes flowchart in §C is load-bearing (the IA decision tree); a prose-only form would be worse. Keep, but add a one-line caption stating why a diagram is used here."
+          acked_at: 2026-05-11T11:32:00Z
+  - id: verify
+    hardness: hard
+    status: in_progress
+    artifact_path: null
+    started_at: 2026-05-11T11:40:00Z
+  - id: complete-dev
+    hardness: hard
+    status: pending
+  - id: retro
+    hardness: soft
     status: pending
   - id: final-summary
     hardness: infra

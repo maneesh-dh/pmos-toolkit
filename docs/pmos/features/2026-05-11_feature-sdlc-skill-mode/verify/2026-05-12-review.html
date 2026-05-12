@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>feature-sdlc-skill-mode — Verification Report</title>
+  <link rel="stylesheet" href="../assets/style.css?v=2.38.0">
+  <script defer src="../assets/viewer.js?v=2.38.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">feature-sdlc-skill-mode — Verification Report</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>feature:</strong> feature-sdlc-skill-mode · <strong>branch:</strong> <code>feat/feature-sdlc-skill-mode</code> · <strong>date:</strong> 2026-05-12 · <strong>verdict:</strong> <strong>PASS</strong> (no Critical/Medium gaps; 3 advisory findings logged) · <strong>spec:</strong> <code>docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/02_spec.html</code></p>
+<p><em>Scope: skill-text + bash-script feature — no app code, no UI, no DB, no API. "Verified" evidence = the required text/code exists in the named file; behavioral checks (<code>skill-eval-check.sh --selftest</code>, fixture runs, <code>audit-recommended.sh</code>) were executed and pass.</em></p>
+
+<section id="summary">
+<h2 id="summary">1. Verification Summary</h2>
+<table>
+<thead><tr><th>Phase</th><th>Outcome</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>2. Static Verification</td><td>PASS</td><td><code>bash -n</code> clean on both scripts; <code>skill-eval-check.sh --selftest</code> → exit 0 ("SELFTEST PASS: 20 [D] checks ↔ skill-eval.md"); fixture <code>clean-skill</code> → all pass, exit 0; fixture <code>dirty-skill</code> → 9 planted defects flagged, exit 1; <code>skill-sdlc</code> alias → exit 0 (generic + claude-code); <code>audit-recommended.sh</code> → PASS exit 0 (12 calls / 5 Recommended / 7 defer-only / 0 unmarked).</td></tr>
+<tr><td>3. Multi-Agent Code Review</td><td>PASS (no blocker)</td><td>2 reviewers (convention/consistency + spec-grader). Highest finding scored 70 (&lt;75 act-threshold). Manifests synced 2.38.0; both <code>non-interactive-block</code> and <code>awk-extractor</code> canonical regions intact; phase headings match body prose; all cited reference files present.</td></tr>
+<tr><td>4. Deploy &amp; Integration</td><td>N/A — no runtime surface</td><td>No UI / API / DB / migration surface. The only executable artifact is <code>tools/skill-eval-check.sh</code> — its behavior is verified under Phase 2 (selftest + fixture runs + alias run). Sub-steps 3a–3f skipped (zero UI surface).</td></tr>
+<tr><td>5. Spec Compliance</td><td>PASS</td><td>90 Verified · 1 NA-with-alt-evidence (FR-92) · 0 Unverified. No Critical/Medium gaps. See §2–§4 below.</td></tr>
+<tr><td>6. Harden Test Suite</td><td>PASS — no new tests needed</td><td>The feature's test surface is already comprehensive: the <code>dirty-skill</code> fixture is the regression test for every deterministic check; <code>--selftest</code> guards the [D]↔skill-eval.md bijection; <code>audit-recommended.sh</code> guards the canonical-block. No verification-discovered bug requires a new test.</td></tr>
+<tr><td>7. Final Compliance Pass</td><td>PASS</td><td>No TODO/FIXME/HACK in new substantive files; no debug logging; docs updated (README.md, CLAUDE.md, archive/skills/README.md).</td></tr>
+<tr><td>7.5 Design-System Drift</td><td>N/A — skipped</td><td>No frontend changes, no DESIGN.md.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="spec-compliance">
+<h2 id="spec-compliance">2. Spec Compliance — Functional Requirements (§7)</h2>
+<p>Every FR-ID in spec §7 maps to concrete text/code. Full per-FR grading was performed; summary below (one row per FR family — all rows <strong>Verified</strong> unless noted).</p>
+<table>
+<thead><tr><th>FR family</th><th>Outcome</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>FR-01..06 (subcommand parsing &amp; mode resolution)</td><td>Verified</td><td><code>SKILL.md</code> §"Phase 0 Subcommand Dispatch" — feature/skill-new/skill-feedback/list recognised; token-1 disambiguation; <code>skill</code> with no description → usage error exit 64; <code>--from-feedback</code>/<code>--from-retro</code> source resolution; <code>--resume</code> ignores subcommand token; <code>argument-hint</code> enumerates all flags.</td></tr>
+<tr><td>FR-10..14 (state.yaml schema v4)</td><td>Verified</td><td><code>reference/state-schema.md</code> §"Schema v4" — additive over v3 (<code>pipeline_mode</code>, <code>skill_eval</code> substructure, mode-conditional <code>phases[]</code>); per-mode phase sets per D22; v3→v4 4-step migration block; <code>schema_version: 4</code> in SKILL.md Phase 1.</td></tr>
+<tr><td>FR-20..27 (Phase 0c /feedback-triage)</td><td>Verified</td><td><code>SKILL.md</code> Phase 0c — retro-parser.md verbatim for paste-back; finding shape; skill-mapping + zero-finding exit; per-finding critique (already_handled/classification/recommendation/scope_hint); Findings-Presentation-Protocol prompts; <code>0c_feedback_triage.html</code> via HTML substrate; combined per-skill requirements seed via <code>reference/seed-requirements-template.md</code>.</td></tr>
+<tr><td>FR-30..34 (Phase 0d /skill-tier-resolve)</td><td>Verified</td><td><code>SKILL.md</code> Phase 0d + <code>reference/skill-tier-matrix.md</code> + <code>reference/repo-shape-detection.md</code> — tier from matrix (per-skill max for skill-feedback); skill-location detection order (host rule &gt; plugin.json &gt; .agents/ &gt; .claude/skills/); target_platform detection; <code>--tier</code> override with divergence note; single consolidated confirmation prompt.</td></tr>
+<tr><td>FR-40..49 (Phase 6a /skill-eval gate)</td><td>Verified</td><td><code>SKILL.md</code> Phase 6a — <code>iterations[n].pre_ref</code> capture; runs <code>tools/skill-eval-check.sh --target &lt;p&gt; &lt;dir&gt;</code> with exit-2/no-bash fallback to LLM-judge (never silently skipped); reviewer subagent contract (raw files, [J] checks, fix_note+quote required, temp 0, no edits); orchestrator validation (check_id-set equality + quote substring-grep, hard-fail → soft-phase dialog); net-worse predicate; 2-iteration cap → Accept-residuals/Iterate-manually/Restore-iteration-1/Abort; <code>accepted_residuals[]</code> with ISO timestamp.</td></tr>
+<tr><td>FR-50..52 (Phase 7 /verify integration)</td><td>Verified</td><td><code>SKILL.md</code> Phase 7 — /verify re-runs skill-eval.md fresh; reconciles vs <code>accepted_residuals[]</code> (still-failing → loud-but-non-blocking; newly-failing → blocks; now-passing → dropped); release-prereq best-effort grading with graceful degradation; /verify non-skippable in all modes (Anti-pattern #10).</td></tr>
+<tr><td>FR-60..62 (skill-patterns.md)</td><td>Verified</td><td><code>reference/skill-patterns.md</code> (265 lines) — §A Frontmatter / §B Description &amp; triggering / §C Structure &amp; progressive disclosure / §D Body &amp; content / §E Scripts &amp; tooling / §F Platform-conditional frontmatter; each section ends with a <code>Checks:</code> line; 3 disagreements + resolutions recorded; cited (never copied) at requirements/spec/execute/verify; pmos-specific bits live in CLAUDE.md with back-link.</td></tr>
+<tr><td>FR-70..72 (skill-eval.md + skill-eval-check.sh)</td><td>Verified</td><td><code>reference/skill-eval.md</code> (193 lines, 39 checks: 20 [D] + 19 [J], each with check_id/tag/applies-when/check/§-backref, group-skip rules, cross-ref); <code>tools/skill-eval-check.sh</code> (220 lines, bash, <code>--target</code>/<code>--selftest</code>, TSV, exit 0/1/2); <code>--selftest</code> asserts [D]↔skill-eval.md bijection + every-row-names-one-§ (PASS); [J] half covered by a /verify structural check (FR-72).</td></tr>
+<tr><td>FR-80..81 (/skill-sdlc alias)</td><td>Verified</td><td><code>plugins/pmos-toolkit/skills/skill-sdlc/SKILL.md</code> (16 lines) — name matches dir; description = one-clause what + 6 trigger phrases; <code>user-invocable: true</code>; <code>argument-hint</code> present; body = "immediately invoke <code>/pmos-toolkit:feature-sdlc skill &lt;verbatim&gt;</code>, do nothing else"; no learnings-load line — rides on /feature-sdlc's learnings (D19).</td></tr>
+<tr><td>FR-85..87 (linear renumber)</td><td>Verified</td><td><code>grep '^## Phase' SKILL.md</code> → <code>0, 0a, 0b, 0c, 0d, 1, 2, 2a, 3, 3a, 3b, 3c, 4, 5, 6, 6a, 7, 8, 8a, 9, 10</code> — exact match, no gaps, in order; phase ids name-based with new <code>feedback-triage</code>/<code>skill-tier-resolve</code>/<code>skill-eval</code>; bare /feature-sdlc executes the same logical steps as 2.36.0 in feature mode.</td></tr>
+<tr><td>FR-90..95 (archival &amp; repo changes)</td><td>Verified (FR-92: NA — alt-evidence)</td><td>CLAUDE.md <code>## Skill-authoring conventions</code> added (canonical path, naming, post-move check, skill-patterns.md pointer, see-also cross-links); <code>archive/skills/{create-skill,update-skills}/</code> present + <code>archive/skills/README.md</code>; <code>ls plugins/pmos-toolkit/skills/</code> shows neither old skill, shows <code>skill-sdlc</code>; moved reference files present + referenced at new paths; README rows updated (/feature-sdlc <code>skill</code> subcommand, new /skill-sdlc row, /create-skill + /update-skills → "Archived in 2.38.0" pointers); both <code>plugin.json</code> = 2.38.0 (synced); manifests have no per-command description (byte-identity vacuous). <strong>FR-92:</strong> <code>create-skill/reference/spec-template.md</code> was preserved under <code>archive/</code> (moved with its parent dir, history kept) rather than literally deleted — satisfies §13.3's own wording ("under archive/ only, and not referenced by any live skill"); see §4.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="checklist-edges-tests">
+<h2 id="checklist-edges-tests">3. §10 Check List · §11 Edge Cases · §13 Testing Strategy</h2>
+<ul>
+<li><strong>§10 skill-eval.md check list</strong> — all 39 checks present across groups 10.A (8: 7 [D]/1 [J]), 10.B (6 [J]), 10.C (9: 6 [D]/3 [J]), 10.D (9: 4 [D]/5 [J]), 10.E (4: 1 [D]/3 [J]), 10.F (3: 2 [D]/1 [J]); 20 [D] total; group-skip rules (no <code>scripts/</code> → skip 10.E; no <code>reference/</code> → 10.C ref-only N/A; <code>--target generic</code> → skip 10.F) implemented in both skill-eval.md and the script. <strong>Verified.</strong></li>
+<li><strong>§11 Edge Cases E1–E21</strong> — all 21 map to concrete handling (no <code>scripts/</code>; Tier-1 no <code>reference/</code>; 3 patterns disagreements; codex/generic targets; pmos-repo dogfood; skill-eval-check.sh unavailable → LLM fallback; checkpoint placement; old-command "unknown skill"; <code>--from-retro</code> no artifact; zero findings; ambiguous target skills; iter-2 net-worse → restore; <code>--no-worktree</code> in skill modes; v1→v4 migration chain; host CLAUDE.md silent → fallback location; reviewer bad check_id/quote → hard-fail; multi-plugin → ask which; <code>--tier</code> ≠ matrix → CLI wins; Phase-6a re-invoke via /execute task-resume; cross-skill conflicts surfaced via per-skill sections + /grill + multi-role review). <strong>Verified.</strong></li>
+<li><strong>§13 Testing &amp; Verification Strategy</strong> — §13.1–13.2 test plans map to deterministic logic / loops in SKILL.md + state-schema.md; §13.3 structural checks (linear-renumber grep, archival ls, manifest-sync diff, CLAUDE.md grep, patterns↔eval bijection, /skill-sdlc forwarding shape) and §13.4 verification commands were <strong>executed and produce the spec-prescribed output</strong>. <strong>Verified.</strong></li>
+</ul>
+</section>
+
+<section id="advisory-findings">
+<h2 id="advisory-findings">4. Advisory Findings (non-blocking)</h2>
+<p>No finding scored at or above the /verify Phase-3 act-on threshold (75). The three below are logged for a follow-up pass — none blocks merge of <code>feature-sdlc-skill-mode</code>.</p>
+<table>
+<thead><tr><th>#</th><th>Score</th><th>Finding</th><th>Disposition</th></tr></thead>
+<tbody>
+<tr><td>A1</td><td>70</td><td><strong>Dogfooding gap — <code>feature-sdlc</code> fails its own <code>e-scripts-dir [D]</code> check.</strong> <code>skill-eval-check.sh</code> lives at <code>feature-sdlc/tools/</code>, but the rubric mandates <code>scripts/</code>. Running the checker against the <code>feature-sdlc/</code> dir reports <code>e-scripts-dir fail</code> + exit 1.</td><td><strong>Accept for this release.</strong> The spec and plan deliberately placed the eval tooling at <code>tools/</code> (mirroring the repo-level <code>plugins/pmos-toolkit/tools/audit-recommended.sh</code> convention); <code>feature-sdlc</code> is an orchestrator host, and Phase 6a applies the rubric to <em>authored</em> skills, not to the host. Follow-up option: either move the script to <code>scripts/</code> or amend §E + <code>e-scripts-dir</code> to accept <code>tools/</code> — out of scope for this feature.</td></tr>
+<tr><td>A2</td><td>58</td><td><strong><code>c-portable-paths [D]</code> heuristic is over-broad.</strong> The <code>grep '(/Users/|/home/)…'</code> rule flags prose/example paths — <code>skill-patterns.md:133</code> (the literal anti-pattern example <code>`/Users/alice/...`</code>) and example YAML values in <code>state-schema.md</code> — as if they were hard-coded bundle paths. Any future skill whose docs cite an example absolute path would also be flagged in Phase 6a.</td><td><strong>Note; mitigated.</strong> Phase 6a has the <code>accepted_residuals[]</code> escape hatch and the reviewer/user override for exactly this case, and the check still catches real bundle-path leaks. Follow-up: narrow the heuristic (only flag paths in markdown links / non-<code>${…}</code> bundle references) and change the anti-pattern example to <code>`/path/to/...`</code>.</td></tr>
+<tr><td>A3</td><td>53</td><td><strong>Pre-existing — <code>reference/failure-dialog.md</code> has no leading ToC</strong> (119 lines), so <code>feature-sdlc</code> also fails <code>c-reference-toc [D]</code>. Not introduced by this PR (file not in the diff).</td><td><strong>Note; pre-existing tech debt.</strong> Cheap follow-up: add a jump-list to <code>failure-dialog.md</code>. Likewise the two stale <code>/push</code> mentions in <code>README.md</code> (lines ~148, ~169) contradict CLAUDE.md's "<code>/complete-dev</code> is the canonical release skill" — pre-existing, untouched by this PR, worth a separate cleanup.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="open-items">
+<h2 id="open-items">5. Open Items Requiring User Decision</h2>
+<p><strong>None.</strong> 0 "Unverified — action required" rows. The single NA row (FR-92) is a defensible reading of the spec's own §13.3 wording — no action needed, though the team may <code>git rm archive/skills/create-skill/reference/spec-template.md</code> if they want the literal "dropped" semantics.</p>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-11_feature-sdlc-skill-mode/verify/2026-05-12-review.html</span>
+  </footer>
+</body>
+</html>

@@ -1,13 +1,19 @@
-# Seed requirements brief — handed to /requirements per skill
+# Seed requirements brief — handed to /requirements per skill (skill-feedback mode)
 
-This is the brief Phase 8 hands to `/requirements` as the starting point for one skill's pipeline run. **The brief must be self-contained** — do not write "see the triage doc". `/requirements` should be able to run from this text alone.
+In `/feature-sdlc skill --from-feedback` runs, this is the brief that drives `/requirements`.
+When more than one skill is in scope, `/requirements` receives **one combined doc with a
+per-skill section** (one copy of the block below per skill). **Each per-skill section must
+be self-contained** — do not write "see the triage doc". `/requirements` should be able to
+run from this text alone. (Lifted from the now-archived `/update-skills` skill; the only
+changes on move were generalising the `/update-skills`-, `/execute`-, and `/push`-specific
+framing.)
 
 ```markdown
 # Update brief: /<skill-name>
 
-**Source:** /update-skills triage at {triage_doc_path}
+**Source:** /feature-sdlc skill --from-feedback — approved findings from {feature_folder}/0c_feedback_triage.html
 **Triage findings approved for this skill:** {N}
-**Tier (user-confirmed):** Tier <1 | 2 | 3>
+**Per-skill tier:** Tier <1 | 2 | 3>  ·  **Run tier (= max across skills):** Tier <1 | 2 | 3>
 
 ## Approved findings (verbatim from triage)
 
@@ -44,8 +50,8 @@ List anything findings touched on but the user explicitly skipped or deferred. /
 ## Constraints
 
 - Skill must remain backwards-compatible with its current `argument-hint`/contract unless a finding explicitly removes it.
-- Reference paths (`learnings/learnings-capture.md`, `_shared/*`) resolve as siblings under `plugins/pmos-toolkit/skills/`.
-- Version bump at next /push: <patch | minor | major>.
+- Reference paths resolve relative to the skill's own directory (per the host repo's layout — see `repo-shape-detection.md`; in this repo that means siblings under `plugins/pmos-toolkit/skills/`).
+- Version bump at /complete-dev: <patch | minor | major>.
 ```
 
 ## Notes for the implementer
@@ -53,4 +59,5 @@ List anything findings touched on but the user explicitly skipped or deferred. /
 - Trim SKILL.md excerpts to the smallest unit that conveys the section being changed. A 200-line phase is fine; the entire SKILL.md is not.
 - For findings that span multiple phases or files, include one excerpt per location, each clearly headed.
 - If a finding's "proposed fix" is vague ("improve clarity"), translate it into one concrete sentence in the **Proposed direction** paragraph rather than passing the vagueness downstream.
-- Tier-1 briefs can omit the "Proposed direction" paragraph if the change is a literal one-line edit; in that case the brief functions more like a /execute task description.
+- Tier-1 briefs can omit the "Proposed direction" paragraph if the change is a literal one-line edit; in that case the brief functions more like a one-line task description for /execute.
+- When multiple skills are in scope, emit one per-skill section per skill in a single combined doc; `/requirements` designs each skill's change set in its own section and tiers the run at `max` of the per-skill tiers.

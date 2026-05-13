@@ -527,18 +527,18 @@ For plans with **more than ~12 tasks**, group tasks under `## Phase N: <name>` h
 ```markdown
 ## Tasks
 
-## Phase 1: Schema and Migration
-[Phase rationale: 1-2 sentences on why these tasks group as a deployable slice.]
+## Phase 1: Tracer bullet — single record end-to-end
+[Phase rationale: prove the full request → persistence → render path for one record with hardcoded inputs. Riskiest integration points (new auth handshake, new ORM mapping) are inside this slice. Demoable: a user can create-and-see one record by the end of the phase.]
 
-### T1: ...
-### T2: ...
-### T3: ...
+### T1: ... (tracer bullet — minimal end-to-end path)
+### T2: ... (widen T1 with realistic input validation)
+### T3: ... (add the first non-trivial relationship to T1's record)
 
-## Phase 2: API Layer
-[Phase rationale.]
+## Phase 2: Widen — list, filter, edit
+[Phase rationale: with the end-to-end skeleton proven in Phase 1, widen read and mutate paths. Each task remains a vertical slice that ships a user-observable improvement (list view, filter, edit form).]
 
-### T4: ...
-### T5: ...
+### T4: ... (list view of records)
+### T5: ... (filter by status — still end-to-end)
 ```
 
 **Rules:**
@@ -546,6 +546,7 @@ For plans with **more than ~12 tasks**, group tasks under `## Phase N: <name>` h
 - Each phase boundary triggers **full /verify** (multi-agent code review + interactive QA) — slow. Make phases **deployable slices** of 5–10 tasks. Avoid 1–2 task phases (verify cost dwarfs the work).
 - Phases are contiguous: a task belongs to exactly one phase; phase numbering starts at 1; no gaps.
 - Phase 1 always begins at T1.
+- Phases group **vertical slices**, not layers — see §Vertical-Slice Decomposition above. Horizontal phase names ("all migrations", "all endpoints", "all UI") are an anti-pattern: every phase must be a deployable, user-observable slice on its own. Phase 1 is the tracer bullet — narrow but end-to-end through the riskiest unproven integration points.
 
 Plans without `## Phase N` headings continue to work — /execute treats them as a single implicit phase verified once at the end.
 

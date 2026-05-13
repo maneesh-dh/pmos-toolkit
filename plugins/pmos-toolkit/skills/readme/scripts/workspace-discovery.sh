@@ -123,22 +123,232 @@ apply_f15_precedence() {
   done
 }
 
+# --- package enumeration (T9, FR-WS-2) ---------------------------------------
+#
+# Per-manifest semantics:
+#   pnpm-workspace.yaml          : top-level `packages:` only. catalog/overrides/
+#                                  patchedDependencies are NOT enumeration sources.
+#                                  Supports `!pattern` negation.
+#   package.json#workspaces      : array form OR object form (`{"packages":[...]}`).
+#                                  Negation supported (yarn/npm parity).
+#   Cargo.toml#workspace         : `members` glob + optional `exclude` array.
+#   go.work                      : `use ./path` lines, no globs.
+#   pyproject.toml#tool.uv.workspace : `members` glob.
+#   lerna.json                   : top-level `packages` array.
+#   nx.json / turbo.json         : descriptors only — never enumerate.
+
+emit_patterns_pnpm() {
+  # stdout: include patterns (one per line, `!`-prefixed for negations).
+  # Reads ONLY the top-level `packages:` array (filters catalog/overrides/...).
+  local f="$1/pnpm-workspace.yaml"
+  [ -f "$f" ] || return 0
+  readme::yaml_get packages "$f" 2>/dev/null | python3 -c '
+import sys, json
+raw = sys.stdin.read().strip()
+if not raw:
+    sys.exit(0)
+try:
+    arr = json.loads(raw)
+except Exception:
+    sys.exit(0)
+if isinstance(arr, list):
+    for p in arr:
+        if isinstance(p, str):
+            print(p)
+'
+}
+
+emit_patterns_pkg_json() {
+  # Array form: workspaces=[...]. Object form: workspaces.packages=[...].
+  local pj="$1/package.json"
+  [ -f "$pj" ] || return 0
+  python3 - "$pj" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+w = d.get("workspaces")
+arr = None
+if isinstance(w, list):
+    arr = w
+elif isinstance(w, dict):
+    arr = w.get("packages")
+if isinstance(arr, list):
+    for p in arr:
+        if isinstance(p, str):
+            print(p)
+PY
+}
+
+emit_patterns_lerna() {
+  local f="$1/lerna.json"
+  [ -f "$f" ] || return 0
+  python3 - "$f" <<'PY'
+import json, sys
+try:
+    d = json.load(open(sys.argv[1]))
+except Exception:
+    sys.exit(0)
+arr = d.get("packages")
+if isinstance(arr, list):
+    for p in arr:
+        if isinstance(p, str):
+            print(p)
+PY
+}
+
+emit_patterns_cargo() {
+  # Reads [workspace] members + exclude. Prefers tomllib (Python 3.11+);
+  # falls back to a regex parser sufficient for the conventional shape.
+  local f="$1/Cargo.toml"
+  [ -f "$f" ] || return 0
+  python3 - "$f" <<'PY'
+import sys, re
+path = sys.argv[1]
+members, excludes = [], []
+try:
+    import tomllib
+    with open(path, "rb") as fh:
+        d = tomllib.load(fh)
+    ws = d.get("workspace") or {}
+    members = ws.get("members") or []
+    excludes = ws.get("exclude") or []
+except Exception:
+    # Regex fallback: find [workspace] section and parse members=/exclude= arrays.
+    txt = open(path).read()
+    m = re.search(r"^\[workspace\][^\[]*", txt, re.M)
+    if m:
+        body = m.group(0)
+        def grab(key):
+            mm = re.search(rf"^\s*{key}\s*=\s*\[(.*?)\]", body, re.M | re.S)
+            if not mm:
+                return []
+            inner = mm.group(1)
+            return [s.strip().strip('"').strip("'") for s in inner.split(",") if s.strip()]
+        members = grab("members")
+        excludes = grab("exclude")
+for p in members:
+    if isinstance(p, str):
+        print(p)
+for p in excludes:
+    if isinstance(p, str):
+        print("!" + p)
+PY
+}
+
+emit_patterns_go_work() {
+  # `use ./path` (single) or `use ( ./a ./b )` block. No globs.
+  local f="$1/go.work"
+  [ -f "$f" ] || return 0
+  python3 - "$f" <<'PY'
+import sys, re
+txt = open(sys.argv[1]).read()
+# Single-line: use ./mod
+for m in re.finditer(r"^\s*use\s+(\./[^\s\(]+)\s*$", txt, re.M):
+    print(m.group(1).lstrip("./"))
+# Block form: use ( ./a ./b )
+for blk in re.finditer(r"use\s*\(([^)]*)\)", txt, re.S):
+    for line in blk.group(1).splitlines():
+        line = line.strip()
+        if line.startswith("./"):
+            print(line.lstrip("./"))
+PY
+}
+
+emit_patterns_uv() {
+  local f="$1/pyproject.toml"
+  [ -f "$f" ] || return 0
+  python3 - "$f" <<'PY'
+import sys, re
+path = sys.argv[1]
+members = []
+try:
+    import tomllib
+    with open(path, "rb") as fh:
+        d = tomllib.load(fh)
+    ws = (d.get("tool") or {}).get("uv", {}).get("workspace") or {}
+    members = ws.get("members") or []
+except Exception:
+    txt = open(path).read()
+    m = re.search(r"^\[tool\.uv\.workspace\][^\[]*", txt, re.M)
+    if m:
+        mm = re.search(r"^\s*members\s*=\s*\[(.*?)\]", m.group(0), re.M | re.S)
+        if mm:
+            members = [s.strip().strip('"').strip("'") for s in mm.group(1).split(",") if s.strip()]
+for p in members:
+    if isinstance(p, str):
+        print(p)
+PY
+}
+
+enumerate_packages() {
+  # $1 = repo root, $2 = primary manifest name.
+  # stdout: relative directory paths, one per line, deduped + sorted.
+  # Matches are filtered to dirs containing the per-manifest member-manifest
+  # file (e.g., package.json for JS, Cargo.toml for Rust) — this matches
+  # real pnpm/cargo/uv behavior and naturally drops empty intermediate dirs
+  # like `packages/private/` whose children are excluded by negation.
+  local root="$1" primary="$2"
+  local patterns="" member_file=""
+  case "$primary" in
+    "pnpm-workspace.yaml")              patterns="$(emit_patterns_pnpm     "$root")"; member_file="package.json" ;;
+    "package.json#workspaces")          patterns="$(emit_patterns_pkg_json "$root")"; member_file="package.json" ;;
+    "lerna.json")                       patterns="$(emit_patterns_lerna    "$root")"; member_file="package.json" ;;
+    "Cargo.toml#workspace")             patterns="$(emit_patterns_cargo    "$root")"; member_file="Cargo.toml" ;;
+    "go.work")                          patterns="$(emit_patterns_go_work  "$root")"; member_file="go.mod" ;;
+    "pyproject.toml#tool.uv.workspace") patterns="$(emit_patterns_uv       "$root")"; member_file="pyproject.toml" ;;
+    *) return 0 ;;
+  esac
+  [ -n "$patterns" ] || return 0
+  # Convert newline-separated patterns into argv for glob_resolve.
+  # Bash 3.2-portable: build an array via a `while read` loop.
+  local -a pat_argv
+  pat_argv=()
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    pat_argv+=("$p")
+  done <<EOF
+$patterns
+EOF
+  [ "${#pat_argv[@]}" -gt 0 ] || return 0
+  # go.work entries are literal paths, not globs — but glob_resolve handles
+  # both (a non-glob is just a single-match glob, provided the dir exists).
+  local resolved
+  resolved="$(readme::glob_resolve "$root" "${pat_argv[@]}")"
+  [ -n "$resolved" ] || return 0
+  # Filter to dirs containing the per-manifest member file.
+  printf '%s\n' "$resolved" | while IFS= read -r rel; do
+    [ -n "$rel" ] || continue
+    if [ -f "$root/$rel/$member_file" ]; then
+      printf '%s\n' "$rel"
+    fi
+  done
+}
+
 # --- JSON emit ----------------------------------------------------------------
 
 emit_json() {
-  # $1 = primary, $2..$N = secondaries
+  # $1 = primary, $2 = repo_root, $3 = packages_json (JSON array string),
+  # $4..$N = secondaries.
   local primary="$1"; shift
+  local packages_json="$1"; shift
   local repo_type="unknown"
   [ -n "$primary" ] && repo_type="monorepo-root"
-  python3 - "$primary" "$repo_type" "$@" <<'PY'
+  python3 - "$primary" "$repo_type" "$packages_json" "$@" <<'PY'
 import json, sys
 primary = sys.argv[1]
 repo_type = sys.argv[2]
-secondaries = sys.argv[3:]
+packages_json = sys.argv[3]
+secondaries = sys.argv[4:]
+try:
+    packages = json.loads(packages_json) if packages_json else []
+except Exception:
+    packages = []
 out = {
     "primary": primary if primary else None,
     "secondaries": secondaries,
-    "packages": [],  # T9 will populate via glob resolution
+    "packages": packages,
     "repo_type": repo_type,
 }
 json.dump(out, sys.stdout)
@@ -168,10 +378,31 @@ discover() {
   done <<EOF
 $ranked
 EOF
+  # T9: enumerate packages for the primary manifest (FR-WS-2).
+  local pkg_lines=""
+  if [ -n "$primary" ]; then
+    pkg_lines="$(enumerate_packages "$root" "$primary")" || true
+  fi
+  # Build a JSON array of {path, manifest_source} objects (T10 will refine
+  # manifest_source for multi-stack; T9 uses the primary uniformly).
+  local packages_json
+  packages_json="$(printf '%s\n' "$pkg_lines" | python3 -c '
+import sys, json
+ms = ""
+if len(sys.argv) > 1:
+    ms = sys.argv[1]
+pkgs = []
+for line in sys.stdin.read().splitlines():
+    line = line.strip()
+    if not line:
+        continue
+    pkgs.append({"path": line, "manifest_source": ms})
+print(json.dumps(pkgs))
+' "$primary")"
   if [ "${#secondaries[@]}" -eq 0 ]; then
-    emit_json "$primary"
+    emit_json "$primary" "$packages_json"
   else
-    emit_json "$primary" "${secondaries[@]}"
+    emit_json "$primary" "$packages_json" "${secondaries[@]}"
   fi
 }
 

@@ -2,8 +2,10 @@
 # /architecture audit — entrypoint.
 # T1 shipped a hardcoded U004 grep; T3 added the 3-tier rule loader + L1 cap (FR-21)
 # + stack detection (FR-22) + L3 presence (FR-23); T4 adds L3 override merge
-# (FR-11/20) + exemption parsing (FR-13) + config keys (FR-14). Findings still
-# come from the T1 U004 grep until T5+ wire the real scanner.
+# (FR-11/20) + exemption parsing (FR-13) + config keys (FR-14); T5 adds the file
+# scanner with gitignore + hardcoded deny-list + extension filter (FR-40/41/42/43,
+# D15). Findings still come from the T1 U004 grep, but now driven by the
+# enumerated file list, until T6+ wire the rest of the L1 rules.
 
 set -euo pipefail
 
@@ -29,8 +31,21 @@ PLUGIN_YAML="${RUN_AUDIT_PLUGIN_YAML:-$SKILL_DIR/principles.yaml}"
 #   rule_overrides: [{id, fields:{<field>:{before,after}}}],
 #   exemptions: [{rule, file, line?, adr, expires?, note?}],
 #   config: {adr_path, scan_root, extra_ignore},
-#   effective_severity: {<rule_id>: <severity>}
+#   effective_severity: {<rule_id>: <severity>},
+#   scanned: {total, by_ext, excluded_by_gitignore, excluded_by_fallback,
+#             files_for_rules: [<rel-path>, ...]}
 # }
+# File scanner (FR-40/41/42/43, D15):
+#   In a git repo  → enumerate via `git ls-files --cached --others --exclude-standard`
+#                    (.gitignore is honored by `--exclude-standard`); a separate
+#                    `find` pass counts files dropped by gitignore.
+#   Non-git tree   → enumerate via `find -type f -not -path '*/\.git/*'`.
+#   Hardcoded deny-list (14 entries from D15): node_modules, .venv, __pycache__,
+#     dist, build, .pytest_cache, .ruff_cache, .mypy_cache, coverage, .next,
+#     .nuxt, .git, target, vendor — applied as path-segment match.
+#   extra_ignore from L3 config (FR-14) unions with the deny-list.
+#   Files for the rule pipeline are filtered to .ts .tsx .js .jsx .mjs .cjs .vue .py;
+#   all other survivors count toward scanned.total but are not handed to evaluators.
 # Merge precedence (FR-20): project L3 > stack L2 > universal L1.
 # L1 cap (FR-21): >15 tier=1 plugin rules → exit 64 with exact message.
 # Stack detection (FR-22): package.json+tsconfig.json → ts; pyproject/setup/requirements → py.
@@ -39,7 +54,7 @@ PLUGIN_YAML="${RUN_AUDIT_PLUGIN_YAML:-$SKILL_DIR/principles.yaml}"
 # T4 only parses exemptions; reconciliation against ADRs lands in T15.
 LOADER_JSON="$(
   python3 - "$PLUGIN_YAML" "$SCAN_ROOT" <<'PY'
-import json, os, sys, yaml
+import json, os, subprocess, sys, yaml
 
 plugin_path, scan_root = sys.argv[1], sys.argv[2]
 
@@ -136,6 +151,88 @@ for r in (l3.get("rules", []) or []):
 
 effective_severity = {rid: r.get("severity") for rid, r in merged.items() if r.get("severity")}
 
+# FR-40/41/42/43, D15 — file enumeration.
+DENY_SEGMENTS = (
+    "node_modules", ".venv", "__pycache__", "dist", "build",
+    ".pytest_cache", ".ruff_cache", ".mypy_cache", "coverage",
+    ".next", ".nuxt", ".git", "target", "vendor",
+)
+SUPPORTED_EXTS = (".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue", ".py")
+
+extra_ignore_segments = []
+for raw in config["extra_ignore"]:
+    seg = str(raw).strip().strip("/")
+    if seg:
+        extra_ignore_segments.append(seg)
+
+deny_set = set(DENY_SEGMENTS) | set(extra_ignore_segments)
+
+def has_denied_segment(rel_path):
+    parts = rel_path.replace("\\", "/").split("/")
+    return any(p in deny_set for p in parts)
+
+def find_all_files(root):
+    out = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        # Always skip .git internals; deny-list filtering runs on the rel path.
+        dirnames[:] = [d for d in dirnames if d != ".git"]
+        for name in filenames:
+            full = os.path.join(dirpath, name)
+            rel = os.path.relpath(full, root).replace("\\", "/")
+            out.append(rel)
+    return out
+
+def in_git_repo(root):
+    try:
+        r = subprocess.run(
+            ["git", "-C", root, "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True, check=False,
+        )
+        return r.returncode == 0 and r.stdout.strip() == "true"
+    except FileNotFoundError:
+        return False
+
+scanned_total = 0
+by_ext = {}
+excluded_by_gitignore = 0
+excluded_by_fallback = 0
+files_for_rules = []
+
+if os.path.isdir(scan_root):
+    is_repo = in_git_repo(scan_root)
+    all_files = find_all_files(scan_root)
+
+    if is_repo:
+        r = subprocess.run(
+            ["git", "-C", scan_root, "ls-files", "--cached", "--others",
+             "--exclude-standard"],
+            capture_output=True, text=True, check=False,
+        )
+        kept_by_git = set(
+            line for line in r.stdout.splitlines() if line.strip()
+        )
+        # Files visible to `find` but not in the git keep-set are gitignored.
+        for rel in all_files:
+            if rel not in kept_by_git:
+                excluded_by_gitignore += 1
+        post_gitignore = [rel for rel in all_files if rel in kept_by_git]
+    else:
+        post_gitignore = list(all_files)
+
+    for rel in post_gitignore:
+        if has_denied_segment(rel):
+            excluded_by_fallback += 1
+            continue
+        ext = os.path.splitext(rel)[1].lower()
+        if ext not in SUPPORTED_EXTS:
+            # Non-supported survivors (dotfiles, configs, docs) are not handed
+            # to evaluators and not counted in scanned.total (per plan §T5
+            # inline verification: total counts only the rule-pipeline set).
+            continue
+        scanned_total += 1
+        by_ext[ext] = by_ext.get(ext, 0) + 1
+        files_for_rules.append(rel)
+
 print(json.dumps({
     "tier_1": len(tier_1_rules),
     "tier_2_ts": tier_2_ts,
@@ -148,22 +245,45 @@ print(json.dumps({
     "exemptions": exemptions,
     "config": config,
     "effective_severity": effective_severity,
+    "scanned": {
+        "total": scanned_total,
+        "by_ext": by_ext,
+        "excluded_by_gitignore": excluded_by_gitignore,
+        "excluded_by_fallback": excluded_by_fallback,
+        "files_for_rules": files_for_rules,
+    },
 }))
 PY
 )"
 
 START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# ── Scanner stub (T5+ replaces with real driver) ──────────────────────────────
-# Still the T1 hardcoded U004 grep; severity is rewritten post-grep by jq using
-# effective_severity so L3 demotes/promotes flow through.
-findings_json="$(
-  { grep -rn --include='*.ts' 'console\.log' "$SCAN_ROOT" 2>/dev/null || true; } \
-    | awk -F: '{
-        printf "{\"rule_id\":\"U004\",\"severity\":\"warn\",\"file\":\"%s\",\"line\":%s,\"message\":\"console.log forbidden in src/\",\"source_citation\":\"principles.yaml#U004\",\"suppressed_by\":null}\n", $1, $2
-      }' \
-    | jq -s .
-)"
+# ── Scanner (T5: enumerated-file-driven; T6+ adds the rest of the rules) ─────
+# Iterate scanned.files_for_rules and run the T1 U004 grep per-file. Severity is
+# rewritten post-grep by jq using effective_severity so L3 demotes/promotes
+# flow through.
+SCANNED_FILES_LIST="$(jq -r '.scanned.files_for_rules[]' <<<"$LOADER_JSON")"
+
+findings_json='[]'
+if [ -n "$SCANNED_FILES_LIST" ]; then
+  findings_json="$(
+    {
+      while IFS= read -r rel; do
+        [ -n "$rel" ] || continue
+        # U004 applies to .ts/.tsx only; ignore other supported exts here.
+        if [[ "$rel" != *.ts && "$rel" != *.tsx ]]; then
+          continue
+        fi
+        full="$SCAN_ROOT/$rel"
+        [ -f "$full" ] || continue
+        { grep -n 'console\.log' "$full" 2>/dev/null || true; } \
+          | awk -F: -v f="$rel" '{
+              printf "{\"rule_id\":\"U004\",\"severity\":\"warn\",\"file\":\"%s\",\"line\":%s,\"message\":\"console.log forbidden in src/\",\"source_citation\":\"principles.yaml#U004\",\"suppressed_by\":null}\n", f, $1
+            }'
+      done <<<"$SCANNED_FILES_LIST"
+    } | jq -s .
+  )"
+fi
 
 END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -188,5 +308,6 @@ jq -n \
     config: $loader.config,
     rule_overrides: $loader.rule_overrides,
     exemptions: $loader.exemptions,
+    scanned: ($loader.scanned | del(.files_for_rules)),
     findings: ($f | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) }))
   }'

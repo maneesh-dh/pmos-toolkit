@@ -6,7 +6,7 @@
   <meta name="pmos:feature-sdlc-slug" content="architecture-principles-skill">
   <meta name="pmos:feature-sdlc-mode" content="skill-new">
   <meta name="pmos:feature-sdlc-tier" content="3">
-  <meta name="pmos:feature-sdlc-status" content="in_progress">
+  <meta name="pmos:feature-sdlc-status" content="paused">
   <title>Pipeline status — architecture-principles-skill</title>
   <link rel="stylesheet" href="assets/style.css?v=2.46.0">
   <script defer src="assets/viewer.js?v=2.46.0"></script>
@@ -32,7 +32,7 @@
   <dt>Target platform</dt><dd><code>generic</code> (Claude Code + Codex)</dd>
   <dt>Output format</dt><dd><code>html</code></dd>
   <dt>Started</dt><dd>2026-05-13</dd>
-  <dt>Status</dt><dd><strong>in_progress</strong> — /plan complete; resume cursor = execute</dd>
+  <dt>Status</dt><dd><strong>paused</strong> — user requested resume in fresh session after /plan</dd>
   <dt>Resume cursor</dt><dd><code>current_phase = execute</code></dd>
   <dt>Seed</dt><dd><a href="../../ideate/2026-05-13_architecture-principles-skill.html">Ideation artifact</a></dd>
 </dl>
@@ -64,13 +64,30 @@
 <ol>
   <li>Open a new terminal at <code>/Users/maneeshdhabria/Desktop/Projects/agent-skills-architecture-principles-skill</code> (this worktree).</li>
   <li>Start a fresh <code>claude</code> session.</li>
-  <li>Run <code>/feature-sdlc --resume</code> — the orchestrator reads <code>.pmos/feature-sdlc/state.yaml</code>, validates drift, and resumes at <code>execute</code>.</li>
-  <li>/execute will be seeded with <code>03_plan.html</code>; execution mode = <code>inline</code> (single-agent task-by-task; no <code>--subagent-driven</code>). 21 tasks in dependency-ordered chains; commit cadence = per-task.</li>
+  <li>Run <code>/feature-sdlc --resume</code> — the orchestrator reads <code>.pmos/feature-sdlc/state.yaml</code>, validates drift, runs the compact checkpoint, and resumes at <code>execute</code>.</li>
+  <li>/execute will be seeded with <code>03_plan.html</code>; execution mode = <code>inline</code> (single-agent task-by-task; no <code>--subagent-driven</code>). 21 tasks in dependency-ordered chains; commit cadence = per-task; /execute's task-level resume picks up at T1 (or wherever a prior partial run left off).</li>
+  <li>After /execute: Phase 6a /skill-eval runs <code>skill-eval-check.sh --target generic plugins/pmos-toolkit/skills/architecture/</code> (39-check binary rubric, cap 2 remediation iterations).</li>
+</ol>
+</section>
+
+<section id="plan-decisions-locked">
+<h2 id="plan-decisions-locked">Key /plan decisions to carry into /execute</h2>
+<ol>
+  <li><strong>execution_mode = inline</strong> (user-confirmed). /execute runs task-by-task in a single agent; no <code>--subagent-driven</code> flag.</li>
+  <li><strong>21 tasks across 6 phases.</strong> T1 = tracer bullet (single grep rule, JSON to stdout, fixture-driven). T21 = TN (fixtures + skill-eval + citations + gap-map + determinism + manual dry-run).</li>
+  <li><strong>P1 stack:</strong> bash POSIX + jq + python3+yaml. Skill is install-free; SKILL.md Phase 0 gates jq presence (R2 mitigation).</li>
+  <li><strong>P2 test runner = plain bash.</strong> Each fixture under <code>tests/fixtures/</code> carries a <code>.assert</code> script; <code>tests/run.sh</code> walks all fixtures and prints <code>ok</code> / <code>FAIL</code>.</li>
+  <li><strong>P3 vertical-slice doctrine.</strong> Each phase ships a working audit a bit wider than the last; no horizontal layer-cuts.</li>
+  <li><strong>P4 TDD shape = fixture-first.</strong> Every Phase 2-7 task writes a fixture, asserts it fails the current implementation, implements, asserts it passes.</li>
+  <li><strong>P5 FR-63 release-prereq scope discipline.</strong> No version-bump / CHANGELOG / README / manifest-sync / learnings.md tasks in any Wave — /complete-dev (Phase 8) is the sole writer.</li>
+  <li><strong>P6 determinism strategy:</strong> emit timestamps as normal; <code>tools/check-determinism.sh</code> strips <code>.run</code> via <code>jq 'del(.run)'</code> before diffing.</li>
+  <li><strong>Three-file split discipline (G3, D16):</strong> T2 writes plugin path only; T4 reads user path only; T13 writes user ADRs only — never crosses streams.</li>
+  <li><strong>Canonical skill path (repo CLAUDE.md):</strong> <code>plugins/pmos-toolkit/skills/architecture/SKILL.md</code>, lowercase-hyphenated dir, frontmatter <code>name: architecture</code> matches dir exactly.</li>
 </ol>
 </section>
 
 <section id="spec-decisions-locked">
-<h2 id="spec-decisions-locked">Key /spec decisions to carry into /plan</h2>
+<h2 id="spec-decisions-locked">Key /spec decisions (already carried into the plan)</h2>
 <ol>
   <li><strong>v1 scope = audit only.</strong> scaffold / spec-check / code-check explicitly v2+ (D1 / §3 non-goals).</li>
   <li><strong>Three-file split</strong> (G3, D16): plugin L1+L2 at <code>plugins/pmos-toolkit/skills/architecture/principles.yaml</code> · user L3 + exemptions at <code>&lt;repo&gt;/.pmos/architecture/principles.yaml</code> · ADRs at <code>&lt;repo&gt;/docs/adr/ADR-NNNN-*.md</code>. Plugin-update safe.</li>

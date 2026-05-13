@@ -1,0 +1,13 @@
+plan,features,satisfaction,how_likely_to_recommend,why
+Free,Reports|Mobile,4,9,The reports are great and easy to share with the team
+Pro,Reports|Integrations|API,5,10,Integrations save us hours every week
+Free,Reports,3,7,Onboarding was confusing; reports are useful though
+Team,Reports|Mobile|Integrations,5,10,Everything works smoothly
+Pro,Mobile|API,4,8,Mobile app is solid; API needs better docs
+Free,Reports,2,5,Pricing is too high for what you get
+Pro,Reports|Integrations,4,9,Great integrations but performance lags sometimes
+Team,Reports|API,5,10,Best in class for our use case
+Free,Mobile,1,3,Crashes constantly on iOS
+Pro,Reports|Mobile|Integrations|API,5,9,Love everything; would recommend
+Free,Reports,3,6,Decent but expensive
+Team,Reports|Integrations,4,8,Good overall; reporting could be deeper

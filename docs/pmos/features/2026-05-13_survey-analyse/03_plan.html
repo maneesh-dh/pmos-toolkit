@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>survey-analyse skill — Plan</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.38.0">
+  <script defer src="assets/viewer.js?v=2.38.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">survey-analyse skill — Plan</h1>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="meta" data-pmos-section="meta">
+  <h2 id="meta">Meta</h2>
+  <dl>
+    <dt>Tier</dt><dd>3 (mode-driven Q&amp;A tasks; ~20 TDD tasks)</dd>
+    <dt>Upstream</dt><dd><a href="02_spec.html">02_spec.html</a></dd>
+    <dt>Execution mode</dt><dd>Sequential (single subagent / inline); waves possible later but not required for this skill</dd>
+    <dt>Resume cursor</dt><dd>T-IDs are monotonic; <code>state.yaml.phases.execute</code> reads T-id-on-disk markers</dd>
+  </dl>
+</section>
+
+<section id="tasks" data-pmos-section="tasks">
+  <h2 id="tasks">Tasks</h2>
+  <p>Each task: a one-line goal, the FRs it satisfies, an inline test (TDD red→green), and a commit message stem. Tasks group into waves by dependency.</p>
+
+  <h3 id="wave-1-scaffold">Wave 1 — scaffold + frontmatter (skill structure)</h3>
+  <ol>
+    <li><strong>T1 — Create skill directory + SKILL.md frontmatter.</strong> Frontmatter satisfies §A + §B + §F.1 (user-invocable, argument-hint). Test: <code>head -30 SKILL.md | grep -E '^(name: survey-analyse|user-invocable: true|description:|argument-hint:)'</code> all 4 present. FRs: PA1, PA2, PA3, PB1, PF1.</li>
+    <li><strong>T2 — Add SKILL.md body skeleton.</strong> Sections: announce line; <code>## Platform Adaptation</code>; <code>## Track Progress</code>; the 8 numbered phases; learnings-load line in Phase 0; <code>## Phase N: Capture Learnings</code> at end. Test: <code>grep -c "^## Phase" SKILL.md</code> ≥ 9. FRs: PD4, PD5.</li>
+  </ol>
+
+  <h3 id="wave-2-helpers">Wave 2 — bundled helper modules (TDD per module)</h3>
+  <ol start="3">
+    <li><strong>T3 — <code>scripts/helpers/categorical.py</code> + selftest fixture.</strong> Function: <code>freq_table</code>. Selftest fixture: 10-row CSV with known frequencies. Test: <code>python3 scripts/helpers/categorical.py --selftest</code> exits 0. FR-R17, FR-PE1.</li>
+    <li><strong>T4 — <code>multi_select.py</code> + selftest.</strong> Asserts respondent-base %, sums &gt;100% correctly. FR-R17.</li>
+    <li><strong>T5 — <code>likert.py</code> + selftest.</strong> Known distribution, T2B/B2B/median; ordinal-mean caveat returned. FR-R17, anti-pattern check #1.</li>
+    <li><strong>T6 — <code>nps.py</code> + selftest.</strong> 0–10 input → integer NPS = %P − %D. FR-R16, FR-R17, anti-pattern check #3.</li>
+    <li><strong>T7 — <code>ranking.py</code> + selftest.</strong> Avg rank + weighted-points (both conventions returned). FR-R17.</li>
+    <li><strong>T8 — <code>matrix.py</code> + selftest.</strong> Per-row Likert + per-respondent zero-variance straightlining flag. FR-R17.</li>
+    <li><strong>T9 — <code>numeric.py</code> + selftest.</strong> n, mean, median, SD, percentiles, 1.5×IQR outlier detection. FR-R17.</li>
+    <li><strong>T10 — <code>stats.py</code> (chi-square, column-z, Holm) + selftest.</strong> Known-answer fixture from a textbook example for chi-square and Holm step-down. FR-R06, FR-R17.</li>
+    <li><strong>T11 — <code>ingest.py</code> (csv, tsv, xlsx, xls, pdf) + selftest.</strong> 5 fixture files, one per extension. FR-R01.</li>
+    <li><strong>T12 — <code>schema.py</code> (type inference) + selftest.</strong> Given a fixture column of values, infer the question type. Confidence score. FR-R02 (inference side).</li>
+    <li><strong>T13 — <code>clean.py</code> (straightliners, speeders, dupes, attention) + selftest.</strong> FR for cleaning steps.</li>
+    <li><strong>T14 — <code>pii.py</code> (regex detectors) + selftest.</strong> FR-R05.</li>
+    <li><strong>T15 — <code>tests/selftest.sh</code> aggregator.</strong> Runs every <code>--selftest</code>. Exits non-zero on any failure. FR-R17.</li>
+  </ol>
+
+  <h3 id="wave-3-references">Wave 3 — reference/ files</h3>
+  <ol start="16">
+    <li><strong>T16 — <code>reference/question-type-analysis.md</code>.</strong> Per-q-type playbook (single-select, multi-select, Likert, NPS, ranking, matrix, numeric). ToC in first 15 lines. Cites the helper function names; one worked example per type. FR-PC2.</li>
+    <li><strong>T17 — <code>reference/text-analysis.md</code>.</strong> Braun &amp; Clarke 6-phase contract + Phase 5 subagent prompt template + theme-reporting JSON shape + PII detect-and-warn protocol. ToC; ≤600 lines. FR-PC2.</li>
+    <li><strong>T18 — <code>reference/cross-survey-stats.md</code>.</strong> Cross-tabs, Holm correction (plain-language framing + technical name in last section), MoE table, weighting caveats. ToC. FR-R06, FR-PC2.</li>
+    <li><strong>T19 — <code>reference/data-quality-and-reporting.md</code>.</strong> Cleaning checklist + report skeleton + exec-summary writing rules. ToC. FR-PC2.</li>
+  </ol>
+
+  <h3 id="wave-4-skillmd-body">Wave 4 — flesh out SKILL.md body</h3>
+  <ol start="20">
+    <li><strong>T20 — Phase 0 + Platform Adaptation.</strong> Inline the canonical non-interactive block; document Python-3.10+ dependency; learnings-load line. FR-PD4.</li>
+    <li><strong>T21 — Phases 1–3 body.</strong> Ingest, schema-confirm, clean. FR-R01, FR-R02.</li>
+    <li><strong>T22 — Phases 4–5 body.</strong> Per-run analysis.py author + Bash run; subagent-per-question for themes. FR-R03, FR-R04, FR-R05, FR-R12.</li>
+    <li><strong>T23 — Phases 6–8 body.</strong> Cross-tabs + Holm + plain-language; report rendering; learnings + handoff. FR-R06, FR-R09, FR-R10, FR-R14.</li>
+    <li><strong>T24 — Anti-Patterns + Capture Learnings sections.</strong> The 5 zero-tolerance checks + Phase N: Capture Learnings. FR-PD4.</li>
+  </ol>
+
+  <h3 id="wave-5-release-prereqs">Wave 5 — release prerequisites</h3>
+  <ol start="25">
+    <li><strong>T25 — README row.</strong> Add a <code>/survey-analyse</code> row to the repo README under "Utilities" alongside <code>/survey-design</code>.</li>
+    <li><strong>T26 — Bump both plugin manifests.</strong> <code>plugin.json</code> in <code>.claude-plugin/</code> AND <code>.codex-plugin/</code> — minor bump 2.38.0 → 2.39.0; single commit. (Pre-push hook enforces sync.)</li>
+    <li><strong>T27 — CHANGELOG entry.</strong> One-line user-facing entry under 2.39.0 noting <code>/survey-analyse</code> shipped.</li>
+    <li><strong>T28 — Learnings header bootstrap.</strong> Add <code>## /survey-analyse</code> section header to <code>~/.pmos/learnings.md</code> (idempotent).</li>
+  </ol>
+</section>
+
+<section id="risks" data-pmos-section="risks">
+  <h2 id="risks">Risks</h2>
+  <ul>
+    <li><strong>PDF tabulation reliability.</strong> Mitigation: ship Typeform + Google Forms fixtures; document explicit best-effort + fallback.</li>
+    <li><strong>SKILL.md body bloat.</strong> 8 phases + canonical non-interactive block + platform-adaptation + anti-patterns risks &gt;500 lines. Mitigation: push detail to <code>reference/</code> aggressively; review at T24 and split if needed.</li>
+    <li><strong>Subagent contract drift.</strong> Phase 5's subagent contract is text-prompt-defined; small wording changes can shift outputs. Mitigation: lock the contract in <code>reference/text-analysis.md</code> as a verbatim template the SKILL.md body cites.</li>
+    <li><strong>Helper version skew with /survey-design.</strong> Both skills share a survey-mental-model but no code. Mitigation: spec confirms /survey-design's <code>survey.json</code> sections[].questions[] shape is what we consume.</li>
+  </ul>
+</section>
+
+<section id="verify-checklist" data-pmos-section="verify-checklist">
+  <h2 id="verify-checklist">Final-verification checklist (for /verify)</h2>
+  <ul>
+    <li>[ ] <code>tests/selftest.sh</code> exits 0 (FR-R17).</li>
+    <li>[ ] <code>feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/survey-analyse</code> exits 0.</li>
+    <li>[ ] Manual run on a small fixture produces a <code>report.html</code> passing the 5 zero-tolerance checks.</li>
+    <li>[ ] <code>assert_heading_ids.sh</code> clean on every <code>*.html</code> the skill produces.</li>
+    <li>[ ] Both <code>plugin.json</code> manifests at the new version; README row present; CHANGELOG entry present.</li>
+    <li>[ ] No <code>data-section</code> attrs; no Tailwind; no external CDN refs; <code>?v=&lt;version&gt;</code> cache-bust on every emitted asset URL.</li>
+  </ul>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: 03_plan.html</span>
+  </footer>
+</body>
+</html>

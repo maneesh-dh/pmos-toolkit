@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "artifact": "03_plan.html",
+  "ids": ["meta", "tasks", "wave-1-scaffold", "wave-2-helpers", "wave-3-references", "wave-4-skillmd-body", "wave-5-release-prereqs", "risks", "verify-checklist"],
+  "sections": [
+    {"id": "meta", "level": 2, "title": "Meta", "parent_id": null},
+    {"id": "tasks", "level": 2, "title": "Tasks", "parent_id": null},
+    {"id": "wave-1-scaffold", "level": 3, "title": "Wave 1 — scaffold + frontmatter", "parent_id": "tasks"},
+    {"id": "wave-2-helpers", "level": 3, "title": "Wave 2 — bundled helper modules", "parent_id": "tasks"},
+    {"id": "wave-3-references", "level": 3, "title": "Wave 3 — reference/ files", "parent_id": "tasks"},
+    {"id": "wave-4-skillmd-body", "level": 3, "title": "Wave 4 — flesh out SKILL.md body", "parent_id": "tasks"},
+    {"id": "wave-5-release-prereqs", "level": 3, "title": "Wave 5 — release prerequisites", "parent_id": "tasks"},
+    {"id": "risks", "level": 2, "title": "Risks", "parent_id": null},
+    {"id": "verify-checklist", "level": 2, "title": "Final-verification checklist (for /verify)", "parent_id": null}
+  ]
+}

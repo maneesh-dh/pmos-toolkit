@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>survey-analyse skill — Spec</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.38.0">
+  <script defer src="assets/viewer.js?v=2.38.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">survey-analyse skill — Spec</h1>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="meta" data-pmos-section="meta">
+  <h2 id="meta">Meta</h2>
+  <dl>
+    <dt>Date</dt><dd>2026-05-13</dd>
+    <dt>Status</dt><dd>Draft</dd>
+    <dt>Tier</dt><dd>3</dd>
+    <dt>Upstream</dt><dd><a href="01_requirements.html">01_requirements.html</a> (loop 2 — post grill)</dd>
+    <dt>Standing acceptance criteria</dt><dd><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code> §A–§F (turned into FRs below); this repo's <code>CLAUDE.md</code> "Skill-authoring conventions" and "Canonical skill path".</dd>
+  </dl>
+</section>
+
+<section id="architecture" data-pmos-section="architecture">
+  <h2 id="architecture">Architecture</h2>
+  <h3 id="file-layout">File layout (target)</h3>
+  <pre><code class="language-text">plugins/pmos-toolkit/skills/survey-analyse/
+├── SKILL.md                         # frontmatter + 8-phase body (≤500 lines)
+├── reference/
+│   ├── question-type-analysis.md    # per-q-type playbook (the meat)
+│   ├── text-analysis.md             # Braun & Clarke subagent contract + theme reporting
+│   ├── cross-survey-stats.md        # cross-tabs, Holm correction, MoE, weighting
+│   └── data-quality-and-reporting.md # cleaning checklist + report structure
+├── scripts/
+│   └── helpers/
+│       ├── __init__.py
+│       ├── ingest.py                # CSV/TSV/XLSX/PDF readers; normalise to dicts
+│       ├── schema.py                # type inference + value-pattern helpers
+│       ├── clean.py                 # straightlining/speeders/dupes/attention checks
+│       ├── categorical.py           # freq, mode, % of base
+│       ├── multi_select.py          # % of respondents (not responses), co-occurrence
+│       ├── likert.py                # distribution, median, mode, T2B, B2B
+│       ├── nps.py                   # %P/%Pas/%D + NPS integer score
+│       ├── ranking.py               # avg rank + weighted points
+│       ├── matrix.py                # per-row Likert + straightlining flag
+│       ├── numeric.py               # n, mean, median, SD, percentiles, IQR outliers
+│       ├── stats.py                 # chi-square, column-z-test, Holm correction
+│       └── pii.py                   # regex detectors (email/phone/honorific name)
+└── tests/
+    ├── README.md
+    ├── selftest.sh                  # exercises every helper's --selftest
+    └── fixtures/
+        ├── small-likert.csv         # known-answer fixture for likert helper
+        ├── nps-mixed.csv
+        └── multi-select.csv
+</code></pre>
+
+  <h3 id="run-folder">Run folder layout (per /survey-analyse invocation)</h3>
+  <pre><code class="language-text">{docs_path}/survey-analyses/{YYYY-MM-DD}_&lt;slug&gt;/
+├── responses.csv                    # normalised input (after Phase 1 ingest)
+├── cleaned_responses.csv            # after Phase 3 cleaning
+├── cleaning.json                    # cleaning rules + records removed
+├── schema.json                      # user-confirmed schema (col → type + opts)
+├── analysis.py                      # LLM-authored per-run script
+├── per_question.json                # helper output: per-Q stats
+├── themes.json                      # Phase 5 subagent output
+├── synthesis.json                   # Phase 6 cross-tabs + key takeaways
+├── report.html                      # final report (+ report.md sidecar when output_format=both)
+├── report.sections.json
+├── index.html
+└── assets/                          # copied from _shared/html-authoring
+</code></pre>
+
+  <h3 id="control-flow">Control flow (8 phases)</h3>
+  <p>Linear, no orchestrator-level review loops. The phase contract maps 1:1 to the Phase numbers in <code>01_requirements.html#solution-direction</code>:</p>
+  <ol>
+    <li>Phase 0 — Setup (settings, flags, non-interactive block, learnings)</li>
+    <li>Phase 1 — Ingest (CSV/TSV/XLSX/XLS/PDF → <code>responses.csv</code>)</li>
+    <li>Phase 2 — Schema + context (always user-confirmed, column-by-column)</li>
+    <li>Phase 3 — Clean (rules + counts; <code>cleaned_responses.csv</code> + <code>cleaning.json</code>)</li>
+    <li>Phase 4 — Per-question analysis (LLM authors + Bash-runs <code>analysis.py</code>; <code>per_question.json</code>)</li>
+    <li>Phase 5 — Open-end thematic coding (subagent-per-question; <code>themes.json</code>)</li>
+    <li>Phase 6 — Whole-survey synthesis (cross-tabs + Holm; <code>synthesis.json</code>)</li>
+    <li>Phase 7 — Report rendering (substrate-compliant <code>report.html</code>)</li>
+    <li>Phase 8 — Learnings + handoff</li>
+  </ol>
+</section>
+
+<section id="api-contracts" data-pmos-section="api-contracts">
+  <h2 id="api-contracts">API contracts</h2>
+  <h3 id="api-helpers">Helper module signatures</h3>
+  <p>Every helper module exposes pure functions taking a list-of-rows + a column name (or two for cross-tabs) and returning a JSON-serializable dict. No global state. Each helper carries a <code>--selftest</code> CLI entry point asserting known-answer fixtures.</p>
+  <pre><code class="language-python"># scripts/helpers/categorical.py
+def freq_table(rows: list[dict], col: str) -&gt; dict:
+    """{ "n": int, "responses": {value: count}, "percent": {value: float}, "mode": value }
+    Percentages computed on the respondent base (non-null responses for col)."""
+
+# scripts/helpers/multi_select.py
+def multi_select_table(rows: list[dict], col: str, delimiter: str = "|") -&gt; dict:
+    """{ "n_respondents": int, "option_counts": {opt: int},
+        "option_percent_of_respondents": {opt: float},
+        "mean_selected_per_respondent": float } — NOT a 100% breakdown."""
+
+# scripts/helpers/likert.py
+LIKERT_SCALES = {5: [...], 7: [...]}  # canonical anchor labels
+def likert_stats(rows, col, scale_size=5, reverse_scored=False) -&gt; dict:
+    """{ "distribution": {1..scale_size: count + %}, "median": int, "mode": int,
+        "t2b_percent": float, "b2b_percent": float, "net_score": float,
+        "mean_with_ordinal_caveat": float }"""
+
+# scripts/helpers/nps.py
+def nps(rows, col) -&gt; dict:
+    """{ "n": int, "promoter_percent": float, "passive_percent": float,
+        "detractor_percent": float, "nps_score": int }  # nps as integer -100..+100"""
+
+# scripts/helpers/ranking.py
+def ranking_stats(rows, items_cols: dict[str, str]) -&gt; dict:
+    """items_cols maps item name → its rank-column. Returns avg rank +
+        weighted points; both conventions stated in the returned dict."""
+
+# scripts/helpers/matrix.py
+def matrix_stats(rows, row_cols: dict[str, str], scale_size=5) -&gt; dict:
+    """Per-row Likert stats keyed by row label + a respondent-level
+        straightlining flag (zero-variance across row_cols)."""
+
+# scripts/helpers/numeric.py
+def numeric_stats(rows, col) -&gt; dict:
+    """{ n, mean, median, sd, min, max, p25, p50, p75, outliers_iqr: [...],
+        histogram: [{bin, count}] }"""
+
+# scripts/helpers/stats.py
+def chi_square(observed: list[list[int]]) -&gt; dict:
+    """{ chi2, df, p }"""
+def column_z_test(p1, n1, p2, n2) -&gt; float:
+    """Two-proportion z-test → p-value."""
+def holm_correct(p_values: list[float]) -&gt; list[float]:
+    """Holm-Bonferroni step-down correction; returns adjusted p-values
+        in the same order. Family = the supplied list."""
+
+# scripts/helpers/clean.py
+def detect_straightliners(rows, matrix_cols: list[list[str]]) -&gt; list[int]:  # row indices
+def detect_speeders(rows, duration_col, threshold_ratio=0.5) -&gt; list[int]:
+def detect_duplicates(rows, key_cols: list[str]) -&gt; list[int]:
+def detect_failed_attention(rows, attention_checks: list[dict]) -&gt; list[int]:
+
+# scripts/helpers/ingest.py
+def read_responses(path: str, sheet: str | int | None = None) -&gt; tuple[list[dict], list[str]]:
+    """Returns (rows, header_order). Dispatches by extension.
+        .csv/.tsv → csv stdlib; .xlsx/.xls → openpyxl; .pdf → text extraction + heuristic tabulation."""
+
+# scripts/helpers/pii.py
+PII_PATTERNS = {"email": r"...", "phone": r"...", "honorific_name": r"..."}
+def detect_pii(quote: str) -&gt; dict:
+    """{ "email_matches": [...], "phone_matches": [...], "name_matches": [...] }"""
+</code></pre>
+
+  <h3 id="api-analysispy">The per-run <code>analysis.py</code> shape</h3>
+  <pre><code class="language-python">"""Generated by /survey-analyse on YYYY-MM-DD for run &lt;slug&gt;.
+   Edit by hand only if you know what you're doing — re-runs of /survey-analyse
+   overwrite this file."""
+import csv, json, sys
+sys.path.insert(0, "/abs/path/to/plugins/pmos-toolkit/skills/survey-analyse/scripts")
+from helpers import categorical, multi_select, likert, nps, ranking, matrix, numeric, stats
+
+ROWS = list(csv.DictReader(open("cleaned_responses.csv")))
+SCHEMA = json.load(open("schema.json"))
+
+per_q = {}
+for col, meta in SCHEMA["columns"].items():
+    kind = meta["type"]
+    if kind == "single_select":     per_q[col] = categorical.freq_table(ROWS, col)
+    elif kind == "multi_select":    per_q[col] = multi_select.multi_select_table(ROWS, col, meta.get("delimiter", "|"))
+    elif kind == "likert":          per_q[col] = likert.likert_stats(ROWS, col, scale_size=meta["scale_size"])
+    elif kind == "nps":             per_q[col] = nps.nps(ROWS, col)
+    # ... ranking, matrix, numeric, open_text (skipped — handled in Phase 5)
+
+# Cross-tabs (Phase 6) — Holm-corrected across the family.
+cross_tabs = {}
+for segment in SCHEMA["segments"]:
+    fam_pvals = []
+    cross_tabs[segment] = {}
+    for col, meta in SCHEMA["columns"].items():
+        if meta["type"] in {"single_select", "likert", "nps"}:
+            cells, raw_p = stats.cross_tab(ROWS, row_col=col, segment_col=segment)
+            cross_tabs[segment][col] = {"cells": cells, "p_raw": raw_p}
+            fam_pvals.append(raw_p)
+    adjusted = stats.holm_correct(fam_pvals)
+    # assign adjusted back to each entry...
+
+json.dump({"per_question": per_q, "cross_tabs": cross_tabs}, open("per_question.json", "w"), indent=2)
+</code></pre>
+
+  <h3 id="api-themes-subagent">Phase 5 subagent contract</h3>
+  <p>For each open-text column: dispatch a fresh Agent with prompt template:</p>
+  <pre><code class="language-text">[mode: &lt;current-mode&gt;]
+Question: &lt;question text from schema&gt;
+Verbatims (n=&lt;N&gt;): &lt;chunked list, each prefixed with response_id&gt;
+
+Apply Braun &amp; Clarke 6-phase inductive thematic analysis:
+1. Familiarise. 2. Open code. 3. Search for themes. 4. Review themes.
+5. Name &amp; define. 6. Write up.
+
+Return JSON: {
+  "themes": [
+    {"name": "&lt;3–5 word name&gt;",
+     "definition": "&lt;one-sentence what's-in / what's-out&gt;",
+     "response_ids": [&lt;ids that touch this theme&gt;],
+     "representative_quote_ids": [&lt;1–3 ids&gt;],
+     "sentiment_lean": "positive|neutral|negative|mixed"}
+  ],
+  "uncoded_response_ids": [&lt;ids that didn't fit any theme&gt;]
+}
+A response MAY appear in multiple themes; report double-counting in
+&lt;themes_meta&gt; (sum of theme counts will be &gt; N when this happens).
+</code></pre>
+</section>
+
+<section id="functional-requirements" data-pmos-section="functional-requirements">
+  <h2 id="functional-requirements">Functional Requirements</h2>
+  <p>FRs are grouped by source: the requirements doc (FR-R*) and <code>skill-patterns.md</code> §A–§F (FR-PA*–FR-PF*). Each carries a 1-line test condition. <code>/verify</code> uses these as the rubric; <code>/skill-eval</code> Phase 6a tests the skill-patterns ones (1:1 with the <code>skill-eval.md</code> check_ids).</p>
+
+  <h3 id="fr-from-requirements">From the requirements doc</h3>
+  <table>
+    <thead><tr><th>FR</th><th>Requirement</th><th>Test</th></tr></thead>
+    <tbody>
+      <tr><td>FR-R01</td><td>Skill accepts <code>.csv</code> / <code>.tsv</code> / <code>.xlsx</code> / <code>.xls</code> / <code>.pdf</code> as <code>--responses</code> input</td><td>Five tests/fixtures (one per extension) each yield a non-empty <code>responses.csv</code>.</td></tr>
+      <tr><td>FR-R02</td><td>Phase 2 surfaces every column for user confirmation before Phase 4 (no silent auto-proceed)</td><td>Grep SKILL.md Phase 2 body for "AskUserQuestion" + "every column" or equivalent; manual playthrough on a known fixture confirms.</td></tr>
+      <tr><td>FR-R03</td><td>Phase 4 numeric output is byte-identical on identical <code>cleaned_responses.csv</code> + <code>schema.json</code> across runs</td><td>CI: run <code>analysis.py</code> twice on a fixture; <code>diff per_question.json per_question.json.run2</code> empty.</td></tr>
+      <tr><td>FR-R04</td><td>Phase 5 emits ≥1 verbatim quote per theme (when any response in the theme has a non-empty verbatim)</td><td>Test fixture with 3 themes; assert <code>themes.json</code> has <code>representative_quote_ids</code> non-empty for each.</td></tr>
+      <tr><td>FR-R05</td><td>Phase 5 surfaces a PII count in chat when quotes match the regex catalogue; does not redact</td><td>Test fixture with email-bearing verbatim; assert chat-side warning emitted; assert raw verbatim appears in <code>themes.json</code> unchanged.</td></tr>
+      <tr><td>FR-R06</td><td>Phase 6 applies Holm correction by default across each cross-tab family; reports both raw and adjusted p</td><td>Cross-tab fixture with k=10 tests; <code>cross_tabs[*].p_holm</code> values match <code>holm_correct()</code> applied to the raw p list.</td></tr>
+      <tr><td>FR-R07</td><td><code>--raw-p-only</code> flag suppresses Holm adjustment</td><td>Run with flag; <code>cross_tabs[*].p_holm</code> absent or equals raw p.</td></tr>
+      <tr><td>FR-R08</td><td>Phase 6 auto-flags cross-tab cells with <code>n &lt; 30</code></td><td>Cross-tab fixture with a known small cell; <code>cross_tabs[*][q].cells[seg].small_n_flag == true</code>.</td></tr>
+      <tr><td>FR-R09</td><td>Phase 7 writes <code>report.html</code> through <code>_shared/html-authoring/</code>: substrate template, kebab-case <code>&lt;h2&gt;</code>/<code>&lt;h3&gt;</code> ids, <code>?v=&lt;plugin-version&gt;</code> cache-bust, <code>assets/</code> copied, atomic temp-then-rename, <code>report.sections.json</code> companion</td><td><code>_shared/html-authoring/conventions.md</code> assertions pass; <code>assert_heading_ids.sh</code> clean on the produced <code>report.html</code>.</td></tr>
+      <tr><td>FR-R10</td><td>When <code>output_format=both</code>, emit <code>report.md</code> via <code>html-to-md.js</code></td><td>Run with <code>--format both</code>; both files present in run folder; md is a faithful round-trip.</td></tr>
+      <tr><td>FR-R11</td><td>No workstream context loaded (standalone utility)</td><td>Grep SKILL.md for absence of workstream-load line; manual playthrough confirms.</td></tr>
+      <tr><td>FR-R12</td><td>Skill runs <code>analysis.py</code> via Bash; one consolidated permission ask covers the run</td><td>Manual run; the Bash call is announced once before Phase 4.</td></tr>
+      <tr><td>FR-R13</td><td>When <code>python3</code> is absent: hard-stop with install message; no half-run report</td><td>Test in a python3-less environment; skill stops at Phase 4 prelude with clear instructions.</td></tr>
+      <tr><td>FR-R14</td><td>Methodology &amp; Limitations section of <code>report.html</code> is non-empty on every run</td><td>Grep <code>report.html</code> for <code>id="methodology"</code>; section body length &gt; 100 chars.</td></tr>
+      <tr><td>FR-R15</td><td>Run folder slug collision: append <code>-2</code>, <code>-3</code>, ... never overwrite</td><td>Test: run twice with same slug; second run folder is <code>&lt;slug&gt;-2</code>.</td></tr>
+      <tr><td>FR-R16</td><td>NPS auto-detected on 0–10 columns with "recommend" wording; user can override</td><td>Fixture with a 0–10 recommend column inferred as <code>nps</code>; schema-confirmation prompt offers type override.</td></tr>
+      <tr><td>FR-R17</td><td>Each helper module ships a <code>--selftest</code> CLI that exercises known-answer fixtures and exits non-zero on failure</td><td><code>tests/selftest.sh</code> runs every helper's selftest; CI exits 0.</td></tr>
+    </tbody>
+  </table>
+
+  <h3 id="fr-from-skill-patterns">From <code>skill-patterns.md</code> (1:1 with <code>skill-eval.md</code> checks)</h3>
+  <table>
+    <thead><tr><th>FR</th><th>§</th><th>Requirement</th><th>Test (skill-eval check_id)</th></tr></thead>
+    <tbody>
+      <tr><td>FR-PA1</td><td>§A</td><td>SKILL.md opens with YAML frontmatter delimited by <code>---</code>; <code>name</code> and <code>description</code> present</td><td>a-frontmatter-present, a-name-present, a-desc-present</td></tr>
+      <tr><td>FR-PA2</td><td>§A</td><td><code>name: survey-analyse</code>; lowercase-hyphen; ≤64 chars; matches directory name</td><td>a-name-lowercase-hyphen, a-name-len, a-name-matches-dir</td></tr>
+      <tr><td>FR-PA3</td><td>§A</td><td><code>description</code> ≤1024 chars; verb-or-gerund leading; third person</td><td>a-desc-len, a-name-verb-or-gerund, b-desc-third-person</td></tr>
+      <tr><td>FR-PB1</td><td>§B</td><td>Description states <strong>what</strong> + <strong>when</strong> + ≥5 user-spoken trigger phrases; no embedded workflow step list; pushy phrasing</td><td>b-desc-has-when, b-desc-has-what, b-desc-trigger-phrases, b-desc-no-step-list, b-desc-pushy</td></tr>
+      <tr><td>FR-PC1</td><td>§C</td><td>Body ≤500 lines (501–800 = pass-with-note; &gt;800 = fail)</td><td>c-body-size</td></tr>
+      <tr><td>FR-PC2</td><td>§C</td><td>Reference files one level deep; reference files &gt;100 lines open with a ToC; bundled paths use portable tokens (no hardcoded absolute paths); <code>scripts/</code> and <code>reference/</code> layout per the convention</td><td>c-references-one-level, c-reference-toc, c-portable-paths, c-asset-layout</td></tr>
+      <tr><td>FR-PC3</td><td>§C</td><td>Progressive disclosure: heavy detail in <code>reference/</code>, SKILL.md stays as the lean entry point; context economy</td><td>c-progressive-disclosure, c-context-economy</td></tr>
+      <tr><td>FR-PD1</td><td>§D</td><td>Body in imperative form ("Read X", "Run Y")</td><td>d-imperative-form</td></tr>
+      <tr><td>FR-PD2</td><td>§D</td><td>Non-obvious instructions carry a one-line "why"; no all-caps shouting noise</td><td>d-explain-why</td></tr>
+      <tr><td>FR-PD3</td><td>§D</td><td>Flowcharts only when control flow has real branches (do not draw 5-step linear flowcharts)</td><td>d-flowcharts-justified</td></tr>
+      <tr><td>FR-PD4</td><td>§D</td><td>One excellent worked example per pattern; <code>## Platform Adaptation</code> section right after the announce line; learnings-load line at startup; numbered <code>## Phase N: Capture Learnings</code> at end</td><td>d-platform-adaptation, d-learnings-load-line, d-capture-learnings-phase, d-examples-quality, d-body-skeleton</td></tr>
+      <tr><td>FR-PD5</td><td>§D</td><td><code>## Track Progress</code> instruction for the 8-phase body</td><td>d-progress-tracking</td></tr>
+      <tr><td>FR-PE1</td><td>§E</td><td>Bundled scripts under <code>scripts/</code>; dependencies documented (Python version, openpyxl); each non-trivial script ships <code>--selftest</code></td><td>e-scripts-dir, e-deps-documented, e-script-selftest, e-eval-driven</td></tr>
+      <tr><td>FR-PF1</td><td>§F</td><td><code>user-invocable: true</code> + <code>argument-hint</code> enumerating every parsed flag</td><td>f-cc-user-invocable, f-cc-argument-hint-matches</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="non-functional" data-pmos-section="non-functional">
+  <h2 id="non-functional">Non-Functional Requirements</h2>
+  <ul>
+    <li><strong>NFR-1 (size).</strong> SKILL.md body ≤500 lines (Tier 3 cap; matches §C). Reference files individually ≤600 lines.</li>
+    <li><strong>NFR-2 (performance).</strong> Phase 4 <code>analysis.py</code> processes 5,000 rows × 30 columns in ≤10s on a 2020-era laptop.</li>
+    <li><strong>NFR-3 (portability).</strong> Helpers stdlib-only except <code>openpyxl</code>; <code>openpyxl</code> pinned to ≥3.0 in helper docstrings. PDFs use stdlib only (best-effort tabulation); falls back to the Read tool for layout-broken PDFs.</li>
+    <li><strong>NFR-4 (atomicity).</strong> All run-folder file writes are temp-then-rename; no half-written artifacts.</li>
+    <li><strong>NFR-5 (observability).</strong> Skill logs phase entry/exit to chat; cleaning log surfaces every excluded record.</li>
+    <li><strong>NFR-6 (mode passthrough).</strong> Inherits <code>[mode: …]</code> first-line marker from /feature-sdlc when invoked downstream; honours the canonical non-interactive block.</li>
+  </ul>
+</section>
+
+<section id="testing-strategy" data-pmos-section="testing-strategy">
+  <h2 id="testing-strategy">Testing strategy</h2>
+  <ol>
+    <li><strong>Helper self-tests.</strong> Every module under <code>scripts/helpers/</code> ships <code>--selftest</code> with known-answer fixtures (small-N Likert, NPS, multi-select, etc.). Run via <code>tests/selftest.sh</code> in CI.</li>
+    <li><strong>Fixture-driven integration.</strong> <code>tests/fixtures/</code> ships ≥3 small response files (CSV + XLSX + PDF). The /verify smoke runs the skill against each and asserts: report.html written; methodology section non-empty; per_question.json matches expected (golden file).</li>
+    <li><strong>Skill-eval rubric (Phase 6a).</strong> <code>feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/survey-analyse</code> runs the deterministic half; reviewer subagent runs the LLM-judge half against <code>skill-eval.md</code>.</li>
+    <li><strong>Anti-pattern checks.</strong> The 5 zero-tolerance defects (T2B+distribution mandatory on Likert; multi-select on respondent base; NPS as integer; subgroup base shown; theme quotes) are CI-asserted on the integration fixture's produced report.html.</li>
+  </ol>
+</section>
+
+<section id="open-items" data-pmos-section="open-items">
+  <h2 id="open-items">Open items deferred to /plan</h2>
+  <ul>
+    <li>OQ3: exact <code>n &lt; ?</code> cutoff for "skip Phase 6 entirely". Spec sets <code>n &lt; 30</code> as the default; /plan task tags this for fixture review.</li>
+    <li>PDF tabulation reliability: spec sets the contract (Read-then-LLM-tabulate; pause and ask for CSV if both fail). /plan adds a dedicated task to harden this on at least 2 platform-exported PDFs (Typeform, Google Forms).</li>
+  </ul>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: 02_spec.html</span>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Exemption-row fixture — parse-only; reconciliation logic lands in T15.
+schema_version: 1
+
+adr_path: docs/adr/
+extra_ignore:
+  - generated/
+  - vendor/
+
+exemptions:
+  - rule: U004
+    file: src/a.ts
+    adr: ADR-0001
+    note: "Console.log allowed in legacy bootstrap shim."

@@ -165,6 +165,27 @@ All script paths use `${CLAUDE_PLUGIN_ROOT}/skills/readme/scripts/…` — no ab
 
 ### Subsection 5 — TBD (atomic write)
 
+### §2: Simulated-reader pass
+
+This subsection documents the protocol /readme follows after `rubric.sh` returns its findings (§1 step 3) and before the AskUserQuestion batching (§1 step 4). It implements FR-SR-1 / FR-SR-2 / FR-SR-3 and decision-log entries D13 + P3. Skip entirely when `--skip-simulated-reader` is set (advisory log: `simulated-reader: skipped via --skip-simulated-reader`).
+
+**1. Parallel Task dispatch (FR-SR-1, P3 — 3 concurrent calls).** Issue **3 `Task` tool calls in ONE assistant response** — one per persona: `evaluator`, `adopter`, `contributor`. Sequential dispatch is forbidden (P3); the parallel-scheduling requirement is what makes the 120s-per-call wall budget tractable. Each `Task` prompt body inlines, in order:
+   - The persona-specific prompt block from `reference/simulated-reader.md §1` (load the file and paste the matching persona section verbatim — do not re-author).
+   - The full **un-stripped** README markdown source (the user-supplied input file, byte-for-byte — required for FR-SR-3 substring grep to be sound).
+   - The return-shape contract from `reference/simulated-reader.md §2` (JSON schema: `persona`, `friction[]` with `quote`/`line`/`section`/`severity`/`rationale`).
+   - A per-call timeout of **120s**. On timeout, emit to chat: `simulated-reader: persona <name> timed out (120s); skipping` (NFR-4) and proceed with whichever of the other 2 personas returned in time.
+
+**2. Substring validation on return (FR-SR-3).** For each returned JSON payload, parse `friction[]` and validate every entry against the un-stripped README source:
+   - **Quote length:** if `len(quote) < 40` → hard-fail with `simulated-reader returned quote shorter than 40 chars: <quote>` and pause with the failure dialog.
+   - **Substring grep:** if `quote NOT IN readme_source_text` (exact substring, byte-for-byte) → hard-fail with `simulated-reader returned quote not found in README: <prefix-30>…` and pause with the failure dialog.
+   - **Persona label match:** the returned `persona` field MUST exactly equal the dispatched persona label (one of `evaluator|adopter|contributor`). Mismatch → hard-fail with `simulated-reader persona label mismatch: dispatched=<X>, returned=<Y>`.
+
+**3. Merge into rubric stream.** Every entry from a persona that passes all FR-SR-3 checks merges into the rubric findings as a severity-tagged item — using the `severity` field from the persona return (default `friction` when omitted). Annotate each merged entry with `source: simulated-reader/<persona>` so the §1 step-3 aggregator and the §1 step-4 AskUserQuestion batcher can distinguish persona findings from `rubric.sh` checks.
+
+**4. Dedupe near-duplicates.** After merge, dedupe across the combined findings list. Two findings are duplicates iff `abs(line_a - line_b) ≤ 2` AND they target the same section heading (use the parsed section spine from `reference/section-schema.yaml`). Keep the higher-severity entry; drop the lower. On equal severity, keep the `rubric.sh` entry over the persona entry (rubric findings are deterministic; persona findings are probabilistic).
+
+> See [reference/simulated-reader.md](reference/simulated-reader.md) for the full persona prompts and return-shape JSON schema (per §C "references one level deep" of skill-patterns.md).
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

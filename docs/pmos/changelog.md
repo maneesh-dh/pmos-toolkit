@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.47.0: /readme — audit, scaffold, update READMEs against a binary 15-check rubric
+
+New skill `/pmos-toolkit:readme` shipped via `/feature-sdlc skill` (skill-new mode). Three modes share one substrate: `--audit` (default) grades an existing README against a 15-check binary rubric + a 3-persona simulated-reader pass; `--scaffold` writes a missing README from detected workspace signals; `--update <commit-range>` proposes diff-driven section edits from recent commit history. Monorepo-aware (8 workspace-manifest detectors + multi-stack), cross-file rules R1–R4 (Install/Contributing/License root-only + version-bump-touches-changelog), voice work delegated to `/polish` (never inlined). Never auto-commits — every write goes through an atomic-write contract with a pre-write diff preview.
+
+### What's new
+
+- **`/pmos-toolkit:readme`** — the canonical skill at `plugins/pmos-toolkit/skills/readme/SKILL.md` (477 lines, NFR-6 ≤480). Three substrates under `scripts/`: `rubric.sh` (15-check binary grader with `--selftest` 100% A2 agreement on 10 fixtures), `workspace-discovery.sh` (8 manifest detectors: `package.json`, `pyproject.toml`, `Cargo.toml`, `go.mod`, `Gemfile`, `composer.json`, `pom.xml`, `build.gradle`), `commit-classifier.sh` (Conventional-Commits + breaking-change detection), `voice-diff.sh` (delegates to `/polish` for prose work). Cross-file rules at `reference/cross-file-rules.md`: R1 (Install root-only), R2 (Contributing root-only), R3 (License root-only with anchor for fragment resolution), R4 (version-bump → changelog touched). Plugin-manifest detection warns-and-skips when no manifest mentioned. Bash 3.2-safe end-to-end.
+- **Test suite (13/13 green from repo root)** — 4 substrate `--selftest` invocations + 9 integration scripts (`tracer_audit`, `scaffold_greenfield`, `update_hook_dry_run`, `audit_cluttered`, `cross_file_rules`, `multi_stack_grafana_style`, `compose_audit_scaffold`, `simulated_reader_contract`) + dogfood orchestrator `run-dogfood.sh` (ADVISORY-exit-0 contract per /plan Loop-1 F2 — exits 0 even when host-repo gates can't pass because the repo has only 1 plugin with no top-level README; surfaces as advisory residual `phase-9-r1`).
+- **`reference/skill-tier-matrix.md`** — the new `/readme` skill is **Tier 3** (full-pipeline: shipped via the complete `/feature-sdlc skill` flow including `/grill` + `/simulate-spec` folded in `/spec` Phase 6.5 + 26-task `/plan` + subagent-driven `/execute` + Phase 6a `/skill-eval` 2-iteration loop + feature-level `/verify`).
+
+### Known accepted residuals (carried per Phase 6a + execute reconciliation)
+
+- **`a-name-verb-or-gerund` (Phase 6a accepted)** — skill name is `readme`, a noun. Verb/gerund preferred by rubric, but `readme` is the user-spoken trigger (`/readme`, "audit my README"); rename has wide blast radius. Documented in `reference/skill-eval.md` exception list.
+- **`c-context-economy` (Phase 6a accepted)** — inlined non-interactive-block + awk extractor (~100 lines) is the canonical cross-skill greppable contract (audited by `audit-recommended.sh`), not /readme-specific bloat.
+- **Execute carried residuals (6)** — `phase-1-r1` SC1091 info on `_lib.sh source` (info-level only), `phase-2-r1` rubric.yaml `pass_when` doc-impl drift on `install-or-quickstart-presence` (functional path correct), `phase-2-r2` `_lib.sh` header says Bash >=4 but code is 3.2-safe (comment-only), `phase-3-r1` `repo_type` binary at workspace-discovery layer (full FR-WS-5 taxonomy deferred), `phase-3-r3` long-tail fallback triggers on no-manifest alone (plugin-marketplace signal combination deferred to v2), `phase-4-r3` FR-SR-4 dedupe rule documented in SKILL.md §2 step 4 (end-to-end exercise deferred).
+- **`phase-9-r1` dogfood advisory** — G1 (73%) + G3 (0 findings) ADVISORY_FAIL on host repo because only 1 plugin exists with no top-level README; the 6-target plan-spec set is unattainable on today's repo by design (per /plan Loop-1 F2 — `run-dogfood.sh` still exits 0).
+- One low-severity `tracer_audit.sh` cwd-portability gap (uses repo-root-relative paths; works from repo root, fails from skill dir) — non-blocking; documented in `reference/cross-file-rules.md` follow-ups.
+
+### Pipeline run signature
+
+- **Phases run:** worktree(`feat/readme-skill`) → init-state → skill-tier-resolve(T3) → requirements (+folded /grill Tier-3 + /msf-req 7 gap + 14 grill) → spec (+folded /simulate-spec A2 10/10 + A8 20/20) → plan (26 tasks, subagent-driven mode) → execute (9 phases, 50 commits) → skill-eval (2 iterations; iter 2 → 16/18 [J] + 19/19 [D], 2 accepted residuals) → verify (PASS_WITH_ACCEPTED_RESIDUALS, [D] 19/19 + tests 13/13) → complete-dev → final-summary.
+- **Manifests:** both `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json` bumped 2.46.0 → 2.47.0 in sync (pre-push hook enforces).
+
 ## 2026-05-13 — pmos-toolkit 2.46.0: /feature-sdlc base-drift pre-flight + release-prereq scope discipline
 
 Two follow-up fixes for `/feature-sdlc` from the 2026-05-13 retro on the `/survey-analyse` run, applied to its skill modes. (2.44.0 was taken by `/plan vertical-slice`; 2.45.0 by `/ideate` — both shipped concurrently.)

@@ -88,6 +88,7 @@ pmos-toolkit/
 | `/pmos-toolkit:create-skill` | _Archived in 2.38.0 — superseded by `/feature-sdlc skill <description>` (or the `/skill-sdlc` alias); see `archive/skills/README.md`_ |
 | `/pmos-toolkit:diagram` | Generate a single SVG vector diagram from a free-form description — brainstorms 2–3 framings, drafts, and self-evaluates against a hybrid SVG-metrics + vision rubric |
 | `/pmos-toolkit:ideate` | Turn a fuzzy idea into a structured, pressure-tested one-page brief — 3-phase loop (Frame → Expand → Pressure-test) with always-on premortem + Munger inversion + assumption-mapping against the chosen finalist, saved to `{docs_path}/ideate/{YYYY-MM-DD}_<slug>.html` |
+| `/pmos-toolkit:readme` | Audit, scaffold, or update a repository's README against a binary 15-check rubric + 3-persona simulated reader. Three modes (`--audit`, `--scaffold`, `--update <commit-range>`); monorepo-aware (8 workspace manifests + multi-stack); voice work delegated to `/polish`; never auto-commits |
 | `/pmos-toolkit:survey-design` | Design a methodologically sound survey from a rough intent (or refine an existing one) — generates a sectioned `survey.json`, runs a reviewer-critique pass + a simulated-respondent friction walk, renders a fillable `preview.html`, and emits import files for Typeform / SurveyMonkey / Google Forms |
 | `/pmos-toolkit:survey-analyse` | Analyse fielded survey responses (CSV / TSV / XLSX / XLS / PDF) and produce a defensible HTML report — bundled per-question-type Python helpers compute deterministic stats, the LLM authors a per-run `analysis.py`, open-end coding via subagent-per-question (Braun & Clarke), cross-tabs with Holm correction by default. Sister to `/survey-design` |
 | `/pmos-toolkit:design-crit` | Critique an application URL, wireframes, or prototype on overall UX — captures flow screenshots via packaged Playwright script, evaluates against a Nielsen + WCAG 2.2 + visual + Gestalt + journey-friction rubric, runs a PSYCH/MSF pass, and synthesises prioritized recommendations |
@@ -100,7 +101,7 @@ pmos-toolkit/
                    optional bridges (UI features)    optional enhancers                  optional validator
 ```
 
-`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/feature-sdlc`, `/skill-sdlc`, `/diagram`, `/survey-design`, `/survey-analyse`, `/design-crit`, `/ideate`, `/mac-health` are standalone — invoke them at any point.
+`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/feature-sdlc`, `/skill-sdlc`, `/diagram`, `/survey-design`, `/survey-analyse`, `/design-crit`, `/ideate`, `/readme`, `/mac-health` are standalone — invoke them at any point.
 
 ## Install
 

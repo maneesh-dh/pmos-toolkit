@@ -200,7 +200,8 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
    - **NOT authoritative for:** visual style, color, typography, spacing, iconography, component library. Tasks should adapt the wireframe to the host app's existing design system and conventions — never copy visual treatment verbatim when it conflicts with the host app.
 
    Every UI task in Phase 3 must cite the wireframe(s) it implements via a `**Wireframe refs:**` field — same discipline as `**Spec refs:**`. This preserves the wireframe→implementation→verification chain for /verify Phase 4 sub-step 3f. If the host app has established patterns (Tailwind tokens, component library, layout conventions) that differ from the wireframe's visual treatment, the task should explicitly say "follow host-app convention X" rather than "match wireframe."
-7. **Detect stack signals** (FR-10). Glob host-repo root for manifest files: `package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`. Compute file-count weight per stack. Log signals to a "Stack signals" subsection of Code Study Notes (FR-100).
+7. **Identify the tracer-bullet candidate** (see Phase 3 §Vertical-Slice Decomposition). Scan the spec for the narrowest user-observable behavior — the smallest end-to-end path through every layer the feature touches. Earmark it as the candidate for T1, the tracer bullet. If the spec offers multiple candidate narrowest paths, pick the one that exercises the riskiest unproven integration point (a new protocol, an unfamiliar library, a cross-service handshake). The result is a one-line note in Code Study Notes, format: `Tracer-bullet candidate: <narrowest behavior> — exercises <layers>; risk it derisks: <unproven integration>.` Phase 3 builds T1 against this candidate.
+8. **Detect stack signals** (FR-10). Glob host-repo root for manifest files: `package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`. Compute file-count weight per stack. Log signals to a "Stack signals" subsection of Code Study Notes (FR-100).
 
    **JS-stack lockfile disambiguation** (FR-10a): map lockfile presence → stack: `package-lock.json` → npm; `pnpm-lock.yaml` → pnpm; `yarn.lock` + no `.yarnrc.yml` → yarn-classic; `yarn.lock` + `.yarnrc.yml` → yarn-berry; `bun.lockb` → bun. When `package.json` is present with no lockfile, default to npm and surface as a low-risk Phase 4 finding.
 
@@ -211,14 +212,14 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 
    **Greenfield substitute** (FR-91, E2). When no signals are observed, do NOT skip the gate — choose a reference system (the closest existing system the planner can cite) and record the choice in Code Study Notes. **Phase 2 gate:** structural choices must be justified against ≥1 reference system; absence of stack signals is not a license to invent.
 
-8. **Peer-plan conflict scan** (FR-54, FR-54a). Glob `{docs_path}/features/*/03_plan.{html,md}` (excluding the current feature folder). Filter by frontmatter `status` ∈ {`Draft`, `Planned`, `Executing`}. Grep each peer plan for impacted file paths from step 1. On match, add a Risks-table row + an Open Question.
+9. **Peer-plan conflict scan** (FR-54, FR-54a). Glob `{docs_path}/features/*/03_plan.{html,md}` (excluding the current feature folder). Filter by frontmatter `status` ∈ {`Draft`, `Planned`, `Executing`}. Grep each peer plan for impacted file paths from step 1. On match, add a Risks-table row + an Open Question.
 
-9. **Wireframe coverage** (FR-16, FR-16a). If `{feature_folder}/wireframes/` exists, every `*.html` file under it must be referenced by ≥1 task's `**Wireframe refs:**` field OR listed in a `## Wireframes Out of Scope` subsection of the plan. **Vestigial wireframes** (FR-16a): when no UI signal is detected (no UI tasks in the spec) but the wireframes folder exists, auto-emit `## Wireframes Out of Scope` with all wireframes listed.
+10. **Wireframe coverage** (FR-16, FR-16a). If `{feature_folder}/wireframes/` exists, every `*.html` file under it must be referenced by ≥1 task's `**Wireframe refs:**` field OR listed in a `## Wireframes Out of Scope` subsection of the plan. **Vestigial wireframes** (FR-16a): when no UI signal is detected (no UI tasks in the spec) but the wireframes folder exists, auto-emit `## Wireframes Out of Scope` with all wireframes listed.
 
 <!-- defer-only: ambiguous -->
-10. **Spec re-open during planning** (§8.7, E13). When Phase 2 code study contradicts a spec decision (e.g., spec says "use Postgres" but `docker-compose.yml` shows MySQL), halt via `AskUserQuestion`: `Spec decision conflicts with repo standard. {Spec text} vs {observed standard}. How to resolve?` Options: **Halt /plan and update spec** (terminates this run; user re-runs /spec then /plan) / **Document override in spec via Decision Log entry** (open spec, add Decision Log entry citing the divergence with rationale, save, continue planning) / **Accept spec as-is despite divergence** (record decision in plan's Decision Log; proceed with spec's choice) / **Skip — not actually a conflict** (spec was correct; observation was misread). In `--non-interactive` mode this is a high-risk decision with no Recommended option → trigger FR-61a halt protocol (exit code 2 + write `03_plan_blocked.md`).
+11. **Spec re-open during planning** (§8.7, E13). When Phase 2 code study contradicts a spec decision (e.g., spec says "use Postgres" but `docker-compose.yml` shows MySQL), halt via `AskUserQuestion`: `Spec decision conflicts with repo standard. {Spec text} vs {observed standard}. How to resolve?` Options: **Halt /plan and update spec** (terminates this run; user re-runs /spec then /plan) / **Document override in spec via Decision Log entry** (open spec, add Decision Log entry citing the divergence with rationale, save, continue planning) / **Accept spec as-is despite divergence** (record decision in plan's Decision Log; proceed with spec's choice) / **Skip — not actually a conflict** (spec was correct; observation was misread). In `--non-interactive` mode this is a high-risk decision with no Recommended option → trigger FR-61a halt protocol (exit code 2 + write `03_plan_blocked.md`).
 
-11. **Summarize findings** in a "Code Study Notes" section for the plan.
+12. **Summarize findings** in a "Code Study Notes" section for the plan.
 
 **Gate:** You must have read every impacted file before writing a single line of the plan.
 
@@ -259,7 +260,7 @@ The `## Code Study Notes` section MUST contain four subsections — each may be 
 - `### Patterns to follow` — with `file:line` refs
 - `### Existing code to reuse` — file paths + one-line responsibility
 - `### Constraints discovered` — gotchas, hidden invariants
-- `### Stack signals` — the per-stack signals from Phase 2 step 7
+- `### Stack signals` — the per-stack signals from Phase 2 step 8
 
 ### Readability promise (FR-101)
 
@@ -341,7 +342,7 @@ execution_mode: inline | subagent-driven   # set in the closing phase (default: 
 
 ### Stack signals
 
-- [Per-stack signals from Phase 2 step 7. Cite the relevant `_shared/stacks/<stack>.md` file.]
+- [Per-stack signals from Phase 2 step 8. Cite the relevant `_shared/stacks/<stack>.md` file.]
 
 [Each subsection MAY be "None observed" but cannot be omitted.]
 

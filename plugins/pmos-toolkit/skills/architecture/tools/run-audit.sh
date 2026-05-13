@@ -134,7 +134,19 @@ config = {
 }
 
 # FR-13 — exemptions passthrough; reconciliation lives in T15.
-exemptions = list(l3.get("exemptions", []) or [])
+# PyYAML auto-coerces unquoted ISO dates (e.g. `expires: 2025-01-01`) to
+# datetime.date objects, which json.dumps refuses. Coerce to ISO strings so
+# the JSON pipeline downstream stays string-typed regardless of quoting.
+import datetime as _dt
+def _stringify_dates(v):
+    if isinstance(v, (_dt.date, _dt.datetime)):
+        return v.isoformat()
+    if isinstance(v, dict):
+        return {k: _stringify_dates(val) for k, val in v.items()}
+    if isinstance(v, list):
+        return [_stringify_dates(x) for x in v]
+    return v
+exemptions = _stringify_dates(list(l3.get("exemptions", []) or []))
 
 # FR-20 — merge L3 rule overrides onto merged set; track diffs.
 rule_overrides = []
@@ -729,6 +741,193 @@ if [ "${#TOOLS_SKIPPED[@]}" -gt 0 ]; then
   tools_skipped_json=$(printf '%s\n' "${TOOLS_SKIPPED[@]}" | jq -R . | jq -s .)
 fi
 
+# ── Exemption reconciliation (T15, FR-65/66) ─────────────────────────────────
+# For each exemption row in project principles.yaml, locate the corresponding
+# ADR file under <scan-root>/<adr_path>/ and classify into three buckets:
+#   - applied:  exemption row + ADR file whose ## Suppresses block lists the
+#               same {rule, file[, line]} → finding suppressed silently
+#   - orphan:   exemption row but no matching ADR file (or ADR missing the
+#               Suppresses entry) → finding still suppressed (user-explicit
+#               intent), but warn surfaced + counted (FR-65 / E10)
+#   - expired:  exemption row whose `expires:` date is < today → treated as
+#               not-present; finding surfaces (FR-66 / E11); stderr summary
+#               enumerates the count
+# Informational ADRs (Suppresses block, no matching exemption row) emit an
+# info-level note; the finding still surfaces (ADR alone is documentation —
+# the principles.yaml row is what mutes).
+#
+# Runs BEFORE ADR write so already-exempted findings do not spawn new ADRs.
+ADR_PATH_REL_FOR_RECONCILE="$(echo "$LOADER_JSON" | jq -r '.config.adr_path')"
+ADR_PATH_REL_FOR_RECONCILE="${ADR_PATH_REL_FOR_RECONCILE%/}"
+RECONCILE_ADR_DIR="$SCAN_ROOT/$ADR_PATH_REL_FOR_RECONCILE"
+exemptions_in_json="$(echo "$LOADER_JSON" | jq '.exemptions')"
+today_iso="$(date -u +%Y-%m-%d)"
+
+reconcile_json=$(
+  EXEMPTIONS_JSON="$exemptions_in_json" \
+  FINDINGS_JSON="$findings_json" \
+  RECONCILE_ADR_DIR="$RECONCILE_ADR_DIR" \
+  TODAY_ISO="$today_iso" \
+  python3 <<'PY'
+import json, os, re, sys
+from datetime import date
+
+exemptions_in = json.loads(os.environ["EXEMPTIONS_JSON"])
+findings_in = json.loads(os.environ["FINDINGS_JSON"])
+adr_dir = os.environ["RECONCILE_ADR_DIR"]
+today = date.fromisoformat(os.environ["TODAY_ISO"])
+
+# Scan ADR_DIR for ADR files and parse their ## Suppresses blocks.
+# adr_records: { "ADR-NNNN": { "name": <filename>, "suppresses": [{rule,file,line}, ...] } }
+adr_records = {}
+if os.path.isdir(adr_dir):
+    for name in sorted(os.listdir(adr_dir)):
+        m = re.match(r"^(ADR-\d{4})-.*\.md$", name)
+        if not m:
+            continue
+        adr_id = m.group(1)
+        path = os.path.join(adr_dir, name)
+        try:
+            with open(path) as f:
+                content = f.read()
+        except OSError:
+            continue
+        # Take everything after the LAST `## Suppresses` heading to EOF; per
+        # adr-template.md the block is the trailing section.
+        sup_match = re.search(
+            r"^##\s*Suppresses\s*\n(.+?)(?=^##\s|\Z)",
+            content, re.MULTILINE | re.DOTALL,
+        )
+        suppresses = []
+        if sup_match:
+            block = sup_match.group(1)
+            # Match each "- rule: X\n  file: Y\n  line: Z" triple.
+            for item in re.finditer(
+                r"-\s*rule:\s*(\S+)\s*\n\s*file:\s*(\S+)\s*\n\s*line:\s*(\S+)",
+                block,
+            ):
+                suppresses.append({
+                    "rule": item.group(1),
+                    "file": item.group(2),
+                    "line": item.group(3),
+                })
+        adr_records[adr_id] = {"name": name, "suppresses": suppresses}
+
+def is_expired(row):
+    raw = row.get("expires")
+    if not raw:
+        return False
+    try:
+        return date.fromisoformat(str(raw)) < today
+    except ValueError:
+        return False
+
+# Classify exemption rows. Build a suppress set for filtering findings.
+rows_out = []
+applied = orphan = expired = 0
+# suppress_set: { (rule, file, line_or_None) }
+suppress_set = set()
+
+for row in exemptions_in:
+    annotated = dict(row)
+    rid = row.get("rule")
+    rfile = row.get("file")
+    rline = row.get("line")
+    rline_str = str(rline) if rline is not None else None
+
+    if is_expired(row):
+        annotated["status"] = "expired"
+        expired += 1
+        rows_out.append(annotated)
+        continue
+
+    adr_ref = row.get("adr")
+    adr = adr_records.get(adr_ref) if adr_ref else None
+    matched = False
+    if adr:
+        for s in adr["suppresses"]:
+            if s["rule"] == rid and s["file"] == rfile:
+                if rline_str is None or str(s["line"]) == rline_str:
+                    matched = True
+                    break
+    if matched:
+        annotated["status"] = "applied"
+        applied += 1
+    else:
+        annotated["status"] = "orphan"
+        orphan += 1
+        print(
+            "warn: orphan exemption: {} {}{} (no matching ADR at {}/{})".format(
+                rid, rfile,
+                ":" + rline_str if rline_str else "",
+                adr_dir.rstrip("/"),
+                (adr_ref or "<no adr field>") + "-*.md",
+            ),
+            file=sys.stderr,
+        )
+
+    # Both applied and orphan suppress the finding.
+    suppress_set.add((rid, rfile, rline_str))
+    rows_out.append(annotated)
+
+# Filter findings: drop those matching any suppress key.
+filtered = []
+suppressed_by_log = []
+for f in findings_in:
+    fid = f.get("rule_id")
+    ffile = f.get("file")
+    fline_str = str(f.get("line")) if f.get("line") is not None else None
+    hit = False
+    for (rid, rfile, rline_str) in suppress_set:
+        if rid == fid and rfile == ffile:
+            if rline_str is None or rline_str == fline_str:
+                hit = True
+                break
+    if hit:
+        suppressed_by_log.append({"rule_id": fid, "file": ffile, "line": fline_str})
+    else:
+        filtered.append(f)
+
+# Informational ADRs: ## Suppresses entries that no non-expired exemption row claims.
+active_keys = set()
+for row in exemptions_in:
+    if is_expired(row):
+        continue
+    active_keys.add((row.get("rule"), row.get("file")))
+
+informational = []
+for adr_id in sorted(adr_records.keys()):
+    for s in adr_records[adr_id]["suppresses"]:
+        if (s["rule"], s["file"]) not in active_keys:
+            informational.append(
+                "{} documents suppression but no exemption row in principles.yaml".format(adr_id)
+            )
+
+result = {
+    "exemptions_summary": {
+        "applied": applied,
+        "orphan": orphan,
+        "expired": expired,
+        "informational": informational,
+        "rows": rows_out,
+    },
+    "filtered_findings": filtered,
+    "expired_count": expired,
+}
+print(json.dumps(result))
+PY
+)
+
+# The python block emits warn lines + final JSON on stdout. The JSON is the
+# LAST line; everything before it is the warn stream (already on stderr).
+exemptions_summary_json=$(echo "$reconcile_json" | jq '.exemptions_summary')
+findings_json=$(echo "$reconcile_json" | jq '.filtered_findings')
+expired_count=$(echo "$reconcile_json" | jq '.expired_count')
+
+if [ "$expired_count" -gt 0 ]; then
+  echo "note: $expired_count exemption(s) expired; suppression lifted. Re-affirm via ADR or remove the row." >&2
+fi
+
 # ── ADR write (T13, FR-60/61/62) ─────────────────────────────────────────────
 # For each block-severity finding (post-effective_severity rewrite), stamp a
 # Nygard ADR at <scan-root>/<adr_path>/ADR-NNNN-<kebab-title>.md. Numbering is
@@ -873,6 +1072,7 @@ jq -n \
   --argjson fde "$fde_json" \
   --argjson adrs_written "$adrs_written_json" \
   --argjson adrs_truncated "$adrs_truncated_json" \
+  --argjson exemptions_summary "$exemptions_summary_json" \
   --arg start "$START" \
   --arg end "$END" \
   --arg root "$SCAN_ROOT" \
@@ -890,7 +1090,7 @@ jq -n \
     stacks_detected: $loader.stacks_detected,
     config: $loader.config,
     rule_overrides: $loader.rule_overrides,
-    exemptions: $loader.exemptions,
+    exemptions: $exemptions_summary,
     scanned: ($loader.scanned | del(.files_for_rules)),
     tools_skipped: $tools_skipped,
     tools_errored: $tools_errored,

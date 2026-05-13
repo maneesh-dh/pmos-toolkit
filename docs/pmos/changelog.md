@@ -1,5 +1,139 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.43.0: /survey-analyse skill
+
+Sister to `/survey-design`: turns a raw survey response export (CSV / TSV / XLSX / XLS / PDF) into a defensible HTML report.
+
+### What's new
+
+- **`/survey-analyse`** — new standalone utility. Eight phases: ingest → user-confirmed schema (column-by-column; no silent auto-classification) → cleaning (straightliners / speeders / incompletes / duplicates / attention checks, with rule counts logged) → per-question analysis via **bundled Python helper modules** under `scripts/helpers/` (`categorical`, `multi_select`, `likert`, `nps`, `ranking`, `matrix`, `numeric`, `stats`, `clean`, `ingest`, `schema`, `pii`) — pure stdlib + `openpyxl` for xlsx; each ships `--selftest`. The LLM authors a per-run `analysis.py` that imports the helpers and runs it via Bash with one consolidated permission ask → open-end thematic coding via **subagent-per-question** (Braun & Clarke 6-phase contract; structured JSON return validated against the verbatim ids) → whole-survey cross-tabs with **Holm correction applied by default** across each segment family (plain-language framing in the report body; technical term in Methodology; `--raw-p-only` opts out) → HTML report through the `_shared/html-authoring/` substrate with executive summary, methodology & limitations, key findings, per-question, open-end themes, cross-tab appendix, data-quality log. Numbers are deterministic across runs on the same cleaned input; narrative + theme names are LLM-generated and disclosed as such. PII in verbatim quotes is **detect-and-warn only** — never auto-redacted. Bundled `reference/` files cover the per-question-type playbook, the thematic-coding contract, the cross-survey statistics (Holm, MoE, weighting), and the cleaning / reporting standards.
+
+### Breaking changes
+
+None.
+
+### Migration
+
+None — additive. New skill auto-discovered from `plugins/pmos-toolkit/skills/`.
+
+---
+
+## 2026-05-13 — pmos-toolkit 2.42.0: /artifact HTML output parity
+
+`/artifact` produces HTML artifacts that look and behave like every other pipeline skill's HTML output — same toolbar, same fonts, same anchors, same companion files. Eight gaps closed:
+
+### What's new
+
+- **MD→HTML authoring contract is explicit.** `/artifact` Phase 2.7 spells out that the skill authors HTML directly using `template.md` for section ordering + per-section guidance (matching how `/spec` and `/plan` author HTML from outline) — no MD→HTML renderer step at write time. The template store at `~/.pmos/artifacts/templates/<slug>/template.md` retains its MD shape (runbook edge case row 4 carve-out).
+- **Pre-rename heading-id + section-wrapper assertion** (FR-2). Before the atomic `rename(2)` of `{slug}.html.tmp`, inline `grep` checks hard-fail the write if any `<h2>`/`<h3>` lacks an `id="..."` or any `<section>` lacks one — surfacing the soft-phase failure dialog (Retry / Pause / Abort).
+- **Phase 3 reviewer dispatch is HTML-aware** (FR-4, FR-5, FR-9). The reviewer subagent receives a chrome-stripped HTML slice (`<h1>` + `<main>` only, via `chrome-strip.js`) plus the companion `{slug}.sections.json`. Reviewer returns gain a required `quote` field — a ≥40-char verbatim substring of the source. The skill validates parent-side: every finding's `section` must be a kebab id present in `sections.json`; every `quote` must substring-match the source. On miss → hard-fail. Reviewer-prompt updated with HTML preamble + Rules 9 and 10 making the contract explicit.
+- **Post-edit re-emit of `sections.json` + MD sidecar** (FR-6). After any Phase 3 `Edit` applies a fix, the skill regenerates `{slug}.sections.json` from the live HTML via the new `build_sections_json.js` helper, and (when `output_format=both`) re-runs the MD sidecar through `html-to-md.js`. No more stale companions.
+- **`build_sections_json.js`** (new substrate file). Zero-dep Node helper at `_shared/html-authoring/assets/build_sections_json.js` — regex+stack DOM walker (~80 LOC, mirrors `chrome-strip.js`'s pattern). Reads HTML from argv or stdin; emits the conventions.md §10 `[{id, level, title, parent_id}]` schema. Self-tested against `01_requirements.html` + `02_spec.html`.
+- **Refine flow extension mirrors primary format** (FR-7). `/artifact refine prd.html` now offers `prd.refined.html` (not `prd.refined.md`); the legacy MD path still works for `.md` primaries.
+- **Update flow Comment Resolution Log is HTML-shaped** (FR-8). `/artifact update` appends a `<section id="comment-resolution-log">` containing an HTML `<table>` to the artifact (not a markdown table). MD primary keeps the markdown table fallback.
+- **JSON frontmatter example** (FR-3). Phase 2.7's frontmatter example shows the actual emitted `<script type="application/json" id="pmos-frontmatter">` shape (not the misleading YAML triple-dash that was there before).
+
+### Changed
+
+- **Substrate manifest extended** (FR-11). `build_sections_json.js` joins the substrate manifest enumeration across 11 files: `_shared/html-authoring/README.md` plus 10 SKILL.md files (`artifact`, `design-crit`, `grill`, `msf-req`, `msf-wf`, `plan`, `requirements`, `simulate-spec`, `spec`, `verify`). New substrate files added in future releases continue to ride along automatically — the "currently includes" list is informational, not gating.
+- **`reviewer-prompt.md`** is HTML-aware (no more "you receive a markdown document"), explicitly cites the new `quote` field as required, and ties `section` to `sections.json` ids.
+
+### Migration
+
+None — additive. Existing MD-only primary mode (`output_format=md`) continues to work — chrome-strip + quote validation only run for HTML. `build_sections_json.js` is consumed by `/artifact` only at this release; other HTML-emitting skills can adopt it incrementally.
+
+## 2026-05-13 — pmos-toolkit 2.41.1: subtle "Created using pmos-toolkit" attribution in HTML chrome
+
+Every HTML artifact emitted by a pmos-toolkit skill now carries a small, muted "Created using pmos-toolkit" link to the GitHub README — one centralized substrate edit, no per-skill changes.
+
+### What's new
+
+- **Attribution in the shared HTML chrome.** `plugins/pmos-toolkit/skills/_shared/html-authoring/template.html` adds an `<a class="pmos-attribution">` in both the toolbar (right of the action buttons) and the footer (inline after `Source:`, separated by a middot). Both link to `https://github.com/maneesh-dhabria/pmos-toolkit#readme` with `target="_blank" rel="noopener noreferrer"`. Styled via a new `.pmos-attribution` class in `assets/style.css`: `--pmos-fs-xs`, italic, `--pmos-muted` color, `opacity: 0.65`, with hover bumping to `opacity: 1` plus a 1px underline at `text-underline-offset: 2px` — subtle by default, clearly clickable on intent. The toolbar variant is hidden in print; the footer attribution prints (it's where source/citation conventionally appears).
+- **Reach.** Inherited automatically by every skill that emits via the substrate: `/requirements`, `/spec`, `/plan`, `/wireframes`, `/prototype`, `/diagram`, `/survey-design`, `/polish`, `/artifact`, `/design-crit`, `/msf-req`, `/msf-wf`, `/grill`, `/creativity`, `/simulate-spec`, plus the pipeline-status and OQ-index artifacts written by `/feature-sdlc`. No per-skill edits.
+- **No reviewer-payload leakage.** `_shared/html-authoring/assets/chrome-strip.js` already extracts only `<h1>` + `<main>`, so the attribution (which sits in `<header>` and `<footer>` chrome) is automatically stripped from the bytes passed to reviewer subagents — no risk of the LLM judge quoting "Created using pmos-toolkit" as a finding.
+
+### Why
+
+Drive adoption without being in users' face. The attribution is discoverable (in chrome on every artifact) but deferential (xs italic muted, opacity 0.65) — readers who care can click through to the README; readers focused on the artifact content barely register it.
+
+## 2026-05-13 — pmos-toolkit 2.41.0: /complete-dev gains lastrun memory + one-shot defaults confirm + worktree-cleanup moved to after push
+
+`/complete-dev` learns to remember its own answers, asks for them in one consolidated prompt instead of twelve scattered ones, and stops removing the worktree before push tag succeeds (which was severing the `/feature-sdlc --resume` contract).
+
+### What's new
+
+- **Per-developer lastrun memory.** Each `/complete-dev` run now reads `.pmos/complete-dev.lastrun.yaml` (gitignored, per-developer) at Phase 0 and writes it at the end of Phase 17 once the release lands. The schema captures `merge_style`, `worktree_disposition`, `deploy_path`, `version_bump`, `changelog_disposition`, `push_target`, `verify_already_ran`, plus the last-run `detected_signals.deploy` for Phase 5's environment-change check. Malformed file → stderr warn + fall through to built-in defaults; never errors. Cancelled / failed runs do NOT update lastrun (so broken choices aren't memorialized). See `plugins/pmos-toolkit/skills/complete-dev/reference/lastrun-schema.md`.
+- **New Phase 0.5 — "Confirm run defaults".** One consolidated `AskUserQuestion` seeded from lastrun (or built-ins). Pick **Confirm all** (Recommended) and the run-shaping prompts at Phase 1 (/verify gate), Phase 3 guard-PASS (merge style), Phase 5 (deploy path, when detected signals haven't drifted), Phase 8 (changelog accept), Phase 9 step 5 (bump kind), and Phase 14 (push target) all short-circuit — about six per-run prompts collapsed into one. Pick **Edit one or more** to multi-select which fields to override; the per-field prompts then loop until you re-confirm. Destructive prompts (merge conflict, stale-bump recovery, push failure, tag collision, commit message draft, Phase 6 learnings findings) always still fire — they involve free-form input or non-recoverable consequences and can't be meaningfully memorized. Skipped in non-interactive mode (the AUTO-PICK-Recommended contract already covers it).
+- **Worktree removal moved to Phase 16.5 — after push tag succeeds.** Previously Phase 4 ran cleanup right after merge, severing `/feature-sdlc --resume`: a Phase 15 push failure would leave the worktree gone AND `<worktree>/.pmos/feature-sdlc/state.yaml` unreachable. The substantive cleanup body (dirty-check excluding `.pmos/feature-sdlc/`, `--force-cleanup` handling, `ExitWorktree(action=keep)` with fallback chat line) now lives at Phase 16.5; Phase 4 is a one-line deferral stub. Anti-pattern #4 retitled "Removing the worktree before **push** succeeds" with explicit reference to the resume-contract dependency. The Phase 17 success summary now reports `Worktree <removed|retained>` to reflect that lastrun can opt into retention.
+- **New flag: `--reset-defaults`.** Bypass the lastrun read for one run (seed Phase 0.5 from built-ins instead). The file is not deleted; Phase 17 still overwrites it with this run's choices.
+
+### Changed
+
+- `complete-dev/SKILL.md` grew Phase 0.5 (consolidated confirm), Phase 16.5 (relocated cleanup body), and Phase 0 lastrun-load steps; Phase 4 shrank to a deferral stub; Phases 1/3/5/8/9/14 each gained a "Short-circuit when Phase 0.5 confirmed" rider above their existing prompt. Phase 7.5's release-notes recipes moved verbatim to `reference/release-recipes.md` (keeps SKILL.md body under the 800-line eval cap). Anti-pattern #4 rewritten.
+- README's `/complete-dev` row now mentions Phase 0.5 lastrun confirm + Phase 16.5 timing.
+- `.gitignore` adds `.pmos/complete-dev.lastrun.yaml`.
+
+### Why
+
+Triaged from user feedback on the 2.40.0 ship: "save lastrun defaults to make /complete-dev easy to execute, reduce questions asked, rationalize the worktree removal sequence — it happens too early." The pre-push worktree removal was a latent resume-contract bug (state.yaml lives inside the worktree); the prompt-count was friction the user kept hitting on every ship.
+
+## 2026-05-13 — pmos-toolkit 2.40.0: /polish honors source format (md or HTML) + opt-in editorial reduction pass
+
+`/polish` learns two things, plus a de-flake of `/feature-sdlc skill`'s `[D] body` checks comes along for the ride.
+
+### What's new
+
+- **Source format honored.** Hand `/polish` a local `.md` and you get `<name>.polished.md`; hand it a local `.html` and you get `<name>.polished.html` — same shape in, same shape out. HTML inputs get HTML-aware lock zones (tags + attributes, `<script>`/`<style>`/`<pre>`/`<code>` contents, HTML comments, `<head>`, short `<td>`/`<th>` cells) and `<h1>`/`<h2>` chunk anchors; the rubric and patches only ever change text between tags. URL and Notion inputs continue to normalize to markdown (their HTML is page chrome, not an authored artifact). After an HTML rewrite, `/polish` verifies all non-prose bytes are byte-identical to the original; if not, it keeps the output but surfaces a loud `⚠ markup outside prose nodes may have shifted — review before replacing` and drops the replace prompt's default-yes — never refuse, never hard-fail.
+- **New "Phase 2.5 — Editorial reduction" (opt-in, runs before the rubric).** Either pass `--reduce <pct|range>` (e.g. `--reduce 30-40` or `--reduce 25`) or pick a target at the gate: `Skip — no reduction (Recommended)` / `~10-20% (light trim)` / `~30-40% (substantial cut)` / `~50%+ (aggressive)` / custom. Skip is a true no-op; the pipeline behaves exactly as before. On a non-Skip target, an **editor subagent** critiques the doc ruthlessly (rephrase / merge / reorder / tighten / cut) and emits structured notes to `editor_notes.json` (validated against the new `schemas/editor-notes.schema.json`); a **rewriter subagent** applies the `risk: low` notes honoring lock zones; `risk: high` notes (structural reorders, large merges) and any `PRESERVE_VOICE_CONFLICT` are surfaced through the existing Phase 5 findings protocol — never auto-applied. If the rewriter falls short of the target band, the editor gets one capped re-critique. The editor pass is **not** a polish iteration — the existing 2-iteration rubric cap is untouched.
+- **`--dry-run` interplay.** With a non-Skip target, the editor still runs and writes `editor_notes.json`; the rewriter and re-critique do not. The dry-run report now includes the editor notes + target reconciliation above the rubric results.
+- **Phase 7 metrics anchored to the original.** The headline `Words: 1,842 → 1,310 (-29%)` is computed against the original ingested doc (not the editor-reduced one), so the % reflects editor cut + rubric tightening together. A new `Editorial pass:` summary line reports target / estimated / actual / applied / skipped / surfaced — or `skipped` / the dry-run variant.
+
+### Changed
+
+- **`/polish` is now `10` phases** (Phase 2.5 inserted between preset selection and the rubric). The "Track Progress" instruction, the platform-adaptation note, the file map, and the anti-patterns all updated; the rubric runs on the *working document* (editor-reduced if Phase 2.5 ran).
+- **`reference/chunking.md`** gains a "Format-aware lock zones" subsection (the markdown set is unchanged; HTML adds its own lock zones); the chunking algorithm cites `<h1>`/`<h2>` (and `<h3>`/`<p>` for oversized) as the HTML analogues.
+- **New files:** `plugins/pmos-toolkit/skills/polish/reference/editorial-pass.md` (editor + rewriter prompt templates, the `editor_notes.json` validate/prune contract, re-critique, HTML fidelity rule), `plugins/pmos-toolkit/skills/polish/schemas/editor-notes.schema.json` (JSON Schema draft-07), and two fixtures — `tests/fixtures/html-doc.html` (HTML round-trip + lock zones) and `tests/fixtures/bloated-doc.md` (a verbose PRD-shaped doc for the reduction pass) — with paired `tests/expected.yaml` contracts.
+
+### Fixed
+
+- **`/feature-sdlc skill`'s deterministic eval was flaky on any skill with a >16KB body.** `tools/skill-eval-check.sh` ran the body-pattern checks as `body | grep -q …`; under `set -o pipefail`, `grep -q` closes the pipe on its first match and the upstream `sed` gets SIGPIPE, so the pipeline reports failure even when the pattern *did* match — flaking `d-platform-adaptation`, `d-learnings-load-line`, `d-capture-learnings-phase`, and `d-progress-tracking`. The body is now cached once and the checks read from a here-string. Same script for `/polish` runs 10/10 clean post-fix.
+
+### Migration
+
+None — additive. The existing markdown path is byte-for-byte unchanged when the editor gate is Skipped (the default). The new `--reduce` flag and the new phase do not require any state changes; `editor_notes.json` is a per-run artifact alongside the polished file.
+
+### References
+
+- Requirements: `docs/pmos/features/2026-05-13_polish-editorial-pass/01_requirements.html`
+- Spec: `docs/pmos/features/2026-05-13_polish-editorial-pass/02_spec.html`
+- Plan: `docs/pmos/features/2026-05-13_polish-editorial-pass/03_plan.html`
+- Feedback triage: `docs/pmos/features/2026-05-13_polish-editorial-pass/0c_feedback_triage.html`
+
+---
+
+## 2026-05-13 — pmos-toolkit 2.39.0: /execute parallel subagent-driven execution mode
+
+`/execute` can now run a plan by fanning independent tasks out across subagents in parallel, instead of (or in addition to) the single-agent task-by-task loop. The behavior is selected by a flag, the user is asked which mode to use right after `/plan`, and all of the subagent-driven logic lives inside `/execute` itself — nothing outside `plugins/pmos-toolkit/skills/execute/` is required.
+
+### What's new
+
+- **`/execute --subagent-driven` — parallel, subagent-driven execution.** A fresh implementer subagent per task; a deterministic wave planner groups tasks into "waves" (a task is in wave *k* once all its `Depends on:` / `Requires state from:` are in earlier waves **and** it shares no `Files:` path with its wave-mates), and each wave's implementers are dispatched concurrently. Implementer subagents implement + test but never `git commit` — the controller commits each task's file-set serially after the wave, preserving the `T<N>` commit subjects the resume resolver depends on (and honoring the plan's `commit_cadence`). Every completed task then goes through a two-stage review — spec-compliance reviewer subagent first, then (only on ✅) a code-quality reviewer subagent — looping to clean, and one whole-implementation reviewer runs after the last wave. Implementer status (`DONE` / `DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED` / stall) is handled per the subagent-driven contract. Inspired by `superpowers:subagent-driven-development`, but with no dependency on it — degenerate plans (dependency cycle, unknown task id, legacy plan with no v2 task fields) fall back to fully-sequential singleton waves.
+- **`plugins/pmos-toolkit/skills/execute/subagent-driven.md` — self-contained prompt templates.** Implementer / spec-compliance-reviewer / code-quality-reviewer / final-reviewer templates plus model-selection guidance (cheap model for mechanical 1–2-file tasks, standard for integration, most-capable for design/review). No `../_shared/*` or `superpowers:*` reference is load-bearing.
+- **`/plan` asks the execution mode at close.** Before the closing offer, `/plan` asks **Inline execution** (Recommended — one agent, task-by-task, lowest token cost) vs **Subagent-driven execution** (fresh subagent per task, parallel waves, two-stage review — faster on wide plans), records the choice as `execution_mode:` in the plan's frontmatter, and reflects it in the `/execute …` invocation it offers.
+- **`/feature-sdlc` honors it.** Phase 6 reads `execution_mode` from the plan and passes `--subagent-driven` accordingly; an absent value (legacy plan) means inline, with no re-prompt.
+
+### Changed
+
+- `/execute` `argument-hint` gains `[--subagent-driven | --inline]` (mutually exclusive, last wins, absent ⇒ inline). On platforms with no subagent tool, `--subagent-driven` degrades to a warning + inline execution — never an error. `/execute` also gains a `## Track Progress` section. The pre-existing "Subagent Execution (when Agent tool is available)" note is now framed as a lightweight *sequential* sub-option of inline mode; the new section is the parallel variant.
+- Both `plugin.json` manifests bumped to 2.39.0 (in sync).
+
+### References
+
+- Requirements: `docs/pmos/features/2026-05-13_execute-subagent-mode/01_requirements.md`
+- Spec: `docs/pmos/features/2026-05-13_execute-subagent-mode/02_spec.md`
+- Plan: `docs/pmos/features/2026-05-13_execute-subagent-mode/03_plan.md`
+- Verification report: `docs/pmos/features/2026-05-13_execute-subagent-mode/04_verify.md`
+
 ## 2026-05-12 — pmos-toolkit 2.38.0: skill development via /feature-sdlc (skill modes, skill-eval rubric, /skill-sdlc alias)
 
 Folds skill authoring into the same SDLC spine everything else uses. `/create-skill` and `/update-skills` are retired — building or revising a skill now runs the full worktree-isolated, resumable, gated `/feature-sdlc` pipeline (requirements → spec → plan → execute → eval → verify → complete-dev), and every skill is scored against a binary rubric before it can merge.

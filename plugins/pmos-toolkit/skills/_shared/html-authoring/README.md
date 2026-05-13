@@ -11,7 +11,7 @@ Skills used to write Markdown directly. Now they author HTML — an HTML version
 | `README.md` | This file — entry point for skills consuming the substrate. |
 | `template.html` | Base scaffold a skill copies + slot-fills (`{{title}}`, `{{asset_prefix}}`, `{{plugin_version}}`, `{{content}}`). FR-02. |
 | `conventions.md` | Semantic structure rules every skill MUST follow when generating `{{content}}`. Heading-id contract lives here. FR-03 / FR-03.1. |
-| `assets/` | Per-folder runtime assets — `style.css`, `viewer.js`, `serve.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, `html-to-md.js`. Skills copy this directory into `{feature_folder}/assets/` at write time (FR-10). |
+| `assets/` | Per-folder runtime assets — `style.css`, `viewer.js`, `serve.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, `html-to-md.js`, `build_sections_json.js`, `chrome-strip.js`. Skills copy this directory into `{feature_folder}/assets/` at write time (FR-10). |
 
 ## The authoring contract (skill author's checklist)
 

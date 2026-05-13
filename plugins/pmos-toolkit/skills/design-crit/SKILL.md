@@ -331,7 +331,7 @@ Write `{out_dir}/design-crit.html` per the substrate at `${CLAUDE_PLUGIN_ROOT}/s
 
 **Atomic write (FR-10.2):** write `design-crit.html` and the companion `design-crit.sections.json` via temp-then-rename — never serve a half-written file.
 
-**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{out_dir}/assets/` (or `{feature_folder}/assets/` if `{out_dir}` resolves under a pipeline feature folder, sharing the substrate with sibling artifacts) if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{out_dir}/assets/` (or `{feature_folder}/assets/` if `{out_dir}` resolves under a pipeline feature folder, sharing the substrate with sibling artifacts) if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, `build_sections_json.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
 
 **Asset prefix (FR-10.1):** when `{out_dir}` is a top-level feature-folder write, `assets/`; when nested under a feature folder (`{feature_folder}/design-crit/`), `../assets/`.
 

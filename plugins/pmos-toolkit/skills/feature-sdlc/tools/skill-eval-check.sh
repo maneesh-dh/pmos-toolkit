@@ -142,12 +142,18 @@ if [[ $HAS_SCRIPTS -eq 0 ]]; then
        -not -path "$SKILL_DIR/assets/*" -not -path "$SKILL_DIR/reference/*" -not -path "$SKILL_DIR/references/*" \
        -not -path "$SKILL_DIR/tests/*" | grep -q .; then HAS_SCRIPTS=1; fi
 fi
+# Cache the body once. `body | grep -q …` races under `set -o pipefail`: grep -q
+# closes the pipe on its first match, the upstream `sed` gets SIGPIPE, and the
+# pipeline reports failure even though the pattern *did* match — making the [D]
+# body checks flaky on any skill whose body exceeds the pipe buffer. Read from a
+# here-string (which bash fully buffers) instead.
+BODY_TXT="$(body)"
 # thin alias? body < ~30 lines AND mentions "alias" AND forwards to another skill
-BODY_LINES="$(body | wc -l | tr -d ' ')"
+BODY_LINES="$(printf '%s\n' "$BODY_TXT" | wc -l | tr -d ' ')"
 IS_ALIAS=0
-if [[ "$BODY_LINES" -lt 30 ]] && body | grep -qi 'alias' && body | grep -qiE 'invoke|forward'; then IS_ALIAS=1; fi
+if [[ "$BODY_LINES" -lt 30 ]] && grep -qi 'alias' <<<"$BODY_TXT" && grep -qiE 'invoke|forward' <<<"$BODY_TXT"; then IS_ALIAS=1; fi
 # phase count
-PHASE_COUNT="$(body | grep -cE '^##+[[:space:]]+Phase[[:space:]]' || true)"
+PHASE_COUNT="$(grep -cE '^##+[[:space:]]+Phase[[:space:]]' <<<"$BODY_TXT" || true)"
 
 FAILS=0
 emit() { printf '%s\t%s\t%s\n' "$1" "$2" "$3"; [[ "$2" == "fail" ]] && FAILS=$((FAILS+1)); return 0; }
@@ -191,15 +197,15 @@ loose="$(find "$SKILL_DIR" -maxdepth 1 -type f ! -name 'SKILL.md' ! -name '*.md'
 if [[ -z "$loose" ]]; then emit c-asset-layout pass "no loose non-doc files in skill root"; else emit c-asset-layout fail "loose file(s) in skill root: $(echo $loose)"; fi
 
 # --- 10.D ---
-if body | grep -qE '^##+[[:space:]]+(Cross-)?Platform Adaptation'; then emit d-platform-adaptation pass "## Platform Adaptation present"; else emit d-platform-adaptation fail "no ## Platform Adaptation section"; fi
+if grep -qE '^##+[[:space:]]+(Cross-)?Platform Adaptation' <<<"$BODY_TXT"; then emit d-platform-adaptation pass "## Platform Adaptation present"; else emit d-platform-adaptation fail "no ## Platform Adaptation section"; fi
 if [[ $IS_ALIAS -eq 1 ]]; then
   : # d-learnings-load-line, d-capture-learnings-phase N/A for thin aliases (FR-81)
 else
-  if body | grep -qi 'learnings\.md'; then emit d-learnings-load-line pass "learnings.md load line present"; else emit d-learnings-load-line fail "no ~/.pmos/learnings.md load instruction"; fi
-  if body | grep -qE '^##+[[:space:]]+Phase[[:space:]]+[0-9N][^:]*:.*Capture Learnings'; then emit d-capture-learnings-phase pass "numbered Capture Learnings phase present"; else emit d-capture-learnings-phase fail "no numbered Capture-Learnings phase"; fi
+  if grep -qi 'learnings\.md' <<<"$BODY_TXT"; then emit d-learnings-load-line pass "learnings.md load line present"; else emit d-learnings-load-line fail "no ~/.pmos/learnings.md load instruction"; fi
+  if grep -qE '^##+[[:space:]]+Phase[[:space:]]+[0-9N][^:]*:.*Capture Learnings' <<<"$BODY_TXT"; then emit d-capture-learnings-phase pass "numbered Capture Learnings phase present"; else emit d-capture-learnings-phase fail "no numbered Capture-Learnings phase"; fi
 fi
 if [[ "$PHASE_COUNT" -ge 3 ]]; then
-  if body | grep -qE '^##+[[:space:]]+Track Progress'; then emit d-progress-tracking pass "## Track Progress present ($PHASE_COUNT phases)"; else emit d-progress-tracking fail "$PHASE_COUNT phases but no ## Track Progress instruction"; fi
+  if grep -qE '^##+[[:space:]]+Track Progress' <<<"$BODY_TXT"; then emit d-progress-tracking pass "## Track Progress present ($PHASE_COUNT phases)"; else emit d-progress-tracking fail "$PHASE_COUNT phases but no ## Track Progress instruction"; fi
 fi
 
 # --- 10.E (skipped entirely if no scripts) ---

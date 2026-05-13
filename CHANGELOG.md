@@ -1,19 +1,5 @@
 # Changelog
 
-## pmos-toolkit 2.39.0 — 2026-05-13
-
-### What's new
-
-- **`/survey-analyse`** — new standalone utility, sister to `/survey-design`, that turns a raw survey response export (CSV / TSV / XLSX / XLS / PDF) into a defensible HTML report. Eight phases: ingest → user-confirmed schema (column-by-column; the LLM never silently auto-classifies) → cleaning (straightliners / speeders / incompletes / duplicates / attention checks, with rule counts logged) → per-question analysis via **bundled Python helper modules** (`scripts/helpers/{categorical,multi_select,likert,nps,ranking,matrix,numeric,stats,clean,ingest,schema,pii}.py` — pure stdlib + `openpyxl` for xlsx; each ships `--selftest`) — the LLM authors a per-run `analysis.py` that imports the helpers, then runs it via Bash with a single consolidated permission ask → open-end thematic coding via **subagent-per-question** (Braun & Clarke 6-phase contract; structured JSON return; validated against the verbatim ids) → whole-survey cross-tabs with **Holm correction applied by default** across each segment family (plain-language framing in the body; technical term in Methodology; `--raw-p-only` opts out) → HTML report through the `_shared/html-authoring/` substrate with executive summary, methodology & limitations, key findings, per-question, open-end themes, cross-tab appendix, data-quality log. Numbers are deterministic across runs on the same cleaned input; narrative + theme names are LLM-generated and disclosed as such. PII in verbatim quotes is **detect-and-warn only** — never auto-redacted. Bundled `reference/` files cover the per-question-type playbook, the thematic-coding contract, the cross-survey statistics (Holm, MoE, weighting), and the cleaning / reporting standards.
-
-### Breaking changes
-
-None.
-
-### Migration
-
-None — additive. New skill auto-discovered from `plugins/pmos-toolkit/skills/`.
-
 ## pmos-toolkit 2.36.0 — 2026-05-11
 
 ### What's new

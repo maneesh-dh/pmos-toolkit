@@ -1,8 +1,15 @@
 # Polish rubric — 14 built-in checks
 
+## Contents
+
+- Implementation modes (regex vs llm-judge)
+- Local vs global checks
+- The 14 built-in checks (1–14, with patterns / judge prompts)
+- Custom checks (user-defined, merged on top)
+
 Each check returns `pass` or `fail` plus cited spans. No subjective scoring.
 
-**Detection skips locked zones.** Never run any check against text inside code fences, frontmatter, link URLs, footnote refs, short table cells (<8 words), or Notion non-prose placeholders.
+**Detection skips locked zones.** Never run any check against text inside code fences, frontmatter, link URLs, footnote refs, short table cells (<8 words), Notion non-prose placeholders, or — for HTML inputs — tags/attributes, `<script>`/`<style>`/`<pre>`/`<code>` contents, HTML comments, and the `<head>`.
 
 ## Implementation modes
 

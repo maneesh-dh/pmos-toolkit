@@ -2,12 +2,12 @@
 name: complete-dev
 description: End-of-development orchestrator that follows /verify — merges feature work into main, captures learnings into CLAUDE.md/AGENTS.md, regenerates the changelog, bumps versions, deploys per repo norms, tags the release, and pushes to all configured remotes. Supersedes the legacy /push skill. Terminal stage of the requirements -> spec -> plan -> execute -> verify -> complete-dev pipeline. Use when the user says "complete the dev cycle", "ship this work", "merge and deploy", "wrap up this branch", "finish development", "ready to push and deploy", "push to remotes", "push and ship", or "push the release".
 user-invocable: true
-argument-hint: "[--skip-changelog] [--skip-deploy] [--no-tag] [--force-cleanup] [optional commit-message hint] [--non-interactive | --interactive]"
+argument-hint: "[--skip-changelog] [--skip-deploy] [--no-tag] [--force-cleanup] [--reset-defaults] [optional commit-message hint] [--non-interactive | --interactive]"
 ---
 
 # /complete-dev — end-of-development orchestrator
 
-Runs the full end-of-dev ceremony after `/verify`: merge → worktree cleanup → deploy detection → learnings capture → README + /changelog → version bump → commit → tag → push.
+Runs the full end-of-dev ceremony after `/verify`: confirm run defaults (one prompt seeded from lastrun) → merge → deploy detection → learnings capture → README + /changelog → version bump → commit → tag → push → worktree cleanup. The Phase 0.5 "Confirm run defaults" prompt collapses ~6 per-phase prompts into one consolidated confirm seeded from `.pmos/complete-dev.lastrun.yaml` (per-developer memory of the last run's choices); destructive gates (merge conflict, stale-bump, push failure, tag collision, commit message) still ask.
 
 **Announce at start:** "Running /complete-dev: end-of-dev ceremony — merge, deploy, learnings, commit, tag, push. Approval gates at every destructive step."
 
@@ -22,7 +22,7 @@ Standalone-ish: invokes `/changelog` (Phase 8) and optionally `/verify` (Phase 1
 
 ## Track Progress
 
-This skill has 19 phases. Create one task per phase using your agent's task-tracking tool (e.g., `TaskCreate` in Claude Code, equivalent elsewhere). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+This skill has 23 phases (Phase 0, 0.5, 1, 2, 3, 4, 5, 6, 7, 7.5, 8, 9, 10, 11, 12, 13, 14, 15, 15.5, 16, 16.5, 17, 18 — Phase 4 is a one-line deferral stub since v2.41.0; the substantive worktree-cleanup body lives at Phase 16.5). Create one task per phase using your agent's task-tracking tool (e.g., `TaskCreate` in Claude Code, equivalent elsewhere). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
 
 ## Platform Adaptation
 
@@ -43,9 +43,11 @@ Read `~/.pmos/learnings.md` if it exists. Note any entries under `## /complete-d
 
 `$ARGUMENTS` may contain:
 
-- `--skip-changelog` — bypass Phase 8 (still runs Phase 5 detection so dry-run summary documents what was skipped)
-- `--skip-deploy` — bypass Phase 15's deploy invocation only (push and tag still happen)
+- `--skip-changelog` — bypass Phase 8 (still runs Phase 5 detection so dry-run summary documents what was skipped). Forces `run_defaults.changelog_disposition: skip` in Phase 0.5.
+- `--skip-deploy` — bypass Phase 15's deploy invocation only (push and tag still happen). Forces `run_defaults.deploy_path: skip-deploy` in Phase 0.5.
 - `--no-tag` — bypass Phase 13 tagging (push still happens)
+- `--force-cleanup` — pass through to Phase 16.5 worktree-cleanup's dirty-branch handling (allows `git worktree remove --force`)
+- `--reset-defaults` — ignore `.pmos/complete-dev.lastrun.yaml` and seed Phase 0.5 from built-in defaults instead. The lastrun file is not deleted; Phase 17 will overwrite it with this run's choices as usual.
 - Free-form text — used as the commit-message hint draft in Phase 11
 
 ---
@@ -147,10 +149,73 @@ Run in parallel:
 
 Print a one-line state summary: `Branch: <name>; Worktree: <yes|no>; Uncommitted: <N>; Remotes: <list>; Ahead of origin: <N>`.
 
-## Phase 1 — /verify gate
+**Load lastrun defaults.** Read `.pmos/complete-dev.lastrun.yaml` per `reference/lastrun-schema.md`:
+
+- File absent → seed `run_defaults` from built-in defaults (see `reference/lastrun-schema.md` § "Built-in defaults").
+- File present + valid → seed `run_defaults` from the file.
+- File present but malformed → stderr warn `lastrun.yaml malformed or unknown version — falling back to built-in defaults`; seed from built-ins. Never error out (FR-LR03).
+- `--reset-defaults` flag → bypass the read; seed from built-ins.
+
+Apply CLI-flag overrides to `run_defaults`: `--skip-changelog` → `changelog_disposition: skip`; `--skip-deploy` → `deploy_path: skip-deploy`. `--no-tag` is orthogonal (not stored in lastrun). Phase 0.5's confirm prompt surfaces overrides with a `(overridden by --flag)` annotation.
+
+## Phase 0.5 — Confirm run defaults
+
+**Skip if `mode == non-interactive`** — the AUTO-PICK-Recommended contract in the inlined non-interactive block already handles every prompt; Phase 0.5's confirm is redundant there. Log to chat: `Phase 0.5 auto-confirmed (non-interactive); defaults source: <lastrun|built-in>`.
+
+Otherwise, present `run_defaults` in a single consolidated prompt. Sample shape (substitute actual `run_defaults` values + override annotations):
+
+```
+Phase 0.5 — Confirm run defaults
+
+  /verify already ran:    true
+  Merge style:            rebase onto main, then fast-forward
+  Worktree disposition:   remove after push succeeds
+  Deploy path:            skip explicit deploy (CI handles it)
+  Version bump:           minor
+  Changelog action:       accept as drafted
+  Push target:            all configured remotes
+
+(Source: .pmos/complete-dev.lastrun.yaml — last updated 2026-05-12)
+```
+
+```
+question: "Proceed with these defaults? Destructive prompts (merge conflict, stale-bump, push failure, tag collision, commit message draft) will still fire as needed."
+options:
+  - Confirm all (Recommended)
+  - Edit one or more
+  - Cancel
+```
+
+**On "Confirm all":** mark `run_defaults_confirmed = true`. Downstream phases consult `run_defaults` and short-circuit their non-destructive prompts (Phase 1, Phase 3 guard-PASS, Phase 5 unchanged-signals, Phase 8 accept-path, Phase 9 step 5 bump, Phase 14 push). The destructive-prompt allowlist in `reference/lastrun-schema.md` still fires.
+
+**On "Edit one or more":**
 
 <!-- defer-only: ambiguous -->
-ALWAYS ask via `AskUserQuestion` (no auto-detection — branch state changes via amend/rebase make commit-pattern detection unreliable):
+```
+question: "Which fields do you want to change?"
+multiSelect: true
+options:
+  - /verify already ran
+  - Merge style
+  - Worktree disposition
+  - Deploy path
+  - Version bump
+  - Changelog action
+  - Push target
+```
+
+For each selected field, present the per-field prompt (reuse Phase 1 / 3 / 5 / 8 / 9 / 14's option lists verbatim). After all selected fields are updated, re-display the consolidated summary and re-ask "Proceed with these defaults?" — loop until the user picks Confirm.
+
+**On "Cancel":** exit /complete-dev with no side effects.
+
+## Phase 1 — /verify gate
+
+**Short-circuit when Phase 0.5 confirmed `run_defaults.verify_already_ran: true`** — log `Phase 1: /verify gate auto-confirmed via Phase 0.5 (verify_already_ran: true)` and proceed to Phase 2.
+
+Otherwise (Phase 0.5's edit path set it to `false`, OR running in non-interactive mode which already AUTO-PICKs the Recommended option):
+
+<!-- defer-only: ambiguous -->
+Ask via `AskUserQuestion` (no auto-detection — branch state changes via amend/rebase make commit-pattern detection unreliable):
 
 ```
 question: "Has /verify been run for this branch's current state?"
@@ -193,6 +258,10 @@ fi
 ```
 
 **Step B — Show the prompt.** Annotation flips based on guard.
+
+**Short-circuit when Phase 0.5 confirmed AND `guard=PASS`:** map `run_defaults.merge_style` → action (`rebase-then-ff` → rebase; `merge-ff-or-noff` → merge; `branch-only` → stay on feature). Log `Phase 3 (guard PASS): merge style '<style>' auto-selected via Phase 0.5`. Skip the prompt; proceed to Step C with the chosen action.
+
+**Guard FAIL ALWAYS re-prompts** (destructive escape hatch — see `reference/lastrun-schema.md` § "Destructive-prompt allowlist"). Phase 0.5's `merge_style` is ignored on guard-FAIL; the prompt below is shown with merge as Recommended.
 
 - **Guard PASS** (default — solo branch or unpushed):
 
@@ -237,40 +306,11 @@ If **merge** chosen, the existing sequence:
 5. `git merge <feature-branch>` (fast-forward where possible; `--no-ff` if explicitly chosen)
 6. **Conflicts → STOP and ask user. Do NOT auto-resolve.**
 
-## Phase 4 — Worktree cleanup (FR-CD01–CD06)
+## Phase 4 — Worktree cleanup (deferred to Phase 16.5 since v2.41.0)
 
-If Phase 2 detected a worktree AND Phase 3 merged successfully:
+**No-op stub.** The worktree-cleanup logic (FR-CD01–CD06) used to live here, but was relocated to **Phase 16.5** in v2.41.0 to preserve the `/feature-sdlc` resume contract: `state.yaml` lives in `<worktree>/.pmos/feature-sdlc/`, so removing the worktree before push tag (Phase 16) succeeds severs the user's ability to `/feature-sdlc --resume` if a later phase fails. See Anti-pattern #4 below and `reference/lastrun-schema.md` for the full rationale.
 
-Skip Phase 4 entirely (chat: `Phase 4 skipped: not in a worktree.`) when Phase 2 detected `--no-worktree` mode or a non-worktree session (FR-CD06).
-
-Otherwise, run the existing user gate:
-
-```
-question: "Worktree at <path> can be removed (changes merged to main locally). Remove now?"
-options:
-  - Remove worktree (Recommended)
-  - Keep worktree (I want to inspect it before push)
-  - Cancel
-```
-
-On **Remove**:
-
-1. **Compute dirty status excluding `.pmos/feature-sdlc/`** (FR-CD03). Query the worktree's tracked + untracked status, **excluding the entire `.pmos/feature-sdlc/` subtree** (state.yaml is gitignored but exists on disk and would otherwise count as untracked). Non-empty result set = dirty. The exact git invocation (porcelain flags, pathspec syntax, or two-step `git ls-files --others --exclude-standard` + `git diff --name-only`) is left to the implementor to pin against the installed git version; the contract is the exclusion + the boolean result.
-
-2. **Dirty branch (FR-CD01 step 2 + FR-CD02):**
-   - With `--force-cleanup` flag: `git worktree remove --force <path>`; proceed to step 4.
-   - Without `--force-cleanup`: surface the raw git error and stop. The user decides whether to commit, stash, or rerun with `--force-cleanup`. No auto-stash.
-
-3. **Clean branch (FR-CD01 steps 3–5):**
-   - Call `ExitWorktree(action=keep)` (FR-CD04).
-     - Success → cwd is restored to the launch session's root; proceed.
-     - No-op (any non-success return — typically "Must not already be in a worktree" / "Must have entered the worktree this session") → print fallback (FR-CD05): `Worktree removed. After this session ends, run: cd <root-main-path>` where `<root-main-path>` is the first entry of `git worktree list` (canonical realpath per `_shared/canonical-path.md`); proceed.
-   - Run `git worktree remove <path>` (no `--force`).
-   - Run `git branch -D feat/<slug>`.
-
-4. **Confirm.** `git worktree list` no longer contains the feature's worktree; `git branch --list "feat/<slug>"` is empty. Print confirmation to chat.
-
-**Note:** Removal happens BEFORE push by design (preserves the existing Phase 4 ordering). If push fails later (Phase 15), the worktree is already gone — recovery uses the rollback recipes in `reference/rollback-recipes.md`, not the worktree.
+Log to chat: `Phase 4: worktree retained through release; cleanup deferred to Phase 16.5.` Proceed to Phase 5.
 
 ## Phase 5 — Detect deployment norms
 
@@ -284,6 +324,8 @@ Probe and **enumerate ALL detected signals** (do not pick silently):
 6. `pyproject.toml` with `[project]` metadata at `./pyproject.toml` or `./backend/pyproject.toml` (PyPI publish via `uv publish`)
 
 See `reference/deploy-norms.md` for the full detection rubric.
+
+**Short-circuit when Phase 0.5 confirmed AND detected signals match lastrun's `detected_signals.deploy`:** map `run_defaults.deploy_path` → action; log `Phase 5: deploy path '<path>' auto-selected via Phase 0.5 (signals unchanged from lastrun)`; skip the prompt; record the chosen path for Phase 14's dry-run summary and Phase 17's lastrun write. If detected signals **differ from lastrun** (new CI workflow appeared, package.json gained a deploy script, plugin manifest path changed) the prompt below ALWAYS fires — the environment has shifted and the prior default may be wrong.
 
 Present detected signals + a recommendation. Example:
 
@@ -359,55 +401,17 @@ options:
 
 If "Update": read each new skill's `SKILL.md` `description:` and add a categorized row (Pipeline / Enhancers / Artifacts & docs / Tracking & context / Utilities — ask if unclear). Remove rows for deleted skills. Show diff before staging.
 
-## Phase 7.5 — Release-notes recipes (new in v2.34.0 per T20/W7)
+## Phase 7.5 — Release-notes recipes
 
-When generating the release notes section (consumed by /changelog in Phase 8 OR included directly in the merge commit body), include the following recipes for users navigating folded-phase commits and the v2.34.0 flag surface:
-
-### Recipe 1 — Filter human-meaningful commits (skip auto-apply)
-
-Folded MSF and simulate-spec phases write per-finding auto-apply commits (T6/T7/T8). To read the human-authored commit history without the auto-apply noise:
-
-```bash
-git log --invert-grep --grep='auto-apply' main..HEAD
-```
-
-This excludes commits like `requirements: auto-apply msf-req finding F3`, `wireframes: auto-apply msf-wf finding F7`, `spec: auto-apply simulate-spec patch P12`. Useful when scanning for behavior changes.
-
-### Recipe 2 — Discover dependency graph from Depends-on bodies
-
-Auto-apply commits include `Depends-on: F<M>` (or `P<M>`) in the commit body when finding F<N> requires F<M>. To enumerate the dependency graph:
-
-```bash
-git log --grep='Depends-on:' --pretty=format:'%h %s%n%b%n---' main..HEAD
-```
-
-Useful when reviewing whether folded findings landed in the right order, or when debugging why a re-apply on resume picked the wrong cursor.
-
-### Recipe 3 — Anti-pattern: manual git rebase mid-pipeline
-
-**DO NOT** `git rebase -i` during an in-progress /feature-sdlc run. The orchestrator's resume cursor uses `--since=<phase.started_at>` (T13/FR-57) plus per-finding commit greps to detect already-applied work. Rebasing rewrites timestamps and SHAs, which makes the apply-loop think nothing was applied — leading to duplicate auto-apply commits or skipped findings on resume.
-
-Safe alternative: complete the pipeline (or pause via the compact checkpoint), then rebase in a fresh `/complete-dev` session before merging.
-
-### Recipe 4 — `--help` quick reference for the v2.34.0 flag surface
-
-11 new flags added across the pipeline in v2.34.0:
-
-| Skill | New flags |
-|-------|-----------|
-| `/feature-sdlc` | `--minimal` (skip 4 soft gates: creativity, wireframes, prototype, retro) |
-| `/requirements` | `--skip-folded-msf`, `--msf-auto-apply-threshold N` |
-| `/wireframes` | `--skip-folded-msf-wf`, `--msf-auto-apply-threshold N` |
-| `/spec` | `--skip-folded-sim-spec` |
-| `/retro` | `--last N`, `--days N`, `--since YYYY-MM-DD`, `--project current\|all`, `--skill <name>`, `--scan-all` |
-
-`--msf-auto-apply-threshold N` defaults to 80 (Tier 3) — sub-threshold findings surface via inline disposition (D14) with `Recommended=Defer`.
+When generating the release notes section (consumed by /changelog in Phase 8 OR included directly in the merge commit body), apply the recipes in `reference/release-recipes.md` — four `git log` filters and anti-patterns for navigating folded-phase commits and the v2.34.0 flag surface (skip-auto-apply filter, Depends-on graph, no-mid-pipeline-rebase, --help flag table).
 
 ## Phase 8 — Run /changelog (unless --skip-changelog)
 
 If `--skip-changelog`: skip with a one-line warning.
 
 Otherwise: invoke `/pmos-toolkit:changelog` inline. /changelog writes to `{docs_path}/changelog.md` (resolved via `.pmos/settings.yaml`).
+
+**Short-circuit when Phase 0.5 confirmed AND `run_defaults.changelog_disposition: accept`:** log `Phase 8: changelog auto-accepted as drafted via Phase 0.5`; skip the prompt below; stage the entry for the Phase 11 commit. The `edit / rerun / skip` paths ALWAYS fire the prompt (edit needs free-form input; rerun is non-default; skip is destructive).
 
 After /changelog completes, surface the diff to the user:
 
@@ -480,6 +484,8 @@ options:
 If "Revert and re-bump", run the recipe in `reference/version-bump-recovery.md`, then continue at Step 5 with the restored manifests.
 
 **Step 5 — Bump prompt.**
+
+**Short-circuit when Phase 0.5 confirmed AND `run_defaults.version_bump ∈ {patch, minor, major, skip}`:** apply the bump per `run_defaults.version_bump`; log `Phase 9 step 5: bump '<kind>' auto-selected via Phase 0.5 (baseline: <baseline_v>)`; skip the prompt below. **Step 4a's stale-bump recovery prompt always fires when triggered** — it's destructive.
 
 ```
 question: "Current version is <baseline_v>. What kind of bump?"
@@ -614,6 +620,8 @@ Pushing to:       <remote-list>
 =============================
 ```
 
+**Short-circuit when Phase 0.5 confirmed:** apply `run_defaults.push_target` (`all-remotes` → push all; `origin-only` → push origin only); log `Phase 14: push target '<target>' auto-selected via Phase 0.5`; skip the prompt below; the dry-run summary above is ALWAYS printed regardless. (Push **failure** in Phase 15 still re-prompts — destructive.)
+
 ```
 question: "Push to <N> remotes?"
 options:
@@ -676,23 +684,71 @@ git push <remote> v<version>
 
 Skip if `--no-tag` was used.
 
+## Phase 16.5 — Worktree cleanup (FR-CD01–CD06) — moved here from Phase 4 in v2.41.0
+
+**Skip Phase 16.5 entirely** (chat: `Phase 16.5 skipped: not in a worktree.`) when Phase 2 detected `--no-worktree` mode or a non-worktree session (FR-CD06).
+
+**Skip when Phase 15 push failed and the user picked anything except a fully-completed retry** — the worktree must remain available for re-push attempts and `/feature-sdlc --resume`. The Phase 15.5 push-retry loop returns control to Phase 13 → 14 → 15 → 16 → 16.5; only when 16 push tag succeeds does this phase run.
+
+**Short-circuit when Phase 0.5 confirmed AND `run_defaults.worktree_disposition: remove`:** log `Phase 16.5: worktree removal auto-selected via Phase 0.5`; skip the prompt below; proceed to step 1 of the Remove sequence. When `run_defaults.worktree_disposition: keep`, log `Phase 16.5: worktree retained via Phase 0.5`; skip the prompt; skip the Remove sequence; proceed to Phase 17.
+
+Otherwise (Phase 0.5 edit-path or non-interactive Recommended-AUTO-PICK already covered):
+
+```
+question: "Worktree at <path> can be removed (push succeeded; release tagged). Remove now?"
+options:
+  - Remove worktree (Recommended)
+  - Keep worktree (I want to inspect it)
+  - Cancel
+```
+
+On **Remove**:
+
+1. **Compute dirty status excluding `.pmos/feature-sdlc/`** (FR-CD03). Query the worktree's tracked + untracked status, **excluding the entire `.pmos/feature-sdlc/` subtree** (state.yaml is gitignored but exists on disk and would otherwise count as untracked). Non-empty result set = dirty. The exact git invocation (porcelain flags, pathspec syntax, or two-step `git ls-files --others --exclude-standard` + `git diff --name-only`) is left to the implementor to pin against the installed git version; the contract is the exclusion + the boolean result.
+
+2. **Dirty branch (FR-CD01 step 2 + FR-CD02):**
+   - With `--force-cleanup` flag: `git worktree remove --force <path>`; proceed to step 4.
+   - Without `--force-cleanup`: surface the raw git error and stop. The user decides whether to commit, stash, or rerun with `--force-cleanup`. No auto-stash.
+
+3. **Clean branch (FR-CD01 steps 3–5):**
+   - Call `ExitWorktree(action=keep)` (FR-CD04).
+     - Success → cwd is restored to the launch session's root; proceed.
+     - No-op (any non-success return — typically "Must not already be in a worktree" / "Must have entered the worktree this session") → print fallback (FR-CD05): `Worktree removed. After this session ends, run: cd <root-main-path>` where `<root-main-path>` is the first entry of `git worktree list` (canonical realpath per `_shared/canonical-path.md`); proceed.
+   - Run `git worktree remove <path>` (no `--force`).
+   - Run `git branch -D feat/<slug>`.
+
+4. **Confirm.** `git worktree list` no longer contains the feature's worktree; `git branch --list "feat/<slug>"` is empty. Print confirmation to chat.
+
+**Note:** Removal happens **AFTER push tag succeeds** by design (v2.41.0 change — was Phase 4 pre-push). This preserves the `/feature-sdlc` resume contract: `state.yaml` lives in `<worktree>/.pmos/feature-sdlc/`, so a Phase 15 push failure leaves the worktree intact AND the user can `/feature-sdlc --resume` to retry. See Anti-pattern #4.
+
 ## Phase 17 — Final verification
 
 Run in parallel:
 - `git status -sb` — confirm clean working tree, main in sync
 - `git log --oneline -3` — show committed history
-- `pwd` — confirm cwd is root main checkout (not a deleted worktree)
+- `pwd` — confirm cwd is root main checkout (not a deleted worktree, when Phase 16.5 ran the Remove path)
+
+**Write lastrun (FR-LR04).** Atomically update `.pmos/complete-dev.lastrun.yaml` per `reference/lastrun-schema.md` § "Write contract":
+
+1. Build the `defaults` dict from THIS run's chosen values (the `run_defaults` modified by Phase 0.5 edits AND any destructive-allowlist re-prompts that overrode them mid-run).
+2. Record `detected_signals.deploy` from Phase 5's emission (so the next run's Phase 5 short-circuit can compare).
+3. Stamp `last_updated: <ISO-8601 UTC now>`.
+4. Write `.pmos/complete-dev.lastrun.yaml.tmp`, then `rename(2)` → `.pmos/complete-dev.lastrun.yaml`.
+5. On rename failure, log to chat `lastrun write failed: <error>; next /complete-dev run will use built-in defaults` and continue — the release has already shipped; this is not a release-blocking error.
+
+A **failed** or **cancelled** run skips the lastrun write — we do not memorialize broken choices. (Phase 15 push-failure with no retry, Phase 0.5 Cancel, Phase 1 Cancel all skip Phase 17 entirely.)
 
 Print success summary:
 
 ```
 ✓ Merged <branch>, bumped to vX.Y.Z, deployed via <method | skipped>,
-  pushed to <remotes>, tagged vX.Y.Z. Worktree removed. Now in <main-path>.
+  pushed to <remotes>, tagged vX.Y.Z. Worktree <removed|retained>. Now in <main-path>.
+  lastrun defaults saved to .pmos/complete-dev.lastrun.yaml.
 ```
 
 If anything failed in Phase 15-16, list the failed remote(s) + suggested manual retry: `git push <remote> main && git push <remote> v<version>`.
 
-## Phase 18 — Capture Learnings
+## Phase 18: Capture Learnings
 
 **This skill is not complete until the learnings-capture process has run.** Read and follow `learnings/learnings-capture.md` (relative to the skills directory, i.e. `plugins/pmos-toolkit/skills/learnings/learnings-capture.md`) now.
 
@@ -705,7 +761,7 @@ Reflect on whether this session surfaced anything worth capturing under `## /com
 1. **Auto-deciding the deploy method** without enumerating signals — repo norms can be ambiguous (npm `deploy` script + CI auto-deploy = double-deploy risk). Always show ALL detected signals + recommend; user picks.
 2. **`git add -A` blindly** — could include `.env`, `.bak`, secrets. Stage specific paths only.
 3. **Auto-resolving merge conflicts** in Phase 3. Always halt and ask.
-4. **Removing the worktree before merge succeeds** — Phase 4 gate is "after successful local merge", not "after Phase 3 starts". The order matters.
+4. **Removing the worktree before push succeeds** — since v2.41.0, worktree cleanup lives at **Phase 16.5** (after Phase 16 push tag), not Phase 4. The `/feature-sdlc` resume contract depends on `<worktree>/.pmos/feature-sdlc/state.yaml`; removing the worktree before push completes means a Phase 15 push failure leaves no resumable state AND no worktree to inspect. Phase 4 is now a deferral stub; do not move the cleanup body back. If you need pre-push cleanup for a non-resumable standalone /complete-dev run, that's still wrong — the worktree's branch is the source of truth for the merged content; keep it through the push.
 5. **Pushing to all remotes in parallel** — sequence with origin first; abort chain on origin failure (pre-push hook runs once, not N times).
 6. **Tagging before push** — tag is local until pushed; if push fails the tag is still local. Phase 13 → Phase 15 → Phase 16 ordering is load-bearing.
 7. **Auto-rolling-back the merge on push failure** — destructive; user almost always wants to fix-and-retry. Rollback is the explicit escape hatch, never the default.

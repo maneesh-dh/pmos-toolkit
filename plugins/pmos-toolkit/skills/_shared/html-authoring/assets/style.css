@@ -386,6 +386,37 @@ figcaption {
   border-top: 1px solid var(--pmos-border-2);
   font-size: var(--pmos-fs-xs);
   color: var(--pmos-muted);
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.5ch;
+}
+
+/* Subtle attribution — toolbar (right-aligned, small) and footer (inline after source) */
+.pmos-attribution {
+  font-size: var(--pmos-fs-xs);
+  font-style: italic;
+  color: var(--pmos-muted);
+  text-decoration: none;
+  letter-spacing: 0.01em;
+  opacity: 0.65;
+  transition: opacity 120ms ease;
+}
+.pmos-attribution:hover,
+.pmos-attribution:focus-visible {
+  opacity: 1;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+.pmos-attribution--toolbar {
+  margin-left: var(--pmos-sp-3);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.pmos-attribution-sep {
+  color: var(--pmos-muted);
+  opacity: 0.5;
 }
 
 /* Toast (Copy confirmation) */
@@ -524,7 +555,8 @@ button:focus-visible, a:focus-visible, [tabindex]:focus-visible {
   .pmos-quickstart-banner,
   .pmos-fallback-banner,
   .pmos-toast,
-  .pmos-section-anchor { display: none !important; }
+  .pmos-section-anchor,
+  .pmos-attribution--toolbar { display: none !important; }
   .pmos-viewer-shell { display: block; }
   .pmos-main { height: auto; }
   body { background: white; color: black; }

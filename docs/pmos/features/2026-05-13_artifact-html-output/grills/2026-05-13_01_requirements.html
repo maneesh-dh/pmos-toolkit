@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grill Report — 01_requirements (artifact-html-output)</title>
+  <link rel="stylesheet" href="../assets/style.css?v=2.40.0">
+  <script defer src="../assets/viewer.js?v=2.40.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Grill Report — 01_requirements (artifact-html-output)</h1>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+<p><strong>Depth:</strong> standard &middot; <strong>Questions asked:</strong> 4 &middot; <strong>Date:</strong> 2026-05-13</p>
+
+<section id="resolved">
+<h2 id="resolved">Resolved</h2>
+<ul>
+  <li><strong>D1 hardening</strong> &rarr; Phase 2.7 runs an inline <code>assert_heading_ids</code> + section-wrapper regex check on the <code>.tmp</code> file before <code>rename(2)</code>; hard-fail on miss with canonical error (matches /verify FR-72 enforcement).</li>
+  <li><strong>D2 placement</strong> &rarr; /artifact's Phase 3 chrome-strips + validates in-skill (no orchestrator above for standalone runs); hard-fail &rarr; soft-phase failure dialog (Retry / Pause / Abort).</li>
+  <li><strong>D4 implementation</strong> &rarr; sections.json re-built via new <code>assets/build_sections_json.js</code> helper.</li>
+  <li><strong>D6 revised</strong> &rarr; add ONE new substrate file (<code>build_sections_json.js</code>) &mdash; concede the strict "no new files" stance. Inline heading-id grep stays inline. Update v2.33.0 substrate manifest mentions across the 7+ HTML-emitting SKILL.md files in the same commit.</li>
+</ul>
+</section>
+
+<section id="open-deferred">
+<h2 id="open-deferred">Open / Deferred</h2>
+<p>None &mdash; all 4 grilled branches have terminal dispositions.</p>
+</section>
+
+<section id="gaps-surfaced">
+<h2 id="gaps-surfaced">Gaps surfaced</h2>
+<ul>
+  <li><strong>Substrate-manifest fanout</strong>: D6 revision means 7+ SKILL.md files enumerate the substrate file list. Adding <code>build_sections_json.js</code> requires a coordinated fanout edit. <em>Recommend</em>: explicit FR in /spec (<code>FR-Manifest-Update</code>: append the new helper to the enumeration in one commit; the "rides along automatically" precedent applies to future additions, but the named-list update is one-time).</li>
+  <li><strong>jsdom dependency</strong>: <code>html-to-md.js</code> vendors <code>turndown.umd.js</code> (UMD, no Node deps). jsdom is a Node-only dep. <em>Recommend pivot</em>: avoid jsdom; use a minimal regex-DOM walker (or a small balanced-tag tracker like <code>chrome-strip.js</code> uses) to keep zero install footprint. Confirm path in /spec.</li>
+  <li><strong>/verify smoke-test coverage</strong>: /verify's <code>assert_heading_ids.sh</code> (T22) globs <code>*.html</code> per FR-72 &mdash; should already cover <code>prd.html</code> etc. Confirm in /spec.</li>
+</ul>
+</section>
+
+<section id="next-step">
+<h2 id="next-step">Recommended next step</h2>
+<p>Update 01_requirements.html Decisions table to incorporate D6 revision and the inline-assert / in-skill-validation specifics. Then run <code>/spec</code>.</p>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_artifact-html-output/grills/2026-05-13_01_requirements.html</span>
+  </footer>
+</body>
+</html>

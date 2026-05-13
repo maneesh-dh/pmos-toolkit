@@ -504,6 +504,20 @@ File-action verbs (FR-24): `Create`, `Modify`, `Delete`, `Move`, `Rename`, `Test
 
 ### Task Design Rules
 
+#### Vertical-Slice Decomposition
+
+**Rule.** Each task is a thin **vertical slice** that cuts through every layer it needs (schema, API, UI, tests) to deliver one user-observable behavior end-to-end. A horizontal cut — a task that touches only one layer — is the wrong shape. Slices may be **narrow**: hardcoded inputs, single-row fixtures, one happy-path branch are fine in early slices; widen in subsequent tasks.
+
+**Tracer bullet (T1).** The first task is a **tracer bullet** — the minimal end-to-end path that proves the architecture works. Prefer the narrowest, dullest, hardcoded-where-needed slice that still exercises every integration layer the feature touches. The point of T1 is not to deliver value; it is to prove that the chosen architecture survives contact with reality. Risky unproven integration points (a new protocol, an unfamiliar library, a cross-service handshake) MUST be inside T1's path. If the spec has multiple narrow end-to-end candidates, pick the one that exercises the riskiest unproven point.
+
+**Preference.** Prefer **many thin slices** over few thick ones. A plan with 8 tasks where T1-T2 ship a working tracer bullet beats a plan with 4 fat tasks where nothing is end-to-end until T4.
+
+**Done-when (per slice).** A completed slice is independently demoable or verifiable on its own. The check: could you ship just this slice and it would still be a coherent (if narrow) improvement? If the answer requires "wait for the next task to land," the slice is too horizontal.
+
+**Exception path.** Refactors, schema-only spikes, pure-CSS changes, and config/IaC tasks cannot be vertical — there is no end-to-end behavior to deliver. Such tasks MUST declare the exception with a one-line rationale in the **Slice shape** field (see below). A task without an explicit exception declaration is assumed to be a vertical slice.
+
+**Slice shape field.** Each task MAY include a `**Slice shape:** vertical | refactor-prep | spike | css-only | config` field. When omitted, `vertical` is assumed. Non-vertical tasks MUST include the field with a one-line rationale, e.g., `**Slice shape:** refactor-prep — extracts the auth helper T3's vertical cut depends on.` Phase 4 review (item 13) enforces this.
+
 #### Optional: `## Phase N` Groupings (for large plans)
 
 For plans with **more than ~12 tasks**, group tasks under `## Phase N: <name>` headings. Each phase boundary triggers full `/verify` + a `/compact` handshake when /execute reaches the end of the phase (see `execute/SKILL.md` Phase 2.5).
@@ -867,3 +881,4 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT let TN's frontend smoke test stop at "renders correctly" — it must include hard-reload, an error-path probe, the UX polish checklist, and (if wireframes exist) a wireframe diff. Polish belongs in the plan, not as a verify afterthought.
 - Do NOT create `## Phase N` groupings of 1–2 tasks — each phase boundary triggers full /verify (multi-agent code review + interactive QA), which dwarfs the implementation cost of a tiny phase. Target 5–10 tasks per phase, or skip phases entirely for small plans.
 - Do NOT skip the execution-mode selection question (Inline vs Subagent-driven) at close — the recorded `execution_mode:` frontmatter value is what `/execute` and `/feature-sdlc` Phase 6 read; omitting it silently forces inline everywhere.
+- Do NOT decompose by layer — "all migrations first, then all endpoints, then all UI." Each task is a thin **vertical slice** that cuts through every layer it needs to deliver one user-observable behavior. T1 is a **tracer bullet**: the narrowest end-to-end path that proves the architecture. Refactors, schema-only spikes, CSS-only, and config-only tasks are the only legitimate exceptions and MUST declare `**Slice shape:**` with a one-line rationale. See Phase 3 §Vertical-Slice Decomposition.

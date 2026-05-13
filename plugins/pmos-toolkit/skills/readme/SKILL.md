@@ -129,7 +129,33 @@ Three modes share a single substrate: a 15-check rubric, a workspace-discovery s
 
 ## Implementation
 
-### Subsection 1 — TBD (mode resolver)
+### Single-file audit flow
+
+This subsection documents the procedure /readme follows when invoked at a repo with an existing `README.md` and no monorepo signal. Mode-resolver wiring for `--scaffold` and `--update <range>` lands in T14 / T18; cross-file rules for monorepo workspaces in T21. T3 owns the audit mode's tracer path end-to-end.
+
+**1. Argv parsing — mode resolver.** Parse `--audit | --scaffold | --update <range>` as **mutually exclusive**. If two are present, refuse with platform-aware error: `Modes are mutually exclusive: --audit / --scaffold / --update <range>. Pick one.` (FR-MODE-1.) If none is passed and `README.md` exists at the resolved repo-path → default to `--audit` and log: `mode: audit (existing README detected)`. If none is passed and no `README.md` exists → default to `--scaffold` and log: `mode: scaffold (no README found)`. (FR-MODE-4.)
+
+**2. Shell the rubric.** From SKILL.md, invoke the bundled rubric script via the portable plugin root:
+```
+bash "${CLAUDE_PLUGIN_ROOT}/skills/readme/scripts/rubric.sh" "${repo_path}/README.md"
+```
+Capture stdout (TSV: `check-id\tverdict\tcommit\tline\tmessage` per row) and exit code. Exit 0 ⇒ all pass; exit 1 ⇒ ≥1 fail; exit 2 ⇒ script error (refuse with `rubric.sh exited 2 — see stderr above. Aborting audit.`).
+
+**3. Aggregate findings.** Tally `PASS` / `FAIL` rows from the TSV. Emit one summary line to chat: `rubric: <P> pass / <F> fail`. (FR-OUT-1.) Empty `FAIL` set ⇒ no diff preview, no AskUserQuestion: close with `README clean against rubric. Nothing to fix.` (FR-OUT-5 — no findings, no diff path.)
+
+**4. Batched AskUserQuestion for findings.** If `<F> > 0`, group failing findings into batches of ≤4 per `AskUserQuestion` call (FR-OUT-2). Each finding presents one question with options **Apply suggested fix (Recommended)** / **Modify** / **Skip — leave as-is** / **Defer**. Question shape: `[<check-id>] <message>. Suggested fix: <one-line>.` Pass canonical (Recommended) labelling per the non-interactive contract.
+
+**5. Atomic write.** For every Apply-or-Modify disposition, compute the proposed README content in memory, then write via temp + rename:
+```
+tmp="${target}.tmp.$$"
+printf '%s' "${new_content}" > "${tmp}"
+mv -- "${tmp}" "${target}"
+```
+Never write to `${target}` directly. (FR-OUT-4.) On any write error, refuse with `Atomic write failed: ${err}. Original README preserved at ${target}.` and exit 1 without modifying the file. The integration test at `tests/integration/tracer_audit.sh` exercises this contract end-to-end.
+
+**6. Close-out.** Emit final line to chat: `README written to ${target}. Run /complete-dev to include it in the release commit.` (FR-OUT-4 — never auto-commit.)
+
+All script paths use `${CLAUDE_PLUGIN_ROOT}/skills/readme/scripts/…` — no absolute paths. (FR-C1.)
 
 ### Subsection 2 — TBD (rubric runner)
 

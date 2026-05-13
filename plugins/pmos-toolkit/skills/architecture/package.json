@@ -1,0 +1,9 @@
+{
+  "name": "architecture-skill-tooling",
+  "private": true,
+  "description": "Tooling deps for the /architecture audit skill (dependency-cruiser for TS L2 rules; typescript peer required for .ts parsing).",
+  "devDependencies": {
+    "dependency-cruiser": "^16.0.0",
+    "typescript": "^5.0.0"
+  }
+}

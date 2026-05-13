@@ -1,0 +1,6 @@
+{
+  "name": "ts-circular-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "description": "T9 fixture — 2-file circular import; expected: one TS001 finding."
+}

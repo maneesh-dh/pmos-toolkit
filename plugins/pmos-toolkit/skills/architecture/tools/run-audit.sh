@@ -560,11 +560,79 @@ print(json.dumps(findings))
 PY
 )
 
+# ── L2 delegated tool: dependency-cruiser (T9, FR-30/32/33) ──────────────────
+# Runs only when stacks_detected includes "ts". Graceful-degrade per FR-32:
+# missing npx/depcruise → tools_skipped += "dependency-cruiser", findings=[].
+# Invocation: `npx --no-install depcruise --output-type json --config <cfg> $SCAN_ROOT`
+# from within $SCAN_ROOT so the project's own typescript peer is picked up.
+# Violations are mapped name → rule_id (.depcruise.cjs names rules TS001-TS004
+# 1:1 with principles.yaml); severity is rewritten downstream via effective_severity.
+TOOLS_SKIPPED=()
+STACKS=$(echo "$LOADER_JSON" | jq -r '.stacks_detected | join(",")')
+depcruise_findings='[]'
+if echo ",$STACKS," | grep -q ',ts,'; then
+  echo "[delegated] dependency-cruiser: check available" 1>&2
+  # Run from $SCAN_ROOT first to honour project-local typescript; fall back to
+  # $SKILL_DIR (which ships dep-cruiser + typescript as devDeps) so the skill
+  # works on projects that don't install typescript themselves.
+  dc_cwd=""
+  if (cd "$SCAN_ROOT" && npx --no-install depcruise --version >/dev/null 2>&1); then
+    dc_cwd="$SCAN_ROOT"
+  elif (cd "$SKILL_DIR" && npx --no-install depcruise --version >/dev/null 2>&1); then
+    dc_cwd="$SKILL_DIR"
+  fi
+  if [ -n "$dc_cwd" ]; then
+    dc_cfg="$SKILL_DIR/tools/.depcruise.cjs"
+    scan_abs="$(cd "$SCAN_ROOT" && pwd)"
+    # `timeout` is GNU; macOS ships `gtimeout` only when coreutils is installed.
+    # Fall through to a no-timeout invocation if neither is present.
+    dc_timeout=""
+    if command -v timeout >/dev/null 2>&1; then dc_timeout="timeout 60"
+    elif command -v gtimeout >/dev/null 2>&1; then dc_timeout="gtimeout 60"
+    fi
+    echo "[delegated] $dc_timeout npx --no-install depcruise --output-type json --config $dc_cfg $scan_abs (cwd=$dc_cwd)" 1>&2
+    dc_start=$(date +%s)
+    dc_out=$(cd "$dc_cwd" && $dc_timeout npx --no-install depcruise \
+      --output-type json --config "$dc_cfg" "$scan_abs" 2>/tmp/depcruise.err) || true
+    dc_end=$(date +%s)
+    echo "[delegated] duration: $((dc_end-dc_start))s" 1>&2
+    if [ -n "$dc_out" ]; then
+      depcruise_findings=$(echo "$dc_out" | jq '[.summary.violations[] | {
+        rule_id: .rule.name,
+        file: (.from // "<unknown>"),
+        line: 1,
+        severity: (if .rule.severity == "error" then "block"
+                   elif .rule.severity == "warn" then "warn"
+                   else "info" end),
+        message: (.comment // (.rule.name + " — see principles.yaml")),
+        source_citation: ("principles.yaml#" + .rule.name),
+        suppressed_by: null
+      }]')
+    fi
+  else
+    echo "[warn] dependency-cruiser not available; skipping TS L2 declarative checks (FR-32)" 1>&2
+    TOOLS_SKIPPED+=("dependency-cruiser")
+  fi
+fi
+
+# Merge depcruise findings into the unified findings array.
+findings_json=$(jq -n \
+  --argjson a "$findings_json" \
+  --argjson b "$depcruise_findings" \
+  '$a + $b')
+
+# Build tools_skipped JSON array (empty when no tool was skipped).
+tools_skipped_json='[]'
+if [ "${#TOOLS_SKIPPED[@]}" -gt 0 ]; then
+  tools_skipped_json=$(printf '%s\n' "${TOOLS_SKIPPED[@]}" | jq -R . | jq -s .)
+fi
+
 END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 jq -n \
   --argjson f "$findings_json" \
   --argjson loader "$LOADER_JSON" \
+  --argjson tools_skipped "$tools_skipped_json" \
   --arg start "$START" \
   --arg end "$END" \
   --arg root "$SCAN_ROOT" \
@@ -584,6 +652,7 @@ jq -n \
     rule_overrides: $loader.rule_overrides,
     exemptions: $loader.exemptions,
     scanned: ($loader.scanned | del(.files_for_rules)),
+    tools_skipped: $tools_skipped,
     findings: ($f
       | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
       | sort_by({block:0, warn:1, info:2}[.severity] // 9, .file, .line, .rule_id))

@@ -18,3 +18,7 @@ __pycache__/
 
 # Playwright MCP scratch artifacts (snapshots/console logs from /verify runs)
 .playwright-mcp/
+
+# Skill-local node_modules (e.g. architecture skill's dependency-cruiser devDep)
+plugins/pmos-toolkit/skills/*/node_modules/
+plugins/pmos-toolkit/skills/*/package-lock.json

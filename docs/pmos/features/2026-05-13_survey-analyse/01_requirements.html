@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>survey-analyse skill — Requirements</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.38.0">
+  <script defer src="assets/viewer.js?v=2.38.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">survey-analyse skill — Requirements</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="meta" data-pmos-section="meta">
+  <h2 id="meta">Meta</h2>
+  <dl>
+    <dt>Date</dt><dd>2026-05-13</dd>
+    <dt>Last updated</dt><dd>2026-05-13</dd>
+    <dt>Status</dt><dd>Draft</dd>
+    <dt>Tier</dt><dd>3 — Feature (user override at /feature-sdlc Phase 0d; matrix recommended 2)</dd>
+    <dt>Pipeline mode</dt><dd>skill-new (driven by /feature-sdlc skill-new mode)</dd>
+    <dt>Skill location</dt><dd><code>plugins/pmos-toolkit/skills/survey-analyse/SKILL.md</code></dd>
+    <dt>Target platform</dt><dd>claude-code (with documented portable / generic fallback)</dd>
+    <dt>Standing acceptance criteria</dt><dd><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code> §A–§F (frontmatter; description &amp; triggering; structure &amp; progressive disclosure; body &amp; content; scripts &amp; tooling; platform-conditional frontmatter); this repo's <code>CLAUDE.md</code> "Skill-authoring conventions" + "Canonical skill path" + "Plugin manifest version sync" + "/complete-dev release entry".</dd>
+  </dl>
+</section>
+
+<section id="problem" data-pmos-section="problem">
+  <h2 id="problem">Problem</h2>
+  <p>Users of this toolkit (PMs, researchers, founders) field surveys via Typeform / SurveyMonkey / Google Forms / Qualtrics, get back a CSV / Excel / PDF of raw responses, and then face the slowest step of the loop: turning hundreds or thousands of mixed-type responses (single-select, multi-select, Likert, NPS, ranking, matrix, numeric, open-text) into a credible report that answers <em>"so what should we do?"</em>. Doing it by hand in a spreadsheet takes hours and the typical pitfalls (treating ordinal Likert as interval; computing multi-select on the wrong base; reporting NPS as an average; over-fitting themes onto a tiny open-end sample; spurious "significant" subgroup differences from multiple-comparisons) silently degrade the conclusions. There is no skill in pmos-toolkit that closes that loop today — <code>/survey-design</code> builds the questionnaire but stops at fielding; everything after collection is manual.</p>
+  <h3 id="problem-who">Who experiences this?</h3>
+  <p>A PM, researcher, founder, or analyst with a fielded survey's raw responses in hand who needs a defensible report (executive summary + per-question deep-dive) to share with a stakeholder or to drive a decision. Typically n is 50–5,000; one survey; mixed question types; English-language verbatims.</p>
+  <h3 id="problem-why-now">Why now?</h3>
+  <p>The toolkit just shipped <code>/survey-design</code> (v2.36.0). The natural pair-with — analysing the responses the survey produced — is the obvious next step and the user explicitly asked for it. The two skills compose: <code>/survey-design</code>'s <code>survey.json</code> is a high-fidelity questionnaire-context input that <code>/survey-analyse</code> can consume verbatim.</p>
+</section>
+
+<section id="goals" data-pmos-section="goals">
+  <h2 id="goals">Goals &amp; Non-Goals</h2>
+  <h3 id="goals-goals">Goals</h3>
+  <ul>
+    <li><strong>Turn raw responses into a credible report in one skill invocation.</strong> The user points the skill at a response file (CSV/XLSX/TSV/PDF) and optionally a context doc/survey.json; the skill returns an HTML report with executive summary, whole-survey synthesis, and per-question analysis — measured by: a single run on a ≤2,000-row survey produces a report the user can hand to a stakeholder without manual rework.</li>
+    <li><strong>Use methodologically defensible numbers, not LLM eyeball estimates.</strong> Per-question stats (frequencies, T2B/B2B, NPS = %P − %D, median for ordinal/numeric, average rank, theme counts) come from a deterministic helper script — not LLM inspection of the raw CSV — measured by: identical inputs produce byte-identical numeric tables across runs.</li>
+    <li><strong>Bake in the survey-methodology pitfalls catalogue.</strong> Bundled <code>reference/</code> guidelines cover per-question-type methods, open-end thematic coding, whole-survey statistics (significance, multiple comparisons, MoE, weighting caveats), data cleaning, and synthesis/reporting standards — measured by: the produced report never (a) reports a Likert mean without also showing the distribution and T2B, (b) reports a multi-select option's % on the response base instead of the respondent base, (c) reports NPS as an average, (d) headlines a subgroup difference without showing base sizes, or (e) themes open-ends without representative verbatim quotes.</li>
+    <li><strong>Surface limitations honestly.</strong> Every report carries a Methodology &amp; Limitations section that records the sample size, completion rate (if derivable), cleaning rules applied (with counts removed), the probability-vs-non-probability classification (and whether MoE is reported or suppressed accordingly), and any flagged risks (small N for a headlined subgroup; high "Don't know" rate on a key item; speeder/straightliner share) — measured by: the section is non-empty on every run; the report does not headline a subgroup with <code>n &lt; 30</code> without an explicit caveat.</li>
+    <li><strong>Compose cleanly with the rest of the toolkit.</strong> Skill follows the <code>/survey-design</code> shape (standalone utility; writes to its own dated run folder under <code>{docs_path}/survey-analyses/</code>; HTML-substrate artifacts with companion <code>sections.json</code> and feature-folder <code>index.html</code>; the runbook's <code>output_format</code> gate; the canonical non-interactive block; platform-adaptation section) — measured by: the skill passes the <code>/feature-sdlc</code> Phase 6a <code>skill-eval.md</code> rubric (§A–§F) with no failed checks at iteration 1.</li>
+  </ul>
+  <h3 id="goals-non-goals">Non-Goals (explicit scope cuts)</h3>
+  <ul>
+    <li><strong>NOT a data-collection or survey-fielding tool</strong> — because <code>/survey-design</code> covers design and the user fields the survey on their platform of choice. <code>/survey-analyse</code> starts at the response export.</li>
+    <li><strong>NOT a longitudinal / wave-tracking analyzer</strong> in v1 — because single-wave coverage is the dominant use case and wave-over-wave comparisons need a separate cross-run identifier story. Re-runnable on each wave separately; tracked as a future enhancement.</li>
+    <li><strong>NOT a real-time dashboard</strong> — because the artifact is a one-shot HTML report. Re-run for refreshed numbers.</li>
+    <li><strong>NOT a statistical-modelling / regression / clustering tool</strong> — because the user's stated job is "explain what the responses say and what to do" not "build a predictive model". Limited to descriptive stats + the planned bivariate significance tests.</li>
+    <li><strong>NOT a weighting designer</strong> — the skill will <em>apply</em> a user-supplied per-respondent weight column if present and document it; computing weights against population benchmarks is out of scope.</li>
+    <li><strong>NOT a PII redactor</strong> — anonymizing free-text quotes is the user's responsibility; the skill will flag obvious PII patterns (emails, phone numbers) in surfaced quotes as a quality check but will not silently rewrite them.</li>
+    <li><strong>NOT translation</strong> — multilingual verbatim analysis is out of scope in v1; user is expected to feed English (or pre-translated) responses.</li>
+  </ul>
+</section>
+
+<section id="ux-analysis" data-pmos-section="ux-analysis">
+  <h2 id="ux-analysis">User Experience Analysis</h2>
+  <h3 id="ux-motivation">Motivation</h3>
+  <ul>
+    <li><strong>Job to be done:</strong> "I have survey responses; I need a defensible report I can share or act on by the end of today."</li>
+    <li><strong>Importance / urgency:</strong> high — the survey was fielded to inform a decision; the analysis is the blocker between data and decision.</li>
+    <li><strong>Alternatives:</strong> hand-rolled spreadsheet pivot tables (slow, error-prone on Likert/multi-select/NPS conventions); the survey platform's built-in reporter (rigid, no cross-tabs or theming); paying a research vendor (expensive, slow); asking an LLM to "summarize this CSV" (no rigour, no per-question methodology).</li>
+  </ul>
+  <h3 id="ux-friction">Friction Points</h3>
+  <table>
+    <thead><tr><th>Friction Point</th><th>Cause</th><th>Mitigation</th></tr></thead>
+    <tbody>
+      <tr><td>"What is each column? Are these single-select or multi-select?"</td><td>Raw exports have no machine-readable question-type schema; column headers are the question text.</td><td>Skill infers question types from the data shape (cardinality, value patterns), then surfaces the inferred schema for one-prompt confirmation; if a <code>/survey-design</code> <code>survey.json</code> is provided, skip inference entirely.</td></tr>
+      <tr><td>"What decision is this for?"</td><td>Without the survey's purpose, the synthesis is a data dump.</td><td>Phase 2 ASKS via <code>AskUserQuestion</code> for the survey's purpose / decisions sought / segments of interest, batched in one prompt.</td></tr>
+      <tr><td>"My file is Excel / PDF / weird"</td><td>Multiple platforms, multiple shapes.</td><td>Accept CSV / TSV / XLSX / XLS / PDF as first-class; multi-sheet XLSX → pick sheet; PDF → use Read-then-LLM-tabulate fallback with explicit limitations.</td></tr>
+      <tr><td>"Are these numbers actually right?"</td><td>LLM-narrated stats are not reproducible.</td><td>Stats come from <code>scripts/analyse.py</code> (or <code>analyse.mjs</code> fallback) — deterministic; the helper emits a JSON the LLM narrates on top of; the JSON is saved alongside the report for audit.</td></tr>
+      <tr><td>"Does this small subgroup really differ?"</td><td>Subgroup comparisons on small N are the #1 over-claim.</td><td>Cross-tabs auto-flag small-base cells (<code>n &lt; 30</code>); column-proportion z-tests with column letters; multi-comparison caveat in the methodology section.</td></tr>
+      <tr><td>"I don't trust the open-end themes"</td><td>LLM clustering can over-fit / under-cite.</td><td>Theme report includes count + % of open-end responders + 1–3 representative verbatim quotes per theme; "themes &lt;5 mentions on n &lt; 50 open-ends" are explicitly labeled "preliminary / illustrative".</td></tr>
+    </tbody>
+  </table>
+  <h3 id="ux-satisfaction">Satisfaction Signals</h3>
+  <ul>
+    <li>The exec summary headline ("62% of respondents picked X; among Enterprise (n=140) it was 78%") reads like something the user would have written if they had time.</li>
+    <li>The per-question sections show charts/tables matching the question's type (diverging stacked bars for Likert; horizontal bars with multi-answer label for multi-select; the headline NPS number large + the distribution).</li>
+    <li>The methodology section is short enough to read and specific enough to defend ("attention-check fail = 1 of 3 missed; 7 respondents excluded; speeders n=3 (&lt;30% median time) excluded").</li>
+  </ul>
+</section>
+
+<section id="solution-direction" data-pmos-section="solution-direction">
+  <h2 id="solution-direction">Solution Direction</h2>
+  <p>A standalone utility skill at <code>plugins/pmos-toolkit/skills/survey-analyse/SKILL.md</code>, modelled on <code>/survey-design</code>'s shape (sister skill — produces analysis where /survey-design produces questionnaire). The skill runs eight numbered phases and writes a single dated run folder under <code>{docs_path}/survey-analyses/{YYYY-MM-DD}_&lt;slug&gt;/</code>:</p>
+  <ol>
+    <li><strong>Phase 0 — Setup.</strong> Read <code>.pmos/settings.yaml</code> (default <code>docs_path</code> if absent — same fallback as <code>/survey-design</code>, NOT first-run pipeline-setup). Parse flags: <code>--responses &lt;path&gt;</code>, <code>--context &lt;path|url&gt;</code>, <code>--survey-json &lt;path&gt;</code>, <code>--sheet &lt;name|N&gt;</code>, <code>--weight-col &lt;name&gt;</code>, <code>--format html|md|both</code>, <code>--non-interactive|--interactive</code>, <code>--engine python|node|auto</code>, <code>--skip-cleaning</code>, <code>--no-significance</code>. Resolve <code>output_format</code>. Pick a unique dated run-folder slug. Inline the canonical non-interactive block. Load <code>~/.pmos/learnings.md</code> under <code>## /survey-analyse</code>.</li>
+    <li><strong>Phase 1 — Ingest responses.</strong> Read the input file. Dispatch by extension: <code>.csv</code>/<code>.tsv</code> → native; <code>.xlsx</code>/<code>.xls</code> → pandas <code>read_excel</code> in the Python helper (or sheetjs in the Node helper); <code>.pdf</code> → Read tool tabulates with a one-table-per-question heuristic + LLM fallback for layout-broken PDFs, with limitations explicitly noted. Multi-sheet XLSX → prompt for which sheet unless <code>--sheet</code> set. Save a normalised <code>responses.csv</code> in the run folder as the canonical analysis input. Stop and ask the user if the file fails to parse or yields zero rows.</li>
+    <li><strong>Phase 2 — Survey-context intake.</strong> If <code>--survey-json</code> was passed (a <code>/survey-design</code> output): read it; treat its <code>sections[].questions[]</code> as the authoritative schema. Else: ingest any <code>--context</code> doc/URL. Else: infer the schema from the response columns (cardinality, value patterns; flag low-confidence inferences). Surface the inferred-or-loaded schema + a one-paragraph LLM summary of "what this survey is about" via <code>AskUserQuestion</code>, asking for: confirm-or-correct the schema; survey purpose; key decision(s) the analysis should inform; segments of interest. One batched prompt.</li>
+    <li><strong>Phase 3 — Clean.</strong> Run the cleaning checklist from <code>reference/data-quality.md</code>: straightliners (per matrix, zero or near-zero per-respondent variance), speeders (if a duration column is present, <code>&lt;½ × median</code> default; configurable), incompletes (configurable threshold), exact-duplicates, attention-check fails (only if the schema flags such a question), numeric outliers (1.5×IQR review). Each rule documents: rule, threshold, records flagged, records removed. Skipped under <code>--skip-cleaning</code> with a warning in the methodology section. Output: <code>cleaned_responses.csv</code> + <code>cleaning.json</code> log.</li>
+    <li><strong>Phase 4 — Per-question analysis.</strong> Invoke <code>scripts/analyse.py</code> (or <code>scripts/analyse.mjs</code> fallback per <code>--engine auto</code> resolution) over <code>cleaned_responses.csv</code> + the confirmed schema. For each question, the helper emits the correct stats for the question type per <code>reference/question-type-analysis.md</code>:
+      <ul>
+        <li><strong>single-select / categorical:</strong> freq, %, mode.</li>
+        <li><strong>multi-select:</strong> per-option % of respondents (not responses), mean options selected.</li>
+        <li><strong>Likert / rating (ordinal):</strong> full distribution, median, mode, T2B, B2B, T2B−B2B; mean reported with an explicit ordinal caveat.</li>
+        <li><strong>NPS (auto-detected: 0–10 scale, "recommend" wording):</strong> %P, %Passive, %D, NPS = %P − %D as an integer.</li>
+        <li><strong>ranking:</strong> average rank + weighted points; convention stated.</li>
+        <li><strong>matrix / grid:</strong> per-row Likert stats; whole-matrix straightlining flag.</li>
+        <li><strong>numeric / open numeric:</strong> n, mean, median, SD, min, max, percentiles, histogram bins, outliers flagged.</li>
+        <li><strong>open-text:</strong> deferred to Phase 5.</li>
+      </ul>
+      Output: <code>per_question.json</code> — keyed by column name; values are typed stat blocks. The LLM never recomputes these numbers; it narrates on top of them.
+    </li>
+    <li><strong>Phase 5 — Open-end thematic coding.</strong> For each open-text column with <code>n ≥ 5</code>: run the Braun &amp; Clarke 6-phase inductive coding (familiarise → open code → group → review → name &amp; define → write up), implemented as an LLM pass over the verbatims (chunked for large N) per <code>reference/text-analysis.md</code>. Output: <code>themes.json</code> — one entry per open-text column: themes (name, definition, count, % of open-end responders, 1–3 representative quotes, sentiment lean). Themes &lt; 5 mentions on n &lt; 50 open-ends labelled "preliminary".</li>
+    <li><strong>Phase 6 — Whole-survey synthesis.</strong> Run cross-tabs of every closed question against user-confirmed segment variables (Phase 2). For each cross-tab: column %, n per cell, chi-square overall, pairwise column-proportion z-tests (unless <code>--no-significance</code>). Auto-flag <code>n &lt; 30</code> cells. Multiple-comparisons caveat in the methodology section. Synthesise key takeaways: top 3–5 findings across the survey + open-end themes that explain them. Output: <code>synthesis.json</code> + a narrative draft.</li>
+    <li><strong>Phase 7 — Report rendering.</strong> Render <code>report.html</code> via the <code>_shared/html-authoring/</code> substrate (template.html, kebab-case heading ids, sections.json companion, <code>?v=&lt;plugin-version&gt;</code> cache-bust, assets/ copy, atomic temp-then-rename). Sections (in order): Executive Summary; Methodology &amp; Limitations; Key Findings; Per-question Analysis; Open-end Themes; Cross-tab Appendix; Data-quality Log. Inline SVG bar/diverging-stacked-bar charts (no external libs; SVG round-trips to MD via turndown). Companion <code>report.sections.json</code>. Regenerate the run-folder <code>index.html</code> with the inlined manifest. <code>output_format: both</code> → emit <code>report.md</code> sidecar via the substrate's <code>html-to-md.js</code>. Output: <code>report.html</code> (+ <code>report.md</code> sidecar when applicable).</li>
+    <li><strong>Phase 8 — Workstream / Learnings / Handoff.</strong> No workstream enrichment (the skill does not load workstream context — see D1). Read <code>~/.pmos/learnings.md</code> under <code>## /survey-analyse</code>. Emit the one-line learnings reflection (<code>Learning: …</code> or <code>No new learnings this session because …</code>). Handoff line: print the path to <code>report.html</code> + the run folder.</li>
+  </ol>
+  <p>The control flow is linear — no review loops at the skill level (the user re-runs the skill to iterate; phase outputs are saved as JSON for cheap re-rendering without re-coding). The skill has a single <code>## Track Progress</code> contract listing the 8 phases.</p>
+</section>
+
+<section id="user-journeys" data-pmos-section="user-journeys">
+  <h2 id="user-journeys">User Journeys</h2>
+  <h3 id="journey-primary">Primary journey (happy path)</h3>
+  <ol>
+    <li>User runs <code>/survey-analyse --responses ~/Downloads/survey.xlsx --survey-json docs/pmos/survey-design/2026-05-08_pricing-survey/survey.json</code> in a Claude Code session.</li>
+    <li>Phase 0 sets up; Phase 1 reads the XLSX → asks "Sheet 1 (Responses) or Sheet 2 (Metadata)?"; user picks Sheet 1.</li>
+    <li>Phase 2 loads <code>survey.json</code>; schema confirmed without re-prompting; one batched <code>AskUserQuestion</code>: "Purpose of this survey? Key decision? Segments to compare? Anything else to flag?". User answers.</li>
+    <li>Phase 3 cleans: 11 records flagged (3 speeders, 2 straightliners, 6 incompletes); user sees the log and confirms exclusion. <code>cleaned_responses.csv</code> = 489 rows.</li>
+    <li>Phase 4 runs <code>scripts/analyse.py</code>; <code>per_question.json</code> written; agent narrates each question's stat block.</li>
+    <li>Phase 5 themes the 3 open-text columns; <code>themes.json</code> written.</li>
+    <li>Phase 6 produces cross-tabs by user-confirmed segments (plan tier, region); flags 2 cells with <code>n &lt; 30</code>; synthesises 4 key takeaways.</li>
+    <li>Phase 7 renders <code>report.html</code> + <code>report.sections.json</code>; <code>index.html</code> regenerated.</li>
+    <li>Handoff: user opens <code>report.html</code> in a browser, reviews, shares with the stakeholder.</li>
+  </ol>
+  <h3 id="journey-no-survey-json">Alternate — no survey.json, only a context doc</h3>
+  <ol>
+    <li>User runs <code>/survey-analyse --responses survey.csv --context "this was a pricing-willingness survey fielded to 600 founders in April"</code>.</li>
+    <li>Phase 2 infers the schema from the response columns; confidence per question; one prompt asks the user to confirm/correct, and to fill in survey purpose / decisions / segments.</li>
+    <li>Rest of the flow continues as Primary.</li>
+  </ol>
+  <h3 id="journey-pdf">Alternate — PDF input</h3>
+  <ol>
+    <li>User runs <code>/survey-analyse --responses survey-export.pdf</code> (Google Forms / Typeform PDF export).</li>
+    <li>Phase 1 attempts Read-tool tabulation; if structured tables are recovered, proceeds with a warning ("PDF ingestion is best-effort; verify the normalised <code>responses.csv</code> before committing"); if not, falls back to an LLM-tabulation pass over the PDF text and prompts the user to confirm; if still ambiguous, the skill pauses and asks the user to export CSV/XLSX instead.</li>
+  </ol>
+  <h3 id="journey-non-interactive">Alternate — non-interactive run</h3>
+  <ol>
+    <li>User runs <code>/survey-analyse --responses survey.csv --non-interactive</code> (e.g. inside a CI / automation).</li>
+    <li>The canonical non-interactive block kicks in: every AskUserQuestion is auto-picked on its (Recommended) option or deferred per the defer-only tag; deferred questions buffer to <code>_open_questions.md</code> in the run folder; the report emits with a <strong>Run Outcome: deferred</strong> marker and an explicit "this run did not get user clarifications X, Y, Z" section.</li>
+  </ol>
+  <h3 id="journey-error-engine">Error — Python missing, Node missing too</h3>
+  <ol>
+    <li>Phase 4 detects no <code>python3</code>; falls back to <code>node</code>; if neither is on PATH: stops with a clear "install python3 or node" message, surfaces a one-line copy-pasteable install command, writes the partial run-folder state, and exits.</li>
+  </ol>
+  <h3 id="journey-error-empty">Error — empty / unparseable file</h3>
+  <ol>
+    <li>Phase 1 → zero rows or parse error → stops, surfaces the parser's error verbatim, asks the user to re-export or pick another file. No subsequent phases run.</li>
+  </ol>
+  <h3 id="empty-states" data-pmos-section="empty-states">
+    <h4 id="empty-states-h">Empty states &amp; edge cases</h4>
+    <table>
+      <thead><tr><th>Scenario</th><th>Condition</th><th>Expected behaviour</th></tr></thead>
+      <tbody>
+        <tr><td>Single-column file</td><td>responses.csv has 1 column</td><td>Treat as 1 free-text or 1 categorical question; warn that cross-tabs are not possible; produce a degenerate but valid report.</td></tr>
+        <tr><td>No open-text columns</td><td>schema has zero free-text questions</td><td>Skip Phase 5 silently; report has no Themes section; methodology notes the absence.</td></tr>
+        <tr><td>No segment variables identified</td><td>Phase 2 surfaces zero confirmed segments</td><td>Skip Phase 6 cross-tabs; produce univariate-only synthesis; report flags this explicitly.</td></tr>
+        <tr><td>Very small N (n &lt; 30)</td><td>cleaned_responses.csv has 1–29 rows</td><td>Run the analysis; suppress all significance tests; the report's Methodology section headlines the small-N caveat; no subgroup analysis attempted.</td></tr>
+        <tr><td>PDF with no recoverable tables</td><td>tabulation fails twice (Read + LLM)</td><td>Stop at Phase 1 with the export-as-CSV recommendation; do not produce a partial report.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+</section>
+
+<section id="design-decisions" data-pmos-section="design-decisions">
+  <h2 id="design-decisions">Design Decisions</h2>
+  <table>
+    <thead><tr><th>#</th><th>Decision</th><th>Options considered</th><th>Rationale</th></tr></thead>
+    <tbody>
+      <tr><td>D1</td><td>Standalone utility; does NOT load workstream context</td><td>(a) Load workstream (every pmos pipeline skill does); (b) Don't load (matches /survey-design)</td><td>User explicitly said workstream is not necessary; sister to /survey-design which is also a standalone utility writing to its own run folder. Keeps the skill universally usable in any repo without prior pmos setup.</td></tr>
+      <tr><td>D2</td><td>Run folder lives at <code>{docs_path}/survey-analyses/{YYYY-MM-DD}_&lt;slug&gt;/</code></td><td>(a) Mirror <code>survey-design/</code> as <code>survey-analyses/</code>; (b) Reuse <code>survey-design/</code> when re-analysing the same survey; (c) <code>analyses/</code> generic</td><td>(a) chosen — distinct sibling directory keeps run folders cleanly separated and idempotent; never overwrite an existing folder (append <code>-2</code>, …); the user can manually drop an analysis next to a survey-design folder if they want to.</td></tr>
+      <tr><td>D3</td><td>Stats engine: bundled Python (preferred) + bundled Node (fallback); <code>--engine auto</code> default</td><td>(a) Python only; (b) Node only; (c) Both (auto-detect); (d) Pure LLM</td><td>User-specified. Python (pandas + scipy) is the rigour bar; Node is the install-light fallback. Auto picks Python if <code>python3 -c "import pandas, scipy"</code> succeeds, else <code>node</code>, else hard-stop with install instructions.</td></tr>
+      <tr><td>D4</td><td>Input formats: CSV, TSV, XLSX, XLS, PDF — all first class</td><td>Per the input-formats prompt</td><td>User-confirmed: all four. PDF carries an explicit "best-effort with limitations" warning per the journey.</td></tr>
+      <tr><td>D5</td><td>The LLM narrates on top of helper-script output; never recomputes numbers</td><td>(a) LLM-narrator-on-deterministic-stats; (b) LLM-as-stats-computer</td><td>(a) — reproducibility, auditability, scale. <code>per_question.json</code> / <code>themes.json</code> / <code>synthesis.json</code> are saved alongside the report so the numbers can be re-rendered without re-running coding or stats.</td></tr>
+      <tr><td>D6</td><td>Open-end coding: LLM-driven Braun &amp; Clarke 6-phase inductive; deterministic counts on the final code assignments</td><td>(a) LLM-driven thematic; (b) Bundled lightweight ML clustering (sklearn / sentence-transformers); (c) Hand-coded categories from the user</td><td>(a) — (b) blows up the dependency surface and underperforms on short verbatims; (c) defeats the purpose. The 6-phase process is the source of credibility; final code-to-response assignments are JSON, so counts and quote selection are deterministic.</td></tr>
+      <tr><td>D7</td><td>Charts: inline SVG, no external libs</td><td>(a) Inline SVG; (b) Chart.js / D3 via CDN; (c) PNG via headless browser</td><td>(a) — matches the substrate's no-external-CDN rule; round-trips to MD via turndown; no runtime dependency.</td></tr>
+      <tr><td>D8</td><td>NPS is auto-detected; user can override</td><td>(a) Auto-detect (0–10 scale + "recommend" wording); (b) Always ask; (c) Never assume</td><td>(a) — convention; user can override via the schema-confirmation prompt or by re-tagging the column type.</td></tr>
+      <tr><td>D9</td><td>Tier 3 skill; full 8-phase body; full reference/ set</td><td>Set by /feature-sdlc Phase 0d (user override matrix=2 → 3)</td><td>Matches the user's stated scope: bundled reference/ guidelines, multiple question types, statistical rigour. The user override is recorded in the orchestrator's state.yaml.</td></tr>
+      <tr><td>D10</td><td>No <code>survey.json</code> writer; only consumer</td><td>(a) Consume only; (b) Also emit a survey.json describing the analysed survey</td><td>(a) — analysis doesn't need to round-trip into a fielded survey; if the user wants to re-field, they re-run /survey-design.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="success-metrics" data-pmos-section="success-metrics">
+  <h2 id="success-metrics">Success Metrics</h2>
+  <table>
+    <thead><tr><th>Metric</th><th>Baseline</th><th>Target</th><th>Measurement</th></tr></thead>
+    <tbody>
+      <tr><td>Skill-eval rubric pass at iteration 1</td><td>n/a (new skill)</td><td>Zero failed <code>[D]</code>+<code>[J]</code> checks in <code>skill-eval.md</code></td><td>/feature-sdlc Phase 6a output</td></tr>
+      <tr><td>Time from raw export → shareable report</td><td>≥ 2 hours manual</td><td>≤ 15 minutes per typical 500-row survey</td><td>User self-reports the first 3 real runs</td></tr>
+      <tr><td>Methodology defensibility</td><td>n/a</td><td>Every produced report passes the 5 zero-tolerance checks listed under Goals (T2B+distribution; multi-select base; NPS as integer; subgroup base shown; theme quotes)</td><td>A bundled test fixture run in CI asserts the checks against a canned response file</td></tr>
+      <tr><td>Dependency-graceful</td><td>n/a</td><td>Skill runs to completion (or stops with clear install instructions) on a fresh machine with neither python3 nor node</td><td>Test fixture exercising the engine fallback chain</td></tr>
+      <tr><td>Composes with /survey-design</td><td>n/a</td><td>A /survey-design <code>survey.json</code> output is consumed verbatim with zero schema friction</td><td>Manual integration test in /verify</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="research-sources" data-pmos-section="research-sources">
+  <h2 id="research-sources">Research Sources</h2>
+  <table>
+    <thead><tr><th>Source</th><th>Type</th><th>Key takeaway</th></tr></thead>
+    <tbody>
+      <tr><td><code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code></td><td>Existing skill (sister)</td><td>The shape to mirror: standalone utility, dated run folder, HTML substrate, three reference files, platform-adaptation section, no first-run pipeline-setup. <code>survey-analyse</code> reuses this skeleton and inverts the input/output.</td></tr>
+      <tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code></td><td>Authoring guide (cited)</td><td>§A–§F define frontmatter, description &amp; triggering, structure &amp; progressive disclosure, body content, scripts/tooling, platform-conditional frontmatter. These are the standing acceptance criteria; /spec turns them into FRs.</td></tr>
+      <tr><td>CLAUDE.md ## Canonical skill path; ## Plugin manifest version sync; ## Skill-authoring conventions</td><td>Repo policy</td><td>Skill goes at <code>plugins/pmos-toolkit/skills/survey-analyse/SKILL.md</code>; both <code>plugin.json</code> manifests bump in one commit on release; release entry is <code>/complete-dev</code>.</td></tr>
+      <tr><td>AAPOR Best Practices &amp; Standard Definitions — https://aapor.org/standards-and-ethics/best-practices/</td><td>Methodology standard</td><td>Disclose sample, mode, dates, weighting, full question wording, sponsor; report MoE in percentage points and only for probability samples.</td></tr>
+      <tr><td>AAPOR MoE / Credibility Interval guidance — https://aapor.org/wp-content/uploads/2023/01/Margin-of-Sampling-Error-508.pdf</td><td>Methodology standard</td><td>MoE is a probability-sample concept; non-probability samples get a modeled credibility interval or none — never a vanilla MoE.</td></tr>
+      <tr><td>Pew Research, "Why and how we weight surveys" — https://www.pewresearch.org/decoded/2025/07/23/why-and-how-were-weighting-surveys-for-past-presidential-vote/</td><td>Methodology</td><td>Weight to known population benchmarks; trim extreme weights; report unweighted n alongside weighted percentages.</td></tr>
+      <tr><td>Pew Research, evaluating online non-probability surveys — https://www.pewresearch.org/methods/2016/05/02/evaluating-online-nonprobability-surveys/</td><td>Methodology</td><td>Opt-in online samples vary widely in accuracy; treat their precision claims cautiously and lean on describing limitations.</td></tr>
+      <tr><td>Reichheld, "The One Number You Need to Grow", HBR (2003) — https://hbr.org/2003/12/the-one-number-you-need-to-grow</td><td>Industry origin</td><td>NPS = %Promoters (9–10) − %Detractors (0–6) on an 11-point 0–10 recommend scale; report as integer, not an average; pair with the "why" follow-up.</td></tr>
+      <tr><td>Bain, "Net Promoter 3.0" — https://www.bain.com/insights/net-promoter-3-0/</td><td>Industry</td><td>NPS is volatile on small N; pair with verbatim themes and earned-growth metrics; don't headline an NPS swing without the underlying distribution.</td></tr>
+      <tr><td>Braun &amp; Clarke (2006) — DOI: 10.1191/1478088706qp063oa</td><td>Academic</td><td>Six-phase inductive thematic analysis: familiarise → open code → search for themes → review → name &amp; define → write up. Themes are constructed by the analyst, not "emergent". Themes need a clear definition + representative quotes.</td></tr>
+      <tr><td>Braun &amp; Clarke worked example (Springer, 2021) — https://link.springer.com/article/10.1007/s11135-021-01182-y</td><td>Academic</td><td>Concrete walk-through of reflexive TA from codes to named themes with quote evidence — the playbook for Phase 5.</td></tr>
+      <tr><td>Dillman, Smyth &amp; Christian, "Internet, Phone, Mail, and Mixed-Mode Surveys" 4ed (Wiley 2014)</td><td>Textbook</td><td>Canonical reference for coverage / sampling / non-response / mixed-mode effects; cited for the methodology section's limitations framing.</td></tr>
+      <tr><td>SurveyMonkey, "Likert Scale — Best Practices" — https://www.surveymonkey.com/learn/survey-best-practices/likert-scale/</td><td>Practitioner</td><td>Likert is ordinal; report distributions and top/bottom-box; keep scale polarity consistent across items; reverse-score before aggregating a multi-item construct.</td></tr>
+      <tr><td>SurveyMonkey, "Survey data cleaning: 7 things" — https://www.surveymonkey.com/curiosity/survey-data-cleaning-7-things-to-check-before-you-start-your-analysis/</td><td>Practitioner</td><td>Cleaning checklist: speeders, straightliners, incompletes, duplicates, outliers, "other" back-coding, attention checks.</td></tr>
+      <tr><td>SurveyMonkey, "Ranking question" — https://help.surveymonkey.com/en/surveymonkey/create/ranking-question/</td><td>Practitioner</td><td>Average ranking and weighted points are inverse conventions; state which is used and reproduce from raw ranks.</td></tr>
+      <tr><td>Qualtrics, "Cross-Tabulation Analysis" — https://www.qualtrics.com/experience-management/research/cross-tabulation/</td><td>Practitioner</td><td>Crosstabs reveal subgroup differences; chi-square overall + column-proportion z-tests pairwise; layered banners shrink cells fast.</td></tr>
+      <tr><td>Qualtrics, "Response Quality" — https://www.qualtrics.com/support/survey-platform/survey-module/survey-checker/response-quality/</td><td>Practitioner</td><td>Built-in flags for speeders, straightliners, bots, duplicates; review before excluding.</td></tr>
+      <tr><td>Pollfish, "Using crosstabs in survey data analysis" — https://www.pollfish.com/resources/blog/market-research/using-crosstabs-in-survey-data-analysis/</td><td>Practitioner</td><td>Over-segmentation produces unstable percentages and unusable cell sizes; show base sizes.</td></tr>
+      <tr><td>CloudResearch, "Identify &amp; Handle Invalid Survey Responses" — https://www.cloudresearch.com/resources/guides/ultimate-guide-to-survey-data-quality/how-to-identify-handle-invalid-survey-responses/</td><td>Practitioner</td><td>Multiple short attention checks; don't exclude on a single failed check; combine indicators (speed, straightlining, gibberish).</td></tr>
+      <tr><td>Leiner (2019), "Too Fast, Too Straight, Too Weird" — https://www.researchgate.net/publication/258997762_Too_Fast_Too_Straight_Too_Weird_Post_Hoc_Identification_of_Meaningless_Data_in_Internet_Surveys</td><td>Academic</td><td>Practical cutoffs for relative completion-speed and straightlining detection in online surveys.</td></tr>
+      <tr><td>ChartGen, "How to Visualize Survey Results" — https://chartgen.ai/resources/blog/how-to-visualize-survey-results-charts-examples</td><td>Practitioner</td><td>Match chart to data: bar for categorical, horizontal bar for multi-select (don't sum to 100%), diverging stacked bar for Likert.</td></tr>
+      <tr><td>WPForms, "How to Write a Summary of Survey Results" — https://wpforms.com/how-to-write-summary-survey-results/</td><td>Practitioner</td><td>Lead with headline finding + impact, then 3–5 findings in descending importance, then context and recommended actions.</td></tr>
+      <tr><td>Chattermill, "Survey Results Report" — https://chattermill.com/blog/survey-results-report</td><td>Practitioner</td><td>Report skeleton: exec summary → method → key findings → deep dives → themes → limitations → recommendations → appendix; every finding needs a "so what".</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="open-questions" data-pmos-section="open-questions">
+  <h2 id="open-questions">Open Questions</h2>
+  <table>
+    <thead><tr><th>#</th><th>Question</th></tr></thead>
+    <tbody>
+      <tr><td>OQ1</td><td>Should the Python helper pin exact <code>numpy</code>/<code>pandas</code>/<code>scipy</code> versions in a bundled <code>requirements.txt</code>, or rely on whatever the user has installed? Trade-off: pinning is reproducible; non-pinning avoids version skew with the user's other Python work. Default deferred to <code>/spec</code>: state versions as minima, no hard pin.</td></tr>
+      <tr><td>OQ2</td><td>Should cross-tab significance default to <code>--no-significance</code> (cleaner default; analysts who want it opt in) or default-on with the multiple-comparisons caveat baked in? Default deferred to <code>/spec</code>: default-on but always surface the caveat.</td></tr>
+      <tr><td>OQ3</td><td>What's the minimum sample size below which the skill suppresses Phase 6 entirely vs. just suppressing significance tests? Tentative: <code>n &lt; 30</code> → univariate only; documented in the report.</td></tr>
+      <tr><td>OQ4</td><td>Should the skill support a <code>--longitudinal</code> mode (two response files, same questionnaire) in v1, or strictly defer to a future enhancement? Currently deferred (Non-Goals); revisit if the user pushes.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<section id="review-log" data-pmos-section="review-log">
+  <h2 id="review-log">Review Log</h2>
+  <table>
+    <thead><tr><th>Loop</th><th>Findings</th><th>Changes made</th></tr></thead>
+    <tbody>
+      <tr><td>1 (initial draft)</td><td>Structural pass clean (all Tier-3 sections present); product-critique pass surfaced: needed explicit Empty-states &amp; Edge-cases table; needed concrete journey for PDF input; needed explicit "LLM narrates, doesn't recompute" decision; needed dependency-graceful Success metric.</td><td>Added empty-states/edge-cases table; added 3 alternate + 2 error journeys; added D5 (LLM-as-narrator) decision; added the dependency-graceful Success Metric row.</td></tr>
+    </tbody>
+  </table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: 01_requirements.html</span>
+  </footer>
+</body>
+</html>

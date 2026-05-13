@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://pmos-toolkit.local/schemas/polish-editor-notes.schema.json",
+  "title": "Polish editorial-pass notes",
+  "description": "Output of the /polish Phase 2.5 editor subagent: a structured critique the rewriter subagent then applies. The editor never rewrites — it only emits this file.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["doc_format", "target", "reconciliation", "notes"],
+  "properties": {
+    "doc_format": {
+      "type": "string",
+      "enum": ["markdown", "html"],
+      "description": "The source document's format, carried from Phase 1."
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "low", "high"],
+      "description": "The reduction target the user picked (preset range, custom range/point, or the open-ended ~50%+ which is a point of 50).",
+      "properties": {
+        "kind": { "type": "string", "enum": ["range", "point"] },
+        "low":  { "type": "number", "minimum": 0, "maximum": 90 },
+        "high": { "type": "number", "minimum": 0, "maximum": 90 }
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["estimated_pct", "achievable", "note"],
+      "description": "Editor's self-assessment: does the sum of est_words_saved reach the target band without touching protected content or destroying meaning?",
+      "properties": {
+        "estimated_pct": { "type": "number", "minimum": 0, "maximum": 100 },
+        "achievable":    { "type": "boolean" },
+        "note":          { "type": "string" }
+      }
+    },
+    "recritique": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Set after the (single, capped) re-critique pass per GR-3. Absent on the first editor pass.",
+      "properties": {
+        "ran":           { "type": "boolean" },
+        "shortfall_pct": { "type": ["number", "null"], "minimum": 0, "maximum": 100 }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "description": "One entry per reduction opportunity. The rewriter applies risk=low notes; risk=high notes are surfaced to the user via the findings protocol.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "locator", "rationale", "est_words_saved", "risk"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^E[0-9]+$",
+            "description": "Sequential note id, e.g. E1, E2, ... (re-critique appends with continuing ids)."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["rephrase", "merge", "reorder", "tighten", "cut"],
+            "description": "What the rewriter should do. 'reorder' is always risk=high; a 'merge' spanning >2 adjacent paragraphs is risk=high."
+          },
+          "locator": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["heading_path", "quote"],
+            "description": "How the rewriter finds the span. No line numbers — they go stale.",
+            "properties": {
+              "heading_path": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Enclosing headings (markdown # levels or HTML <hN> text), outermost first."
+              },
+              "quote": {
+                "type": "string",
+                "minLength": 20,
+                "description": "A verbatim substring of the source document (>= 20 chars). cut/tighten notes whose quote is empty or not a verbatim substring are dropped before the rewriter runs."
+              }
+            }
+          },
+          "rationale": {
+            "type": "string",
+            "description": "Why this edit. Surfaced to the user for risk=high notes."
+          },
+          "est_words_saved": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Estimated words removed by this note. May be 0 for a pure 'rephrase'."
+          },
+          "risk": {
+            "type": "string",
+            "enum": ["low", "high"],
+            "description": "low → rewriter applies it; high → surfaced for approval (structural reorders always surfaced individually)."
+          }
+        }
+      }
+    }
+  }
+}

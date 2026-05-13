@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Deploy Runbook</title>
+  <style>body { font-family: system-ui; max-width: 40rem; }</style>
+</head>
+<body>
+  <h1>Deploy runbook</h1>
+  <p>It is important to note that this runbook — which has been carefully crafted over time — describes the steps needed to deploy the service to production. Basically, you should follow these steps in order.</p>
+
+  <h2>Pre-flight checks</h2>
+  <p>Before you begin, you'll want to make sure that the staging environment is green and that there are no open incidents. It's also worth double-checking that the on-call engineer has been notified, perhaps via the usual channel.</p>
+  <pre><code>kubectl --context staging get pods | grep -v Running   # leave this line BYTE-IDENTICAL</code></pre>
+
+  <h2>Rollout</h2>
+  <p>To actually do the rollout, run the deploy script. It will, as it turns out, handle the canary stage automatically. If something goes wrong, the script rolls back on its own, which is nice. See the <a href="https://wiki.example.com/deploy">deploy wiki</a> for the full reference.</p>
+  <table>
+    <tr><th>Stage</th><th>Timeout</th></tr>
+    <tr><td>canary</td><td>5m</td></tr>
+    <tr><td>full</td><td>15m</td></tr>
+  </table>
+  <!-- POLISH: do not touch this comment -->
+  <p>After the rollout completes, verify the dashboards and close out the deploy ticket.</p>
+</body>
+</html>

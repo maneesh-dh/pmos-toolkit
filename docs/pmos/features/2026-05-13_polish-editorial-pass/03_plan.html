@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plan — /polish editorial pass + format honoring</title>
+<link rel="stylesheet" href="assets/style.css?v=2.38.0">
+</head>
+<body>
+<main>
+<h1 id="plan">Execution plan — /polish: source-format honoring + editorial reduction pass</h1>
+<p><strong>Tier 2 · target <code>plugins/pmos-toolkit/skills/polish/</code> · source <code>02_spec.html</code></strong><br>
+No executable test runner exists for <code>/polish</code> — "verification" per task = a <code>grep</code>/inspection check (the skill's <code>tests/</code> are contract docs, not CI). Tasks are ordered so new reference/schema files land before SKILL.md cites them.</p>
+
+<h2 id="status">Task status</h2>
+<table>
+<thead><tr><th>Task</th><th>Status</th></tr></thead>
+<tbody>
+<tr><td>T1 — <code>schemas/editor-notes.schema.json</code></td><td>pending</td></tr>
+<tr><td>T2 — <code>reference/editorial-pass.md</code></td><td>pending</td></tr>
+<tr><td>T3 — <code>reference/chunking.md</code> HTML lock zones + chunking</td><td>pending</td></tr>
+<tr><td>T4 — <code>reference/findings-protocol.md</code> + <code>reference/patch-contract.md</code> additions</td><td>pending</td></tr>
+<tr><td>T5 — SKILL.md frontmatter + Track Progress + Platform Adaptation</td><td>pending</td></tr>
+<tr><td>T6 — SKILL.md Phase 1 (<code>doc_format</code> detection) + Phase 2.5 (new section)</td><td>pending</td></tr>
+<tr><td>T7 — SKILL.md Phase 3/4/5/6 touchpoints</td><td>pending</td></tr>
+<tr><td>T8 — SKILL.md Phase 7 (output ext, replace, metrics, fidelity warn) + anti-patterns + file map</td><td>pending</td></tr>
+<tr><td>T9 — fixtures (<code>html-doc.html</code>, <code>bloated-doc.md</code>) + <code>tests/expected.yaml</code></td><td>pending</td></tr>
+<tr><td>T10 — release prereqs (version bump ×2 manifests, changelog, README check)</td><td>pending — done by /complete-dev, staged here</td></tr>
+</tbody>
+</table>
+
+<h2 id="tasks">Tasks</h2>
+
+<h3 id="t1">T1 — <code>schemas/editor-notes.schema.json</code></h3>
+<p>Create the JSON Schema (draft-07) for <code>editor_notes.json</code> per spec §3.6. Mirror the style/structure of the existing <code>schemas/custom-checks.schema.json</code>. Required top-level: <code>doc_format</code> (enum markdown|html), <code>target</code> ({kind: enum range|point, low: number, high: number}), <code>reconciliation</code> ({estimated_pct: number, achievable: bool, note: string}), <code>recritique</code> ({ran: bool, shortfall_pct: number|null}), <code>notes</code> (array of {id: string, kind: enum, locator: {heading_path: array of string, quote: string minLength 20}, rationale: string, est_words_saved: integer minimum 0, risk: enum low|high}). <code>additionalProperties: false</code> at each level.<br>
+<strong>Verify:</strong> <code>python3 -c "import json,sys; json.load(open('plugins/pmos-toolkit/skills/polish/schemas/editor-notes.schema.json'))"</code> exits 0; <code>grep -c '"draft-07"\|json-schema.org/draft-07' …schema.json</code> ≥ 1; eyeball that all 6 note fields + 4 top-level keys are present and <code>quote</code> has <code>minLength: 20</code>.</p>
+
+<h3 id="t2">T2 — <code>reference/editorial-pass.md</code></h3>
+<p>New reference file. Sections: (1) <strong>When this runs</strong> — Phase 2.5, after preset, before rubric; opt-in. (2) <strong>Editor subagent prompt template</strong> — fenced block: role ("you critique, you do NOT rewrite"), inputs (doc, voice markers, lock-zone map, doc_format, target), the note schema, the constraints (verbatim ≥20-char quotes, no line numbers, no locked-zone targets, kind/risk rules, est_words_saved, reconciliation), <code>temperature: 0</code>, output = the JSON object only. (3) <strong>Validation &amp; prune</strong> — schema-validate; drop cut/tighten notes whose quote isn't a verbatim substring; print-and-continue on schema errors. (4) <strong>Rewriter subagent prompt template</strong> — fenced block: role, inputs (original doc, pruned editor_notes.json, voice markers, lock-zone map, doc_format), apply low-risk notes honoring locks, skip-and-log unlocatable/locked, do NOT apply high-risk, emit reduced doc + applied/skipped log, <code>PRESERVE_VOICE_CONFLICT</code> per <code>patch-contract.md</code>, <code>temperature: 0</code>. (5) <strong>Capped re-critique</strong> — the GR-3 contract (1×; delta notes appended; rewriter re-applies once; then done). (6) <strong>High-risk notes → findings protocol</strong> — cite <code>findings-protocol.md</code>; structural reorders individually surfaced. (7) <strong>HTML fidelity</strong> — the byte-identical-outside-prose check + best-effort-warn fallback (GR-1). (8) <strong>Dry-run</strong> — editor runs + writes notes; rewriter + re-critique do not. (9) <strong>Chunking</strong> — reduce-first-then-rebucket (GR-2).<br>
+<strong>Verify:</strong> file exists; <code>grep -q 'patch-contract.md' …editorial-pass.md && grep -q 'findings-protocol.md' …editorial-pass.md</code>; <code>grep -q 'temperature: 0' …editorial-pass.md</code> (appears ≥2×); <code>grep -q 'PRESERVE_VOICE_CONFLICT' …editorial-pass.md</code>; section headers (1)–(9) present.</p>
+
+<h3 id="t3">T3 — <code>reference/chunking.md</code></h3>
+<p>Add a "## Format-aware lock zones" subsection right after the existing lock-zone table: when <code>doc_format == html</code>, the additional HTML lock-zone rows from spec §2.2 (tags+attributes, script/style, pre/code, comments, head/doctype/frontmatter, short table cells). Add a short note under "## Chunking algorithm": when <code>doc_format == html</code>, primary chunk boundaries are <code>&lt;h1&gt;/&lt;h2&gt;</code> open tags; oversized split on <code>&lt;h3&gt;</code> then <code>&lt;p&gt;</code> with the same 200-word read-only overlap; stitch-back verifies all non-prose bytes byte-identical (best-effort-warn fallback per <code>editorial-pass.md</code>). Markdown rules untouched.<br>
+<strong>Verify:</strong> <code>grep -q 'Format-aware lock zones' reference/chunking.md</code>; <code>grep -q '&lt;h1&gt;/&lt;h2&gt;\|h1/h2 .*HTML\|HTML.*h1' reference/chunking.md</code>; markdown lock-zone table still intact (line count of that table unchanged).</p>
+
+<h3 id="t4">T4 — <code>reference/findings-protocol.md</code> + <code>reference/patch-contract.md</code></h3>
+<p><code>findings-protocol.md</code>: add one paragraph (e.g. under "## Surface path") — high-risk editor notes from Phase 2.5 (and any <code>PRESERVE_VOICE_CONFLICT</code> the rewriter emits) enter the surface path exactly like high-risk rubric findings; structural reorders follow the existing "## Structural changes" rule. <code>patch-contract.md</code>: add one note (e.g. under "## `PRESERVE_VOICE_CONFLICT` handling" or a new short "## Reuse by the editorial rewriter" line) — the Phase 2.5 rewriter subagent reuses this token + JSON shape + handling.<br>
+<strong>Verify:</strong> <code>grep -q 'editor note\|editorial' reference/findings-protocol.md</code>; <code>grep -q 'editorial\|Phase 2.5\|rewriter' reference/patch-contract.md</code>.</p>
+
+<h3 id="t5">T5 — SKILL.md frontmatter + Track Progress + Platform Adaptation</h3>
+<p>Frontmatter: <code>description</code> — "single markdown document" → "single document"; append a reduction trigger to the "Use when…" list (e.g. <code>"shorten this doc by ~30%", "cut this draft down"</code>). <code>argument-hint</code> — add <code>[--reduce &lt;pct|range&gt;]</code>; the input-shape note mentions a local <code>.html</code> file round-trips as HTML. "Track Progress (do this FIRST)": "9 phases" → "10 phases"; "create one TodoWrite task for each of the 9 phases" → "10"; the "If you have already taken any other action … you have skipped this step" sentence still references the count → "10". Platform Adaptation: "9" → "10" anywhere it appears; add a bullet — format detection is deterministic (extension-based), never a prompt; add a bullet — without a subagent tool, the editor + rewriter passes run sequentially in the main agent (same as the rest).<br>
+<strong>Verify:</strong> <code>! grep -q 'single markdown document' SKILL.md</code>; <code>grep -c '10 phases\|10 per-phase\|of the 10' SKILL.md</code> ≥ 2; <code>grep -q -- '--reduce' SKILL.md</code>; <code>! grep -q 'each of the 9 phases' SKILL.md</code>.</p>
+
+<h3 id="t6">T6 — SKILL.md Phase 1 + new Phase 2.5</h3>
+<p>Phase 1 "Ingest + classify": after the input-source table, add a step — "Detect <code>doc_format</code>: local <code>.html</code>/<code>.htm</code> → <code>html</code>; everything else (incl. URL/Notion/inline) → <code>markdown</code>. Deterministic, no LLM call." In "Compute lock zones", note "if <code>doc_format == html</code>, also apply the HTML lock zones in <code>reference/chunking.md</code>." In "Size bucketing + chunking", note the HTML chunk anchors. Insert a new <strong>"## Phase 2.5 — Editorial reduction"</strong> section after Phase 2 and before Phase 3, implementing spec §3: the <code>--reduce</code> parse + the gate <code>AskUserQuestion</code> (with the Recommended Skip + 3 ranges + custom note), the no-op-on-Skip rule, the editor subagent dispatch, the validate/prune step, the rewriter subagent dispatch, the high-risk → Phase 5 routing, the capped re-critique, the HTML fidelity check + best-effort-warn, the dry-run interplay, "the editor pass does not consume a rubric iteration", "writes <code>editor_notes.json</code>" — citing <code>reference/editorial-pass.md</code> for the prompt templates and <code>schemas/editor-notes.schema.json</code> for validation. Include the <code>&lt;!-- defer-only: --&gt;</code>? No — this gate has a Recommended option and is safe to auto-pick; do NOT tag it (spec FR-18).<br>
+<strong>Verify:</strong> <code>grep -q 'Phase 2.5 — Editorial reduction' SKILL.md</code>; <code>grep -q 'doc_format' SKILL.md</code> (≥3×); <code>grep -q 'editorial-pass.md' SKILL.md</code>; <code>grep -q 'editor_notes.json' SKILL.md</code>; the new section sits textually between "## Phase 2 — Pick preset" and "## Phase 3 — Run binary eval rubric" (check with <code>grep -n</code>).</p>
+
+<h3 id="t7">T7 — SKILL.md Phase 3/4/5/6 touchpoints</h3>
+<p>Phase 3 intro: rubric runs on "the working document (the editor-reduced doc if Phase 2.5 ran, else the ingested doc)". Phase 4 budget-estimate block: add the conditional line "<code>+ ~2 LLM calls (editorial critique + rewrite)</code>" (or <code>~4</code> if re-critique ran) — keep the existing block shape otherwise. Phase 5 Findings Presentation Protocol: one sentence — high-risk editor notes / rewriter voice-conflicts are surfaced here like any high-risk finding (cite <code>findings-protocol.md</code>). Phase 6: in "Hard cap: 2 polish iterations total" add "(the Phase 2.5 editorial pass is not a polish iteration — it runs once, before the rubric)".<br>
+<strong>Verify:</strong> <code>grep -q 'editor-reduced\|editorial-reduced\|Phase 2.5 ran' SKILL.md</code>; <code>grep -q 'editorial critique + rewrite\|editorial pass.*LLM call' SKILL.md</code>; <code>grep -q 'not a polish iteration\|editorial pass is not' SKILL.md</code>.</p>
+
+<h3 id="t8">T8 — SKILL.md Phase 7 + anti-patterns + file map</h3>
+<p>Phase 7: step 2 — "Write to <code>&lt;original-basename&gt;.polished.html</code> if <code>doc_format == html</code>, else <code>.polished.md</code>". The replace-prompt step + the <code>.bak</code> fallback: use the matching extension; if the HTML fidelity check failed, show the replace prompt with the <code>⚠</code> warning and NO default-yes. Summary block: metrics "Before → After" anchored to the original ingested doc (note this explicitly); add the <code>Editorial pass: …</code> line (active / skipped / dry-run variants per spec §3.8). Anti-patterns list: "single markdown" → "single doc"; "before creating the 9 per-phase TodoWrite tasks" → "10"; add — "Do NOT let the editor subagent rewrite — it only writes <code>editor_notes.json</code>; the rewriter applies them." / "Do NOT auto-apply high-risk editor notes (reorders, big merges) — surface them via the findings protocol." / "Do NOT loop the editorial re-critique more than once." / "Do NOT round-trip HTML through markdown — polish HTML as HTML; never emit markdown for an HTML input." File map: add <code>reference/editorial-pass.md</code>, <code>schemas/editor-notes.schema.json</code>, <code>editor_notes.json</code> (run artifact), <code>tests/fixtures/html-doc.html</code>, <code>tests/fixtures/bloated-doc.md</code>.<br>
+<strong>Verify:</strong> <code>grep -q 'polished.html' SKILL.md</code>; <code>grep -q 'Editorial pass:' SKILL.md</code>; <code>grep -c 'editor subagent rewrite\|let the editor.*rewrite' SKILL.md</code> ≥ 1; <code>grep -q 'editorial-pass.md' SKILL.md</code> in the file-map section; <code>! grep -q 'single markdown' SKILL.md</code> (whole file).</p>
+
+<h3 id="t9">T9 — fixtures + <code>tests/expected.yaml</code></h3>
+<p>Create <code>tests/fixtures/html-doc.html</code> — a ~40-line authored HTML doc: an <code>&lt;h1&gt;</code> + 2 <code>&lt;h2&gt;</code> sections of prose with some AI-slop/hedging to give the rubric something, a <code>&lt;pre&gt;&lt;code&gt;</code> block, an <code>&lt;a href&gt;</code> link, a 2-row <code>&lt;table&gt;</code> with short cells, an <code>&lt;!-- comment --&gt;</code>. Create <code>tests/fixtures/bloated-doc.md</code> — a ~600-word verbose markdown doc thick with throat-clearing, redundancy, and filler so a <code>~30-40%</code> cut is realistic. Append to <code>tests/expected.yaml</code> two contract blocks (matching the file's existing YAML shape): <code>html-doc.html</code> → <code>doc_format: html</code>, output path ends <code>.polished.html</code>, "markup outside prose nodes byte-identical", "no edits inside <code>&lt;pre&gt;</code>/links/short cells/comments"; <code>bloated-doc.md</code> (with <code>--reduce 30-40</code>) → <code>editor_notes.json</code> written + valid against <code>schemas/editor-notes.schema.json</code>, output polishable word count ≤ 70% of input, summary contains an <code>Editorial pass:</code> line, the editor pass not counted as a polish iteration.<br>
+<strong>Verify:</strong> both fixture files exist; <code>python3 -c "import yaml,sys; yaml.safe_load(open('plugins/pmos-toolkit/skills/polish/tests/expected.yaml'))"</code> exits 0 (if pyyaml available; else eyeball indentation); the two new keys present in <code>expected.yaml</code>.</p>
+
+<h3 id="t10">T10 — release prereqs (staged for /complete-dev)</h3>
+<p>Bump <code>version</code> a minor in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> and <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code> (in sync — pre-push hook enforces). Add a changelog entry (done by <code>/changelog</code> inside <code>/complete-dev</code>). Confirm the README <code>/polish</code> row is still accurate (update its one-line description if it's verbose enough to mention "markdown" — change to "document", and optionally note HTML round-trip + reduction pass). Confirm <code>ls plugins/pmos-toolkit/skills/</code> shows <code>polish/</code> (canonical path intact).<br>
+<strong>Verify:</strong> the two manifest versions are equal and one minor above the prior; <code>git grep -l 'skills/polish' README.md</code> shows the row; canonical path intact.</p>
+
+<h2 id="risks">Risks &amp; sequencing notes</h2>
+<ul>
+<li>T1/T2 must precede T6 (SKILL.md cites them). T3 should precede T6 (Phase 1 references the HTML lock zones). T5–T8 all edit SKILL.md — do them in order, re-grepping after each so a later edit doesn't clobber an earlier one.</li>
+<li>SKILL.md is large (~270 lines now, ~330 after). Edits are targeted string replacements, not rewrites — keep each Edit small and verify with <code>grep -n</code> immediately.</li>
+<li>No new failure modes for the existing markdown path — all changes are additive (a new dimension defaulting to <code>markdown</code>, a new phase defaulting to no-op).</li>
+<li><code>/skill-eval</code> (Phase 6a) will re-check this against <code>skill-patterns.md</code> — keep the SKILL.md description ≤ ~500 chars, keep trigger phrases concrete, keep the new reference file under the progressive-disclosure size norms.</li>
+</ul>
+</main>
+</body>
+</html>

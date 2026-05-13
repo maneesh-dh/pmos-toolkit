@@ -568,6 +568,7 @@ PY
 # Violations are mapped name → rule_id (.depcruise.cjs names rules TS001-TS004
 # 1:1 with principles.yaml); severity is rewritten downstream via effective_severity.
 TOOLS_SKIPPED=()
+TOOLS_ERRORED_JSON='[]'  # appended via jq when a delegated tool exits non-zero
 STACKS=$(echo "$LOADER_JSON" | jq -r '.stacks_detected | join(",")')
 depcruise_findings='[]'
 if echo ",$STACKS," | grep -q ',ts,'; then
@@ -592,10 +593,24 @@ if echo ",$STACKS," | grep -q ',ts,'; then
     fi
     echo "[delegated] $dc_timeout npx --no-install depcruise --output-type json --config $dc_cfg $scan_abs (cwd=$dc_cwd)" 1>&2
     dc_start=$(date +%s)
+    set +e
     dc_out=$(cd "$dc_cwd" && $dc_timeout npx --no-install depcruise \
-      --output-type json --config "$dc_cfg" "$scan_abs" 2>/tmp/depcruise.err) || true
+      --output-type json --config "$dc_cfg" "$scan_abs" 2>/tmp/depcruise.err)
+    dc_rc=$?
+    set -e
     dc_end=$(date +%s)
-    echo "[delegated] duration: $((dc_end-dc_start))s" 1>&2
+    echo "[delegated] duration: $((dc_end-dc_start))s rc=$dc_rc" 1>&2
+    # depcruise rc: 0=clean, non-zero=violations or genuine error. We treat
+    # a non-zero rc with NO stdout as an error (capture in tools_errored).
+    if [ "$dc_rc" -ne 0 ] && [ -z "$dc_out" ]; then
+      dc_err_excerpt=$(head -c 200 /tmp/depcruise.err 2>/dev/null || true)
+      TOOLS_ERRORED_JSON=$(echo "$TOOLS_ERRORED_JSON" | jq \
+        --arg tool "dependency-cruiser" \
+        --arg rc "$dc_rc" \
+        --arg err "$dc_err_excerpt" \
+        '. + [{tool: $tool, exit_code: ($rc|tonumber), stderr: $err}]')
+      echo "[warn] dependency-cruiser exited rc=$dc_rc with no output; recorded to tools_errored (FR-32)" 1>&2
+    fi
     if [ -n "$dc_out" ]; then
       depcruise_findings=$(echo "$dc_out" | jq '[.summary.violations[] | {
         rule_id: .rule.name,
@@ -641,12 +656,25 @@ if echo ",$STACKS," | grep -q ',py,'; then
     scan_abs="$(cd "$SCAN_ROOT" && pwd)"
     echo "[delegated] $rf_timeout ruff check --output-format=json --quiet --select=TID252,F401,F403,F405,B006 $scan_abs" 1>&2
     rf_start=$(date +%s)
+    set +e
     rf_out=$(cd "$SCAN_ROOT" && $rf_timeout ruff check \
       --output-format=json --quiet \
       --select=TID252,F401,F403,F405,B006 \
-      "$scan_abs" 2>/tmp/ruff.err) || true
+      "$scan_abs" 2>/tmp/ruff.err)
+    rf_rc=$?
+    set -e
     rf_end=$(date +%s)
-    echo "[delegated] duration: $((rf_end-rf_start))s" 1>&2
+    echo "[delegated] duration: $((rf_end-rf_start))s rc=$rf_rc" 1>&2
+    # ruff rc: 0=no violations, 1=violations found (expected), 2=error.
+    if [ "$rf_rc" -ge 2 ] && [ -z "$rf_out" ]; then
+      rf_err_excerpt=$(head -c 200 /tmp/ruff.err 2>/dev/null || true)
+      TOOLS_ERRORED_JSON=$(echo "$TOOLS_ERRORED_JSON" | jq \
+        --arg tool "ruff" \
+        --arg rc "$rf_rc" \
+        --arg err "$rf_err_excerpt" \
+        '. + [{tool: $tool, exit_code: ($rc|tonumber), stderr: $err}]')
+      echo "[warn] ruff exited rc=$rf_rc with no output; recorded to tools_errored (FR-32)" 1>&2
+    fi
     if [ -n "$rf_out" ]; then
       ruff_findings=$(echo "$rf_out" | jq --arg root "$scan_abs" '[.[] | {
         rule_id: (
@@ -694,6 +722,7 @@ jq -n \
   --argjson f "$findings_json" \
   --argjson loader "$LOADER_JSON" \
   --argjson tools_skipped "$tools_skipped_json" \
+  --argjson tools_errored "$TOOLS_ERRORED_JSON" \
   --arg start "$START" \
   --arg end "$END" \
   --arg root "$SCAN_ROOT" \
@@ -714,6 +743,7 @@ jq -n \
     exemptions: $loader.exemptions,
     scanned: ($loader.scanned | del(.files_for_rules)),
     tools_skipped: $tools_skipped,
+    tools_errored: $tools_errored,
     findings: ($f
       | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
       | sort_by({block:0, warn:1, info:2}[.severity] // 9, .file, .line, .rule_id))

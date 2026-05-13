@@ -1,0 +1,6 @@
+{
+  "name": "tool-missing-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "description": "T11 fixture — mixed TS+Py; PATH stripped of npx + ruff exercises FR-32."
+}

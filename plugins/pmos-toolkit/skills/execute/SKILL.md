@@ -2,7 +2,7 @@
 name: execute
 description: Execute an implementation plan end-to-end — task-by-task TDD implementation with deploy verification, frontend testing, and manual spot checks. Supports git worktree isolation. Use when the user says "implement the plan", "start building", "execute this", "code this up", or has a plan doc ready for implementation.
 user-invocable: true
-argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>] [--resume | --restart | --from T<N>] [--no-halt] [--non-interactive | --interactive]"
+argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>] [--resume | --restart | --from T<N>] [--no-halt] [--subagent-driven | --inline] [--non-interactive | --interactive]"
 ---
 
 # Plan Executor
@@ -17,7 +17,7 @@ Follow the inline instructions below — they are self-contained.
 
 These instructions use Claude Code tool names. In other environments:
 - **No interactive prompt tool:** State your assumption, document it in the output, and proceed. The user reviews after completion.
-- **No subagents:** Perform research and analysis sequentially as a single agent.
+- **No subagents:** Perform research and analysis sequentially as a single agent. If `--subagent-driven` was passed on a platform with no subagent tool, emit `WARNING: --subagent-driven requested but no subagent tool available; running inline.` and proceed with inline execution — never error out.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
 - **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, track progress via commit messages and report status verbally.
 
@@ -138,6 +138,16 @@ END { emit_pending() }
 
 8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
 <!-- non-interactive-block:end -->
+
+### Phase 0 addendum: execution-strategy resolution
+
+Resolve `execution_strategy ∈ {inline, subagent-driven}` once, at Phase 0 entry:
+
+- `--subagent-driven` and `--inline` are parsed from this skill's argument string. They are mutually exclusive; **last flag wins** on conflict; **neither present ⇒ `inline`** (today's behavior — zero regression).
+- If `subagent-driven` resolved but the platform has **no subagent/Agent tool** (Codex, Gemini, or any harness without it): emit `WARNING: --subagent-driven requested but no subagent tool available; running inline.` to stderr and set `execution_strategy = inline`. Never error.
+- Print to stderr exactly once: `execution_strategy: <inline|subagent-driven> (source: cli|default)`.
+
+`execution_strategy` selects the Phase 2 path (see "Phase 2 — Execution Strategy" below). It does **not** change any other phase: Phase 0/0.4/0.5 setup + resume, Phase 1 setup, Phase 2.5 phase-boundary handling, the runtime-evidence gate, the per-task / per-phase logs, and Phases 3–7 all run identically in both strategies.
 
 ## Phase 0.4: Feature Disambiguation
 

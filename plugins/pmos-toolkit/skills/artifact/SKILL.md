@@ -223,7 +223,22 @@ Generate the artifact section-by-section using:
 
 Write the draft to `{feature_folder}/{slug}.html` (e.g., `prd.html`, `experiment-design.html`) per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`. The template store at `~/.pmos/artifacts/templates/<slug>/template.md` retains its MD shape and is rendered via the substrate at write time (per runbook edge case row 4).
 
-**Atomic write (FR-10.2):** write `{slug}.html` and the companion `{slug}.sections.json` via temp-then-rename — never serve a half-written file.
+**Authoring path (FR-1):** author the HTML body directly using `template.md` for section ordering and per-section guidance comments. Wrap each `## §N` section as `<section id="...">` containing `<h2 id="...">` per `_shared/html-authoring/conventions.md` §3 (kebab-case ids; level-3 subsections become `<h3 id="...">` inside the same `<section>`). **No MD→HTML conversion step happens at write time** — the LLM emits substantive HTML directly, identical to how `/spec` and `/plan` author HTML from outline. The MD template is the *structural* guide, not the rendered source.
+
+**Pre-rename assertion (FR-2):** before the `rename(2)` step of the atomic write, run inline checks on `{slug}.html.tmp`:
+
+```bash
+# Every <h2>/<h3> carries an id="..." attr
+grep -oE '<h[23][^>]*>' {slug}.html.tmp | grep -v 'id="' && \
+  { echo "[/artifact] FR-2 violation: <h2>/<h3> without id in {slug}.html.tmp"; exit 1; }
+# Every <section> wrapper carries an id="..." attr
+grep -oE '<section[^>]*>' {slug}.html.tmp | grep -v 'id="' && \
+  { echo "[/artifact] FR-2 violation: <section> without id in {slug}.html.tmp"; exit 1; }
+```
+
+On either fail: hard-fail the Phase 2.7 write; surface the soft-phase failure dialog (Retry / Pause / Abort). The Retry path re-invokes the LLM with an explicit reminder of conventions.md §3.
+
+**Atomic write (FR-10.2):** write `{slug}.html` and the companion `{slug}.sections.json` via temp-then-rename — never serve a half-written file. The `sections.json` companion is built by running `node {feature_folder}/assets/build_sections_json.js {slug}.html.tmp > {slug}.sections.json.tmp` and renamed alongside.
 
 **Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, `build_sections_json.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
 
@@ -237,20 +252,22 @@ Write the draft to `{feature_folder}/{slug}.html` (e.g., `prd.html`, `experiment
 
 **Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `{slug}.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js {slug}.html > {slug}.md`. The MD sidecar is read-only (FR-33).
 
-Include a frontmatter block in the artifact (HTML primary uses a leading `<script type="application/json" id="pmos-frontmatter">` block carrying the same fields):
+Include a frontmatter block at the top of the HTML `<main>` body as a `<script type="application/json" id="pmos-frontmatter">` element carrying the artifact's metadata (FR-3):
 
-```yaml
----
-type: prd
-tier: full
-preset: narrative
-generated_at: 2026-05-02
-template_version: pmos-toolkit@2.10.0
-sources:
-  - 01_requirements_v3.md
-  - workstream:product-x
----
+```html
+<script type="application/json" id="pmos-frontmatter">
+{
+  "type": "prd",
+  "tier": "full",
+  "preset": "narrative",
+  "generated_at": "2026-05-02",
+  "template_version": "pmos-toolkit@2.41.0",
+  "sources": ["01_requirements.html", "workstream:product-x"]
+}
+</script>
 ```
+
+(Legacy MD-only mode: a YAML triple-dash frontmatter block at the top of the .md file with the same fields.)
 
 Then proceed to Phase 3.
 

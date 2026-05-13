@@ -1,0 +1,161 @@
+# rubric.yaml — /readme audit rubric.
+# 15 binary checks. Severity buckets: blocker (gates publish), friction (degrades UX), nit (polish).
+# Consumed at runtime by scripts/rubric.sh (T7 widens the script to read this file).
+
+version: 1
+
+checks:
+  # Blockers (4)
+  - id: hero-line-presence
+    severity: blocker
+    description: "The first non-blank line after H1 is a one-sentence prose tagline (not a list/heading)."
+    pass_when: "First non-blank, non-list, non-heading line after H1 exists and is ≥30 chars."
+    fix_note_template: "Insert a hero line: '<Project> is a <one-sentence what + who + why>.' below the H1."
+    auto_apply: false
+
+  - id: install-or-quickstart-presence
+    severity: blocker
+    description: "README has an Install or Quickstart section a reader can copy-paste."
+    pass_when: "Heading matching /^##\\s+(Install|Quickstart|Getting Started)/ exists and is followed by a fenced code block within 10 lines."
+    fix_note_template: "Add an ## Install section with a 1-3 line copy-paste-ready command."
+    auto_apply: false
+
+  - id: what-it-does-in-60s
+    severity: blocker
+    description: "A first-time reader can answer 'what is this?' from the first 60 seconds (hero + 2-3 paragraphs)."
+    pass_when: "First 25 lines after frontmatter contain ≥1 hero line + ≥1 use-case clause."
+    fix_note_template: "Rewrite the opening so a reader who skims the first 25 lines learns what + for-whom + why-now."
+    auto_apply: false
+
+  - id: no-banned-phrases
+    severity: blocker
+    description: "README contains zero phrases from the banned-phrase list (marketing slop)."
+    pass_when: "grep -iE banned_phrases against README returns no match."
+    fix_note_template: "Replace banned phrase '${match}' with concrete, specific wording."
+    auto_apply: true  # strikethrough + suggest replacement
+
+  # Friction (7)
+  - id: tldr-fits-screen
+    severity: friction
+    description: "The opening fits on one screen (≤25 lines)."
+    pass_when: "Line count from H1 to first ## section ≤ 25."
+    fix_note_template: "Trim the opening; move details past the first ## section."
+    auto_apply: false
+
+  - id: code-example-runnable-as-shown
+    severity: friction
+    description: "Code blocks in Install/Quickstart are runnable as-shown (no placeholders, no '...')."
+    pass_when: "First code block in Install/Quickstart has no '...' or '<TODO>' or '<placeholder>' tokens."
+    fix_note_template: "Replace placeholders with a runnable example or move to a separate 'Advanced' section."
+    auto_apply: false
+
+  - id: links-resolve
+    severity: friction
+    description: "Markdown links to relative paths resolve to existing files."
+    pass_when: "Each [text](path) where path is relative resolves to a file in the repo."
+    fix_note_template: "Fix broken link '${path}' or remove it."
+    auto_apply: false
+
+  - id: no-marketing-hyperbole
+    severity: friction
+    description: "Adjective density (subjective superlatives) is low."
+    pass_when: "Count of words matching /^(amazing|awesome|incredible|stunning|revolutionary)$/i ≤ 2 in the whole file."
+    fix_note_template: "Replace marketing language with concrete claims."
+    auto_apply: false
+
+  - id: sections-in-recommended-order
+    severity: friction
+    description: "Top-level ## sections follow the standard-readme spine ordering (per reference/section-schema.yaml)."
+    pass_when: "## headings appear in an order that is a subsequence of the spine declared in section-schema.yaml."
+    fix_note_template: "Reorder sections to match the canonical spine."
+    auto_apply: true  # reorder
+
+  - id: contributing-link-or-section
+    severity: friction
+    description: "README has a Contributing section OR links to CONTRIBUTING.md."
+    pass_when: "Heading /^##\\s+Contributing/ OR link to CONTRIBUTING.md exists."
+    fix_note_template: "Add a ## Contributing section or link to CONTRIBUTING.md."
+    auto_apply: false
+
+  - id: license-present
+    severity: friction
+    description: "README has a License section or LICENSE link."
+    pass_when: "Heading /^##\\s+License/ OR link to LICENSE exists."
+    fix_note_template: "Add a ## License section naming the SPDX identifier."
+    auto_apply: false
+
+  # Nits (4)
+  - id: badges-not-stale
+    severity: nit
+    description: "Badge images in the header reference active services (no obviously dead badge providers)."
+    pass_when: "No img/badge URL matches /shields\\.io.*\\?cacheSeconds=-1/ or known-dead patterns."
+    fix_note_template: "Remove or update the stale badge for '${service}'."
+    auto_apply: false
+
+  - id: anchor-links-resolve
+    severity: nit
+    description: "In-document anchor links (#section-name) resolve to existing heading slugs."
+    pass_when: "Each [text](#anchor) has a matching heading whose slug is 'anchor'."
+    fix_note_template: "Fix or remove broken anchor link '#${anchor}'."
+    auto_apply: false
+
+  - id: image-alt-text
+    severity: nit
+    description: "Inline images carry alt text."
+    pass_when: "Each ![alt](path) has alt.length > 0."
+    fix_note_template: "Add alt text to '${path}': '${suggested-alt}'."
+    auto_apply: false
+
+  - id: line-length-soft-cap
+    severity: nit
+    description: "≥95% of non-code lines are ≤120 characters."
+    pass_when: "Count of non-code lines >120 chars / total non-code lines ≤ 0.05."
+    fix_note_template: "Wrap long lines (>120 chars) at word boundaries."
+    auto_apply: true  # reflow
+
+banned_phrases:
+  # FR-RUB-4 / Q7 closed list. Extend only via ~/.pmos/readme/banned-phrases.yaml.
+  - "blazing fast"
+  - "blazing-fast"
+  - "lightning fast"
+  - "lightning-fast"
+  - "production-ready"
+  - "battle-tested"
+  - "industry-leading"
+  - "best-in-class"
+  - "next-generation"
+  - "cutting-edge"
+  - "robust"
+  - "comprehensive"
+  - "powerful"
+  - "seamless"
+
+variants:
+  # FR-RUB-2 — per-repo-type override map. drop/swap/append apply to the base checks list.
+  library:
+    overrides: []  # base 15 apply as-is
+  cli:
+    overrides:
+      - drop: image-alt-text  # CLIs rarely embed screenshots
+      - drop: anchor-links-resolve
+  plugin:
+    overrides:
+      - drop: install-or-quickstart-presence  # plugins install via marketplace, not user command
+      - add: plugin-manifest-mentioned        # bonus check (deferred impl to T21)
+  app:
+    overrides:
+      - drop: code-example-runnable-as-shown  # apps rarely show inline code in README
+  monorepo-root:
+    overrides:
+      - add: contents-table-presence
+      - add: per-package-link-table
+  monorepo-package:
+    overrides:
+      - drop: install-or-quickstart-presence
+      - drop: contributing-link-or-section
+      - drop: license-present
+      - add: link-up-to-root
+  plugin-marketplace-root:
+    overrides:
+      - add: contents-table-presence
+      - add: per-plugin-link-table

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.41.0: /complete-dev gains lastrun memory + one-shot defaults confirm + worktree-cleanup moved to after push
+
+`/complete-dev` learns to remember its own answers, asks for them in one consolidated prompt instead of twelve scattered ones, and stops removing the worktree before push tag succeeds (which was severing the `/feature-sdlc --resume` contract).
+
+### What's new
+
+- **Per-developer lastrun memory.** Each `/complete-dev` run now reads `.pmos/complete-dev.lastrun.yaml` (gitignored, per-developer) at Phase 0 and writes it at the end of Phase 17 once the release lands. The schema captures `merge_style`, `worktree_disposition`, `deploy_path`, `version_bump`, `changelog_disposition`, `push_target`, `verify_already_ran`, plus the last-run `detected_signals.deploy` for Phase 5's environment-change check. Malformed file → stderr warn + fall through to built-in defaults; never errors. Cancelled / failed runs do NOT update lastrun (so broken choices aren't memorialized). See `plugins/pmos-toolkit/skills/complete-dev/reference/lastrun-schema.md`.
+- **New Phase 0.5 — "Confirm run defaults".** One consolidated `AskUserQuestion` seeded from lastrun (or built-ins). Pick **Confirm all** (Recommended) and the run-shaping prompts at Phase 1 (/verify gate), Phase 3 guard-PASS (merge style), Phase 5 (deploy path, when detected signals haven't drifted), Phase 8 (changelog accept), Phase 9 step 5 (bump kind), and Phase 14 (push target) all short-circuit — about six per-run prompts collapsed into one. Pick **Edit one or more** to multi-select which fields to override; the per-field prompts then loop until you re-confirm. Destructive prompts (merge conflict, stale-bump recovery, push failure, tag collision, commit message draft, Phase 6 learnings findings) always still fire — they involve free-form input or non-recoverable consequences and can't be meaningfully memorized. Skipped in non-interactive mode (the AUTO-PICK-Recommended contract already covers it).
+- **Worktree removal moved to Phase 16.5 — after push tag succeeds.** Previously Phase 4 ran cleanup right after merge, severing `/feature-sdlc --resume`: a Phase 15 push failure would leave the worktree gone AND `<worktree>/.pmos/feature-sdlc/state.yaml` unreachable. The substantive cleanup body (dirty-check excluding `.pmos/feature-sdlc/`, `--force-cleanup` handling, `ExitWorktree(action=keep)` with fallback chat line) now lives at Phase 16.5; Phase 4 is a one-line deferral stub. Anti-pattern #4 retitled "Removing the worktree before **push** succeeds" with explicit reference to the resume-contract dependency. The Phase 17 success summary now reports `Worktree <removed|retained>` to reflect that lastrun can opt into retention.
+- **New flag: `--reset-defaults`.** Bypass the lastrun read for one run (seed Phase 0.5 from built-ins instead). The file is not deleted; Phase 17 still overwrites it with this run's choices.
+
+### Changed
+
+- `complete-dev/SKILL.md` grew Phase 0.5 (consolidated confirm), Phase 16.5 (relocated cleanup body), and Phase 0 lastrun-load steps; Phase 4 shrank to a deferral stub; Phases 1/3/5/8/9/14 each gained a "Short-circuit when Phase 0.5 confirmed" rider above their existing prompt. Phase 7.5's release-notes recipes moved verbatim to `reference/release-recipes.md` (keeps SKILL.md body under the 800-line eval cap). Anti-pattern #4 rewritten.
+- README's `/complete-dev` row now mentions Phase 0.5 lastrun confirm + Phase 16.5 timing.
+- `.gitignore` adds `.pmos/complete-dev.lastrun.yaml`.
+
+### Why
+
+Triaged from user feedback on the 2.40.0 ship: "save lastrun defaults to make /complete-dev easy to execute, reduce questions asked, rationalize the worktree removal sequence — it happens too early." The pre-push worktree removal was a latent resume-contract bug (state.yaml lives inside the worktree); the prompt-count was friction the user kept hitting on every ship.
+
 ## 2026-05-13 — pmos-toolkit 2.40.0: /polish honors source format (md or HTML) + opt-in editorial reduction pass
 
 `/polish` learns two things, plus a de-flake of `/feature-sdlc skill`'s `[D] body` checks comes along for the ride.

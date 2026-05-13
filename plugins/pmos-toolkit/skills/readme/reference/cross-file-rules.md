@@ -63,6 +63,7 @@ and a re-run produced zero findings.
 
 ---
 
+<a id="r3-install-contributing-license-root-only"></a>
 ## §R3 Install/Contributing/License root-only (warn-with-override)
 
 **Rule.** Package READMEs should not duplicate the root `Install`,

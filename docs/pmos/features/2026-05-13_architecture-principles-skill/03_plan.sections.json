@@ -1,0 +1,236 @@
+[
+  {
+    "id": "overview",
+    "level": 2,
+    "title": "Overview",
+    "parent_id": null
+  },
+  {
+    "id": "decision-log",
+    "level": 2,
+    "title": "Decision Log",
+    "parent_id": null
+  },
+  {
+    "id": "code-study-notes",
+    "level": 2,
+    "title": "Code Study Notes",
+    "parent_id": null
+  },
+  {
+    "id": "patterns-to-follow",
+    "level": 3,
+    "title": "Patterns to follow",
+    "parent_id": "code-study-notes"
+  },
+  {
+    "id": "existing-code-to-reuse",
+    "level": 3,
+    "title": "Existing code to reuse",
+    "parent_id": "code-study-notes"
+  },
+  {
+    "id": "constraints-discovered",
+    "level": 3,
+    "title": "Constraints discovered",
+    "parent_id": "code-study-notes"
+  },
+  {
+    "id": "stack-signals",
+    "level": 3,
+    "title": "Stack signals",
+    "parent_id": "code-study-notes"
+  },
+  {
+    "id": "prerequisites",
+    "level": 2,
+    "title": "Prerequisites",
+    "parent_id": null
+  },
+  {
+    "id": "file-map",
+    "level": 2,
+    "title": "File Map",
+    "parent_id": null
+  },
+  {
+    "id": "risks",
+    "level": 2,
+    "title": "Risks",
+    "parent_id": null
+  },
+  {
+    "id": "tasks",
+    "level": 2,
+    "title": "Tasks",
+    "parent_id": null
+  },
+  {
+    "id": "phase-1-tracer-bullet",
+    "level": 3,
+    "title": "Phase 1: Tracer bullet — minimal end-to-end audit",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t1",
+    "level": 3,
+    "title": "T1: Tracer bullet — single grep rule, single fixture, JSON to stdout",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "phase-2-rule-loading",
+    "level": 3,
+    "title": "Phase 2: Rule loading + 3-tier merge + L1 cap",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t2",
+    "level": 3,
+    "title": "T2: principles.yaml schema + plugin L1+L2 file",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t3",
+    "level": 3,
+    "title": "T3: Rule loader with 3-tier precedence + L1 cap (FR-21)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t4",
+    "level": 3,
+    "title": "T4: Project L3 loader + exemption rows + extra_ignore",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "phase-3-scanner-l1",
+    "level": 3,
+    "title": "Phase 3: File scanner + L1 grep evaluators (8 rules)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t5",
+    "level": 3,
+    "title": "T5: File scanner — gitignore + hardcoded deny-list + file-type filter",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t6",
+    "level": 3,
+    "title": "T6: L1 grep rules — size/shape (U001, U002, U003, U006)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t7",
+    "level": 3,
+    "title": "T7: L1 grep rules — debug/hygiene (U004, U005, U007, U008)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t8",
+    "level": 3,
+    "title": "T8: L1 grep rules — security/safety (U009, U010)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "phase-4-l2-delegated",
+    "level": 3,
+    "title": "Phase 4: L2 delegated tools (Dep Cruiser + ruff) + graceful degrade",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t9",
+    "level": 3,
+    "title": "T9: Dependency Cruiser shell-out + .depcruise.cjs config (TS001–TS004)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t10",
+    "level": 3,
+    "title": "T10: ruff shell-out (PY001–PY004)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t11",
+    "level": 3,
+    "title": "T11: Tool-missing graceful degrade + tools_errored capture (FR-32)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "phase-5-vue-adr-exemptions",
+    "level": 3,
+    "title": "Phase 5: Vue gap surfacing + ADR pipeline + exemption reconciliation",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t12",
+    "level": 3,
+    "title": "T12: Vue SFC coverage gap surfacing (FR-50, FR-51, FR-52)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t13",
+    "level": 3,
+    "title": "T13: ADR write — Nygard template, monotonic NNNN, atomic write",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t14",
+    "level": 3,
+    "title": "T14: ADR cap (5/run), truncation surfacing, --no-adr flag",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t15",
+    "level": 3,
+    "title": "T15: Exemption reconciliation — matching/orphan/informational + expiry",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "phase-6-report-skill-tests-tn",
+    "level": 3,
+    "title": "Phase 6: Report emit + SKILL.md authoring + reference/ + gate tools + fixtures + TN",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t16",
+    "level": 3,
+    "title": "T16: Report emitter — JSON stdout + stderr summary + determinism (FR-70..FR-73)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t17",
+    "level": 3,
+    "title": "T17: SKILL.md authoring — frontmatter, Phase 0, Platform Adaptation, Anti-Patterns (FR-80, FR-81, FR-83, FR-85)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t18",
+    "level": 3,
+    "title": "T18: reference/ progressive disclosure — l1-rationales, adr-template, gap-map-rationale (FR-82)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t19",
+    "level": 3,
+    "title": "T19: Gate tools — check-citations.sh, check-gap-map.sh, check-determinism.sh (FR-24, FR-34, NFR-02)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t20",
+    "level": 3,
+    "title": "T20: Fixture runner + remaining fixtures (FR-21/30/31/32/41/51/52/63/65; §14.1)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t21",
+    "level": 3,
+    "title": "T21 (TN): Final Verification — fixtures + skill-eval + citations + gap-map + determinism + manual dry-run",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "review-log",
+    "level": 2,
+    "title": "Review Log",
+    "parent_id": null
+  }
+]

@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="pmos:tier" content="3">
+  <meta name="pmos:type" content="feature">
+  <meta name="pmos:feature" content="architecture-principles-skill">
+  <meta name="pmos:spec_ref" content="02_spec.html">
+  <meta name="pmos:requirements_ref" content="01_requirements.html">
+  <meta name="pmos:date" content="2026-05-13">
+  <meta name="pmos:status" content="Draft">
+  <meta name="pmos:commit_cadence" content="per-task">
+  <meta name="pmos:contract_version" content="1">
+  <meta name="pmos:execution_mode" content="inline">
+  <meta name="pmos:phase" content="plan">
+  <title>/architecture skill — Implementation Plan</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.46.0">
+  <script defer src="assets/viewer.js?v=2.46.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">/architecture skill — Implementation Plan</h1>
+    <a class="pmos-attribution pmos-attribution--toolbar"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="overview">
+<h2 id="overview">Overview</h2>
+<p>Build the v1 <code>/architecture audit</code> skill at <code>plugins/pmos-toolkit/skills/architecture/</code>. The skill is bash-POSIX, install-free, shells out to Dependency Cruiser (TS) and ruff (Python) when present, emits JSON to stdout + human summary to stderr, promotes ≤5 block-severity findings into Nygard ADRs. v1 = audit only; scaffold / spec-check / code-check deferred to v2+.</p>
+<p>The plan ships as 21 thin vertical slices. T1 is the tracer bullet (one fixture, one L1 grep rule, JSON finding emitted) that proves the audit harness end-to-end before any rule expansion. T2–T20 widen by capability (loader → scanner → L1 evaluators → L2 delegated tools → Vue gap → ADR + exemptions → report → skill-patterns conformance → tests). T21 (TN) runs the full verification stack: fixtures + skill-eval 39/39 + citations + gap-map + determinism.</p>
+
+<p><strong>Done when:</strong> All 10 fixture tests pass (<code>bash plugins/pmos-toolkit/skills/architecture/tests/run.sh</code> exits 0); Phase 6a <code>skill-eval-check.sh --target generic plugins/pmos-toolkit/skills/architecture/</code> reports 39/39 pass; <code>tools/check-citations.sh</code> exits 0; <code>tools/check-gap-map.sh</code> reports <code>delegated_pct = 0.444</code> (printed, not asserted — G2 is stretch); determinism diff empty after timestamp strip; manual <code>/architecture audit .</code> on this repo exits 0 with a JSON report on stdout.</p>
+
+<p><strong>Done-when walkthrough:</strong> An engineer runs <code>bash plugins/pmos-toolkit/skills/architecture/tests/run.sh</code>; sees <code>ok 10/10</code>; runs <code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target generic plugins/pmos-toolkit/skills/architecture/</code>; sees <code>39/39 passed</code>; opens a TS+Python repo and invokes <code>/architecture audit .</code>; stderr prints the summary header + findings list + ADR list; stdout pipes through <code>jq .findings</code> producing the structured array; <code>ls docs/adr/</code> shows new ADR files with monotonic numbering.</p>
+
+<p><strong>Execution order:</strong></p>
+<pre><code>Phase 1: T1 (tracer)
+Phase 2: T2 → T3 → T4              (schema + loader + L1 cap + L3)
+Phase 3: T5 → T6 → T7 → T8         (scanner + 3 L1 grep batches)  [T6,T7,T8 may parallelize per host CPU]
+Phase 4: T9 → T10 → T11            (Dep Cruiser + ruff + graceful degrade)
+Phase 5: T12 → T13 → T14 → T15     (Vue gap + ADR write + ADR cap + exemption reconcile)
+Phase 6: T16 → T17 → T18 → T19 → T20 → T21
+         (report emit · SKILL.md · reference/ · tools gates · fixtures · TN)
+</code></pre>
+
+<pre><code>```mermaid
+graph TD
+  T1[T1 tracer]
+  T2[T2 schema] --> T3[T3 loader] --> T4[T4 L3]
+  T1 --> T2
+  T4 --> T5[T5 scanner]
+  T5 --> T6[T6 L1a]
+  T5 --> T7[T7 L1b]
+  T5 --> T8[T8 L1c]
+  T6 --> T9[T9 DepCruiser]
+  T7 --> T9
+  T8 --> T9
+  T9 --> T10[T10 ruff]
+  T10 --> T11[T11 degrade]
+  T11 --> T12[T12 Vue]
+  T12 --> T13[T13 ADR write]
+  T13 --> T14[T14 ADR cap]
+  T14 --> T15[T15 reconcile]
+  T15 --> T16[T16 report]
+  T16 --> T17[T17 SKILL.md]
+  T17 --> T18[T18 reference/]
+  T18 --> T19[T19 gate tools]
+  T19 --> T20[T20 fixtures]
+  T20 --> T21[T21 TN]
+```</code></pre>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log">Decision Log</h2>
+<p>Inherits 22 spec D-log entries (<a href="02_spec.html#decision-log">02_spec.html §4</a>). Below: implementation-specific decisions made during /plan.</p>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>P1</td><td><strong>Implementation = bash POSIX + jq + python3+yaml</strong></td><td>(a) bash + jq + python3-yaml · (b) python script · (c) node script</td><td>Skill is install-free; bash is the lowest common denominator on dev machines. jq for JSON shaping (broadly available; fail-soft if missing with awk fallback for the simplest cases). python3-yaml for principles.yaml parse (universally present on macOS + modern Linux dev boxes; SKILL.md body warns on absence). Matches existing pmos-toolkit substrate style (e.g., <code>skill-eval-check.sh</code>).</td></tr>
+<tr><td>P2</td><td><strong>Test runner = plain bash; one fixture per FR cluster</strong></td><td>(a) plain bash · (b) bats · (c) pytest</td><td>Zero install footprint, mirrors <code>plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh</code> idiom. Each fixture is a self-contained mini-repo under <code>tests/fixtures/</code>; runner shells out to <code>tools/run-audit.sh</code> and asserts JSON with <code>jq</code>.</td></tr>
+<tr><td>P3</td><td><strong>Vertical-slice decomposition by capability, not file layer</strong></td><td>(a) capability-vertical · (b) file-vertical (one rule per task) · (c) horizontal (all loaders, then all evaluators, then all writers)</td><td>Each slice ships an end-to-end audit that's a bit wider than the last. T1 audits 1 file against 1 rule and emits JSON; T8 audits any repo against all 8 grep rules; T11 adds delegated tools; etc. Avoids the file-layer anti-pattern called out by FR-103 of /plan.</td></tr>
+<tr><td>P4</td><td><strong>TDD shape = fixture-first; fixture is the failing test</strong></td><td>(a) fixture-first · (b) unit-tests around helper functions · (c) golden-output snapshots only</td><td>The skill is a black-box CLI. Unit-testing internal bash functions is low-value; what matters is "given fixture X, JSON output Y, stderr Z". Each task in Phase 4-7 writes a fixture, asserts it fails the current implementation, implements, asserts it passes. Type=feature → TDD <code>yes — new-feature</code> per FR-104a.</td></tr>
+<tr><td>P5</td><td><strong>Release prereqs out-of-Wave per FR-63</strong></td><td>(a) Waves list /complete-dev work · (b) Wave-free, only in spec §17</td><td>Per <code>/feature-sdlc</code> FR-63 + repo <code>CLAUDE.md ## Plugin manifest version sync</code> + <code>## Release entry point</code>: manifest bumps, CHANGELOG, README rows, learnings.md headers are <strong>/complete-dev's sole writes</strong>. Spec §17 documents them; this plan does NOT list them as tasks. Phase 6a <code>g-release-prereqs-scope</code> + <code>g-plan-grep-clean</code> grade this.</td></tr>
+<tr><td>P6</td><td><strong>Determinism: sort findings, strip timestamps for hashing only</strong></td><td>(a) sort + strip-for-hash · (b) record-then-replay · (c) freeze fake clock</td><td>FR-73 requires byte-identical JSON modulo timestamps. Simplest: emit timestamps as normal; <code>tools/check-determinism.sh</code> strips <code>.run</code> sub-object via <code>jq 'del(.run)'</code> before diffing two runs. No clock-freezing infrastructure needed.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="code-study-notes">
+<h2 id="code-study-notes">Code Study Notes</h2>
+<p>Glossary inherited from <a href="02_spec.html#metadata">02_spec.html</a>; no new domain terms.</p>
+
+<h3 id="patterns-to-follow">Patterns to follow</h3>
+<ul>
+<li><code>plugins/pmos-toolkit/skills/grill/SKILL.md:1-7</code> — frontmatter shape: <code>name / description / user-invocable / argument-hint</code>. Mirror for <code>architecture</code>.</li>
+<li><code>plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh</code> — bash-POSIX shell-out idiom (exit codes 0/1/64, stderr for diagnostics, jq for JSON). Audit harness mirrors this style.</li>
+<li><code>plugins/pmos-toolkit/skills/spec/SKILL.md</code> — Platform Adaptation + Anti-Patterns sections for skill-patterns §D/§F conformance.</li>
+<li><code>plugins/pmos-toolkit/skills/_shared/non-interactive.md</code> — canonical <code>--non-interactive</code> contract (referenced verbatim by the skill body, not inlined).</li>
+</ul>
+
+<h3 id="existing-code-to-reuse">Existing code to reuse</h3>
+<ul>
+<li><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code> — standing acceptance criteria; <strong>cite, do not duplicate</strong>. Referenced by FR-80–FR-85 + Phase 6a /skill-eval.</li>
+<li><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-eval.md</code> — the 39-check rubric; SKILL.md body must satisfy each.</li>
+<li><code>plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh</code> — the deterministic half of the rubric runner; invoked at T21.</li>
+</ul>
+
+<h3 id="constraints-discovered">Constraints discovered</h3>
+<ul>
+<li><strong>Canonical skill path</strong> (repo <code>CLAUDE.md</code>): every pmos-toolkit skill MUST live at <code>plugins/pmos-toolkit/skills/&lt;kebab-name&gt;/SKILL.md</code>. <code>architecture/</code> is lowercase-hyphenated; <code>name:</code> frontmatter must equal <code>architecture</code>.</li>
+<li><strong>Plugin-update safety</strong> (G3): the audit's three-file split (plugin L1+L2 / user L3+exemptions / user ADRs) is a hard contract. Tasks T2 and T13 must write to the correct file roots; mis-routing user state to plugin dir would be a regression.</li>
+<li><strong>jq absence</strong>: not all dev boxes carry jq. SKILL.md body must surface a prerequisite check (<code>command -v jq</code>) and bail with a clear error rather than crash mid-audit.</li>
+<li><strong>npx + python3-yaml availability</strong>: Dep Cruiser ships via <code>npx --no-install depcruise</code> (FR-30) — requires the host to have node. Python3+yaml ships standard on macOS/Linux. Both absences are graceful-skip per FR-32 / FR-23 respectively, not crash.</li>
+</ul>
+
+<h3 id="stack-signals">Stack signals</h3>
+<ul>
+<li><strong>Greenfield substitute per FR-91</strong>: this repo has NO host stack manifests at root (no <code>package.json</code> / <code>pyproject.toml</code>). The repo is a plugin-source repo, not a runtime app. Reference system: existing pmos-toolkit skills (<code>plugins/pmos-toolkit/skills/{grill,spec,feature-sdlc}/</code>) are the canonical structural template. Stack = bash POSIX + jq + python3+yaml. Recorded for /plan FR-91 compliance.</li>
+<li><strong>Test command</strong>: <code>bash plugins/pmos-toolkit/skills/architecture/tests/run.sh</code> — plain shell test harness; no framework dependency.</li>
+<li><strong>Lint command</strong>: <code>shellcheck plugins/pmos-toolkit/skills/architecture/tools/*.sh plugins/pmos-toolkit/skills/architecture/tests/run.sh</code> — best-effort, not blocking (shellcheck not universally installed).</li>
+</ul>
+</section>
+
+<section id="prerequisites">
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>Worktree at <code>/Users/maneeshdhabria/Desktop/Projects/agent-skills-architecture-principles-skill</code> on branch <code>feat/architecture-principles-skill</code> (already created by /feature-sdlc Phase 0a).</li>
+<li>bash, jq, python3 + PyYAML available on the developer's PATH. (<code>command -v bash jq python3 &gt;/dev/null &amp;&amp; python3 -c 'import yaml'</code>.)</li>
+<li>For T9 fixture: Dependency Cruiser available via <code>npx --no-install depcruise --version</code> (node ≥ 18 globally).</li>
+<li>For T10 fixture: <code>ruff --version</code> on PATH.</li>
+<li>(T11 explicitly tests degraded behaviour when either is missing — fixture clears PATH; do NOT uninstall tools globally.)</li>
+</ul>
+</section>
+
+<section id="file-map">
+<h2 id="file-map">File Map</h2>
+<p>Tasks are source of truth (per FR-23). Index below for navigation.</p>
+<table>
+<thead><tr><th>Action</th><th>File</th><th>Responsibility</th><th>Task</th></tr></thead>
+<tbody>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/SKILL.md</code></td><td>Skill body — slash-command surface, Phase structure, Platform Adaptation, Anti-Patterns</td><td>T17</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/principles.yaml</code></td><td>L1 universal (≤15) + L2 stack (ts/py) rules; plugin-owned</td><td>T2</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/reference/l1-rationales.md</code></td><td>Full per-rule rationales + source citations (progressive disclosure)</td><td>T18</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/reference/adr-template.md</code></td><td>Nygard template the skill stamps when writing ADR files</td><td>T18</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/reference/gap-map-rationale.md</code></td><td>Per-rule rationale for <code>delegate_to:</code> assignment</td><td>T18</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh</code></td><td>The audit harness — composed across T1-T16</td><td>T1, T3, T5–T16</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/tools/.depcruise.cjs</code></td><td>Dep Cruiser config encoding TS001–TS004</td><td>T9</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/tools/check-citations.sh</code></td><td>Asserts every rule in <code>principles.yaml</code> has non-empty <code>source:</code></td><td>T19</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/tools/check-gap-map.sh</code></td><td>Computes <code>delegated_pct</code> for the loaded ruleset</td><td>T19</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/tools/check-determinism.sh</code></td><td>Runs audit twice, strips timestamps, diffs</td><td>T19</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/tests/run.sh</code></td><td>Fixture runner — invokes <code>tools/run-audit.sh</code> per fixture, asserts JSON + stderr</td><td>T20</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/architecture/tests/fixtures/&lt;10 fixtures&gt;/</code></td><td>One sub-fixture per FR cluster — see §14.1 of spec</td><td>T1, T4, T6–T15, T20</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="risks">
+<h2 id="risks">Risks</h2>
+<table>
+<thead><tr><th>#</th><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Severity</th><th>Mitigation</th><th>Mitigation in:</th></tr></thead>
+<tbody>
+<tr><td>R1</td><td>Dep Cruiser config syntax mismatch with the installed version → fixture T9 fails on developer box but passes elsewhere</td><td>Medium</td><td>Medium</td><td>Medium</td><td>Pin to <code>dependency-cruiser &gt;= 15</code> in SKILL.md prereqs (FR-33); T9 fixture explicitly invokes <code>npx --no-install depcruise --version</code> as the first assertion; mismatch surfaces clearly</td><td>T9</td></tr>
+<tr><td>R2</td><td>jq absence on the developer's box breaks the audit harness mid-run (silent JSON corruption)</td><td>Medium</td><td>High</td><td>High</td><td>SKILL.md Phase 0 prerequisite gate runs <code>command -v jq</code> first; on miss → stderr <code>ERROR: /architecture requires jq. Install via brew/apt/dnf, then re-run.</code>, exit 64</td><td>T17 (SKILL.md body); T1 (harness)</td></tr>
+<tr><td>R3</td><td>The 18 rules shipped at v1 yield <code>delegated_pct = 0.444</code>, below the 70% G2 stretch — reviewers may push to weaken G2 mid-flight</td><td>High</td><td>Low</td><td>Medium</td><td>Spec D13 + §7.4 locks G2 as stretch. <code>tools/check-gap-map.sh</code> reports the ratio but does not exit non-zero. README + CHANGELOG (release prereqs) carry the same framing</td><td>T19 (gap-map.sh); spec §7.4 holds</td></tr>
+<tr><td>R4</td><td>Plugin updates that touch <code>principles.yaml</code> shape would clobber user L3 → catastrophic data loss</td><td>Low</td><td>High</td><td>Medium</td><td>Three-file split is enforced by file-path discipline (T2 writes plugin path only; T4 reads user path only; T13 writes user ADRs only). Fixture <code>adr-reconcile/</code> exercises the boundary</td><td>T2, T4, T13, T15</td></tr>
+<tr><td>R5</td><td>Phase 6a /skill-eval rubric misses a check that <code>--target generic</code> needs both Claude Code AND Codex coverage → late surprise</td><td>Medium</td><td>Medium</td><td>Medium</td><td>T17 explicitly authors Platform Adaptation covering Claude Code + Codex + no-Task tool; T21 runs skill-eval-check.sh ahead of /verify Phase 7</td><td>T17, T21</td></tr>
+<tr><td>R6</td><td>ADR write race when two audit runs against the same repo collide (NNNN duplicate) — single-user not concerning, CI concern</td><td>Low</td><td>Low</td><td>Low</td><td>FR-61 + spec D20: scan-on-write picks highest+1; per-run cap 5 + monotonic numbering means collision window is small. v2 may need a lock-file. Documented in SKILL.md Anti-Patterns</td><td>T13</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="tasks">
+<h2 id="tasks">Tasks</h2>
+
+<h3 id="phase-1-tracer-bullet">Phase 1: Tracer bullet — minimal end-to-end audit</h3>
+<p>Phase rationale: prove the audit harness end-to-end against a single fixture with a single grep rule. Demoable on its own: a user can run <code>tools/run-audit.sh tests/fixtures/tracer/</code> and see a JSON report with one finding, exit 0. Risky integrations exercised: file scan, regex evaluator, JSON emit, fixture runner shape.</p>
+
+<h3 id="t1">T1: Tracer bullet — single grep rule, single fixture, JSON to stdout</h3>
+<p><strong>Goal:</strong> Implement the narrowest audit pipeline: hardcoded "scan all <code>.ts</code> files for <code>console.log</code>" → emit JSON to stdout with one finding. Proves the architecture survives contact.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-skill-shape">FR-01</a>, <a href="02_spec.html#fr-tool-delegation">FR-40 (find-only)</a>, <a href="02_spec.html#fr-report-format">FR-70, FR-71 (minimal subset)</a>.</p>
+<p><strong>Depends on:</strong> none<br>
+<strong>Idempotent:</strong> yes — re-running produces same output<br>
+<strong>TDD:</strong> yes — new-feature<br>
+<strong>Slice shape:</strong> vertical</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/architecture/tests/fixtures/tracer/src/a.ts</code> (contains one <code>console.log("hi")</code>)</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/architecture/tests/fixtures/tracer/expected.json</code> (a single finding)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Write the fixture: <code>fixtures/tracer/src/a.ts</code> with one line <code>console.log("hi");</code>. Write <code>fixtures/tracer/expected.json</code> describing the expected finding (rule_id <code>U004</code>, file <code>src/a.ts</code>, line 1).</li>
+<li>[ ] Write the failing test: a 10-line bash snippet that runs <code>tools/run-audit.sh tests/fixtures/tracer/ &gt; /tmp/out.json</code> and asserts <code>jq -e '.findings | length == 1' /tmp/out.json</code>.<br>
+Run: <code>bash plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh plugins/pmos-toolkit/skills/architecture/tests/fixtures/tracer/</code><br>
+Expected: <strong>FAIL</strong> with "command not found" (file doesn't exist yet).</li>
+<li>[ ] Implement <code>tools/run-audit.sh</code> (~30 LOC, bash POSIX). Shape:
+<pre><code>#!/usr/bin/env bash
+set -euo pipefail
+SCAN_ROOT="${1:-.}"
+START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+findings_json="$(grep -rn --include='*.ts' 'console\.log' "$SCAN_ROOT" 2>/dev/null \
+  | awk -F: '{print "{\"rule_id\":\"U004\",\"severity\":\"warn\",\"file\":\""$1"\",\"line\":"$2",\"message\":\"console.log forbidden in src/\",\"source_citation\":\"principles.yaml#U004\",\"suppressed_by\":null}"}' \
+  | jq -s .)"
+END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+jq -n --argjson f "$findings_json" --arg start "$START" --arg end "$END" --arg root "$SCAN_ROOT" '
+  {schema_version:1, run:{started_at:$start, finished_at:$end, duration_s:0.0}, scan_root:$root, findings:$f}'
+</code></pre></li>
+<li>[ ] Run test: <code>bash plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh plugins/pmos-toolkit/skills/architecture/tests/fixtures/tracer/</code> | jq -e '.findings | length == 1'<br>
+Expected: <strong>PASS</strong> (exit 0).</li>
+<li>[ ] Verify exit code: <code>echo $?</code> → 0.</li>
+<li>[ ] Commit: <code>git add plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh plugins/pmos-toolkit/skills/architecture/tests/fixtures/tracer/ &amp;&amp; git commit -m "feat(T1): tracer-bullet audit harness — single grep rule, JSON stdout"</code></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh plugins/pmos-toolkit/skills/architecture/tests/fixtures/tracer/ | jq .findings[0].rule_id</code> → <code>"U004"</code></li>
+<li><code>bash plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh plugins/pmos-toolkit/skills/architecture/tests/fixtures/tracer/ &gt;/dev/null; echo $?</code> → <code>0</code></li>
+</ul>
+
+<h3 id="phase-2-rule-loading">Phase 2: Rule loading + 3-tier merge + L1 cap</h3>
+<p>Phase rationale: replace T1's hardcoded "one grep rule" with a real ruleset loaded from <code>principles.yaml</code>, with 3-tier precedence and the L1 cap enforced. After this phase the audit can load any ruleset, but it still only evaluates the U004 grep from T1.</p>
+
+<h3 id="t2">T2: principles.yaml schema + plugin L1+L2 file</h3>
+<p><strong>Goal:</strong> Author the plugin-owned <code>principles.yaml</code> shipping U001–U010 (L1) + TS001–TS004 (L2 ts) + PY001–PY004 (L2 py). Each rule conforms to the FR-12 shape with non-empty <code>source:</code>.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-principles-yaml">FR-10, FR-12, FR-24</a>; <a href="02_spec.html#fr-tool-delegation">§7.4 gap-map table</a>.</p>
+<p><strong>Depends on:</strong> T1<br>
+<strong>Idempotent:</strong> yes<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/architecture/principles.yaml</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/architecture/tests/fixtures/schema-valid/principles.yaml</code> (copy of the shipped file for the schema-validation fixture)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Write a validator stub: <code>tools/run-audit.sh</code> shells <code>python3 -c "import yaml; yaml.safe_load(open('plugins/pmos-toolkit/skills/architecture/principles.yaml'))"</code> and exits 64 on parse error.</li>
+<li>[ ] Author <code>principles.yaml</code> with all 18 rules from spec §7.4. Each rule MUST have <code>id, tier, stack, severity, delegate_to, check, source, message, why</code> per FR-12. <code>source:</code> is non-empty (e.g., <code>"https://github.com/sverweij/dependency-cruiser#no-circular"</code> for TS001; <code>"plugins/pmos-toolkit/skills/architecture/reference/l1-rationales.md#u001"</code> for U001).</li>
+<li>[ ] Add a top-level integrity test: <code>python3 -c "import yaml,sys; rs=yaml.safe_load(open(sys.argv[1]))['rules']; assert all(r.get('source') for r in rs), [r['id'] for r in rs if not r.get('source')]" plugins/pmos-toolkit/skills/architecture/principles.yaml</code> exits 0.</li>
+<li>[ ] Assert L1 count: <code>python3 -c "import yaml; rs=yaml.safe_load(open('.../principles.yaml'))['rules']; assert sum(1 for r in rs if r['tier']==1) == 10"</code> → exit 0.</li>
+<li>[ ] Commit: <code>git commit -m "feat(T2): plugin principles.yaml — 18 rules (U001-U010, TS001-TS004, PY001-PY004)"</code></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>python3 -c "import yaml; rs=yaml.safe_load(open('plugins/pmos-toolkit/skills/architecture/principles.yaml'))['rules']; print(len(rs))"</code> → <code>18</code></li>
+<li>Every rule has non-empty <code>source</code>: assertion above exits 0.</li>
+</ul>
+
+<h3 id="t3">T3: Rule loader with 3-tier precedence + L1 cap (FR-21)</h3>
+<p><strong>Goal:</strong> Replace T1's hardcoded "U004 only" with a loader that reads <code>principles.yaml</code>, applies 3-tier precedence, enforces the L1 cap (abort schema-load on 16th L1 rule).</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-loading-precedence">FR-20, FR-21, FR-22, FR-23, FR-24</a>; <a href="02_spec.html#seq-l1-cap-violation">seq-l1-cap-violation</a>.</p>
+<p><strong>Depends on:</strong> T2<br>
+<strong>Idempotent:</strong> yes<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh</code> (add loader function)</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/architecture/tests/fixtures/principles-16-rules/principles.yaml</code> (a 16-L1 fixture for FR-21 test)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Write the failing test: bash snippet runs <code>RUN_AUDIT_PLUGIN_YAML=tests/fixtures/principles-16-rules/principles.yaml tools/run-audit.sh tests/fixtures/tracer/ 2&gt;&amp;1</code>, asserts stderr matches <code>^ERROR: L1 has 16 rules; cap is 15</code> and exit code 64.<br>
+Expected: <strong>FAIL</strong> — loader not yet wired.</li>
+<li>[ ] Implement the loader inside <code>tools/run-audit.sh</code>:
+<ul>
+<li>Read plugin file path from <code>${RUN_AUDIT_PLUGIN_YAML:-&lt;skill-dir&gt;/principles.yaml}</code>.</li>
+<li>Parse via <code>python3 -c "import yaml,json; print(json.dumps(yaml.safe_load(open(sys.argv[1]))))" "$PLUGIN_YAML"</code> → captured in shell var.</li>
+<li>Count <code>tier==1</code> rules; if &gt;15: stderr exact text <code>ERROR: L1 has &lt;N&gt; rules; cap is 15. Demote rules to L2 or remove.</code>, exit 64.</li>
+<li>Detect stack: <code>[ -f &lt;scan-root&gt;/package.json -a -f &lt;scan-root&gt;/tsconfig.json ]</code> → ts; <code>[ -f &lt;scan-root&gt;/pyproject.toml -o -n "$(ls &lt;scan-root&gt;/requirements*.txt 2&gt;/dev/null)" -o -f &lt;scan-root&gt;/setup.py ]</code> → py.</li>
+<li>Filter L2 rules by detected stack; merge with L1.</li>
+<li>Attempt L3 load from <code>&lt;scan-root&gt;/.pmos/architecture/principles.yaml</code>; missing → set <code>l3_present=false</code>; malformed → stderr <code>ERROR: ... malformed: &lt;err&gt;</code>, exit 64.</li>
+<li>L3 overrides apply per-<code>rule.id</code>: lower-tier fields supersede.</li>
+</ul></li>
+<li>[ ] Run test: stderr matches FR-21 message + exit 64. <strong>PASS</strong>.</li>
+<li>[ ] Add follow-up test: tracer fixture still passes (one finding) → <code>tools/run-audit.sh tests/fixtures/tracer/ | jq '.findings | length'</code> → 1 (U004 still evaluates). Asserts FR-22 (stack detection: tracer fixture has no manifest → L1 only, U004 grep still fires).</li>
+<li>[ ] Add report fields: <code>rules_loaded.tier_1</code>, <code>rules_loaded.tier_2</code>, <code>rules_loaded.tier_3</code>, <code>l3_present</code>, <code>stacks_detected</code>.</li>
+<li>[ ] Commit: <code>git commit -m "feat(T3): rule loader + 3-tier precedence + L1 cap (FR-21)"</code></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li>L1 cap fixture: stderr contains <code>L1 has 16 rules</code>; exit 64.</li>
+<li>Tracer fixture: still emits 1 finding (regression check on T1).</li>
+<li>JSON report now contains <code>rules_loaded.tier_1 == 10</code> and <code>l3_present == false</code>.</li>
+</ul>
+
+<h3 id="t4">T4: Project L3 loader + exemption rows + extra_ignore</h3>
+<p><strong>Goal:</strong> Read user-owned <code>&lt;scan-root&gt;/.pmos/architecture/principles.yaml</code>; parse L3 overrides + <code>exemptions:</code> + config keys (<code>adr_path</code>, <code>scan_root</code>, <code>extra_ignore</code>). Plumb into loader from T3.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-principles-yaml">FR-11, FR-13, FR-14</a>; <a href="02_spec.html#fr-loading-precedence">FR-23 (malformed L3)</a>.</p>
+<p><strong>Depends on:</strong> T3<br>
+<strong>Idempotent:</strong> yes<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>tools/run-audit.sh</code> (L3 parsing)</li>
+<li>Create: <code>tests/fixtures/l3-override/</code> (mini-repo with <code>.pmos/architecture/principles.yaml</code> demoting U004 from warn→info)</li>
+<li>Create: <code>tests/fixtures/l3-malformed/.pmos/architecture/principles.yaml</code> (invalid YAML)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Fixture 1 (override): write <code>tests/fixtures/l3-override/src/a.ts</code> + <code>tests/fixtures/l3-override/.pmos/architecture/principles.yaml</code> with one L3 row <code>{id: U004, tier: 3, severity: info}</code>. Failing test: <code>tools/run-audit.sh tests/fixtures/l3-override/ | jq -e '.findings[0].severity == "info"'</code>.</li>
+<li>[ ] Fixture 2 (malformed): write <code>tests/fixtures/l3-malformed/.pmos/architecture/principles.yaml</code> with broken YAML. Failing test: stderr matches <code>^ERROR.*malformed</code>, exit 64.</li>
+<li>[ ] Fixture 3 (exemption): write <code>tests/fixtures/exemption-row/.pmos/architecture/principles.yaml</code> with <code>exemptions: [{rule: U004, file: src/a.ts, adr: ADR-0001}]</code>. (Reconciliation logic comes in T15; here just parse + count.)</li>
+<li>[ ] Implement parsing in <code>tools/run-audit.sh</code>: read L3 file if exists; merge per FR-20 precedence; collect <code>exemptions[]</code> into a side-array (no reconciliation yet); read <code>adr_path</code> / <code>scan_root</code> / <code>extra_ignore</code>.</li>
+<li>[ ] Emit <code>rule_overrides[]</code> in JSON when L3 changes any field (per E13).</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li>Fixture 1: <code>.findings[0].severity == "info"</code>; <code>.rule_overrides[0].id == "U004"</code>.</li>
+<li>Fixture 2: exit 64; stderr matches.</li>
+<li>Fixture 3: <code>.l3_present == true</code>; exemption parse does not crash.</li>
+</ul>
+
+<h3 id="phase-3-scanner-l1">Phase 3: File scanner + L1 grep evaluators (8 rules)</h3>
+<p>Phase rationale: widen from "U004 only" to all 10 L1 universal rules + a real file-scan policy (gitignore + deny-list + file-type filter). After this phase, the audit can run all L1 grep rules against any repo.</p>
+
+<h3 id="t5">T5: File scanner — gitignore + hardcoded deny-list + file-type filter</h3>
+<p><strong>Goal:</strong> Replace the tracer's <code>grep -rn --include='*.ts'</code> with a proper enumerator: <code>git ls-files</code> when in a repo, <code>find</code> otherwise; exclude per gitignore + hardcoded deny-list; restrict to supported extensions.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-scan-policy">FR-40, FR-41, FR-42, FR-43</a>; <a href="02_spec.html#decision-log">D15</a>.</p>
+<p><strong>Depends on:</strong> T4<br>
+<strong>Idempotent:</strong> yes<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>tools/run-audit.sh</code> (add <code>enumerate_files</code> function)</li>
+<li>Create: <code>tests/fixtures/gitignore-deny/</code> mini-repo (real .git init; <code>node_modules/</code>, <code>.venv/</code>, <code>dist/</code> populated; .gitignore lists them; one valid <code>src/a.ts</code>)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Build fixture: <code>git init</code> the fixture; commit a <code>.gitignore</code> excluding <code>node_modules/.venv/dist/</code>; create files in each excluded dir + one <code>src/a.ts</code>.</li>
+<li>[ ] Failing test (a): <code>tools/run-audit.sh tests/fixtures/gitignore-deny/ | jq -e '.scanned.total == 1'</code> — only <code>src/a.ts</code> survives exclusion.</li>
+<li>[ ] Failing test (b): with the fixture's <code>.gitignore</code> deleted, hardcoded deny-list still excludes the same dirs.</li>
+<li>[ ] Implement <code>enumerate_files()</code>:
+<ul>
+<li>If <code>git -C "$SCAN_ROOT" rev-parse 2&gt;/dev/null</code> succeeds → <code>git -C "$SCAN_ROOT" ls-files</code>; for each, <code>git -C "$SCAN_ROOT" check-ignore -q</code> filters out tracked-but-shouldbe excluded.</li>
+<li>Else → <code>find "$SCAN_ROOT" -type f -not -path '*/\.git/*'</code>.</li>
+<li>Apply hardcoded deny-list (path-segment match against the 14-entry list from D15).</li>
+<li>Apply <code>extra_ignore</code> from L3 (union with deny-list).</li>
+<li>Filter to extensions <code>.ts .tsx .js .jsx .mjs .cjs .vue .py</code> for rule pipeline; count others under <code>scanned.total</code>.</li>
+</ul></li>
+<li>[ ] Emit <code>scanned.by_ext</code>, <code>scanned.excluded_by_gitignore</code>, <code>scanned.excluded_by_fallback</code> in JSON.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>tools/run-audit.sh tests/fixtures/gitignore-deny/ | jq .scanned</code> → <code>total=1, by_ext={".ts":1}, excluded_by_gitignore&gt;0</code>.</li>
+<li>Delete fixture's <code>.gitignore</code>, re-run: <code>excluded_by_fallback&gt;0</code> instead.</li>
+</ul>
+
+<h3 id="t6">T6: L1 grep rules — size/shape (U001, U002, U003, U006)</h3>
+<p><strong>Goal:</strong> Implement U001 (file &gt;500 LOC), U002 (function &gt;100 LOC), U003 (constructor &gt;4 args), U006 (path depth &gt;4 from src/).</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-tool-delegation">§7.4 U001–U006 rows</a>.</p>
+<p><strong>Depends on:</strong> T5<br>
+<strong>Idempotent:</strong> yes<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Modify <code>tools/run-audit.sh</code>; create <code>tests/fixtures/l1-size/{src/big.ts (550 lines), src/big-fn.ts (one fn 120 lines), src/many-args.ts (constructor 5 args), src/a/b/c/d/e/deep.ts}</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Build fixture; expected.json has 4 findings (one per rule).</li>
+<li>[ ] Failing test: <code>jq '.findings | length == 4'</code> on tracer-like assertion against fixture.</li>
+<li>[ ] Implement each rule as a small bash function dispatching on the rule's <code>check:</code> field:
+<ul>
+<li><code>U001</code>: <code>wc -l</code> per file; emit finding when &gt; 500.</li>
+<li><code>U002</code>: <code>awk</code>-based function-boundary detect (TS: <code>^\s*(function|async function|\w+\s*\([^)]*\)\s*{)</code>; PY: <code>^\s*def\s+</code>). Function length = lines until matching close-brace (TS) or de-indent (PY).</li>
+<li><code>U003</code>: regex <code>(function\s+\w+|constructor)\s*\(([^)]*)\)</code>; count commas; emit when &gt; 4.</li>
+<li><code>U006</code>: path-depth count; emit when path-segments-after-<code>src/</code> &gt; 4.</li>
+</ul></li>
+<li>[ ] Run test; <strong>PASS</strong>.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> <code>tools/run-audit.sh tests/fixtures/l1-size/ | jq '[.findings[].rule_id] | sort'</code> → <code>["U001","U002","U003","U006"]</code>.</p>
+
+<h3 id="t7">T7: L1 grep rules — debug/hygiene (U004, U005, U007, U008)</h3>
+<p><strong>Goal:</strong> Implement U004 (already from T1, formalise via <code>principles.yaml</code> regex), U005 (TODO &gt; 90 days via git blame), U007 (file lacking purpose-comment warn-only), U008 (commented-out code blocks &gt; 5 lines).</p>
+<p><strong>Spec refs:</strong> §7.4 U004–U008.</p>
+<p><strong>Depends on:</strong> T6<br>
+<strong>Idempotent:</strong> yes<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>tests/fixtures/l1-hygiene/{src/log.ts (console.log), src/old-todo.ts (TODO with git-blame backdated &gt;90d), src/no-purpose.ts (no top comment), src/commented.ts (8-line comment block)}</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Build fixture with a real git history for U005's blame check (commit the TODO line with <code>GIT_COMMITTER_DATE="2025-01-01T00:00:00Z"</code>).</li>
+<li>[ ] Failing test: 4 distinct rule_ids in <code>.findings</code>.</li>
+<li>[ ] Implement:
+<ul>
+<li>U004: regex <code>(console\.log|print\()</code>; skip files under <code>scripts/</code>, <code>tests/</code>.</li>
+<li>U005: <code>git blame --line-porcelain</code> → committer-time per line; if line contains TODO/FIXME/XXX and age &gt; 90 days → warn.</li>
+<li>U007: file's first non-blank line must start with a comment token (<code>//</code>, <code>#</code>, <code>/*</code>); else warn.</li>
+<li>U008: consecutive lines starting with <code>//</code> or <code>#</code> in src/; &gt;5 → warn (heuristic: lines look like code, e.g., contain <code>(</code>, <code>;</code>, <code>{</code>, <code>=</code>).</li>
+</ul></li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> 4 rule_ids surface on fixture; tracer fixture still produces U004 (regression).</p>
+
+<h3 id="t8">T8: L1 grep rules — security/safety (U009, U010)</h3>
+<p><strong>Goal:</strong> Implement U009 (hardcoded credentials, block-severity) and U010 (<code>NotImplementedError</code> / <code>throw new Error("TBD")</code> on main code paths, block).</p>
+<p><strong>Spec refs:</strong> §7.4 U009, U010.</p>
+<p><strong>Depends on:</strong> T7<br>
+<strong>Idempotent:</strong> yes<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> <code>tests/fixtures/l1-security/{src/secret.ts (line: const API_KEY = "sk-..."), src/tbd.py (raise NotImplementedError())}</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Failing test: 2 block-severity findings.</li>
+<li>[ ] Implement:
+<ul>
+<li>U009: regex set: <code>(api[-_]?key|secret|password|token)\s*=\s*["'][a-zA-Z0-9\-_]{16,}["']</code>; <code>sk-[a-zA-Z0-9]{20,}</code>; <code>AKIA[0-9A-Z]{16}</code>.</li>
+<li>U010: regex <code>(raise NotImplementedError|throw new Error\(["']TBD)</code>; main-code-path = not under <code>tests/</code> or <code>scripts/</code>.</li>
+</ul></li>
+<li>[ ] Verify findings sorted as block first per FR-73 (severity desc).</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> findings include <code>{rule_id:"U009", severity:"block"}</code> and <code>{rule_id:"U010", severity:"block"}</code>.</p>
+
+<h3 id="phase-4-l2-delegated">Phase 4: L2 delegated tools (Dep Cruiser + ruff) + graceful degrade</h3>
+<p>Phase rationale: bring in the AST-tool delegation that satisfies G2 (gap-map). After this phase, the audit dispatches TS L2 to Dep Cruiser and Py L2 to ruff, gracefully degrades when either is missing.</p>
+
+<h3 id="t9">T9: Dependency Cruiser shell-out + .depcruise.cjs config (TS001–TS004)</h3>
+<p><strong>Goal:</strong> Author <code>tools/.depcruise.cjs</code> encoding TS001 (no-circular), TS002 (forbid <code>src/ui/</code> → <code>src/db/</code>), TS003 (no-orphans), TS004 (not-to-dev-dep). Shell out via <code>npx --no-install depcruise --output-type json</code>; parse findings into the audit's JSON.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-tool-delegation">FR-30, FR-33</a>; <a href="02_spec.html#invocation-tool-shellouts">§9.2</a>.</p>
+<p><strong>Depends on:</strong> T8<br>
+<strong>Idempotent:</strong> yes<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>tools/.depcruise.cjs</code>; create <code>tests/fixtures/ts-circular/{src/a.ts (imports b), src/b.ts (imports a), package.json, tsconfig.json}</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Verify Dep Cruiser available: <code>npx --no-install depcruise --version</code> → exit 0 (otherwise skip per FR-32).</li>
+<li>[ ] Write <code>.depcruise.cjs</code> per Dep Cruiser docs encoding TS001–TS004 as <code>forbidden</code>/<code>required</code> rules.</li>
+<li>[ ] Build fixture with a 2-file circular import; expected: one TS001 finding.</li>
+<li>[ ] Failing test: <code>jq '[.findings[] | select(.rule_id=="TS001")] | length == 1'</code>.</li>
+<li>[ ] Implement <code>run_dep_cruiser()</code>:
+<pre><code>cmd="npx --no-install depcruise --output-type json --config &lt;skill-dir&gt;/tools/.depcruise.cjs $SCAN_ROOT"
+echo "[delegated] $cmd" 1&gt;&amp;2
+start=$(date +%s)
+out=$(timeout 60 $cmd 2&gt;/tmp/depcruise.err) || rc=$?
+end=$(date +%s); echo "[delegated] duration: $((end-start))s" 1&gt;&amp;2
+# parse JSON, map Dep Cruiser violations → audit findings
+</code></pre></li>
+<li>[ ] Map Dep Cruiser violations to audit findings: <code>rule_id</code> from rule-name field; <code>file/line</code> from violation. Emit <code>source_citation</code> from principles.yaml.</li>
+<li>[ ] Add NFR-06 observability stderr lines.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> <code>tools/run-audit.sh tests/fixtures/ts-circular/ | jq '[.findings[] | select(.rule_id=="TS001")] | length'</code> → 1.</p>
+
+<h3 id="t10">T10: ruff shell-out (PY001–PY004)</h3>
+<p><strong>Goal:</strong> Shell out to <code>ruff check --output-format=json --select=TID252,F401,F403,F405,B006</code>. Map output to audit findings (PY001–PY004).</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-tool-delegation">FR-31, FR-33</a>.</p>
+<p><strong>Depends on:</strong> T9<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>tests/fixtures/py-tidy-imports/{src/a.py (has relative-import violation), pyproject.toml}</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Failing test: <code>jq '[.findings[] | select(.rule_id|test("^PY"))] | length &gt;= 1'</code>.</li>
+<li>[ ] Implement <code>run_ruff()</code> shell-out (similar shape to T9). Map ruff codes: <code>TID252→PY001</code>, <code>F401→PY002</code>, <code>F403/F405→PY003</code>, <code>B006→PY004</code>.</li>
+<li>[ ] Add NFR-06 stderr observability.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> py-tidy-imports fixture produces at least 1 PY-prefixed finding.</p>
+
+<h3 id="t11">T11: Tool-missing graceful degrade + tools_errored capture (FR-32)</h3>
+<p><strong>Goal:</strong> When either delegated tool is missing on PATH OR exits non-zero, audit must NOT fail — chat-warn + record in report (<code>tools_skipped</code> / <code>tools_errored</code>) + exit 0.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-tool-delegation">FR-32</a>; <a href="02_spec.html#seq-tool-missing">seq-tool-missing</a>; <a href="02_spec.html#edge-cases">E4</a>.</p>
+<p><strong>Depends on:</strong> T10<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>tests/fixtures/tool-missing/</code> mini-repo (TS + Py mixed); test runs audit with <code>PATH=/tmp/empty:/usr/bin</code> stripped of <code>npx</code> + <code>ruff</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Failing test: with stripped PATH, <code>tools/run-audit.sh fixture | jq -e '.tools_skipped == ["dependency-cruiser","ruff"]'</code> AND <code>echo $?</code> → 0.</li>
+<li>[ ] Implement guards in <code>run_dep_cruiser()</code> + <code>run_ruff()</code>:
+<pre><code>if ! command -v npx &gt;/dev/null; then
+  echo "[warn] dependency-cruiser not on PATH; skipping TS L2 declarative checks" 1&gt;&amp;2
+  tools_skipped+=("dependency-cruiser"); return 0
+fi
+</code></pre></li>
+<li>[ ] Non-zero exit handling: capture stderr excerpt (first 200 chars); append to <code>tools_errored[]</code>; exit 0.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> stripped-PATH run still exits 0; <code>.tools_skipped</code> populated; <code>.findings</code> contains only L1 findings.</p>
+
+<h3 id="phase-5-vue-adr-exemptions">Phase 5: Vue gap surfacing + ADR pipeline + exemption reconciliation</h3>
+<p>Phase rationale: the user-facing-honesty layer (F3 Vue gap) and the architectural-decision-capture layer (F5 ADR + exemptions). After this phase, audit emits the full report shape minus the cosmetic stderr format.</p>
+
+<h3 id="t12">T12: Vue SFC coverage gap surfacing (FR-50, FR-51, FR-52)</h3>
+<p><strong>Goal:</strong> <code>.vue</code> files get L1-semantic-only treatment (no L2 TS); audit emits <code>frontend_declarative_coverage</code>; stderr summary includes the F3 note when coverage &lt; 1.0.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-vue-sfc">FR-50, FR-51, FR-52</a>.</p>
+<p><strong>Depends on:</strong> T11<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>tests/fixtures/vue-mixed/{src/Comp1.vue, Comp2.vue, Comp3.vue, src/util1.ts...util7.ts}</code> (3 .vue + 7 .ts).</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Failing test: <code>jq -e '.frontend_declarative_coverage == 0.70'</code>; stderr contains exact F3 note line.</li>
+<li>[ ] Implement: in evaluator dispatch, when file ext == <code>.vue</code>, run L1 grep rules only (skip Dep Cruiser pipeline).</li>
+<li>[ ] Compute coverage: <code>frontend_declarative_coverage = (scanned[.ts,.tsx,.js,.jsx,.mjs,.cjs]) / (scanned[.ts,.tsx,.js,.jsx,.mjs,.cjs,.vue])</code>; 2-decimal precision.</li>
+<li>[ ] Emit stderr note (T17 will render the full summary; for now emit just the F3 line when applicable).</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> 0.70 coverage on fixture; F3 stderr line present.</p>
+
+<h3 id="t13">T13: ADR write — Nygard template, monotonic NNNN, atomic write</h3>
+<p><strong>Goal:</strong> For each block-severity finding (subject to cap, deferred to T14), write an ADR file at <code>&lt;scan-root&gt;/&lt;adr_path&gt;/ADR-NNNN-&lt;kebab-title&gt;.md</code>. Atomic, monotonic, no overwrite.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-adr-exemption">FR-60, FR-61, FR-62</a>; <a href="02_spec.html#invocation-adr-write">§9.3</a>.</p>
+<p><strong>Depends on:</strong> T12<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>reference/adr-template.md</code> (Nygard template); create <code>tests/fixtures/adr-write/{src/secret.ts (triggers U009 block)}</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Failing test: <code>tools/run-audit.sh fixture/</code>; assert <code>ls fixture/docs/adr/ADR-0001-*.md</code> exists; assert ADR body matches Nygard template (contains <code>**Status:** Proposed</code>, <code>## Suppresses</code> block).</li>
+<li>[ ] Implement <code>write_adr()</code>:
+<ul>
+<li>Scan <code>&lt;adr_path&gt;</code> for highest <code>ADR-(\d+)</code>; next = max+1.</li>
+<li>Render template substituting <code>{NNNN, title, date, rule_id, severity, file, line}</code>.</li>
+<li>Atomic: write to <code>.tmp-pid</code> file, <code>mv</code> rename.</li>
+<li>Collision (NNNN exists despite scan): increment until free; never overwrite.</li>
+<li>Mkdir parent if missing.</li>
+</ul></li>
+<li>[ ] Title kebab-casing: <code>echo "$message" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed 's/--*/-/g; s/^-//; s/-$//'</code>; truncate to 60 chars.</li>
+<li>[ ] Emit <code>adrs_written[]</code> in JSON.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> fixture has ADR-0001 written; running again creates ADR-0002 (monotonic).</p>
+
+<h3 id="t14">T14: ADR cap (5/run), truncation surfacing, --no-adr flag</h3>
+<p><strong>Goal:</strong> Cap ADR writes at 5/run; surplus block findings list in <code>adrs_truncated</code>; <code>--no-adr</code> flag suppresses writes entirely.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-adr-exemption">FR-63, FR-67</a>; <a href="02_spec.html#decision-log">D22</a>; <a href="02_spec.html#edge-cases">E12</a>.</p>
+<p><strong>Depends on:</strong> T13<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>tests/fixtures/adr-cap/{src/{secret1..secret12}.ts}</code> (12 block findings).</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Failing test: <code>jq -e '.adrs_written | length == 5'</code> AND <code>jq -e '.adrs_truncated | length == 7'</code>; stderr contains <code>note: 7 additional block findings not promoted to ADR (cap 5/run).</code></li>
+<li>[ ] Sort block findings per FR-63: severity desc → rule_id asc → file asc → line asc; take top 5 for ADR; remainder → <code>adrs_truncated</code>.</li>
+<li>[ ] Add <code>--no-adr</code> flag parsing in <code>run-audit.sh</code>; when set, skip write loop; <code>adrs_written = []</code>; findings still emitted.</li>
+<li>[ ] Failing test 2: <code>--no-adr</code> run → 0 files written; <code>.adrs_written == []</code>.</li>
+<li>[ ] E7 disk-full handling: wrap each write in <code>|| { adrs_failed+=({rule_id, error}); continue; }</code>; report <code>adrs_failed[]</code> (defensive; not fixture-tested at v1).</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> cap fixture: 5 ADRs on disk, 7 in <code>adrs_truncated</code>; <code>--no-adr</code> writes nothing.</p>
+
+<h3 id="t15">T15: Exemption reconciliation — matching/orphan/informational + expiry</h3>
+<p><strong>Goal:</strong> Reconcile <code>exemptions[]</code> from project <code>principles.yaml</code> against ADR files at <code>&lt;adr_path&gt;</code>. Three outcomes per FR-65; expired exemptions surface via FR-66.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-adr-exemption">FR-65, FR-66</a>; <a href="02_spec.html#edge-cases">E10, E11</a>.</p>
+<p><strong>Depends on:</strong> T14<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create 3 sub-fixtures under <code>tests/fixtures/adr-reconcile/{matching, orphan, informational}/</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Matching fixture: exemption row in principles.yaml + ADR file with <code>## Suppresses</code> block listing the same <code>{rule, file, line}</code>. Failing test: matching finding is absent from <code>.findings</code> (silent suppress).</li>
+<li>[ ] Orphan fixture: exemption row, NO ADR file. Failing test: suppression applied (finding absent from main set) BUT <code>.exemptions.orphan == 1</code> + warn entry in report.</li>
+<li>[ ] Informational fixture: ADR file with <code>## Suppresses</code>, NO matching exemption row. Failing test: finding STILL surfaces; report contains info-level note <code>ADR-NNNN documents suppression but no exemption row in principles.yaml</code>.</li>
+<li>[ ] Expiry fixture: exemption with <code>expires: 2025-01-01</code>. Failing test: finding surfaces; <code>.exemptions.expired == 1</code>; stderr summary lists expired count.</li>
+<li>[ ] Implement <code>reconcile_exemptions()</code>: parse ADR <code>## Suppresses</code> blocks via awk; compare against exemption rows; classify into 3 buckets + expired.</li>
+<li>[ ] Emit <code>.exemptions = { applied: N, orphan: M, expired: P }</code>; <code>.findings[].suppressed_by</code> populated where applicable.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> 3 sub-fixtures all pass with their respective assertions.</p>
+
+<h3 id="phase-6-report-skill-tests-tn">Phase 6: Report emit + SKILL.md authoring + reference/ + gate tools + fixtures + TN</h3>
+<p>Phase rationale: package everything into the deliverable shape — stderr summary, the SKILL.md body conforming to skill-patterns §A–§F, reference/ progressive-disclosure files, the three gate tools (citations, gap-map, determinism), the fixture runner, and the final verification.</p>
+
+<h3 id="t16">T16: Report emitter — JSON stdout + stderr summary + determinism (FR-70..FR-73)</h3>
+<p><strong>Goal:</strong> Lock the JSON shape to FR-71 schema (schema_version, run, scan_root, stacks_detected, l3_present, scanned, rules_loaded, declarative_delegated_pct, frontend_declarative_coverage, tools_skipped, tools_errored, findings, adrs_written, adrs_truncated, exemptions). Render the FR-72 stderr summary (≤30 lines, severity-tinted via NO_COLOR-respecting ANSI). Findings sorted per FR-73.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-report-format">FR-70, FR-71, FR-72, FR-73</a>; <a href="02_spec.html#cli-output">§11</a>; <a href="02_spec.html#nfrs">NFR-02</a>.</p>
+<p><strong>Depends on:</strong> T15<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Modify <code>tools/run-audit.sh</code> (sort + summary emit); create <code>tests/fixtures/determinism/</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Implement <code>sort_findings()</code>: <code>jq 'sort_by(.severity, .rule_id, .file, .line)'</code> with severity mapped to numeric (block=0, warn=1, info=2) for desc-by-severity-then-asc-everything-else.</li>
+<li>[ ] Implement <code>render_stderr_summary()</code>: header + counts + block listing (verbatim) + warn/info summary by count + notes (cap, SFC, orphan) + ADR list. Respect <code>NO_COLOR</code>.</li>
+<li>[ ] Failing test: <code>diff &lt;(tools/run-audit.sh determinism/ | jq 'del(.run)') &lt;(tools/run-audit.sh determinism/ | jq 'del(.run)')</code> → empty.</li>
+<li>[ ] Implement <code>declarative_delegated_pct</code> computation at runtime: <code>count(rules where delegate_to in [dependency-cruiser, ruff]) / count(rules where tier in [1,2])</code>; 3 decimals.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> diff empty after timestamp strip; stderr summary &lt; 30 lines for a clean repo.</p>
+
+<h3 id="t17">T17: SKILL.md authoring — frontmatter, Phase 0, Platform Adaptation, Anti-Patterns (FR-80, FR-81, FR-83, FR-85)</h3>
+<p><strong>Goal:</strong> Write <code>plugins/pmos-toolkit/skills/architecture/SKILL.md</code>. Frontmatter matches dir name <code>architecture</code>; description carries ≥ 5 user-spoken trigger phrases; argument-hint <code>audit [path]</code>; target <code>generic</code>. Body has Platform Adaptation (Claude Code / Codex / no-Task) + Anti-Patterns. Cite <code>skill-patterns.md §A–§F</code> as the standing acceptance.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-skill-patterns">FR-80, FR-81, FR-83, FR-85</a>; <a href="02_spec.html#fr-skill-shape">FR-04, FR-05</a>.</p>
+<p><strong>Depends on:</strong> T16<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>plugins/pmos-toolkit/skills/architecture/SKILL.md</code>.</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Failing test: <code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target generic plugins/pmos-toolkit/skills/architecture/ 2&gt;&amp;1 | grep -E '^FAIL'</code> → at least some FAILs (deterministic half exits non-zero before SKILL.md exists).</li>
+<li>[ ] Author SKILL.md with frontmatter:
+<pre><code>---
+name: architecture
+description: Audit a repo against tiered architectural principles (L1 universal ≤15 rules, L2 stack-specific, L3 per-repo overrides); emit JSON report with rule citations; promote ≤5 block findings to Nygard ADRs. Use when the user says &quot;audit my codebase against principles&quot;, &quot;run an architecture review&quot;, &quot;check for circular imports&quot;, &quot;promote architectural decisions to ADRs&quot;, &quot;/architecture&quot;, or &quot;lint my repo against universal rules&quot;.
+user-invocable: true
+argument-hint: &quot;audit [path] [--no-adr] [--non-interactive]&quot;
+target: generic
+---
+</code></pre></li>
+<li>[ ] Body sections (mirror /grill, /spec idiom):
+<ul>
+<li><code># /architecture</code> + announce line</li>
+<li><code>## Platform Adaptation</code> — Claude Code default; Codex (no AskUserQuestion → numbered prompt); no-Task tool (sequential rule evaluation, no subagent dispatch in v1).</li>
+<li><code>## Phase 0: Prerequisites</code> — jq + python3+yaml presence check; warn-on-missing for npx, ruff.</li>
+<li><code>## Phase 1: Resolve scan_root</code> — argument parsing, tilde-expand, symlink-follow-once.</li>
+<li><code>## Phase 2: Load rules</code> — cite <code>principles.yaml</code> and the 3-tier merge; reference <code>reference/l1-rationales.md</code> for full rule list (progressive disclosure §C / FR-82).</li>
+<li><code>## Phase 3: Scan files</code> — gitignore + deny-list policy (D15).</li>
+<li><code>## Phase 4: Evaluate</code> — dispatch to grep / Dep Cruiser / ruff per rule.</li>
+<li><code>## Phase 5: Reconcile exemptions</code> — cite <code>reference/adr-template.md</code>.</li>
+<li><code>## Phase 6: Emit report</code> — JSON stdout + stderr summary.</li>
+<li><code>## Anti-Patterns (DO NOT)</code> — scan node_modules; spawn ADR for warn-severity; delegate to tool not on PATH (auto-skip instead); overwrite user ADR files; emit text to stdout (JSON only).</li>
+<li><code>## Tool version requirements</code> — <code>dependency-cruiser &gt;= 15</code>, <code>ruff &gt;= 0.5</code>.</li>
+</ul></li>
+<li>[ ] Verify FR-82 progressive disclosure: SKILL.md ≤ 800 lines (skill-eval cap); heavy content cited in <code>reference/</code>.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> <code>head -10 SKILL.md</code> shows correct frontmatter; description has ≥5 trigger phrases (count via <code>grep -o '"[^"]*"' or count user-voice phrases manually</code>); <code>wc -l SKILL.md</code> &lt; 800.</p>
+
+<h3 id="t18">T18: reference/ progressive disclosure — l1-rationales, adr-template, gap-map-rationale (FR-82)</h3>
+<p><strong>Goal:</strong> Author 3 reference files under <code>plugins/pmos-toolkit/skills/architecture/reference/</code>. SKILL.md cites them via relative links rather than inlining.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-skill-patterns">FR-82</a>; <a href="02_spec.html#file-layout">§10.1</a>.</p>
+<p><strong>Depends on:</strong> T17<br>
+<strong>TDD:</strong> no — content-only (no behavior to test); skill-eval grades structure</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>reference/l1-rationales.md</code> — one section per U001–U010 with rationale + source citation (the URLs/citations referenced from <code>principles.yaml :: source:</code>).</li>
+<li>Create: <code>reference/adr-template.md</code> — the Nygard template T13 stamps. Includes <code>{NNNN}</code>, <code>{title}</code>, <code>{date}</code>, <code>{rule_id}</code>, <code>{severity}</code>, <code>{file}</code>, <code>{line}</code> placeholders.</li>
+<li>Create: <code>reference/gap-map-rationale.md</code> — per-rule rationale for <code>delegate_to:</code> assignment. Explains why U001-U010 are grep (not delegated): "Dep Cruiser doesn't measure file LOC", etc.</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Author <code>l1-rationales.md</code>: 10 sections (one per U001-U010), each ~5-10 lines: rule statement, why, source citation, examples of violations.</li>
+<li>[ ] Author <code>adr-template.md</code>: byte-for-byte the Nygard shape from spec §FR-62.</li>
+<li>[ ] Author <code>gap-map-rationale.md</code>: 18 entries (one per rule); for each, justify the <code>delegate_to:</code> assignment.</li>
+<li>[ ] Verify SKILL.md links resolve: <code>grep -o 'reference/[a-z-]*\.md' plugins/pmos-toolkit/skills/architecture/SKILL.md | xargs -I {} test -f plugins/pmos-toolkit/skills/architecture/{}</code> → exit 0.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> all 3 reference files exist; SKILL.md citations resolve.</p>
+
+<h3 id="t19">T19: Gate tools — check-citations.sh, check-gap-map.sh, check-determinism.sh (FR-24, FR-34, NFR-02)</h3>
+<p><strong>Goal:</strong> Author 3 bash scripts under <code>tools/</code>. Each exits 0/1; all wired into the fixture runner.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#fr-loading-precedence">FR-24</a>; <a href="02_spec.html#fr-tool-delegation">FR-34</a>; <a href="02_spec.html#testing-verification-commands">§14.4</a>; <a href="02_spec.html#nfrs">NFR-02</a>.</p>
+<p><strong>Depends on:</strong> T18<br>
+<strong>TDD:</strong> yes — new-feature (each script has a fixture)</p>
+
+<p><strong>Files:</strong> Create <code>tools/check-citations.sh</code>, <code>tools/check-gap-map.sh</code>, <code>tools/check-determinism.sh</code>; create <code>tests/fixtures/citations-missing/principles.yaml</code> (one rule lacking <code>source:</code>).</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] <code>check-citations.sh</code>: parse plugin <code>principles.yaml</code>; assert every rule has non-empty <code>source:</code>; exit 1 + list offenders to stderr on failure. Failing test: against citations-missing fixture → exit 1; against shipped principles.yaml → exit 0.</li>
+<li>[ ] <code>check-gap-map.sh</code>: compute <code>delegated_pct</code>; print to stderr; exit 0 always (G2 stretch, not enforced) — report-only.</li>
+<li>[ ] <code>check-determinism.sh</code>: <code>tools/run-audit.sh &lt;fixture&gt; | jq 'del(.run)' &gt; /tmp/a.json</code>; sleep 1; repeat → /tmp/b.json; <code>diff /tmp/a.json /tmp/b.json</code>; exit 0 on empty.</li>
+<li>[ ] All three: <code>chmod +x</code>; exit codes per FR-84 (0=pass, 1=fail, 64=usage).</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> all 3 scripts exit 0 against shipped principles.yaml + tracer fixture.</p>
+
+<h3 id="t20">T20: Fixture runner + remaining fixtures (FR-21/30/31/32/41/51/52/63/65; §14.1)</h3>
+<p><strong>Goal:</strong> Author <code>tests/run.sh</code> that invokes each fixture's audit + assertion, prints <code>ok N/M</code>, exits 1 if any fail. Backfill any missing fixtures from spec §14.1.</p>
+<p><strong>Spec refs:</strong> <a href="02_spec.html#testing-unit">§14.1</a>; <a href="02_spec.html#testing-verification-commands">§14.4</a>.</p>
+<p><strong>Depends on:</strong> T19<br>
+<strong>TDD:</strong> yes — new-feature</p>
+
+<p><strong>Files:</strong> Create <code>tests/run.sh</code>; backfill any missing fixtures (most created in earlier tasks).</p>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>[ ] Inventory fixtures created in T1-T19; reconcile against §14.1 table (tracer, principles-16-rules, ts-circular, py-tidy-imports, vue-mixed, gitignore-deny, adr-reconcile [3 sub], tool-missing, adr-cap, determinism, citations-missing). Should be 10 distinct fixtures + 3 adr-reconcile sub-fixtures = 13 cases.</li>
+<li>[ ] Write <code>tests/run.sh</code> as plain bash:
+<pre><code>#!/usr/bin/env bash
+set -uo pipefail
+PASS=0; FAIL=0
+for fixture in tests/fixtures/*/; do
+  name=$(basename "$fixture")
+  if bash &lt;"$fixture/.assert" 2&gt;&amp;1; then  # each fixture carries a .assert script
+    echo "ok  $name"; PASS=$((PASS+1))
+  else
+    echo "FAIL $name"; FAIL=$((FAIL+1))
+  fi
+done
+echo "---"; echo "$PASS passed, $FAIL failed"
+[ "$FAIL" -eq 0 ]
+</code></pre></li>
+<li>[ ] For each fixture created in earlier tasks, add a <code>.assert</code> script using <code>jq</code> assertions specific to that fixture's FR.</li>
+<li>[ ] Run <code>bash tests/run.sh</code>; expect <code>ok</code> for every fixture; exit 0.</li>
+<li>[ ] Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong> <code>bash plugins/pmos-toolkit/skills/architecture/tests/run.sh</code> → <code>ok</code> on all 13 cases; exit 0.</p>
+
+<h3 id="t21">T21 (TN): Final Verification — fixtures + skill-eval + citations + gap-map + determinism + manual dry-run</h3>
+<p><strong>Goal:</strong> Run the full verification stack. Every command exits as expected.</p>
+
+<ol>
+<li>[ ] <strong>Lint &amp; format (best-effort):</strong> <code>shellcheck plugins/pmos-toolkit/skills/architecture/tools/*.sh plugins/pmos-toolkit/skills/architecture/tests/run.sh 2&gt;&amp;1 | head -50</code> — review and fix any blocking warnings. (Shellcheck absence: warn only, not fail.)</li>
+<li>[ ] <strong>Fixture suite:</strong> <code>bash plugins/pmos-toolkit/skills/architecture/tests/run.sh</code> — expect <code>ok</code> on all 13 cases; exit 0.</li>
+<li>[ ] <strong>Citation gate:</strong> <code>bash plugins/pmos-toolkit/skills/architecture/tools/check-citations.sh</code> — exit 0.</li>
+<li>[ ] <strong>Gap-map report:</strong> <code>bash plugins/pmos-toolkit/skills/architecture/tools/check-gap-map.sh</code> — exit 0; stderr prints <code>delegated_pct = 0.444</code> (informational; not an assertion).</li>
+<li>[ ] <strong>Determinism:</strong> <code>bash plugins/pmos-toolkit/skills/architecture/tools/check-determinism.sh tests/fixtures/ts-circular</code> — exit 0 (diff empty).</li>
+<li>[ ] <strong>Skill-eval gate (preview of Phase 6a):</strong> <code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target generic plugins/pmos-toolkit/skills/architecture/</code> — expect all <code>[D]</code> checks pass; flag any failures for /skill-eval to address in Phase 6a.</li>
+<li>[ ] <strong>Done-when walkthrough:</strong> from a clean tmp dir, <code>cd /tmp &amp;&amp; mkdir audit-demo &amp;&amp; cd audit-demo &amp;&amp; git init &amp;&amp; mkdir src &amp;&amp; echo 'console.log("hi");' &gt; src/a.ts &amp;&amp; bash &lt;worktree&gt;/plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh .</code> → JSON on stdout with one U004 finding; stderr summary present; exit 0.</li>
+<li>[ ] <strong>Canonical-path check</strong> (repo invariant): <code>ls plugins/pmos-toolkit/skills/architecture/</code> — directory present, lowercase-hyphenated, contains SKILL.md.</li>
+<li>[ ] <strong>Polish:</strong> ensure no TODO/FIXME/XXX remains in any new file under <code>plugins/pmos-toolkit/skills/architecture/</code>: <code>grep -rE '(TODO|FIXME|XXX)' plugins/pmos-toolkit/skills/architecture/ | grep -v '/tests/fixtures/' | head</code> — empty.</li>
+<li>[ ] <strong>Final commit:</strong> any verification fixups → <code>git commit -m "chore(T21): final verification — all gates green"</code>.</li>
+</ol>
+
+<p><strong>Cleanup</strong>: none required at this Tier — no temp files created outside <code>tests/fixtures/</code>; no worktree containers; no feature flags. Documentation updates land via /complete-dev (release prereqs), not here.</p>
+
+<p><strong>Done</strong>: all gates green → ready for Phase 6a /skill-eval.</p>
+
+</section>
+
+<section id="review-log">
+<h2 id="review-log">Review Log</h2>
+<p>Detailed loop-by-loop findings live in <code>03_plan_review.md</code> if non-trivial. Below: summary index.</p>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes Made</th></tr></thead>
+<tbody>
+<tr><td>1 (structural + design self-critique)</td><td>Structural: every spec FR maps to a task (FR-01..FR-04→T1+T17, FR-10/12/24→T2, FR-20-23→T3, FR-11/13/14→T4, FR-40-43→T5, §7.4 grep rules→T1+T6+T7+T8, FR-30/33→T9, FR-31→T10, FR-32→T11, FR-50-52→T12, FR-60-62→T13, FR-63/67→T14, FR-65/66→T15, FR-70-73→T16, FR-80/81/83/85→T17, FR-82→T18, FR-24/34→T19, all fixtures+§14.1→T20, full stack→T21). Design: tracer-bullet T1 is end-to-end through the riskiest unproven point (JSON emit + fixture-runner shape). Phases are deployable: every phase ends with a working audit a bit wider than before. No oversized tasks; T17 (SKILL.md) is the heaviest at ~30-60 min. No release-prereq tasks in any wave (FR-63 compliance — P5).</td><td>One self-flag: T18 is content-only (TDD=no — refactor-prep slice). Documented in task body. No structural changes applied.</td></tr>
+<tr><td>2 (blind-review self-pass)</td><td>Read as cold reviewer: clear scope, exact commands, fixture-first TDD shape preserves test-as-spec discipline. P3 vertical-slice doctrine satisfied — no horizontal layer-cuts. One nit: T16 stderr-summary rendering blends "emit summary" with "compute coverage %" which could be split — but the coverage compute is 2 lines of shell, splitting would be churn. Keep merged.</td><td>None applied — within loop cap.</td></tr>
+</tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_architecture-principles-skill/03_plan.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

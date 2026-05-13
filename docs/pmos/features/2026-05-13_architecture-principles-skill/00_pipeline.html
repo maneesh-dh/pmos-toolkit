@@ -6,7 +6,7 @@
   <meta name="pmos:feature-sdlc-slug" content="architecture-principles-skill">
   <meta name="pmos:feature-sdlc-mode" content="skill-new">
   <meta name="pmos:feature-sdlc-tier" content="3">
-  <meta name="pmos:feature-sdlc-status" content="paused">
+  <meta name="pmos:feature-sdlc-status" content="in_progress">
   <title>Pipeline status — architecture-principles-skill</title>
   <link rel="stylesheet" href="assets/style.css?v=2.46.0">
   <script defer src="assets/viewer.js?v=2.46.0"></script>
@@ -32,8 +32,8 @@
   <dt>Target platform</dt><dd><code>generic</code> (Claude Code + Codex)</dd>
   <dt>Output format</dt><dd><code>html</code></dd>
   <dt>Started</dt><dd>2026-05-13</dd>
-  <dt>Status</dt><dd><strong>paused</strong> — user requested resume in fresh session after /spec</dd>
-  <dt>Resume cursor</dt><dd><code>current_phase = plan</code></dd>
+  <dt>Status</dt><dd><strong>in_progress</strong> — /plan complete; resume cursor = execute</dd>
+  <dt>Resume cursor</dt><dd><code>current_phase = execute</code></dd>
   <dt>Seed</dt><dd><a href="../../ideate/2026-05-13_architecture-principles-skill.html">Ideation artifact</a></dd>
 </dl>
 </section>
@@ -49,8 +49,8 @@
 <tr><td>grill</td><td>✓ completed</td><td><a href="grills/2026-05-13_01_requirements.html"><code>grills/2026-05-13_01_requirements.html</code></a> (5 findings folded into spec)</td></tr>
 <tr><td>creativity</td><td>↷ skipped</td><td>—</td></tr>
 <tr><td>spec</td><td>✓ completed</td><td><a href="02_spec.html"><code>02_spec.html</code></a> (Ready for Plan; 42 sections; 39 FRs; 22 D-log entries)</td></tr>
-<tr><td>plan</td><td><strong>→ next (resume cursor)</strong></td><td>—</td></tr>
-<tr><td>execute</td><td>pending</td><td>—</td></tr>
+<tr><td>plan</td><td>✓ completed</td><td><a href="03_plan.html"><code>03_plan.html</code></a> (Draft; 21 tasks across 6 phases; FR-63 release-prereqs compliant; execution_mode=inline)</td></tr>
+<tr><td>execute</td><td><strong>→ next (resume cursor)</strong></td><td>—</td></tr>
 <tr><td>skill-eval</td><td>pending</td><td>—</td></tr>
 <tr><td>verify</td><td>pending</td><td>—</td></tr>
 <tr><td>complete-dev</td><td>pending</td><td>—</td></tr>
@@ -64,8 +64,8 @@
 <ol>
   <li>Open a new terminal at <code>/Users/maneeshdhabria/Desktop/Projects/agent-skills-architecture-principles-skill</code> (this worktree).</li>
   <li>Start a fresh <code>claude</code> session.</li>
-  <li>Run <code>/feature-sdlc --resume</code> — the orchestrator reads <code>.pmos/feature-sdlc/state.yaml</code>, validates drift, and resumes at <code>plan</code>.</li>
-  <li>/plan will be seeded with <code>02_spec.html</code> + <code>--tier 3</code> + the FR-63 release-prereqs directive (no version-bump / CHANGELOG / README / manifest-sync / learnings tasks in any Wave block — those land in /complete-dev only).</li>
+  <li>Run <code>/feature-sdlc --resume</code> — the orchestrator reads <code>.pmos/feature-sdlc/state.yaml</code>, validates drift, and resumes at <code>execute</code>.</li>
+  <li>/execute will be seeded with <code>03_plan.html</code>; execution mode = <code>inline</code> (single-agent task-by-task; no <code>--subagent-driven</code>). 21 tasks in dependency-ordered chains; commit cadence = per-task.</li>
 </ol>
 </section>
 

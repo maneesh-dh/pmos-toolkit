@@ -32,8 +32,8 @@
   <dt>Target platform</dt><dd><code>generic</code> (Claude Code + Codex)</dd>
   <dt>Output format</dt><dd><code>html</code></dd>
   <dt>Started</dt><dd>2026-05-13</dd>
-  <dt>Status</dt><dd><strong>paused</strong> — user requested resume in fresh session</dd>
-  <dt>Resume cursor</dt><dd><code>current_phase = spec</code></dd>
+  <dt>Status</dt><dd><strong>paused</strong> — user requested resume in fresh session after /spec</dd>
+  <dt>Resume cursor</dt><dd><code>current_phase = plan</code></dd>
   <dt>Seed</dt><dd><a href="../../ideate/2026-05-13_architecture-principles-skill.html">Ideation artifact</a></dd>
 </dl>
 </section>
@@ -46,10 +46,10 @@
 <tr><td>init-state</td><td>✓ completed</td><td><code>00_pipeline.html</code></td></tr>
 <tr><td>skill-tier-resolve</td><td>✓ completed</td><td>—</td></tr>
 <tr><td>requirements</td><td>✓ completed</td><td><a href="01_requirements.html"><code>01_requirements.html</code></a></td></tr>
-<tr><td>grill</td><td>✓ completed</td><td><a href="grills/2026-05-13_01_requirements.html"><code>grills/2026-05-13_01_requirements.html</code></a> (5 findings)</td></tr>
+<tr><td>grill</td><td>✓ completed</td><td><a href="grills/2026-05-13_01_requirements.html"><code>grills/2026-05-13_01_requirements.html</code></a> (5 findings folded into spec)</td></tr>
 <tr><td>creativity</td><td>↷ skipped</td><td>—</td></tr>
-<tr><td>spec</td><td><strong>→ next (resume cursor)</strong></td><td>—</td></tr>
-<tr><td>plan</td><td>pending</td><td>—</td></tr>
+<tr><td>spec</td><td>✓ completed</td><td><a href="02_spec.html"><code>02_spec.html</code></a> (Ready for Plan; 42 sections; 39 FRs; 22 D-log entries)</td></tr>
+<tr><td>plan</td><td><strong>→ next (resume cursor)</strong></td><td>—</td></tr>
 <tr><td>execute</td><td>pending</td><td>—</td></tr>
 <tr><td>skill-eval</td><td>pending</td><td>—</td></tr>
 <tr><td>verify</td><td>pending</td><td>—</td></tr>
@@ -64,20 +64,39 @@
 <ol>
   <li>Open a new terminal at <code>/Users/maneeshdhabria/Desktop/Projects/agent-skills-architecture-principles-skill</code> (this worktree).</li>
   <li>Start a fresh <code>claude</code> session.</li>
-  <li>Run <code>/feature-sdlc --resume</code> — the orchestrator reads <code>.pmos/feature-sdlc/state.yaml</code>, validates drift, and resumes at <code>spec</code>.</li>
-  <li>/spec will be seeded with the 5 grill findings (F1–F5) as required FRs.</li>
+  <li>Run <code>/feature-sdlc --resume</code> — the orchestrator reads <code>.pmos/feature-sdlc/state.yaml</code>, validates drift, and resumes at <code>plan</code>.</li>
+  <li>/plan will be seeded with <code>02_spec.html</code> + <code>--tier 3</code> + the FR-63 release-prereqs directive (no version-bump / CHANGELOG / README / manifest-sync / learnings tasks in any Wave block — those land in /complete-dev only).</li>
 </ol>
 </section>
 
-<section id="grill-folded-into-spec">
-<h2 id="grill-folded-into-spec">Grill findings to fold into /spec</h2>
+<section id="spec-decisions-locked">
+<h2 id="spec-decisions-locked">Key /spec decisions to carry into /plan</h2>
 <ol>
-  <li><strong>F1 (block)</strong> — L1 cap (≤15 rules) failure-mode: pick one of abort-load · crash · truncate · info-severity.</li>
-  <li><strong>F2 (block)</strong> — Promote delegation gap-map to /spec Phase-1 deliverable, or weaken the 70% goal.</li>
-  <li><strong>F3 (block)</strong> — Vue SFC blind spot at book-companion: (a) SFC extractor · (b) drop Vue · (c) surface coverage % in report.</li>
-  <li><strong>F4 (warn)</strong> — .gitignore / generated-code policy must land as an explicit FR (deny-list source).</li>
-  <li><strong>F5 (warn)</strong> — ADR-driven mute mechanism: per-site exemption · rule-level mute · ADR-to-rule-id mapping table — pick one.</li>
+  <li><strong>v1 scope = audit only.</strong> scaffold / spec-check / code-check explicitly v2+ (D1 / §3 non-goals).</li>
+  <li><strong>Three-file split</strong> (G3, D16): plugin L1+L2 at <code>plugins/pmos-toolkit/skills/architecture/principles.yaml</code> · user L3 + exemptions at <code>&lt;repo&gt;/.pmos/architecture/principles.yaml</code> · ADRs at <code>&lt;repo&gt;/docs/adr/ADR-NNNN-*.md</code>. Plugin-update safe.</li>
+  <li><strong>AST tools = 2:</strong> Dependency Cruiser (TS) + ruff (Python). ts-arch dropped (D17). Auto-skip-with-warn on missing (FR-32).</li>
+  <li><strong>F1 L1 cap (≤15):</strong> abort schema-load on rule #16 (FR-21).</li>
+  <li><strong>F2 gap-map ratio = 44%</strong> with 18 shipped rules; G2 reframed as stretch goal, not hard FR. /plan can size LLM-judge surface area from §7.4's concrete rule list.</li>
+  <li><strong>F3 Vue SFC = report-the-gap:</strong> L1-semantic-only at v1; <code>frontend_declarative_coverage</code> always in report (FR-50-52).</li>
+  <li><strong>F4 scan policy:</strong> <code>git check-ignore -v</code> primary; 14-entry hardcoded fallback deny-list (FR-41).</li>
+  <li><strong>F5 ADR reconciliation:</strong> matching pair / orphan exemption / informational ADR — three outcomes tested (FR-65).</li>
+  <li><strong>D21 report:</strong> JSON stdout + human stderr summary; exit 0 on completion; deterministic byte-identical output minus timestamps.</li>
+  <li><strong>D22 ADRs:</strong> only block-severity spawns ADRs; cap 5/run; truncated count surfaced.</li>
+  <li><strong>OQ8 (book-companion dry-run)</strong> = post-merge acceptance demo (§14.3), NOT a /verify gate.</li>
+  <li><strong>Skill-patterns §A–§F</strong> → FR-80–FR-85; Phase 6a /skill-eval grades 39/39 binary checks.</li>
 </ol>
+</section>
+
+<section id="release-prereqs-reminder">
+<h2 id="release-prereqs-reminder">Release prereqs (NOT plan tasks — for /complete-dev only)</h2>
+<ul>
+  <li>Manifest version bump 2.46.0 → 2.47.0 in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> AND <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code> (same commit; pre-push hook enforces sync).</li>
+  <li>README row for <code>/architecture audit</code>.</li>
+  <li>CHANGELOG entry.</li>
+  <li><code>## /architecture</code> header in <code>~/.pmos/learnings.md</code> (idempotent append).</li>
+  <li>Use <code>/complete-dev</code>, not legacy <code>/push</code>.</li>
+  <li>See <a href="02_spec.html#release-prerequisites">02_spec.html §17</a> for the full list.</li>
+</ul>
 </section>
 
   </main>

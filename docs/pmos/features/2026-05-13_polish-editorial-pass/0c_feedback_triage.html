@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Feedback triage — polish-editorial-pass</title>
+<link rel="stylesheet" href="assets/style.css?v=2.38.0">
+</head>
+<body>
+<main>
+<h1 id="feedback-triage">Feedback triage — /polish editorial pass</h1>
+<p><strong>Feedback source:</strong> &lt;inline-text&gt; (3 numbered points)<br>
+<strong>Target skills:</strong> <code>polish</code> (<code>plugins/pmos-toolkit/skills/polish/</code>)<br>
+<strong>Standing acceptance criteria:</strong> the revised skill must conform to <code>feature-sdlc/reference/skill-patterns.md §A–§F</code> and this repo's <code>CLAUDE.md ## Skill-authoring conventions</code>.</p>
+
+<h2 id="findings-parsed">Findings (parsed)</h2>
+<table>
+<thead><tr><th>ID</th><th>Severity</th><th>One-line</th><th>Evidence</th><th>Proposed fix (verbatim from feedback)</th></tr></thead>
+<tbody>
+<tr><td>F1</td><td>enhancement</td><td>Honor source format of the document</td><td>SKILL.md description: "single markdown document"; Phase 7 writes <code>&lt;original&gt;.polished.md</code> unconditionally; Phase 1 ingest normalizes URL/Notion to markdown</td><td>"If the document is passed in markdown / html format, return the output in the same format"</td></tr>
+<tr><td>F2</td><td>feature</td><td>Introduce an editor pass with a reduction target</td><td>No reduction/condensation capability today; Phase 4 patches are span-local rewrites tied to rubric failures, not a holistic cut</td><td>"ask the user to share a reduction target in approx. % range terms (e.g. ~30-40%). Use an editor subagent to critique the doc and identify opportunities for rephrasing, merge, reorder, tightening prose, cutting out fluff, etc. ruthlessly. The output of this critique can be saved to editor_notes.json file. A rewriter subagent takes the original doc and then editor_notes.json and then makes the edits."</td></tr>
+<tr><td>F3</td><td>feature</td><td>Editor pass runs before the binary rubric</td><td>Current Phase 3 ("Run binary eval rubric") operates on the ingested doc directly</td><td>"This editor pass should happen before the current skills eval rubric runs"</td></tr>
+</tbody>
+</table>
+
+<h2 id="critique">Critique (vs current SKILL.md + cited references)</h2>
+<table>
+<thead><tr><th>ID</th><th>already_handled</th><th>classification</th><th>recommendation</th><th>scope_hint</th><th>rationale</th></tr></thead>
+<tbody>
+<tr><td>F1</td><td>no</td><td>new-capability</td><td>apply</td><td>medium</td><td>Additive. The lock-zone machinery in <code>reference/chunking.md</code> already enumerates "HTML blocks" and "link URLs" as locked zones, so the substrate exists; the work is (a) a format classifier in Phase 1, (b) HTML-aware lock zones + chunking anchors (<code>&lt;h1&gt;/&lt;h2&gt;</code>), (c) Phase 7 output extension + replace logic, (d) frontmatter <code>argument-hint</code>/<code>description</code> wording, (e) anti-pattern wording ("single markdown" → "single doc"). The 14 rubric checks are prose-level and mostly format-agnostic — they run on extracted prose text either way.</td></tr>
+<tr><td>F2</td><td>no</td><td>new-capability</td><td>modify</td><td>large</td><td>Well-scoped but touches several existing contracts: it must slot before the rubric (F3), respect the 2-iteration cap (the editor pass is iteration-0, not counted), preserve voice (the rewriter gets the same voice markers), and interact cleanly with the budget estimate (editor pass is a fixed ~2 subagent calls, surfaced separately). <strong>Modification (user):</strong> the reduction-target prompt must <em>offer preset ranges</em> (e.g. <code>~10-20%</code> / <code>~30-40%</code> / <code>~50%+</code>) and a <em>custom</em> option / a <em>Skip</em> option — not a free-text-only ask.</td></tr>
+<tr><td>F3</td><td>no</td><td>new-capability (ordering)</td><td>apply</td><td>small</td><td>Pure placement: the new editor phase goes between Phase 2 (preset) and Phase 3 (rubric). The rubric, budget estimate, patch passes, findings protocol and metrics all then operate on the editor-reduced doc. Before/after metrics in Phase 7 must still anchor to the <em>original</em> ingested doc so the headline word-count delta includes the editor cut.</td></tr>
+</tbody>
+</table>
+
+<h2 id="disposition-log">Disposition log</h2>
+<ul>
+<li><strong>F1</strong> — <em>Apply as recommended</em> (user, 2026-05-13).</li>
+<li><strong>F2</strong> — <em>Modify</em> (user, 2026-05-13): "show some ranges to the user and let them select the reduction ranges or specify custom" → reduction-target prompt offers preset ranges + custom + skip; otherwise apply as recommended.</li>
+<li><strong>F3</strong> — <em>Apply as recommended</em> (user, 2026-05-13).</li>
+</ul>
+
+<h2 id="approved-changes-by-skill">Approved changes by skill</h2>
+<h3 id="polish">polish</h3>
+<ol>
+<li><strong>Source-format honoring (F1).</strong> Detect input format (markdown vs HTML) in Phase 1; carry a <code>doc_format ∈ {markdown, html}</code> through the run. HTML inputs get HTML-aware lock zones (tags, attributes, <code>&lt;script&gt;/&lt;style&gt;</code>, comments) and HTML chunk anchors (<code>&lt;h1&gt;/&lt;h2&gt;</code>); markdown unchanged. Phase 7 writes <code>&lt;original&gt;.polished.html</code> for HTML inputs, <code>&lt;original&gt;.polished.md</code> for markdown; the replace prompt and <code>.bak</code> logic follow the same extension. URL/Notion inputs continue to normalize to markdown (their HTML is page chrome, not an authored document) — call this out explicitly. Update <code>description</code>, <code>argument-hint</code>, file-map, and anti-patterns to say "single document" instead of "single markdown document".</li>
+<li><strong>Editorial reduction pass (F2, placed per F3).</strong> A new gated phase between current Phase 2 (preset) and current Phase 3 (rubric):
+  <ul>
+  <li>Prompt the user via <code>AskUserQuestion</code> for a reduction target — options: <code>Skip — no reduction (Recommended)</code> / <code>~10-20% (light trim)</code> / <code>~30-40% (substantial cut)</code> / <code>~50%+ (aggressive)</code> / custom (free-text % or range). Skip ⇒ phase is a no-op and the pipeline proceeds on the ingested doc unchanged.</li>
+  <li><strong>Editor subagent</strong> — receives the (unchanged) ingested doc + voice markers + the reduction target. Critiques ruthlessly: rephrasing, sentence/paragraph merges, section reorders, prose tightening, fluff/throat-clearing/redundancy cuts. Does <em>not</em> rewrite — it emits structured notes to <code>editor_notes.json</code> (one entry per opportunity: <code>{id, kind ∈ rephrase|merge|reorder|tighten|cut, locator (heading path + verbatim quote, no line numbers), rationale, est_words_saved, risk ∈ low|high}</code>) plus a target-vs-estimate reconciliation summary. Locked zones (code, frontmatter, link URLs, short table cells, HTML tags/attrs) are off-limits to editor notes.</li>
+  <li><strong>Rewriter subagent</strong> — receives the original ingested doc + <code>editor_notes.json</code> + voice markers; applies the edits, honoring lock zones; emits the reduced doc + an applied/skipped log. <code>high</code>-risk notes (structural reorders, anything the rewriter can't apply without ambiguity) are surfaced to the user via the Phase 5 findings protocol rather than auto-applied.</li>
+  <li>The reduced doc becomes the working document for the rest of the pipeline (rubric, budget, patches, findings, metrics). The editor pass does <em>not</em> consume one of the 2 rubric-polish iterations. Before/after metrics in Phase 7 anchor to the original ingested doc.</li>
+  <li>If <code>--dry-run</code>: still run the editor critique and write <code>editor_notes.json</code>, but do not invoke the rewriter; report the notes alongside the rubric report.</li>
+  <li>Add to the budget-estimate block: when the editor pass is active, note "+~2 subagent calls (editor critique + rewrite)".</li>
+  </ul>
+</li>
+<li><strong>Bookkeeping (both).</strong> Phase count goes 9 → 10 ("Track Progress" + the "10 per-phase tasks" anti-pattern wording). Add <code>editor_notes.json</code> to the file map. Add a <code>reference/editorial-pass.md</code> (editor + rewriter prompt templates, <code>editor_notes.json</code> schema, target-reconciliation rules) and a <code>schemas/editor-notes.schema.json</code>. Update <code>tests/fixtures/</code> + <code>tests/expected.yaml</code> for: an HTML input fixture, and a verbose doc fixture with a reduction target.</li>
+</ol>
+
+<h2 id="per-skill-tier">Per-skill tier</h2>
+<p>Resolved in Phase 0d (<code>/skill-tier-resolve</code>). Provisional: <strong>Tier 2</strong> for <code>polish</code> — multi-file change to one existing skill (SKILL.md + new reference + new schema + fixtures), no new top-level skill, established pattern. Run tier = 2.</p>
+</main>
+</body>
+</html>

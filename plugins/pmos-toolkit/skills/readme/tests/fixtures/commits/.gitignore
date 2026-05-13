@@ -1,0 +1,4 @@
+# Materialised git histories live under each fixture's .git/ at test time
+# (setup.sh re-creates them deterministically). Never check them in — they'd
+# nest inside the outer worktree's git index.
+*/.git/

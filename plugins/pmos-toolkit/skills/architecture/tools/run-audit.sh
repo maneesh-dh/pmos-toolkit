@@ -9,7 +9,20 @@
 
 set -euo pipefail
 
-SCAN_ROOT="${1:-.}"
+# Arg parsing (T14, FR-67). --no-adr suppresses ADR writes entirely;
+# findings still emit. Positional arg is the scan root (default ".").
+NO_ADR=0
+SCAN_ROOT="."
+for arg in "$@"; do
+  case "$arg" in
+    --no-adr) NO_ADR=1 ;;
+    -*)
+      echo "ERROR: unknown flag: $arg" >&2
+      exit 64
+      ;;
+    *) SCAN_ROOT="$arg" ;;
+  esac
+done
 
 command -v jq >/dev/null 2>&1 || {
   echo "ERROR: /architecture requires jq. Install via brew/apt/dnf, then re-run." >&2
@@ -726,17 +739,42 @@ ADR_PATH_REL="$(echo "$LOADER_JSON" | jq -r '.config.adr_path')"
 ADR_PATH_REL="${ADR_PATH_REL%/}"
 ADR_DIR="$SCAN_ROOT/$ADR_PATH_REL"
 ADR_TEMPLATE="$SKILL_DIR/reference/adr-template.md"
+ADR_CAP=5
 adrs_written_json='[]'
+adrs_truncated_json='[]'
 
+# Sort block findings per FR-63: severity desc (block only here, so moot) →
+# rule_id asc → file asc → line asc. Take top ADR_CAP for ADR write; the
+# remainder lands in adrs_truncated[].
 block_findings_json=$(jq -n --argjson f "$findings_json" --argjson loader "$LOADER_JSON" '
   $f
   | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
   | map(select(.severity == "block"))
-  | sort_by(.file, .line, .rule_id)
+  | sort_by(.rule_id, .file, .line)
 ')
 block_count=$(echo "$block_findings_json" | jq 'length')
 
-if [ "$block_count" -gt 0 ] && [ -f "$ADR_TEMPLATE" ]; then
+# Split into to-write and to-truncate slices (only when at/over cap).
+# --no-adr (FR-67) short-circuits the split before the stderr note fires:
+# no "promoted vs not promoted" distinction when nothing is promoted at all.
+# Findings still emit normally; adrs_truncated stays [].
+if [ "$NO_ADR" -eq 1 ]; then
+  to_write_json='[]'
+  adrs_truncated_json='[]'
+else
+  to_write_json=$(echo "$block_findings_json" | jq --argjson cap "$ADR_CAP" '.[:$cap]')
+  if [ "$block_count" -gt "$ADR_CAP" ]; then
+    adrs_truncated_json=$(echo "$block_findings_json" | jq --argjson cap "$ADR_CAP" '
+      .[$cap:] | map({rule_id, file, line})
+    ')
+    trunc_count=$((block_count - ADR_CAP))
+    echo "note: $trunc_count additional block findings not promoted to ADR (cap $ADR_CAP/run). See report.adrs_truncated." >&2
+  fi
+fi
+
+to_write_count=$(echo "$to_write_json" | jq 'length')
+
+if [ "$to_write_count" -gt 0 ] && [ -f "$ADR_TEMPLATE" ]; then
   mkdir -p "$ADR_DIR"
   highest=0
   shopt -s nullglob
@@ -754,12 +792,12 @@ if [ "$block_count" -gt 0 ] && [ -f "$ADR_TEMPLATE" ]; then
   template_content=$(cat "$ADR_TEMPLATE")
 
   i=0
-  while [ "$i" -lt "$block_count" ]; do
-    rule_id=$(echo "$block_findings_json" | jq -r ".[$i].rule_id")
-    file_path=$(echo "$block_findings_json" | jq -r ".[$i].file")
-    line_no=$(echo "$block_findings_json" | jq -r ".[$i].line")
-    msg=$(echo "$block_findings_json" | jq -r ".[$i].message // .[$i].rule_id")
-    severity=$(echo "$block_findings_json" | jq -r ".[$i].severity")
+  while [ "$i" -lt "$to_write_count" ]; do
+    rule_id=$(echo "$to_write_json" | jq -r ".[$i].rule_id")
+    file_path=$(echo "$to_write_json" | jq -r ".[$i].file")
+    line_no=$(echo "$to_write_json" | jq -r ".[$i].line")
+    msg=$(echo "$to_write_json" | jq -r ".[$i].message // .[$i].rule_id")
+    severity=$(echo "$to_write_json" | jq -r ".[$i].severity")
 
     title_slug=$(printf '%s' "$msg" | tr '[:upper:]' '[:lower:]' \
       | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//' \
@@ -834,6 +872,7 @@ jq -n \
   --argjson tools_errored "$TOOLS_ERRORED_JSON" \
   --argjson fde "$fde_json" \
   --argjson adrs_written "$adrs_written_json" \
+  --argjson adrs_truncated "$adrs_truncated_json" \
   --arg start "$START" \
   --arg end "$END" \
   --arg root "$SCAN_ROOT" \
@@ -857,6 +896,7 @@ jq -n \
     tools_errored: $tools_errored,
     frontend_declarative_coverage: $fde,
     adrs_written: $adrs_written,
+    adrs_truncated: $adrs_truncated,
     findings: ($f
       | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
       | sort_by({block:0, warn:1, info:2}[.severity] // 9, .file, .line, .rule_id))

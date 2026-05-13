@@ -1,14 +1,15 @@
 # Backlog
 
-Last regenerated: 2026-05-12
+Last regenerated: 2026-05-13
 
-3 open items. Capture more with `/backlog add <text>`; refine with `/backlog refine <id>`; promote with `/backlog promote <id>`.
+7 open items. Capture more with `/backlog add <text>`; refine with `/backlog refine <id>`; promote with `/backlog promote <id>`.
 
 ## should
 
 | id | type | status | priority | title | spec | plan | pr |
 |---|---|---|---|---|---|---|---|
 | 0001 | tech-debt | inbox | should | /feature-sdlc fails its own skill-eval-check.sh — e-scripts-dir (script at tools/ not scripts/) + c-portable-paths (heuristic flags prose example paths) | — | — | — |
+| 0004 | bug | inbox | should | skill-eval-check.sh --selftest aborts before reaching selftest dispatch (arg-validation order bug) | — | — | — |
 
 ## could
 
@@ -16,3 +17,6 @@ Last regenerated: 2026-05-12
 |---|---|---|---|---|---|---|---|
 | 0002 | tech-debt | inbox | could | feature-sdlc/reference/failure-dialog.md has no leading ToC (119 lines) → fails c-reference-toc | — | — | — |
 | 0003 | tech-debt | inbox | could | README.md still references /push for releases — CLAUDE.md says /complete-dev is canonical | — | — | — |
+| 0005 | tech-debt | inbox | could | skill-eval-check.sh HAS_SCRIPTS detection uses `find … \| grep -q .` — same SIGPIPE/pipefail pattern as the body-check race | — | — | — |
+| 0006 | feature | inbox | could | /polish — optionally honor HTML for URL / Notion inputs (currently always normalized to markdown) | — | — | — |
+| 0007 | feature | inbox | could | /polish — symmetric "expansion" mode (grow a doc that's too thin) | — | — | — |

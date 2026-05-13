@@ -1,0 +1,80 @@
+[
+  {
+    "id": "architecture",
+    "level": 2,
+    "title": "Architecture",
+    "parent_id": null
+  },
+  {
+    "id": "functional-requirements",
+    "level": 2,
+    "title": "Functional Requirements",
+    "parent_id": null
+  },
+  {
+    "id": "fr-invocation",
+    "level": 3,
+    "title": "FR-INVOCATION — argument parsing",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-frame",
+    "level": 3,
+    "title": "FR-FRAME — Phase 1",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-expand",
+    "level": 3,
+    "title": "FR-EXPAND — Phase 2",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-pressure-test",
+    "level": 3,
+    "title": "FR-PRESSURE-TEST — Phase 3 (always-on)",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-refine",
+    "level": 3,
+    "title": "FR-REFINE — Phase 4 (optional)",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-artifact",
+    "level": 3,
+    "title": "FR-ARTIFACT — output",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-handoff",
+    "level": 3,
+    "title": "FR-HANDOFF — Next Steps",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-platform",
+    "level": 3,
+    "title": "FR-PLATFORM — multi-platform",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-skill-patterns",
+    "level": 3,
+    "title": "FR-SKILL-PATTERNS — §A–§F conformance (Phase 6a gate)",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "non-functional",
+    "level": 2,
+    "title": "Non-functional Requirements",
+    "parent_id": null
+  },
+  {
+    "id": "acceptance-criteria",
+    "level": 2,
+    "title": "Acceptance Criteria",
+    "parent_id": null
+  }
+]

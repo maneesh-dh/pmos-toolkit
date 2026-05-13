@@ -1,0 +1,68 @@
+[
+  {
+    "id": "task-list",
+    "level": 2,
+    "title": "Tasks",
+    "parent_id": null
+  },
+  {
+    "id": "t1",
+    "level": 3,
+    "title": "T1 — Scaffold skill directory",
+    "parent_id": "task-list"
+  },
+  {
+    "id": "t2",
+    "level": 3,
+    "title": "T2 — Write reference files",
+    "parent_id": "task-list"
+  },
+  {
+    "id": "t3",
+    "level": 3,
+    "title": "T3 — Write SKILL.md frontmatter + Track Progress + Platform Adaptation",
+    "parent_id": "task-list"
+  },
+  {
+    "id": "t4",
+    "level": 3,
+    "title": "T4 — Write SKILL.md phase bodies (Phase 0, 1, 2, 3, 4, 5, 6)",
+    "parent_id": "task-list"
+  },
+  {
+    "id": "t5",
+    "level": 3,
+    "title": "T5 — Numbered Capture-Learnings phase + Anti-patterns",
+    "parent_id": "task-list"
+  },
+  {
+    "id": "t6",
+    "level": 3,
+    "title": "T6 — Codex sidecar",
+    "parent_id": "task-list"
+  },
+  {
+    "id": "t7",
+    "level": 3,
+    "title": "T7 — Run skill-eval-check.sh against the new skill",
+    "parent_id": "task-list"
+  },
+  {
+    "id": "t8",
+    "level": 3,
+    "title": "T8 — Release prerequisites",
+    "parent_id": "task-list"
+  },
+  {
+    "id": "risks",
+    "level": 2,
+    "title": "Risks & Mitigations",
+    "parent_id": null
+  },
+  {
+    "id": "final-verification",
+    "level": 2,
+    "title": "Final Verification Checklist",
+    "parent_id": null
+  }
+]

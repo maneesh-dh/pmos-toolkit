@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>/ideation skill — Plan</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.42.0">
+  <script defer src="assets/viewer.js?v=2.42.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">/ideation skill — Plan</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+    <a class="pmos-attribution pmos-attribution--toolbar"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="frontmatter">
+<p><strong>Date:</strong> 2026-05-13 · <strong>Tier:</strong> 2 · <strong>Execution mode:</strong> inline · <strong>Source spec:</strong> <code>02_spec.html</code></p>
+</section>
+
+<section id="task-list">
+<h2 id="task-list">Tasks</h2>
+
+<h3 id="t1">T1 — Scaffold skill directory</h3>
+<p><strong>Goal:</strong> Create <code>plugins/pmos-toolkit/skills/ideation/</code> with empty placeholder files matching the spec's architecture diagram.</p>
+<ul>
+<li>Create <code>plugins/pmos-toolkit/skills/ideation/SKILL.md</code> (placeholder).</li>
+<li>Create <code>plugins/pmos-toolkit/skills/ideation/reference/{techniques,idea-type-classifier,pressure-test-battery,slug-derivation}.md</code> (placeholder).</li>
+<li>Create <code>plugins/pmos-toolkit/skills/ideation/reference/artifact-template.html</code> (placeholder).</li>
+<li>Create <code>plugins/pmos-toolkit/skills/ideation/agents/openai.yaml</code> (placeholder for Codex sidecar).</li>
+</ul>
+<p><strong>Verify:</strong> <code>find plugins/pmos-toolkit/skills/ideation -type f</code> returns the 7 expected files.</p>
+
+<h3 id="t2">T2 — Write reference files</h3>
+<p><strong>Goal:</strong> Populate the 5 reference files. Each &gt;100-line file opens with a ToC in first ~15 lines (skill-eval c-reference-toc). No reference file links to another reference file (c-references-one-level).</p>
+<ul>
+<li><code>reference/techniques.md</code> — the 6 supported techniques (HMW, SCAMPER, Crazy 8s, First Principles, Analogous Inspiration, Premortem-as-generator) with one prompt template each. ~120 lines, ToC required.</li>
+<li><code>reference/idea-type-classifier.md</code> — the regex ordered ruleset from FR-11 + the disambiguation <code>AskUserQuestion</code> shape. ~50 lines, no ToC needed.</li>
+<li><code>reference/pressure-test-battery.md</code> — the three sub-battery prompts (Premortem / Inversion / Assumption-map) with table schemas and the cross-cutting-decision-table format for multi-finalist runs. ~120 lines, ToC required.</li>
+<li><code>reference/slug-derivation.md</code> — kebab-case rules, max-4-words, stopword list, collision suffix. ~40 lines.</li>
+<li><code>reference/artifact-template.html</code> — the 12-section HTML skeleton with kebab-case heading IDs and a <code>&lt;meta name="pmos:ideation-phase"&gt;</code> tag. Acts as the in-place editing target for partial writes.</li>
+</ul>
+<p><strong>Verify:</strong> <code>grep -L "^## " reference/techniques.md reference/pressure-test-battery.md</code> finds none (every ref ≥100 lines has a ToC heading); no <code>reference/*.md</code> links to another <code>reference/*.md</code>.</p>
+
+<h3 id="t3">T3 — Write SKILL.md frontmatter + Track Progress + Platform Adaptation</h3>
+<p><strong>Goal:</strong> Get the frontmatter and the 10.A/10.B/10.F-related preamble right. This is the hard half of the binary rubric.</p>
+<ul>
+<li>Frontmatter: <code>name: ideation</code>, <code>description:</code> &lt;1024 chars, third-person, ≥5 trigger phrases, no embedded workflow, assertive; <code>user-invocable: true</code>; <code>argument-hint:</code> "<code>&lt;seed-text&gt; [--format html|md|both] [--no-stress-test] [--refine] [--slug &lt;slug&gt;] [--resume &lt;path&gt;] [--non-interactive | --interactive]</code>".</li>
+<li>Announce-at-start line.</li>
+<li><code>## Track Progress</code> section instructing one TaskCreate per phase.</li>
+<li><code>## Platform Adaptation</code> section covering: no AskUserQuestion → numbered free-form; no subagents (single-agent); no <code>.pmos/settings.yaml</code> → first-run setup; non-interactive contract.</li>
+</ul>
+<p><strong>Verify:</strong> <code>tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/ideation/</code> passes all 10.A and 10.F [D] checks after T3.</p>
+
+<h3 id="t4">T4 — Write SKILL.md phase bodies (Phase 0, 1, 2, 3, 4, 5, 6)</h3>
+<p><strong>Goal:</strong> The actual control flow. Numbered phases (<code>## Phase 0:</code> through <code>## Phase 6:</code>). Each phase ≤80 lines; rationale + imperative voice; flowcharts only where decision-logic is genuinely non-linear (Phase 1 idea-type classification justifies one).</p>
+<ul>
+<li>Phase 0 — Setup (settings.yaml read, output_format resolution, learnings load, slug derivation, resume detection).</li>
+<li>Phase 1 — Frame (HMW, JTBD, success signal, classify).</li>
+<li>Phase 2 — Expand (technique pair pick, variant generation, finalist selection, atomic partial write).</li>
+<li>Phase 3 — Pressure-test (three sub-batteries, multi-finalist cross-cut table when applicable).</li>
+<li>Phase 4 — Refine (optional).</li>
+<li>Phase 5 — Write Artifact (via <code>_shared/html-authoring/</code> substrate; sections.json; mixed-format sidecar).</li>
+<li>Phase 6 — Handoff (Next Steps suggestions per FR-60).</li>
+</ul>
+<p><strong>Verify:</strong> body line count ≤500 (c-body-size); all phase headings match <code>^##+ +Phase [0-9]</code> regex (d-capture-learnings-phase precondition).</p>
+
+<h3 id="t5">T5 — Numbered Capture-Learnings phase + Anti-patterns</h3>
+<p><strong>Goal:</strong> The trailing-but-numbered phase that satisfies d-capture-learnings-phase and the closing Anti-Patterns section.</p>
+<ul>
+<li><code>## Phase 7: Capture Learnings</code> — the canonical one-line emit ("Learning: …" / "No new learnings this session because …").</li>
+<li><code>## Anti-Patterns (DO NOT)</code> — 6–10 rules with rationale, drawn from the requirements §non-goals and from common ideation-skill failure modes (e.g., "Don't generate &lt;8 variants — breadth before convergence is the load-bearing rule").</li>
+</ul>
+<p><strong>Verify:</strong> <code>grep -E '^##+ +Phase [0-9]+: +Capture Learnings'</code> finds exactly one match; the body has ≥3 phase headings (so d-progress-tracking applies and is satisfied by the T3 Track Progress section).</p>
+
+<h3 id="t6">T6 — Codex sidecar</h3>
+<p><strong>Goal:</strong> <code>agents/openai.yaml</code> with the required Codex fields. Mirror the existing per-skill sidecar pattern from a sibling skill (<code>find plugins/pmos-toolkit/skills -name "openai.yaml" -path "*/agents/*"</code> for a model).</p>
+<p><strong>Verify:</strong> file exists, parseable as YAML, has required fields.</p>
+
+<h3 id="t7">T7 — Run skill-eval-check.sh against the new skill</h3>
+<p><strong>Goal:</strong> Deterministic gate. All 20 [D] checks pass.</p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/ideation/</code></li>
+<li>Exit 0 = pass. On any fail, fix the offending check and re-run. Cap of 2 remediation iterations per Phase 6a.</li>
+</ul>
+
+<h3 id="t8">T8 — Release prerequisites</h3>
+<p><strong>Goal:</strong> Files the next <code>/complete-dev</code> needs to ship 2.43.0 cleanly.</p>
+<ul>
+<li>README — add a <code>/ideation</code> row under "Utilities" with one-line description.</li>
+<li>Both <code>plugin.json</code> manifests — minor bump 2.42.0 → 2.43.0, in one commit, versions synced.</li>
+<li>CHANGELOG — add a 2.43.0 entry (one paragraph: "Adds /ideation standalone utility for brainstorming + pressure-testing fuzzy ideas, with always-on premortem/inversion/assumption-map battery and per-idea HTML artifact at {docs_path}/ideation/").</li>
+</ul>
+<p><strong>Verify:</strong> <code>grep -l '2.43.0' plugins/pmos-toolkit/.claude-plugin/plugin.json plugins/pmos-toolkit/.codex-plugin/plugin.json</code> returns both paths.</p>
+</section>
+
+<section id="risks">
+<h2 id="risks">Risks &amp; Mitigations</h2>
+<table>
+<tr><th>Risk</th><th>Likelihood</th><th>Mitigation</th></tr>
+<tr><td>SKILL.md body exceeds 500 lines (c-body-size fail)</td><td>Medium</td><td>Push prompt templates into <code>reference/techniques.md</code> + <code>reference/pressure-test-battery.md</code>; keep SKILL.md as control-flow only.</td></tr>
+<tr><td>Description over-triggers (fires on any "idea" mention)</td><td>Low</td><td>Specific trigger phrases ("stress-test this idea", "half-formed idea", "/ideation") rather than generic ("ideas").</td></tr>
+<tr><td>Reviewer subagent fails [J] checks on first pass</td><td>Medium</td><td>Phase 6a allows 2 remediation iterations; cap is the contract, not a soft target.</td></tr>
+<tr><td>Codex sidecar drift from sibling skills</td><td>Low</td><td>Copy the closest sibling's sidecar verbatim and adapt; verify against <code>/diagram</code> or <code>/polish</code>.</td></tr>
+</table>
+</section>
+
+<section id="final-verification">
+<h2 id="final-verification">Final Verification Checklist</h2>
+<ol>
+<li><code>tools/skill-eval-check.sh</code> exits 0 against <code>plugins/pmos-toolkit/skills/ideation/</code>.</li>
+<li>SKILL.md body line count ≤500 (verified by the script's <code>c-body-size</code> check).</li>
+<li>One manual end-to-end run with a sample seed produces a complete artifact.</li>
+<li>Both manifests carry <code>2.43.0</code>; README has the <code>/ideation</code> row; CHANGELOG has a 2.43.0 entry.</li>
+<li><code>/verify</code> re-runs skill-eval fresh and reconciles against <code>accepted_residuals[]</code> (empty if Phase 6a passed in one iter).</li>
+</ol>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_ideation/03_plan.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

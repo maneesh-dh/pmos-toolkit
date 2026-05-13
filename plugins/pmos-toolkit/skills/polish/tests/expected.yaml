@@ -68,7 +68,7 @@ small-but-dense.md:
 
 html-doc.html:
   doc_format: html
-  expected_failures: [1, 9]                          # em-dash density + hedging in prose nodes only
+  expected_failures: [1, 5, 9]                       # clutter words + em-dash density + hedging — in prose nodes only
   word_count_delta_pct: [-15, 0]
   preset: technical
   output_extension: ".polished.html"                 # source format honored — NOT .polished.md

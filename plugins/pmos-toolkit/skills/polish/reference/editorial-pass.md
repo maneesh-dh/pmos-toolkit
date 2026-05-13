@@ -1,5 +1,17 @@
 # Editorial reduction pass (Phase 2.5)
 
+## Contents
+
+- (1) Resolving the reduction target — the `--reduce` flag / the gate
+- (2) Editor subagent prompt template
+- (3) Validation & prune (orchestrator)
+- (4) Rewriter subagent prompt template
+- (5) Capped re-critique
+- (6) HTML fidelity (best-effort + warn)
+- (7) `--dry-run`
+- (8) Chunking interplay
+- (9) Budget & metrics
+
 The editorial pass runs **after** preset selection (Phase 2) and **before** the binary rubric (Phase 3). It is **opt-in** — the default is Skip. Its output document (the *reduced doc* if the pass ran, else the ingested doc unchanged) becomes the working document for Phase 3 onward. **The editorial pass is not a polish iteration** — it runs once (plus at most one capped re-critique), independent of the Phase 6 two-iteration rubric cap.
 
 Two subagents: an **editor** (critiques → `editor_notes.json`, never rewrites) and a **rewriter** (applies the notes → reduced doc). When no subagent tool is available, run both sequentially in the main agent — same behavior.

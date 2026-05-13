@@ -19,8 +19,8 @@
       "description": "The reduction target the user picked (preset range, custom range/point, or the open-ended ~50%+ which is a point of 50).",
       "properties": {
         "kind": { "type": "string", "enum": ["range", "point"] },
-        "low":  { "type": "number", "minimum": 0, "maximum": 90 },
-        "high": { "type": "number", "minimum": 0, "maximum": 90 }
+        "low":  { "type": "number", "exclusiveMinimum": 0, "maximum": 90 },
+        "high": { "type": "number", "exclusiveMinimum": 0, "maximum": 90 }
       }
     },
     "reconciliation": {

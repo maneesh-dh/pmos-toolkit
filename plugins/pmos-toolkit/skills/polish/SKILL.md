@@ -245,7 +245,7 @@ Estimated work: ~<calls> LLM calls, ~<seconds>s
 Continue? [Y / Downscope / Dry-run only]
 ```
 
-`<N>` MUST equal `summary.total_failed` from the Phase 3 `rubric_results` block. Formula: `calls = (llm_judge_failures × 1.3 retries avg) + global_check_count + (×2 if iter-2 likely)`. **If the Phase 2.5 editorial pass produced output, add a line under the block: `+ ~2 LLM calls (editorial critique + rewrite)` — or `+ ~4` if a re-critique ran.** Cost intentionally NOT shown — pricing varies. If estimate >30 calls, prompt is mandatory (no default-Y). The Surgical/Comprehensive/Full/Findings-only shape is **not** a substitute — that's a preset decision (Phase 2), not a budget decision.
+`<N>` MUST equal `summary.total_failed` from the Phase 3 `rubric_results` block. Formula: `calls = (llm_judge_failures × 1.3 retries avg) + global_check_count + (×2 if iter-2 likely)`. **If the Phase 2.5 editorial pass produced output, add a line under the block: `+ ~2 LLM calls (editorial critique + rewrite)` — `+ ~1` under `--dry-run` (editor only, no rewrite), or `+ ~4` if a re-critique ran.** Cost intentionally NOT shown — pricing varies. If estimate >30 calls, prompt is mandatory (no default-Y). The Surgical/Comprehensive/Full/Findings-only shape is **not** a substitute — that's a preset decision (Phase 2), not a budget decision.
 
 If `--dry-run`, stop here and print the rubric report. Do not generate patches.
 

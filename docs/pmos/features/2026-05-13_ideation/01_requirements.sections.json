@@ -1,0 +1,134 @@
+[
+  {
+    "id": "problem",
+    "level": 2,
+    "title": "Problem",
+    "parent_id": null
+  },
+  {
+    "id": "who-experiences-this",
+    "level": 3,
+    "title": "Who experiences this?",
+    "parent_id": "problem"
+  },
+  {
+    "id": "why-now",
+    "level": 3,
+    "title": "Why now?",
+    "parent_id": "problem"
+  },
+  {
+    "id": "goals-and-non-goals",
+    "level": 2,
+    "title": "Goals & Non-Goals",
+    "parent_id": null
+  },
+  {
+    "id": "goals",
+    "level": 3,
+    "title": "Goals",
+    "parent_id": "goals-and-non-goals"
+  },
+  {
+    "id": "non-goals",
+    "level": 3,
+    "title": "Non-Goals",
+    "parent_id": "goals-and-non-goals"
+  },
+  {
+    "id": "solution-direction",
+    "level": 2,
+    "title": "Solution Direction",
+    "parent_id": null
+  },
+  {
+    "id": "phase-1-frame",
+    "level": 3,
+    "title": "Phase 1 — Frame",
+    "parent_id": "solution-direction"
+  },
+  {
+    "id": "phase-2-expand",
+    "level": 3,
+    "title": "Phase 2 — Expand",
+    "parent_id": "solution-direction"
+  },
+  {
+    "id": "phase-3-pressure-test",
+    "level": 3,
+    "title": "Phase 3 — Pressure-test (always-on)",
+    "parent_id": "solution-direction"
+  },
+  {
+    "id": "phase-4-optional-refine",
+    "level": 3,
+    "title": "Phase 4 — Refine (optional)",
+    "parent_id": "solution-direction"
+  },
+  {
+    "id": "user-journeys",
+    "level": 2,
+    "title": "User Journeys",
+    "parent_id": null
+  },
+  {
+    "id": "primary-journey",
+    "level": 3,
+    "title": "Primary journey — \"I have a half-formed idea\"",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "alternate-journey-rich-seed",
+    "level": 3,
+    "title": "Alternate journey — rich seed (no Frame questions needed)",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "alternate-journey-override-techniques",
+    "level": 3,
+    "title": "Alternate journey — user overrides technique pick",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "alternate-journey-no-stress-test",
+    "level": 3,
+    "title": "Alternate journey — --no-stress-test",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "error-empty-seed",
+    "level": 3,
+    "title": "Error journey — empty / one-word seed",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "error-resume-interrupted",
+    "level": 3,
+    "title": "Error journey — interrupted run",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "design-decisions",
+    "level": 2,
+    "title": "Design Decisions",
+    "parent_id": null
+  },
+  {
+    "id": "open-questions",
+    "level": 2,
+    "title": "Open Questions",
+    "parent_id": null
+  },
+  {
+    "id": "research-sources",
+    "level": 2,
+    "title": "Research Sources",
+    "parent_id": null
+  },
+  {
+    "id": "acceptance-criteria-pointer",
+    "level": 2,
+    "title": "Acceptance criteria pointer",
+    "parent_id": null
+  }
+]

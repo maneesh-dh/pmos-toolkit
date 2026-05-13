@@ -372,8 +372,8 @@ Re-run the eval-loop judge on an existing artifact. **Internal QA only — does 
 1. Read the artifact at `<path>`. Parse its frontmatter to determine `type`. If frontmatter is missing or `type` cannot be inferred, ask the user via `AskUserQuestion`.
 2. Resolve the template (same 2.1 logic) and load `eval.md`.
 <!-- defer-only: destructive -->
-3. Ask the user: "Overwrite `<path>` or write to `<path>.refined.md`?" via `AskUserQuestion`. Default = `.refined.md` (safer).
-4. Run Phase 3 refinement loop against the artifact (or its `.refined.md` copy).
+3. **Detect primary extension (FR-7):** `EXT=$(basename "$path" | awk -F. '{print $NF}')` — `html` or `md`. Ask the user via `AskUserQuestion`: "Overwrite `<path>` or write to `<path>.refined.<EXT>`?" Default = `.refined.<EXT>` (safer; mirrors primary format). The refined sibling carries the same shape contract as the primary — `prd.refined.html` gets its own `prd.refined.sections.json` companion and (when `output_format=both`) a `prd.refined.md` sidecar; `prd.refined.md` is the legacy path.
+4. Run Phase 3 refinement loop against the artifact (or its `.refined.<EXT>` copy).
 5. Run Phase 4 save & confirm — point at the chosen output path.
 6. Skip Phase 5 (no new workstream signals from a re-run).
 7. Run Phase 6 learnings capture (terminal gate).
@@ -414,9 +414,28 @@ Per parsed item, batch ≤4 per `AskUserQuestion`. Options: **Apply as proposed*
 
 ### Phase U.4 — Append Comment Resolution Log
 
-At the bottom of the artifact, append (or extend) a `## Comment Resolution Log` section with one row per resolved item:
+At the bottom of the artifact (inside `<main>`, before any existing `<section id="deferred-improvements">`), append or extend a `<section id="comment-resolution-log">` with one row per resolved item (FR-8 — HTML primary path):
+
+```html
+<section id="comment-resolution-log">
+  <h2 id="comment-resolution-log">Comment Resolution Log</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Reviewer</th><th>Section</th><th>Feedback</th><th>Resolution</th></tr></thead>
+    <tbody>
+      <tr><td>2026-05-02</td><td>(paste)</td><td>problem</td><td>Add competitor benchmark</td><td>Applied</td></tr>
+      <tr><td>2026-05-02</td><td>sarah@</td><td>guardrails</td><td>Tighten guardrails</td><td>Modified</td></tr>
+    </tbody>
+  </table>
+</section>
+```
+
+Apply via `Edit` against the HTML file; the post-edit re-emit step (Phase 3 step 5) regenerates `sections.json` to include the new id.
+
+When primary is legacy MD (`output_format=md`), fall back to the markdown table emission:
 
 ```markdown
+## Comment Resolution Log
+
 | Date | Reviewer | Section | Feedback | Resolution |
 |---|---|---|---|---|
 | 2026-05-02 | (paste) | §2 | Add competitor benchmark | Applied |

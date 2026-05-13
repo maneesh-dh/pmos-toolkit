@@ -2,8 +2,8 @@
 # skill-eval-check.sh
 #
 # Runs the *deterministic* half of the skill-eval.md rubric against a skill
-# directory. The 20 [D]-tagged checks in ../reference/skill-eval.md are implemented
-# here; the 19 [J] (llm-judge) checks are run separately by a reviewer subagent.
+# directory. The 21 [D]-tagged checks in ../reference/skill-eval.md are implemented
+# here; the 20 [J] (llm-judge) checks are run separately by a reviewer subagent.
 #
 # Exit codes: 0 = all applicable [D] checks pass (or bijection holds in --selftest);
 #             1 = a [D] check failed (or the bijection is broken); 2 = invocation /
@@ -11,8 +11,11 @@
 #             wc, head, find, basename) — no Node, no jq. See full notes below.
 #
 # Usage:
-#   skill-eval-check.sh [--target claude-code|codex|generic] [--selftest] <skill_dir>
+#   skill-eval-check.sh [--target claude-code|codex|generic] [--plan <path>] [--selftest] <skill_dir>
 #   skill-eval-check.sh --selftest <skill_dir>          # bijection self-check only
+#
+# --plan <path> enables 10.G (release-prereqs scope) checks. Without --plan the
+# 10.G group is skipped per its group-skip rule (no 03_plan artifact → N/A).
 #
 # Modes:
 #   scoring  (<skill_dir> given)  — emit one TSV line per applicable [D] check:
@@ -37,6 +40,7 @@
 #                                                          checks N/A; c-body-size
 #                                                          still runs
 #   - --target generic                                  → group F checks skipped
+#   - no --plan <path> given (or path missing)           → group G checks skipped
 #
 # Dependencies: bash >= 3.2, coreutils (grep, sed, awk, wc, head, find, basename).
 #               No Node, no jq.
@@ -46,7 +50,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 SKILL_EVAL_MD="${SCRIPT_DIR}/../reference/skill-eval.md"
 
-# The 20 deterministic checks this script implements. MUST equal the set of
+# The 21 deterministic checks this script implements. MUST equal the set of
 # [D]-tagged rows in skill-eval.md (asserted by --selftest).
 DET_CHECKS=(
   a-frontmatter-present a-name-present a-name-lowercase-hyphen a-name-len
@@ -57,6 +61,7 @@ DET_CHECKS=(
   d-progress-tracking
   e-scripts-dir
   f-cc-user-invocable f-codex-sidecar
+  g-plan-grep-clean
 )
 
 die() { echo "ERROR: $*" >&2; exit 2; }
@@ -65,10 +70,13 @@ die() { echo "ERROR: $*" >&2; exit 2; }
 TARGET="generic"
 SELFTEST=0
 SKILL_DIR=""
+PLAN_FILE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --target) [[ $# -ge 2 ]] || die "--target needs a value"; TARGET="$2"; shift 2;;
     --target=*) TARGET="${1#*=}"; shift;;
+    --plan) [[ $# -ge 2 ]] || die "--plan needs a path"; PLAN_FILE="$2"; shift 2;;
+    --plan=*) PLAN_FILE="${1#*=}"; shift;;
     --selftest) SELFTEST=1; shift;;
     --) shift; [[ $# -gt 0 ]] && SKILL_DIR="$1" && shift; break;;
     -*) die "unknown flag $1";;
@@ -104,7 +112,7 @@ if [[ $SELFTEST -eq 1 ]]; then
   while IFS= read -r row; do
     [[ -z "$row" ]] && continue
     id="$(printf '%s' "$row" | sed -E 's/^\|[[:space:]]*([a-z][a-z0-9-]*)[[:space:]]*\|.*/\1/')"
-    n="$(printf '%s' "$row" | grep -oE 'skill-patterns\.md §[A-F]' | sort -u | wc -l | tr -d ' ')"
+    n="$(printf '%s' "$row" | grep -oE 'skill-patterns\.md §[A-Z]' | sort -u | wc -l | tr -d ' ')"
     if [[ "$n" != "1" ]]; then echo "SELFTEST FAIL: check '$id' names $n skill-patterns §-rules (expected 1)" >&2; fail=1; fi
   done <<< "$(eval_md_all_rows)"
   if [[ $fail -eq 0 ]]; then echo "SELFTEST PASS: ${#DET_CHECKS[@]} [D] checks ↔ skill-eval.md; every check names one §-rule." >&2; exit 0; fi
@@ -221,6 +229,37 @@ if [[ "$TARGET" == "claude-code" ]]; then
   if [[ "$ui" == "true" && "$ah" -ge 1 ]]; then emit f-cc-user-invocable pass "user-invocable: true + argument-hint present"; else emit f-cc-user-invocable fail "needs 'user-invocable: true' (got '${ui:-<none>}') and an argument-hint (got $ah)"; fi
 elif [[ "$TARGET" == "codex" ]]; then
   if [[ -f "$SKILL_DIR/agents/openai.yaml" ]]; then emit f-codex-sidecar pass "agents/openai.yaml present"; else emit f-codex-sidecar fail "no agents/openai.yaml sidecar"; fi
+fi
+
+# --- 10.G (skipped entirely if no --plan path given or the file is missing) ---
+# Extracts the text of every "## Wave N" / "### Wave N" section from the plan
+# (HTML chrome stripped for .html), with the preamble and any "## Release
+# prerequisites" section excluded — then greps for release-prereq markers.
+if [[ -n "$PLAN_FILE" && -f "$PLAN_FILE" ]]; then
+  case "$PLAN_FILE" in
+    *.html) plan_text="$(sed -E 's/<[^>]+>//g' "$PLAN_FILE")" ;;
+    *)      plan_text="$(cat "$PLAN_FILE")" ;;
+  esac
+  wave_text="$(awk '
+    BEGIN { in_wave = 0 }
+    /^#+[[:space:]]+/ {
+      lower = tolower($0)
+      if (lower ~ /wave[[:space:]_-]*[0-9]+/) { in_wave = 1; print; next }
+      else { in_wave = 0; next }
+    }
+    in_wave { print }
+  ' <<<"$plan_text")"
+  if [[ -z "$wave_text" ]]; then
+    : # no wave blocks found — nothing to grep; treat as N/A (silent)
+  else
+    hits="$(grep -nEi 'version bump|bump.*plugin\.json|CHANGELOG\.md|docs/[^[:space:]]*changelog|README row|README\.md row' <<<"$wave_text" || true)"
+    if [[ -z "$hits" ]]; then
+      emit g-plan-grep-clean pass "no release-prereq markers in wave blocks of $(basename "$PLAN_FILE")"
+    else
+      first_hit="$(printf '%s' "$hits" | head -1 | tr '\t' ' ')"
+      emit g-plan-grep-clean fail "wave block(s) contain release-prereq marker(s): $first_hit"
+    fi
+  fi
 fi
 
 if [[ $FAILS -eq 0 ]]; then exit 0; else exit 1; fi

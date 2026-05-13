@@ -268,6 +268,49 @@ On (4) OR (5) OR (6) collision, present a single `AskUserQuestion`:
 
 **Orphan-dir handling (FR-PA04):** if (4) fires (path exists) but (6) does not (path is not in `git worktree list` — git no longer tracks it), the dialog wording MUST include the suffix `(orphan worktree dir detected — git no longer tracks it)` so the user knows manual cleanup may be needed before "Use existing" can succeed.
 
+### Step 2.5 — Base-drift check (FR-PA05)
+
+**Skip if `--no-worktree` was passed** (the user has opted out of worktree creation; the run will inherit the current branch's state).
+
+Before `git worktree add` (Step 3), check whether the local base branch is behind its tracking remote. A worktree branched off a stale local main produces silent damage at merge time — version bumps land below the latest published, changelog entries collide, conflicts surface only at Phase 8.
+
+1. **Resolve the base + remote.**
+   - Base ref = the branch currently checked out (typically `main` / `master`). Capture as `<base>`.
+   - Tracking remote = the upstream of `<base>` via `git rev-parse --abbrev-ref <base>@{upstream}`. If `<base>` has no upstream → log `base-drift: <base> has no upstream; skipping fetch` and proceed to Step 3 (nothing to be behind of).
+   - Capture the remote name from the upstream string (e.g. `origin/main` → `origin`); save as `<remote>`.
+
+2. **Fetch + compute drift.**
+   ```bash
+   git fetch <remote> <base>
+   behind=$(git rev-list --count <base>..<remote>/<base>)
+   ```
+   On `git fetch` non-zero exit (network down, auth failure, etc.): log `base-drift: fetch failed (<error>); proceeding without drift check` and continue to Step 3 (do NOT block on a flaky network).
+
+3. **If `behind == 0`** → log `base-drift: <base> up-to-date with <remote>/<base>; proceeding` and continue to Step 3 unchanged.
+
+4. **If `behind > 0`** → surface a single `AskUserQuestion` BEFORE creating the worktree:
+
+   ```
+   question: "Local <base> is <N> commits behind <remote>/<base>. Pull latest before branching?"
+   options:
+     - Pull latest then branch (Recommended)
+         description: git pull --ff-only <remote> <base>, then create the worktree off the updated base.
+     - Branch from current local <base> (record drift)
+         description: Continue off the stale base; state.yaml.base_drift records the gap so /complete-dev can surface it at merge time.
+     - Abort
+         description: Exit 64; resolve manually.
+   ```
+
+   - **Pull latest then branch (Recommended):** run `git pull --ff-only <remote> <base>`. On non-fast-forward failure (local has diverging commits): surface the raw git error and present a follow-up:
+<!-- defer-only: destructive -->
+     `AskUserQuestion` — **Abort (Recommended)** / **Branch from current local <base> (record drift)**. Never auto-rebase or auto-merge; the user owns the diverging history.
+   - **Branch from current local <base> (record drift):** continue to Step 3. After state.yaml is written (Step 3 substep 3), set `state.base_drift = { behind: <N>, fetched_at: <ISO-8601 now>, remote: '<remote>', base: '<base>', remote_sha: '<short-sha of <remote>/<base>>', local_sha: '<short-sha of local <base>>' }`. The post-phase atomic update protocol (Phase 1) covers this write.
+   - **Abort:** exit 64 with `aborted: local <base> is <N> commits behind <remote>/<base>`.
+
+5. **`--non-interactive` mode** — the prompt is deferred per the canonical non-interactive block (tag adjacency would be `<!-- defer-only: destructive -->` semantics: pulling is non-destructive, but branching off stale base has real downstream effects). The buffer entry records the drift; the run continues with **branch-from-current-local-<base>** as the deferred-default (the only option that does not require user judgement) and writes `state.base_drift` accordingly. The OQ log entry flags this for review at end-of-run.
+
+**Observability (NFR-06):** every branch of this step emits a single chat log line — `base-drift: behind=<N> remote=<remote> base=<base> action=<pulled|recorded|skipped|aborted>` — so users can audit why drift handling did what it did.
+
 ### Step 3 — Create worktree, write state, try EnterWorktree (FR-W01–W04)
 
 1. **Compute the canonical worktree path:**
@@ -322,6 +365,8 @@ When state.yaml is present:
    **Bypass (FR-R03):** when `state.worktree_path` is `null` (set by `--no-worktree` mode), the drift check is skipped — proceed to step 2.
 
    **Observability (NFR-06):** before the comparison, log to chat the line `drift check: realpath(pwd)=<a> realpath(state.worktree_path)=<b> result=<pass|fail>` so users can debug unexpected refusals.
+
+   **Origin-moved check (FR-R06).** After the worktree-path drift check passes, re-run the Phase 0a Step 2.5 fetch+behind logic for the recorded base branch — origin may have advanced since the worktree was created. Resolve `<base>` and `<remote>` from `state.base` and `state.remote` if recorded (Phase 1 writes them); otherwise re-derive via `git rev-parse --abbrev-ref <current-branch>@{upstream}` of the *parent* branch the worktree forked from (`state.base` is authoritative when present). Compute `behind_now = git rev-list --count <base>..<remote>/<base>`. If `behind_now > (state.base_drift.behind || 0)`, log `origin-moved-since-worktree-created: behind_now=<N>, behind_at_create=<M>` and update `state.base_drift = { behind: <N>, fetched_at: now, remote, base, remote_sha, local_sha }` (or insert if absent). This is observability-only on resume — do NOT prompt mid-resume; the user already chose to continue this branch. `/complete-dev` reads `state.base_drift` and surfaces the gap at merge time. On `git fetch` failure: log and proceed (mirrors Phase 0a Step 2.5 behaviour).
 
 2. **Schema-version check (FR-R04, FR-R05, FR-13, see `reference/state-schema.md`):**
    - `state.schema_version > 4` → abort: `state file from newer /feature-sdlc version (vN); upgrade pmos-toolkit and retry`. Exit 64.
@@ -580,6 +625,8 @@ On failure: hard-phase failure dialog (no Skip).
 ## Phase 5: /plan (hard)
 
 Invoke `/pmos-toolkit:plan` with `<feature_folder>/02_spec.{html,md}` (resolved primary; the spec is the source of truth; `/plan` will resolve the feature folder from settings + `--feature` if needed). Pass `--tier <N>` (passthrough). Prepend `[mode: <current-mode>]\n` and `[output_format: <resolved>]\n`.
+
+**In skill modes (FR-63 — release-prereq scope discipline; cited from `reference/skill-patterns.md §G`):** prepend a directive line to the `/plan` prompt — *"Skill modes: do NOT include version-bump, CHANGELOG / changelog, README-row, manifest version-sync, or `~/.pmos/learnings.md` header-bootstrap tasks in any `## Wave N` block. List them under the spec's `## Release prerequisites` section only — `/complete-dev` (Phase 8) is the sole writer of those files per repo norms (see this repo's `CLAUDE.md ## Skill-authoring conventions` for the concrete file list)."* `/plan`'s output is graded by Phase 6a checks `g-release-prereqs-scope` `[J]` and `g-plan-grep-clean` `[D]` — a wave containing any release-prerequisite task fails 6a.
 
 After completion: capture `<feature_folder>/03_plan.{html,md}` (resolve via `_shared/resolve-input.md` `phase=plan`). Append OQ artifact if non-interactive.
 

@@ -16,6 +16,7 @@ and the recorded disagreements are below.
 - **§D — Body & content** — imperative form, explain the why, justified flowcharts, excellent examples, `## Platform Adaptation`, learnings-load line + numbered Capture-Learnings phase, progress tracking, the recommended body skeleton.
 - **§E — Scripts & tooling** — when to bundle a script, documented dependencies, script self-tests, eval-driven development.
 - **§F — Platform-conditional frontmatter** — `[claude-code]` slash-command fields, `[codex]` sidecar; `--target generic` skips this group.
+- **§G — Release-prerequisites scope** — what `/execute` writes vs what `/complete-dev` writes; `/plan` MUST NOT enumerate version bumps, changelog entries, README rows, or manifest version-sync as execute-phase tasks.
 
 Three points in this guide record a genuine disagreement between the published
 sources (Anthropic's skills docs, the Codex/`agents.md` ecosystem, `agentskills.io`,
@@ -250,6 +251,59 @@ intersection of platform requirements applies.
 - **`--target generic`** — neither the `f-cc-*` checks nor `f-codex-sidecar` apply.
 
 Checks: f-cc-user-invocable, f-cc-argument-hint-matches, f-codex-sidecar.
+
+---
+
+## §G — Release-prerequisites scope
+
+**The rule.** A skill's `SKILL.md` body, its `reference/` files, its `scripts/`, and
+its `tests/` are `/execute`'s scope. README rows, manifest version bumps (e.g.
+`plugins/<p>/.claude-plugin/plugin.json` + `.codex-plugin/plugin.json`), changelog
+entries (e.g. `docs/pmos/changelog.md`), and `~/.pmos/learnings.md` header
+bootstraps are `/complete-dev`'s scope. They MUST appear in the spec's
+`## Release prerequisites` section, **never** as a `/plan`-wave task that
+`/execute` will pick up.
+
+**Why.** When `/execute` commits a version bump or a changelog entry against the
+worktree's local base, and origin has advanced during the run, `/complete-dev` is
+forced to merge-conflict-resolve every one of those files at Phase 8 — and
+worse, the bumped version is silently below the latest published, the legacy
+`CHANGELOG.md` may have been picked instead of the canonical `docs/pmos/changelog.md`,
+and the README row may collide. `/complete-dev`'s entire job description
+("Phase 8 — merge, regenerate changelog, bump versions, deploy per repo norms,
+tag release, push") presupposes it is the **sole writer** of those files.
+Having `/execute` write them in advance produces silent damage that only surfaces
+at merge time.
+
+**How to apply.**
+
+1. **`/plan` (skill modes).** When generating waves from the spec, every
+   release-prerequisite item is filtered out of execute-phase tasks. It belongs in
+   the spec's `## Release prerequisites` section as a `/complete-dev` deliverable,
+   not in a `Wave N` block as a `T<N>` task with file edits to
+   `plugin.json` / `CHANGELOG.md` / `docs/pmos/changelog.md` / a README row.
+2. **`/execute` (skill modes).** Treats `## Release prerequisites` as
+   informational — does not pick up tasks from it. Edits only `SKILL.md` content,
+   `reference/`, `scripts/`, and `tests/`. If a `/plan` wave contains a release-
+   prerequisite task (legacy plan, or a `/plan` regression), `/execute` flags it
+   and refuses to commit the file edit — the user fixes the plan and re-runs.
+3. **`/complete-dev` (Phase 8).** Reads the spec's `## Release prerequisites`
+   section, applies the version bump (synced across both manifests where
+   applicable), prepends the changelog entry to the canonical changelog file
+   (resolved from repo conventions, not hard-coded), adds the README row, and
+   bootstraps the `~/.pmos/learnings.md` header. It is the only writer.
+4. **Spec.** `/spec` in skill modes emits a `## Release prerequisites` section
+   enumerating these items as plain bullets — file paths + one-line intent. This
+   section is the handoff contract between `/plan`/`/execute` and `/complete-dev`.
+
+**The pmos-specific bits.** The list of files (`plugin.json` × 2, the canonical
+changelog path, the learnings file, the README row) is repo-specific and lives in
+the host repo's `CLAUDE.md ## Skill-authoring conventions` — see also the
+"Release entry point" and "Plugin manifest version sync" rules there. This
+section sets the *generic* scope rule; the host repo's CLAUDE.md sets the *concrete*
+file list.
+
+Checks: g-release-prereqs-scope, g-plan-grep-clean.
 
 ---
 

@@ -20,6 +20,7 @@ patterns↔eval mapping (FR-72), and every `[D]`-tagged check implemented in the
 - **10.D — Body & content** (9 checks: 4 `[D]`, 5 `[J]`)
 - **10.E — Scripts & tooling** (4 checks: 1 `[D]`, 3 `[J]`)
 - **10.F — Platform-conditional frontmatter** (3 checks: 2 `[D]`, 1 `[J]`; gated by `target_platform`)
+- **10.G — Release-prerequisites scope** (2 checks: 1 `[D]`, 1 `[J]`; gated — pmos-toolkit pipeline plans only)
 - **Totals & group-skip rules**
 - **LLM-judge determinism contract**
 
@@ -28,6 +29,7 @@ patterns↔eval mapping (FR-72), and every `[D]`-tagged check implemented in the
 - **No `scripts/` dir / no bundled executable scripts** → group 10.E is skipped entirely (not a failure).
 - **No `reference/` (or `references/`) dir** → the reference-only group-10.C checks (`c-references-dir-name`, `c-references-one-level`, `c-reference-toc`, `c-progressive-disclosure`) are N/A when no reference dir exists; `c-body-size` still applies.
 - **`--target generic`** → group 10.F (`f-cc-user-invocable`, `f-cc-argument-hint-matches`, `f-codex-sidecar`) is skipped entirely — only the platform-intersection requirements apply.
+- **No `03_plan.{html,md}` artifact present** (or skill is not being authored under the pmos-toolkit pipeline) → group 10.G (`g-release-prereqs-scope`, `g-plan-grep-clean`) is skipped entirely. The two checks only run when `/feature-sdlc skill …` has produced a plan artifact and `/verify` / Phase 6a is grading the plan-to-scope discipline.
 - An N/A check counts as neither pass nor fail; it is omitted from the script's TSV output and from the reviewer's findings.
 
 ## LLM-judge determinism contract
@@ -180,9 +182,23 @@ Every `[J]` check call (copied from the `polish/reference/rubric.md` shape):
 
 ---
 
+## 10.G — Release-prerequisites scope (2 checks; gated — pmos-toolkit pipeline plans only)
+
+| id | tag | applies-when | check / pass-condition | § |
+|---|---|---|---|---|
+| g-release-prereqs-scope | [J] | skill mode AND `03_plan.{html,md}` present AND spec present | The plan's wave sections list ONLY skill content tasks (`SKILL.md` body, `reference/`, `scripts/`, `tests/`). README rows, manifest version bumps (any `plugin.json`), changelog entries (any `CHANGELOG.md` / `docs/**/changelog.md`), and `~/.pmos/learnings.md` header bootstraps are enumerated in the spec's `## Release prerequisites` section as `/complete-dev` deliverables — never as `/execute` tasks. Pass iff every release-prerequisite item is in `## Release prerequisites` and not in a `## Wave N` / `T<N>` block. | skill-patterns.md §G |
+| g-plan-grep-clean | [D] | skill mode AND `03_plan.{html,md}` present | `grep -E '(version bump\|bump.*plugin\.json\|CHANGELOG\.md\|docs/.*changelog\|README row)' 03_plan.{html,md}` finds no match inside any `## Wave N`/`### Wave N`/`T<N>:` block. Pre-amble and the `## Release prerequisites` section are excluded from the scan. Pass iff no match in wave blocks. | skill-patterns.md §G |
+
+**why & how-to-verify (10.G):**
+
+- **g-release-prereqs-scope** — *why:* `/execute` committing version bumps + changelog edits against a stale local base produces silent damage at Phase 8 `/complete-dev` merge time (conflicts, version below latest published, wrong changelog file). `/complete-dev`'s contract presupposes it is the sole writer of those files. *how-to-verify:* read every `## Wave N` block; for each `T<N>` task, confirm its file edits are limited to `SKILL.md`, `reference/`, `scripts/`, or `tests/`. Any task that edits a `plugin.json`, a changelog, a README, or `~/.pmos/learnings.md` is a fail — its `fix_note` is "move this task to the spec's ## Release prerequisites section as a /complete-dev deliverable", and the `quote` is the offending task's heading + first line.
+- **g-plan-grep-clean** — *why:* a deterministic backstop to the `[J]` check above — a regression in `/plan`'s scope discipline shows up as a grep match before any reviewer sees it. *how-to-verify:* the script `bin`-greps the plan artifact for the substrings above, scoped to wave blocks only (preamble + `## Release prerequisites` are excluded). The script must handle both `.html` and `.md` plans (strip HTML chrome before grep). Any match in a wave block is a fail; the evidence column lists the matched lines.
+
+---
+
 ## Totals & group-skip rules
 
-39 checks — **20 `[D]`** (implemented in `tools/skill-eval-check.sh`: `a-frontmatter-present`, `a-name-present`, `a-name-lowercase-hyphen`, `a-name-len`, `a-name-matches-dir`, `a-desc-present`, `a-desc-len`, `c-body-size`, `c-references-dir-name`, `c-references-one-level`, `c-reference-toc`, `c-portable-paths`, `c-asset-layout`, `d-platform-adaptation`, `d-learnings-load-line`, `d-capture-learnings-phase`, `d-progress-tracking`, `e-scripts-dir`, `f-cc-user-invocable`, `f-codex-sidecar`) — **19 `[J]`** (reviewer subagent: the rest). This table is the baseline contract; `/execute` may refine prose and adjust an individual `[D]`/`[J]` where clearly mis-tagged, but must keep the total ≥35, the bijective patterns↔eval mapping (FR-72), and every `[D]`-tagged check implemented in the script (FR-71). The group-skip rules (no `scripts/` → skip 10.E; no `reference/` → 10.C reference-only checks N/A; `--target generic` → skip 10.F) are part of the contract — see the top of this file.
+41 checks — **21 `[D]`** (implemented in `tools/skill-eval-check.sh`: `a-frontmatter-present`, `a-name-present`, `a-name-lowercase-hyphen`, `a-name-len`, `a-name-matches-dir`, `a-desc-present`, `a-desc-len`, `c-body-size`, `c-references-dir-name`, `c-references-one-level`, `c-reference-toc`, `c-portable-paths`, `c-asset-layout`, `d-platform-adaptation`, `d-learnings-load-line`, `d-capture-learnings-phase`, `d-progress-tracking`, `e-scripts-dir`, `f-cc-user-invocable`, `f-codex-sidecar`, `g-plan-grep-clean`) — **20 `[J]`** (reviewer subagent: the rest). This table is the baseline contract; `/execute` may refine prose and adjust an individual `[D]`/`[J]` where clearly mis-tagged, but must keep the total ≥37, the bijective patterns↔eval mapping (FR-72), and every `[D]`-tagged check implemented in the script (FR-71). The group-skip rules (no `scripts/` → skip 10.E; no `reference/` → 10.C reference-only checks N/A; `--target generic` → skip 10.F; no `03_plan.{html,md}` / non-pmos-pipeline skill → skip 10.G) are part of the contract — see the top of this file.
 
 ## Cross-reference to skill-patterns.md
 

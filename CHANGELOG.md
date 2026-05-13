@@ -1,5 +1,29 @@
 # Changelog
 
+## pmos-toolkit 2.43.0 — 2026-05-13
+
+### What's new
+
+- **`/plan` — vertical-slice enforcement.** `/plan` now teaches and enforces vertical-slice task decomposition end-to-end. A new Phase 3 sub-section **§Vertical-Slice Decomposition** defines the rule (each task cuts through every layer it needs to deliver one user-observable behavior), the **tracer-bullet T1 convention** (the narrowest end-to-end path that proves the architecture works, with risky unproven integration points forced inside T1's slice), the *many thin over few thick* preference, the per-slice done-when ("could you ship just this slice?"), and the refactor/spike/css-only/config exception path declared via a new `**Slice shape:**` task field. The previously-horizontal `## Phase N` worked example (Schema and Migration → API Layer) is pivoted to a vertical-slice example (Phase 1: tracer bullet — single record end-to-end / Phase 2: widen to list + filters). Phase 2 deep-code-study gains a new step 7 (*Identify the tracer-bullet candidate*) that earmarks T1's slice at discovery time. Phase 4 review gets a new structural-checklist item 13 enforcing vertical-slice shape with concrete finding conditions (single-layer cut with no declared exception → finding; horizontal phase names → finding; T1 not end-to-end → finding). Anti-Patterns names "decompose by layer" as forbidden. The change is additive — no existing FR, sidecar contract, or tier-gate rule is replaced.
+- **`/plan` — `## Track Progress` section.** Adds the standard `## Track Progress` heading directing agents to create one task per phase. (Co-shipped remediation for a pre-existing `/skill-eval` finding surfaced during this release.)
+
+### Breaking changes
+
+None.
+
+### Migration
+
+None — additive. Existing plans without `**Slice shape:**` fields are interpreted as `vertical` (the default); Phase 4 review will surface a finding only when a task is a pure single-layer cut with no declared exception.
+
+### References
+
+- `docs/pmos/features/2026-05-13_plan-vertical-slices/01_requirements.html`
+- `docs/pmos/features/2026-05-13_plan-vertical-slices/02_spec.html`
+- `docs/pmos/features/2026-05-13_plan-vertical-slices/03_plan.html`
+- Inspiration: [mattpocock/skills `to-issues`](https://github.com/mattpocock/skills/blob/main/skills/engineering/to-issues/SKILL.md) — "each issue is a thin vertical slice that cuts through ALL integration layers end-to-end."
+
+---
+
 ## pmos-toolkit 2.36.0 — 2026-05-11
 
 ### What's new

@@ -27,6 +27,12 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
+## Track Progress
+
+This skill has multiple phases. Create one task per phase using your agent's task-tracking tool (e.g., `TaskCreate` in Claude Code, `TodoWrite` equivalent in older harnesses). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+
+---
+
 ## Backlog Bridge
 
 This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skills/backlog/pipeline-bridge.md`.

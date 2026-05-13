@@ -2,7 +2,7 @@
 name: readme
 description: Audit, scaffold, or update READMEs against a 15-check rubric and 3-persona simulated reader. Use this whenever the user asks to "audit my README", "scaffold a README", "fix my README", "generate a README", "review my README structure", or invokes /readme. Three modes share one substrate (--audit, --scaffold, --update <commit-range>); monorepo-aware (8 workspace manifests + multi-stack); voice work delegated to /polish; never auto-commits.
 user-invocable: true
-argument-hint: "[--audit|--scaffold|--update <commit-range>] [--audit-all|--audit-one <pkg>|--scaffold-missing|--root-only] [--format md] [--skip-simulated-reader] [--non-interactive|--interactive] [<repo-path>]"
+argument-hint: "[--audit|--scaffold|--update <commit-range>] [--scope <audit-all|audit-one <pkg>|scaffold-missing|root-only>] [--skip-simulated-reader] [--non-interactive|--interactive] [<repo-path>]"
 ---
 
 # /readme
@@ -128,6 +128,18 @@ END { emit_pending() }
 Three modes share a single substrate: a 15-check rubric, a workspace-discovery scanner, and a simulated-reader pass. /readme audits or scaffolds the README; voice rewriting is delegated to /polish; commits happen only via /complete-dev.
 
 ## Implementation
+
+### Dependencies
+
+Bundled scripts under `scripts/` and the orchestrator body assume:
+
+- **bash ≥ 4** — `scripts/_lib.sh` and all `scripts/*.sh` use bash-4 features (associative arrays, `${var,,}`). macOS ships bash 3.2 by default; install GNU bash via Homebrew (`brew install bash`) for local dev.
+- **python3 ≥ 3.8** with **PyYAML** — `rubric.sh`, `workspace-discovery.sh`, and `commit-classifier.sh` invoke `python3 -c 'import yaml; ...'` to parse `reference/rubric.yaml` and `reference/section-schema.yaml`. Install with `pip install pyyaml` or `python3 -m pip install --user pyyaml`.
+- **jq ≥ 1.6** — workspace-discovery parses `package.json` / `pnpm-workspace.yaml` derivatives via jq.
+- **node ≥ 18** — `voice-diff.sh` shells into a tiny node helper for unified-diff rendering; the HTML substrate's `chrome-strip.js` / `html-to-md.js` (consumed by the artifact pipeline) also require node.
+- **git** — every flow reads commit history (`--update <range>` and the §7 update-mode flow) and never auto-commits (commit work is delegated to `/complete-dev`).
+
+Each script's `--selftest` exits non-zero with a clear diagnostic if any of the above is missing — run `bash scripts/<name>.sh --selftest` once after install to verify the environment.
 
 ### Single-file audit flow
 

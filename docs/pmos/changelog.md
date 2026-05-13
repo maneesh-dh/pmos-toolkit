@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.41.0: /artifact HTML output parity
+
+`/artifact` produces HTML artifacts that look and behave like every other pipeline skill's HTML output — same toolbar, same fonts, same anchors, same companion files. Eight gaps closed:
+
+### What's new
+
+- **MD→HTML authoring contract is explicit.** `/artifact` Phase 2.7 spells out that the skill authors HTML directly using `template.md` for section ordering + per-section guidance (matching how `/spec` and `/plan` author HTML from outline) — no MD→HTML renderer step at write time. The template store at `~/.pmos/artifacts/templates/<slug>/template.md` retains its MD shape (runbook edge case row 4 carve-out).
+- **Pre-rename heading-id + section-wrapper assertion** (FR-2). Before the atomic `rename(2)` of `{slug}.html.tmp`, inline `grep` checks hard-fail the write if any `<h2>`/`<h3>` lacks an `id="..."` or any `<section>` lacks one — surfacing the soft-phase failure dialog (Retry / Pause / Abort).
+- **Phase 3 reviewer dispatch is HTML-aware** (FR-4, FR-5, FR-9). The reviewer subagent receives a chrome-stripped HTML slice (`<h1>` + `<main>` only, via `chrome-strip.js`) plus the companion `{slug}.sections.json`. Reviewer returns gain a required `quote` field — a ≥40-char verbatim substring of the source. The skill validates parent-side: every finding's `section` must be a kebab id present in `sections.json`; every `quote` must substring-match the source. On miss → hard-fail. Reviewer-prompt updated with HTML preamble + Rules 9 and 10 making the contract explicit.
+- **Post-edit re-emit of `sections.json` + MD sidecar** (FR-6). After any Phase 3 `Edit` applies a fix, the skill regenerates `{slug}.sections.json` from the live HTML via the new `build_sections_json.js` helper, and (when `output_format=both`) re-runs the MD sidecar through `html-to-md.js`. No more stale companions.
+- **`build_sections_json.js`** (new substrate file). Zero-dep Node helper at `_shared/html-authoring/assets/build_sections_json.js` — regex+stack DOM walker (~80 LOC, mirrors `chrome-strip.js`'s pattern). Reads HTML from argv or stdin; emits the conventions.md §10 `[{id, level, title, parent_id}]` schema. Self-tested against `01_requirements.html` + `02_spec.html`.
+- **Refine flow extension mirrors primary format** (FR-7). `/artifact refine prd.html` now offers `prd.refined.html` (not `prd.refined.md`); the legacy MD path still works for `.md` primaries.
+- **Update flow Comment Resolution Log is HTML-shaped** (FR-8). `/artifact update` appends a `<section id="comment-resolution-log">` containing an HTML `<table>` to the artifact (not a markdown table). MD primary keeps the markdown table fallback.
+- **JSON frontmatter example** (FR-3). Phase 2.7's frontmatter example shows the actual emitted `<script type="application/json" id="pmos-frontmatter">` shape (not the misleading YAML triple-dash that was there before).
+
+### Changed
+
+- **Substrate manifest extended** (FR-11). `build_sections_json.js` joins the substrate manifest enumeration across 11 files: `_shared/html-authoring/README.md` plus 10 SKILL.md files (`artifact`, `design-crit`, `grill`, `msf-req`, `msf-wf`, `plan`, `requirements`, `simulate-spec`, `spec`, `verify`). New substrate files added in future releases continue to ride along automatically — the "currently includes" list is informational, not gating.
+- **`reviewer-prompt.md`** is HTML-aware (no more "you receive a markdown document"), explicitly cites the new `quote` field as required, and ties `section` to `sections.json` ids.
+
+### Migration
+
+None — additive. Existing MD-only primary mode (`output_format=md`) continues to work — chrome-strip + quote validation only run for HTML. `build_sections_json.js` is consumed by `/artifact` only at this release; other HTML-emitting skills can adopt it incrementally.
+
 ## 2026-05-13 — pmos-toolkit 2.40.0: /polish honors source format (md or HTML) + opt-in editorial reduction pass
 
 `/polish` learns two things, plus a de-flake of `/feature-sdlc skill`'s `[D] body` checks comes along for the ride.

@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>/artifact — HTML output parity — Plan</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.40.0">
+  <script defer src="assets/viewer.js?v=2.40.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">/artifact — HTML output parity — Plan</h1>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+<script type="application/json" id="pmos-frontmatter">
+{"date":"2026-05-13","tier":3,"feature":"artifact-html-output","status":"Draft","requires":"02_spec.html"}
+</script>
+
+<section id="overview">
+<h2 id="overview">Overview</h2>
+<p>13 FRs mapped to 10 TDD-shaped tasks. Sequential per-task commit cadence. Single SKILL.md target + one substrate file + 8 fanout edits. Estimated scope: ~150 LOC of net SKILL.md edits + ~80 LOC <code>build_sections_json.js</code> + 8 one-line manifest appends.</p>
+</section>
+
+<section id="task-list">
+<h2 id="task-list">Tasks</h2>
+
+<h3 id="t1">T1 — build_sections_json.js helper (FR-10)</h3>
+<ul>
+  <li>Write <code>plugins/pmos-toolkit/skills/_shared/html-authoring/assets/build_sections_json.js</code> — node, no deps, regex+stack DOM walker. Reads <code>argv[2]</code> or stdin, emits sections.json schema to stdout.</li>
+  <li>Self-test: feed it the just-written <code>01_requirements.html</code>; <code>diff</code> output against the hand-written <code>01_requirements.sections.json</code>. Must match.</li>
+  <li>Commit: <code>feat(html-authoring): add build_sections_json.js helper (sections.json from live HTML)</code></li>
+</ul>
+
+<h3 id="t2">T2 — Substrate manifest fanout (FR-11)</h3>
+<ul>
+  <li><code>grep -lr "turndown-plugin-gfm.umd.js" plugins/pmos-toolkit/skills/</code> → enumerate currently-mentioning files. Expect 8 SKILL.md files + README.</li>
+  <li>Append <code>build_sections_json.js</code> to each enumeration. Use <code>sed -i ''</code> or <code>Edit</code>.</li>
+  <li>Verify: <code>grep -L "build_sections_json.js" $(grep -lr "turndown-plugin-gfm.umd.js" plugins/pmos-toolkit/skills/)</code> → empty.</li>
+  <li>Commit: <code>chore(html-authoring): fan out build_sections_json.js mention to 8 SKILL.md files</code></li>
+</ul>
+
+<h3 id="t3">T3 — reviewer-prompt.md update (FR-9)</h3>
+<ul>
+  <li>Edit <code>plugins/pmos-toolkit/skills/artifact/reviewer-prompt.md</code> per FR-9: HTML-aware paragraph 1; add <code>quote</code> field to JSON example; add Rules 9 and 10.</li>
+  <li>Commit: <code>feat(artifact): reviewer-prompt accepts chrome-stripped HTML; require quote+section validation</code></li>
+</ul>
+
+<h3 id="t4">T4 — SKILL.md Phase 2.7 — FR-1 + FR-2 + FR-3</h3>
+<ul>
+  <li>Edit <code>plugins/pmos-toolkit/skills/artifact/SKILL.md</code> Phase 2.7:
+    <ol>
+      <li>Insert FR-1's authoring-contract paragraph above "Atomic write".</li>
+      <li>Insert FR-2's pre-rename assertion bullet above "Atomic write".</li>
+      <li>Replace the YAML frontmatter example with FR-3's JSON shape.</li>
+    </ol>
+  </li>
+  <li>Verify: <code>grep -n "Author the HTML body directly" SKILL.md</code> + <code>grep -n "pmos-frontmatter" SKILL.md</code> + heading-id assertion grep present.</li>
+  <li>Commit: <code>feat(artifact): Phase 2.7 — explicit MD→HTML authoring contract + pre-rename assertion + JSON frontmatter example</code></li>
+</ul>
+
+<h3 id="t5">T5 — SKILL.md Phase 3 step 0/1a — FR-4 + FR-5</h3>
+<ul>
+  <li>Edit SKILL.md Phase 3:
+    <ol>
+      <li>Insert FR-4's "Pre-dispatch input prep" step 0 before "Dispatch reviewer subagent".</li>
+      <li>Insert FR-5's "Validate reviewer return" step 1a after dispatch.</li>
+    </ol>
+  </li>
+  <li>Commit: <code>feat(artifact): Phase 3 — chrome-strip preamble + reviewer-return validation (FR-50/51/52 parity)</code></li>
+</ul>
+
+<h3 id="t6">T6 — SKILL.md Phase 3 step 5 — FR-6 (post-edit re-emit)</h3>
+<ul>
+  <li>Edit SKILL.md Phase 3:
+    <ol>
+      <li>Insert FR-6's "Post-loop companion re-emit" step 5 at end of Phase 3.</li>
+    </ol>
+  </li>
+  <li>Verify: re-emit invokes <code>build_sections_json.js</code> + <code>html-to-md.js</code> (when both).</li>
+  <li>Commit: <code>feat(artifact): Phase 3 — post-edit re-emit of sections.json + MD sidecar</code></li>
+</ul>
+
+<h3 id="t7">T7 — SKILL.md refine-flow extension (FR-7)</h3>
+<ul>
+  <li>Edit SKILL.md Refine Flow line ~336: detect primary extension; offer mirrored <code>.refined.&lt;ext&gt;</code>.</li>
+  <li>Commit: <code>fix(artifact): refine flow mirrors primary extension (.refined.html for HTML primary)</code></li>
+</ul>
+
+<h3 id="t8">T8 — SKILL.md Update flow Comment Resolution Log (FR-8)</h3>
+<ul>
+  <li>Edit SKILL.md Phase U.4: replace markdown table emission with HTML <code>&lt;section id="comment-resolution-log"&gt;</code> + <code>&lt;table&gt;</code>. Keep MD fallback for legacy primary.</li>
+  <li>Commit: <code>feat(artifact): Update flow emits HTML &lt;section&gt;+&lt;table&gt; for Comment Resolution Log (HTML primary)</code></li>
+</ul>
+
+<h3 id="t9">T9 — Synthetic-fixture test (T1–T8 verification, FR-12)</h3>
+<ul>
+  <li>Run a synthetic <code>/artifact prd full</code> invocation (or dry-run via direct file authoring) producing <code>prd.html</code>. Verify:
+    <ol>
+      <li>Heading-id assertion fires on a planted bad <code>&lt;h2&gt;</code>.</li>
+      <li>build_sections_json.js produces correct schema.</li>
+      <li>Reviewer-quote validation fires on a planted hallucinated quote.</li>
+      <li>Refine on <code>prd.html</code> offers <code>.refined.html</code>.</li>
+      <li>Update flow emits <code>&lt;section id="comment-resolution-log"&gt;</code>.</li>
+    </ol>
+  </li>
+  <li>Confirm skill-patterns conformance: each FR maps to a §A–§F element via inspection (no separate audit script — Phase 6a skill-eval handles).</li>
+  <li>No commit (verification only).</li>
+</ul>
+
+<h3 id="t10">T10 — Release prereqs (FR-13)</h3>
+<ul>
+  <li>Bump both <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> and <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code> from 2.40.0 to 2.41.0 in one commit.</li>
+  <li>Add changelog entry per repo convention (README table or CHANGELOG.md).</li>
+  <li>Run <code>git diff plugins/pmos-toolkit/.claude-plugin/plugin.json plugins/pmos-toolkit/.codex-plugin/plugin.json</code> — versions match.</li>
+  <li>Commit: <code>chore(release): pmos-toolkit 2.41.0 — /artifact HTML output parity</code></li>
+</ul>
+</section>
+
+<section id="risk">
+<h2 id="risk">Risk</h2>
+<ul>
+  <li><strong>Substrate-manifest fanout drift</strong> — if a SKILL.md mentioning the substrate manifest is missed, future consumers of <code>build_sections_json.js</code> won't be told it's available. <strong>Mitigation:</strong> T2 verification step.</li>
+  <li><strong>regex-DOM walker brittleness</strong> — non-greedy regex on <code>&lt;section&gt;…&lt;/section&gt;</code> can mis-pair on nested sections. <strong>Mitigation:</strong> stack-based balanced-tag tracker (same pattern as <code>chrome-strip.js</code>); self-test in T1 against the live 01_requirements.html.</li>
+  <li><strong>Reviewer-prompt back-compat</strong> — existing reviewer subagents trained on the old prompt may not produce the <code>quote</code> field. <strong>Mitigation:</strong> FR-5's hard-fail is fail-loud; the soft-phase dialog explicitly notes "the reviewer may need re-prompting" as a Retry path.</li>
+</ul>
+</section>
+
+<section id="verification-checklist">
+<h2 id="verification-checklist">Final verification checklist</h2>
+<ol>
+  <li>All 10 tasks committed.</li>
+  <li><code>build_sections_json.js</code> exists at substrate path; self-test passed.</li>
+  <li>9 file substrate-manifest fanout done.</li>
+  <li><code>/artifact prd full</code> on a fixture writes valid HTML; reviewer flow exercises chrome-strip + quote validation.</li>
+  <li>Both plugin manifests bump to 2.41.0; pre-push hook passes.</li>
+  <li>Phase 6a skill-eval rubric: 100% [D] + [J] pass on iter 1 or 2.</li>
+  <li>Phase 7 /verify: full suite green.</li>
+</ol>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_artifact-html-output/03_plan.html</span>
+  </footer>
+</body>
+</html>

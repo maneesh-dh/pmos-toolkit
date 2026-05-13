@@ -277,16 +277,38 @@ Mirrors `/wireframes` Phase 4 pattern.
 
 ### Loop iteration
 
+0. **Pre-dispatch input prep (FR-4).** When primary is HTML, chrome-strip the draft before dispatch so the reviewer receives only the substantive body (no toolbar, no footer, no `<head>` chrome):
+   ```bash
+   node {feature_folder}/assets/chrome-strip.js {slug}.html > /tmp/artifact-reviewer-input.html
+   ```
+   Pass the stripped HTML inline as the reviewer's draft body. When primary is legacy MD (`output_format=md`), skip this step and pass the raw `.md` file contents instead.
+
 1. **Dispatch reviewer subagent.**
    - Subagent type: `general-purpose`.
-   - Inputs: `reviewer-prompt.md` (system instructions), the full `eval.md` for this template, and the current draft.
+   - Inputs: `reviewer-prompt.md` (system instructions), the full `eval.md` for this template, the companion `{slug}.sections.json`, and the chrome-stripped draft (or raw MD for legacy mode).
    - Background: false (this is a foreground call; we need findings before proceeding).
-   - Subagent returns JSON of the shape defined in `reviewer-prompt.md`.
+   - Subagent returns JSON of the shape defined in `reviewer-prompt.md` — each finding has `section, criterion_id, severity, finding, suggested_fix, quote`.
 
-2. **Parse findings.** Each finding has `section`, `criterion_id`, `severity`, `finding`, `suggested_fix`.
+1a. **Validate reviewer return (FR-5, FR-50/51/52 parity).** Before applying any fix:
+   1. Load `{slug}.sections.json`; collect ids into `known_ids`.
+   2. For every finding, assert `finding.section` ∈ `known_ids` (kebab-case match; tolerate trivial §N-stem derivation). On miss: hard-fail `[/artifact] FR-5 violation: reviewer returned section "{section}" not in sections.json: missing=[…]`.
+   3. For every finding, substring-grep `finding.quote` against the raw `{slug}.html` (un-stripped) source — `quote` must be ≥40 chars and a verbatim substring. On miss: hard-fail `[/artifact] FR-5 violation: reviewer quote not found in {slug}.html: {quote-prefix-30char}…`.
 
-3. **Auto-apply** all `high` and `medium` findings via `Edit` against the draft file. Apply the `suggested_fix` literally — the reviewer prompt requires fixes specific enough to apply directly.
+   On any FR-5 hard-fail: surface the soft-phase failure dialog (Retry / Pause / Abort). Retry re-dispatches the reviewer with the same prompt (idempotent — the reviewer-prompt.md contract is stable).
+
+2. **Parse findings.** Each finding has `section, criterion_id, severity, finding, suggested_fix, quote` (post-validation).
+
+3. **Auto-apply** all `high` and `medium` findings via `Edit` against the draft file. Apply the `suggested_fix` literally — the reviewer prompt requires fixes specific enough to apply directly. (Use the `quote` field as the `old_string` anchor for the Edit when applicable.)
 4. **Log** all `low` findings to a `_residuals` accumulator (in-memory).
+
+5. **Post-loop companion re-emit (FR-6).** After all fixes for this iteration have been applied (and again after all iterations conclude — once is sufficient), re-emit the companions from the live (post-edit) HTML:
+   ```bash
+   node {feature_folder}/assets/build_sections_json.js {slug}.html > {slug}.sections.json.tmp
+   mv {slug}.sections.json.tmp {slug}.sections.json
+   # When output_format=both:
+   node {feature_folder}/assets/html-to-md.js {slug}.html > {slug}.md.tmp && mv {slug}.md.tmp {slug}.md
+   ```
+   Atomic via temp-then-rename. Failures fall through to the soft-phase failure dialog. (Legacy `output_format=md` path skips both re-emits — sections.json is HTML-specific; MD primary has no sidecar.)
 
 ### Loop continuation
 

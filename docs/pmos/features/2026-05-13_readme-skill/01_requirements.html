@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="pmos:phase" content="requirements">
+<meta name="pmos:tier" content="3">
+<meta name="pmos:slug" content="readme-skill">
+<title>/readme skill — Requirements</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:880px;margin:2em auto;padding:0 1em;line-height:1.55;color:#222}
+h1{border-bottom:2px solid #333;padding-bottom:.3em}
+h2{margin-top:2em;border-bottom:1px solid #ddd;padding-bottom:.2em}
+h3{margin-top:1.5em}
+table{border-collapse:collapse;width:100%;margin:.5em 0}
+th,td{border:1px solid #ccc;padding:.4em .6em;text-align:left;vertical-align:top}
+th{background:#f4f4f4}
+code{background:#f0f0f0;padding:.1em .3em;border-radius:3px;font-size:.95em}
+section{margin-bottom:1em}
+.meta{color:#555;font-size:.9em}
+</style>
+</head>
+<body>
+<header>
+<h1>/readme skill — Requirements</h1>
+<p class="meta"><strong>Date:</strong> 2026-05-13 · <strong>Last updated:</strong> 2026-05-13 · <strong>Status:</strong> Draft · <strong>Tier:</strong> 3 — Feature · <strong>Mode:</strong> skill-new · <strong>Seed:</strong> <a href="../../ideate/2026-05-13_readme-skill.html">docs/pmos/ideate/2026-05-13_readme-skill.html</a></p>
+<p><strong>Standing acceptance criteria:</strong> The produced skill MUST conform to <code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code> §A–§F (frontmatter; description &amp; triggering; structure &amp; progressive disclosure; body &amp; content; scripts &amp; tooling; platform-conditional frontmatter). Per FR-61, this is cited, not copied.</p>
+</header>
+
+<section id="problem">
+<h2 id="problem">Problem</h2>
+<p>READMEs in repos that pmos-toolkit users maintain — including agent-skills itself — drift into <em>internal-structure dumps</em>: file inventories, directory trees, "Features" sections, and welcome boilerplate that fail the basic adoption question. A stranger landing on these READMEs can't answer <em>what / who / why / how-to-start</em> in 60 seconds, so the project loses adoption to whatever the reader looks at next.</p>
+
+<h3 id="who-experiences-this">Who experiences this?</h3>
+<ul>
+<li><strong>Maintainer</strong> — the person running <code>/readme</code>; initially this repo's author, later any pmos-toolkit user with rotted READMEs. They feel the loss as silent (low star-rate, no contributors, repeated "what is this?" questions in DMs).</li>
+<li><strong>The README's three readers</strong> (whom the maintainer is serving): <em>evaluator</em> (60s — "keep reading?"), <em>adopter</em> (5min — "get to first success"), <em>contributor</em> (30min — "extend / contribute"). All three are blocked by the same structure-dump anti-pattern.</li>
+</ul>
+
+<h3 id="why-now">Why now?</h3>
+<p>Three triggers converge. (1) Multiple shipped pmos-toolkit skills now <em>need</em> their own READMEs to gain users — adoption is the current bottleneck, not capability. (2) Every existing README generator (readme-md-generator, README-AI, GitHub Copilot's generator) is template-filling without an opinionated rubric; the niche for a rubric-gated alternative is uncontested. (3) agent-skills itself is the dogfood case — a plugin-marketplace-root with ~30 plugin-package READMEs, none audit-passing.</p>
+</section>
+
+<section id="goals-and-non-goals">
+<h2 id="goals-and-non-goals">Goals &amp; Non-Goals</h2>
+<p class="meta">Goals are observable user outcomes; engineering acceptance criteria belong in <code>/spec</code>.</p>
+
+<h3 id="goals">Goals</h3>
+<ul>
+<li><strong>Rubric pass on emit</strong> — generated and audited READMEs pass ≥90% of the binary structural rubric on first write — measured by the rubric script's pass-rate.</li>
+<li><strong>Cold-reader signal</strong> — simulated-reader friction lists overlap ≥50% with a human cold-reader's friction on the same README — measured by a one-off A/B pairing on ≥3 READMEs before v1 ships. <em>Human baseline</em> is collected by 3 unrelated readers (recruited from the pmos-toolkit user community via the project channel) each given the same 3 READMEs cold; their friction lists are merged and Jaccard-compared to the simulator's output.</li>
+<li><strong>Maintainer-actionable findings</strong> — when run against an existing README, /readme produces ≥5 findings the maintainer agrees with on first audit — measured by per-finding accept/skip ratio in the diff-preview gate.</li>
+<li><strong>Voice preserved</strong> — round-tripping a hand-edited README through audit-mode produces &lt;15% sentence-length / vocabulary drift — measured by a voice-diff script (delegated to /polish substrate).</li>
+<li><strong>Monorepo coverage</strong> — workspace-discovery enumerates ≥19/20 of a curated public-monorepo test set correctly — measured by the A8 pre-spec test (Babel, Next.js, Turborepo, Nx, React Native, kubernetes/kubernetes, Cargo workspaces, this repo).</li>
+</ul>
+
+<h3 id="non-goals">Non-Goals</h3>
+<ul>
+<li><strong>NOT</strong> doing sentence-level prose polish — because <code>/polish</code> already solves voice preservation with lock zones + per-finding approval; duplicating that machinery is waste. /readme owns structure + content accuracy; it delegates prose to /polish.</li>
+<li><strong>NOT</strong> generating CHANGELOGs — because release-please / git-cliff / pmos's own <code>/changelog</code> already do that. The commit-classifier mechanic is borrowed for the v2 diff-mode but targets READMEs, not CHANGELOGs.</li>
+<li><strong>NOT</strong> auto-enabling the /complete-dev Phase 7.6 hook in v1 — because the section taxonomy needs validation on ≥3 real repos before patching working trees during release is safe. The hook ships in v1 but is opt-in / default-off until ≥3 real-repo runs and a /retro pass clear it; users explicitly enable it via <code>~/.pmos/readme/config.yaml</code> or a /complete-dev flag.</li>
+<li><strong>NOT</strong> auto-committing the new README — because /complete-dev is the canonical release entry and audit/scaffold are pre-release operations; the user reviews the diff, the user commits.</li>
+<li><strong>NOT</strong> supporting more than 8 workspace-manifest formats in v1 — because the 8 chosen cover ≥95% of public repos. The 8 are: (1) <code>pnpm-workspace.yaml</code>, (2) <code>package.json#workspaces</code>, (3) <code>lerna.json</code>, (4) <code>nx.json</code>, (5) <code>turbo.json</code>, (6) Cargo <code>[workspace]</code>, (7) Go <code>go.work</code>, (8) Python <code>pyproject.toml [tool.uv.workspace]</code>. The pmos-toolkit <code>plugins/*/</code> + <code>.claude-plugin/marketplace.json</code> pair is a <em>repo-type discriminator</em> (plugin-marketplace-root) layered on top of the 8, not a 9th manifest. Long-tail formats (yarn berry PnP, Bazel BUILD, Bun, Rush.js) fall back to interactive repo-type pick.</li>
+<li><strong>NOT</strong> running more than one simulated-reader iteration — because more iterations = LLM drift, not better readers (consistent with /polish's 2-iteration cap and /wireframes's reviewer loop ceiling).</li>
+</ul>
+</section>
+
+<section id="user-experience-analysis">
+<h2 id="user-experience-analysis">User Experience Analysis</h2>
+
+<h3 id="motivation">Motivation</h3>
+<ul>
+<li><strong>Job to be done:</strong> "When I ship or update a repo, I want a README that lets a stranger decide in &lt;60s whether to adopt and start using it in &lt;5min, so I don't lose adoption to a wall of structure prose."</li>
+<li><strong>Importance / urgency:</strong> High and bursty. Importance is steady (adoption is the bottleneck for every new skill / plugin). Urgency spikes at three moments: shipping a new repo, the moment after <code>/complete-dev</code> merges a feature that changed user-facing surface, and the moment someone DMs "what is this?".</li>
+<li><strong>Alternatives:</strong> Hand-write the README (high quality, low frequency — most README rot is "I'll fix it later"); use readme-md-generator (badge-soup, template-filler); use README-AI (AI-slop voice, whole-doc regenerate destroys hand edits); use Copilot's "Generate README" (one-shot, no rubric). All three tool alternatives produce structure-dump output; the hand-written path doesn't scale.</li>
+</ul>
+
+<h3 id="friction-points">Friction Points</h3>
+<table>
+<tr><th>Friction</th><th>Cause</th><th>Mitigation</th></tr>
+<tr><td>"This README is mine — I don't trust a tool to rewrite it"</td><td>Whole-doc regenerators (README-AI) destroy author voice; recognizable AI-slop ("🚀 Features", "blazing fast", "Welcome to").</td><td>Audit-mode operates on findings, not full regen; banned-phrase list in the rubric; prose-level polish delegated to /polish which already solves voice; diff-preview gate before any write.</td></tr>
+<tr><td>"The audit finds 12+ issues — I'll deal with this later"</td><td>Reviewer overload on first audit run; flat finding list with no severity.</td><td>Severity-tiered rubric (blocker / friction / nit); auto-apply mechanical findings; per-finding approval ordered worst-first; default to blockers-only on first run.</td></tr>
+<tr><td>"Which README am I even editing right now?" (monorepo)</td><td>Root README and N package READMEs all opened in same session; no map.</td><td>Workspace-discovery emits a single "detected N workspaces via &lt;manifest&gt;" line; audit-all batches per-package approval; root rubric differs from package rubric so findings are scoped.</td></tr>
+<tr><td>"The 5-block opening is wrong for my repo type"</td><td>One opinionated default applied to repo types where it doesn't fit (monorepo-root, plugin-marketplace-root).</td><td>Per-repo-type rubric variants; <em>map+identity</em> opening for root-type repos (contents-table replaces show-don't-tell); explicit opt-out flag for edge cases; repo-type detected with confirm-prompt fallback when ambiguous.</td></tr>
+<tr><td>"It rewrote my voice"</td><td>Audit-mode making structural edits across the doc, drifting style.</td><td>Structural edits gated by per-finding approval; sentence-level rewrites refused (delegated to /polish); voice-drift measured by sentence-length and vocabulary metrics, &lt;15% gate.</td></tr>
+<tr><td>"I ran /readme on agent-skills and got 200 findings"</td><td>Monorepo audit-all without severity filter blows up the surface.</td><td>Per-package severity filter; default audit-all to blockers-only first pass; per-package approval gates are batched (one Y/n per package), not per finding for non-blocker tiers.</td></tr>
+</table>
+
+<h3 id="satisfaction-signals">Satisfaction Signals</h3>
+<ul>
+<li>A maintainer says "I'd ship this README" after a single audit pass with no manual cleanup.</li>
+<li>The diff preview shows ≤20 lines of structural changes for a "good-but-cluttered" existing README (audit-mode is finding-grained, not rewrite-everything).</li>
+<li>Three unrelated cold readers, given a scaffold-mode output, all answer "what is this?" and "how do I start?" correctly within 60s.</li>
+<li>The maintainer of agent-skills runs <code>/readme --audit-all</code> on the repo, approves ≥80% of findings on first pass for root + every plugin.</li>
+</ul>
+</section>
+
+<section id="solution-direction">
+<h2 id="solution-direction">Solution Direction</h2>
+
+<h3 id="overview">Overview</h3>
+<p>One <code>/readme</code> skill with three operating modes and a shared substrate:</p>
+<ul>
+<li><strong>--audit</strong> (default when <code>README.md</code> exists) — score, list findings worst-first, auto-apply mechanical, per-finding approval for structural rewrites, diff preview, write.</li>
+<li><strong>--scaffold</strong> (default when absent) — detect repo type, mine the repo for facts (manifest, entry point, example usage, license, contributors), Q&amp;A only for what can't be detected, emit per-type opening + spine + Diátaxis linkouts, run rubric + simulated-reader, diff preview, write.</li>
+<li><strong>--update</strong> — invoked from <code>/complete-dev</code> Phase 7.6 hook (opt-in, default-off until first 3 real-repo runs validate the section taxonomy); classify merged commits → impacted sections → patch with human confirm per section; never auto-commit. Emits a suggested patch the user applies via /complete-dev rather than touching the working tree directly (per Q4 leaning — re-resolved below).</li>
+</ul>
+<p>All three share:</p>
+<ul>
+<li><code>section-schema.yaml</code> — the spine: standard-readme ordered backbone (Title → Short Description → TOC → Install → Usage → Contributing → License) + Google's <em>Status</em> / <em>Maintainers</em> fields + Diátaxis-style <em>Documentation</em> linkout. Per-repo-type variants for 7 types: library / CLI / plugin / app / monorepo-root / monorepo-package / plugin-marketplace-root.</li>
+<li><code>rubric.yaml</code> — ~15 binary checks across hero-line shape, opening order, copy-pasteable quickstart, banned-phrase list, structural cleanliness, install-before-architecture, link-out discipline. Severity-tiered (blocker / friction / nit).</li>
+<li><code>simulated-reader.md</code> — three persona subagents (evaluator 60s, adopter 5min, contributor 30min). Each reads top-to-bottom, must quote concrete passages, emits a friction list. Failures feed back as rubric findings.</li>
+<li>Per-type <strong>opening shapes</strong> — the 5-block opening (hero / proof row / show-don't-tell / install / why) for library/CLI/plugin/app/monorepo-package; the <em>map+identity</em> shape (hero / proof row / contents-table / canonical-entry quickstart / why-these-pieces) for monorepo-root and plugin-marketplace-root.</li>
+<li><strong>Workspace discovery</strong> — parses the 8 supported workspace manifests at root invocation; classifies repo as monorepo-root / plugin-marketplace-root / single-package; surfaces a single AskUserQuestion choosing scope (audit-all / audit-one / scaffold-missing / root-only).</li>
+<li><strong>Voice delegation</strong> — sentence-level prose polish is never written by /readme; surfaced as "run /polish on this section" suggestions when structural rewrites would brush the line. Boundary definition: <em>structural</em> = section order, section presence/absence, hero-line shape, opening pattern, link-out direction, banned-phrase removal at the token level. <em>Prose</em> = sentence rewriting, paragraph-level voice, tone, register, register-consistency across sections — those belong to /polish.</li>
+</ul>
+
+<h3 id="monorepo-cross-file-rules">Monorepo cross-file rules (v1 candidates)</h3>
+<p>Four candidate cross-file rules, each one a binary check (A9 clarity test applied at /spec time; rules failing the binary test demote to friction-tier advisory):</p>
+<ol>
+<li><strong>R1 — Root links to every package.</strong> Each detected workspace package's README.md is referenced (by relative link) from the root README's contents-table. Auto-fix: add missing entries.</li>
+<li><strong>R2 — Packages link up to root.</strong> Every package README has a relative-link reference back to the root README. Auto-fix: add the link-up line.</li>
+<li><strong>R3 — Install / Contributing / License sections live at root only.</strong> Package READMEs that contain these sections either (a) match the root's content byte-for-byte (duplicate — surface as friction), or (b) diverge from the root (drift — surface as blocker). Auto-fix: replace package section with a "see root README" link-up.</li>
+<li><strong>R4 — No duplicate hero-line text between root and any package.</strong> Each README has a unique hero line — root describes the family, each package describes itself. Auto-fix: surface as friction; require manual edit (hero lines are voice-sensitive — delegated to maintainer).</li>
+</ol>
+
+<h3 id="three-candidate-approaches-considered">Three candidate approaches considered</h3>
+<table>
+<tr><th>Approach</th><th>Verdict</th><th>Rationale</th></tr>
+<tr><td>Single-mode "regenerate" tool</td><td>Rejected</td><td>This is what README-AI / readme-md-generator already are. Whole-doc regen destroys voice; no audit; no incremental update path. The crowded space.</td></tr>
+<tr><td>Audit-only (no scaffold)</td><td>Rejected</td><td>Half of the use cases (greenfield repos, pmos-toolkit users shipping new plugins) need scaffold. Ships less for the same substrate cost.</td></tr>
+<tr><td><strong>Hybrid: three modes, shared substrate (Recommended ★)</strong></td><td>Chosen</td><td>The substrate (section-schema + rubric + simulated-reader) is amortised across modes; each mode is a thin orchestration layer. v2 update-mode rides on the same taxonomy. Differentiation vs prior art is the rubric + simulated-reader + /polish delegation + monorepo awareness — and all four are mode-agnostic.</td></tr>
+</table>
+</section>
+
+<section id="user-journeys">
+<h2 id="user-journeys">User Journeys</h2>
+
+<h3 id="primary-journey-audit-an-existing-readme">Primary Journey — Audit an existing README (single repo)</h3>
+<ol>
+<li>Maintainer pauses mid-session, runs <code>/readme</code> in a repo with a <code>README.md</code>.</li>
+<li>Skill detects existing README → defaults to <code>--audit</code> mode; logs <code>mode: audit (existing README detected)</code>.</li>
+<li>Skill reads the README, runs workspace-discovery (returns "single package, repo-type=&lt;detected&gt;"); confirms repo-type if heuristic confidence &lt; threshold.</li>
+<li>Skill scores against the rubric variant for the detected type; emits findings worst-first (blockers, then friction, then nits), with a one-line description, the offending section/line, and the proposed fix.</li>
+<li>Skill auto-applies mechanical fixes (banned-phrase removal, hero-line trimming) and logs them as a single "auto-applied N mechanical findings" line.</li>
+<li>For structural rewrites (re-order sections, replace show-don't-tell, add Status field), one AskUserQuestion per finding — <strong>batched ≤4 questions per call</strong>: <em>Apply as proposed (Recommended) / Modify / Skip / Defer</em>. If &gt;20 findings, the skill first issues a triage prompt: <em>Filter to blockers + friction only (Recommended) / Review all N</em>.</li>
+<li>After dispositions, skill runs the simulated-reader pass; any persona friction that wasn't already a rubric finding surfaces as a final batch.</li>
+<li>Skill renders diff preview (proposed README vs current); user confirms.</li>
+<li>Skill writes <code>README.md</code> atomically (temp + rename). Suggests <code>/polish</code> for prose touch-up. Does NOT commit.</li>
+</ol>
+
+<h3 id="primary-journey-scaffold">Primary Journey — Scaffold a README (greenfield repo)</h3>
+<ol>
+<li>Maintainer runs <code>/readme</code> in a repo without a <code>README.md</code>.</li>
+<li>Skill detects absence → defaults to <code>--scaffold</code> mode.</li>
+<li>Skill mines the repo: project name from package manifest, primary entry point from <code>main</code>/<code>bin</code>/CLI shebang, example usage from a <code>tests/</code> or <code>examples/</code> folder, license from <code>LICENSE</code>, contributors from <code>git log</code>.</li>
+<li>Skill runs workspace-discovery; classifies repo-type.</li>
+<li>Skill asks Q&amp;A only for what can't be detected (capped at 4 questions per AskUserQuestion call; typically 3 questions total: <em>hero line — user-verb + outcome ≤15 words</em>; <em>why this exists — 2–3 sentences</em>; <em>target user / persona — one phrase</em>). Hard cap: ≤6 questions across the whole scaffold flow; beyond that, skill emits a stub README with TODO markers rather than interrogating further.</li>
+<li>Skill emits a draft using the per-type opening shape + the section-schema spine + Diátaxis linkouts.</li>
+<li>Rubric + simulated-reader pass.</li>
+<li>Diff preview ("here is the README that would land — confirm?"); user confirms; skill writes.</li>
+</ol>
+
+<h3 id="alternate-journey-monorepo">Alternate Journey — Monorepo audit-all</h3>
+<ol>
+<li>Maintainer runs <code>/readme</code> at the root of a monorepo (e.g., agent-skills).</li>
+<li>Workspace-discovery parses every supported manifest; emits <em>"detected N workspaces via &lt;manifest&gt;"</em>.</li>
+<li>Single AskUserQuestion: <em>audit-all (root + every package) / audit-one (pick from list) / scaffold-missing (READMEs absent in subset) / root-only (default)</em>.</li>
+<li>On audit-all: each file processed against the rubric variant for its sub-type. Cross-file checks fire: root links to every package, packages link up to root, no duplicate Install/Contributing/License between root and packages (those live at root, packages link up).</li>
+<li>Findings rolled up by severity across all packages for the first pass; per-package drill-down on demand.</li>
+<li>Per-package approval gates batched (one Y/n per package, not per finding) for non-blocker tiers; per-finding approval for blockers.</li>
+<li>Single diff preview spanning all touched files; user confirms; skill writes atomically.</li>
+</ol>
+
+<h3 id="alternate-journey-update-mode">Alternate Journey — /complete-dev Phase 7.6 update-mode hook</h3>
+<p class="meta">Ships in v1; opt-in / default-off until first 3 real-repo runs validate the section-affinity table. Maintainer enables via <code>~/.pmos/readme/config.yaml</code> or a /complete-dev flag.</p>
+<ol>
+<li>After /verify passes and before /complete-dev commits the release, the hook fires (only if opted in).</li>
+<li>Skill classifies merged commits via conventional-commit heuristics (<code>feat</code>, <code>fix</code>, <code>docs</code>, etc.) → maps to impacted sections via <code>section-schema.yaml</code>'s commit-affinity table.</li>
+<li>Skill emits a <em>suggested patch</em> covering only impacted sections; surfaces one AskUserQuestion per section: <em>Apply / Modify / Skip / Defer</em>.</li>
+<li>If user approves, patch is staged but never auto-committed — /complete-dev's existing commit flow picks it up as part of the release commit, preserving authorship and provenance.</li>
+<li>If no sections are impacted, caches the "no README changes needed" verdict so re-runs in the same /complete-dev session are free.</li>
+<li>Failure case: commit-classifier confidence below threshold → skip the hook with a warn line ("README update skipped — commit signal ambiguous"), never block /complete-dev.</li>
+</ol>
+
+<h3 id="error-journeys">Error journeys</h3>
+<ul>
+<li><strong>Unknown workspace-manifest format</strong> — root has a layout the 8 supported manifests don't catch (Bazel, yarn berry PnP, Bun, Rush). Skill falls back to interactive repo-type pick rather than guessing; surfaces "detected: unknown layout — pick repo-type" with a list.</li>
+<li><strong>Hand-edited README is dirty (uncommitted)</strong> — snapshot-commit before any write, message <code>snapshot: pre-/readme-rewrite</code> (same pattern as /requirements pre-write safety).</li>
+<li><strong>Audit produces 50+ findings on a monorepo run</strong> — auto-filter to blockers-only on first pass; offer "show friction + nit" expand on demand; cap interactive prompts at 4-per-batch.</li>
+<li><strong>Simulated-reader returns no friction at all</strong> — flag suspicious (theater check); re-prompt the personas with "you have alternatives and 90 seconds; what makes you bounce?" injected into the failure-seeking prompt template.</li>
+<li><strong>Workspace cross-file rule produces ambiguous result</strong> — surface as a friction-tier finding with both options, not a blocker; the rule promotes to blocker only if it passes the A9 clarity test (binary, no human judgement) at /spec time.</li>
+</ul>
+
+<h3 id="empty-states-and-edge-cases">Empty states &amp; edge cases</h3>
+<table>
+<tr><th>Scenario</th><th>Condition</th><th>Expected behaviour</th></tr>
+<tr><td><code>.pmos/settings.yaml</code> absent</td><td>User invokes /readme in a repo never touched by pmos-toolkit pipeline</td><td>Skill falls back to its own default settings (docs_path = <code>docs/</code>, output_format = <code>md</code>) with a one-line notice; never blocks. Pipeline-setup first-run flow only runs when explicitly opted in via <code>/feature-sdlc</code>.</td></tr>
+<tr><td>Empty repo (manifest only, no code)</td><td><code>main</code>/<code>bin</code> can't be resolved to anything callable</td><td>Skill emits a stub README with the 5-block shape but flagged TODOs in show-don't-tell + install; never invents commands that won't run.</td></tr>
+<tr><td>Repo with multiple plausible repo-types</td><td>e.g., a CLI tool that's also a library (npm package with <code>bin</code> + <code>main</code>)</td><td>Skill asks the user to pick the dominant lens; persists the choice in <code>.pmos/readme.config.yaml</code> for future runs.</td></tr>
+<tr><td>Monorepo with one workspace missing a manifest</td><td>workspace dir exists but no <code>package.json</code> / <code>Cargo.toml</code> / etc.</td><td>Skill skips that workspace with a warn line; doesn't fail the audit-all run.</td></tr>
+<tr><td>README is in a non-standard location (<code>docs/README.md</code>)</td><td>repo root has no <code>README.md</code> but <code>docs/</code> does</td><td>Audit-mode runs on the found file; warn the user it's not at root; offer to move it.</td></tr>
+<tr><td>Generated README would exceed 200 lines</td><td>scaffold-mode emits beyond a soft ceiling</td><td>Soft warning: suggest moving Tutorials / How-to / Reference / Explanation content into <code>docs/</code> linked from the README (Diátaxis discipline).</td></tr>
+</table>
+</section>
+
+<section id="design-decisions">
+<h2 id="design-decisions">Design Decisions</h2>
+<table>
+<tr><th>#</th><th>Decision</th><th>Options considered</th><th>Rationale</th></tr>
+<tr><td>D1</td><td>One skill, three modes — not three skills.</td><td>(a) one skill three modes; (b) three skills (<code>/readme-audit</code>, <code>/readme-scaffold</code>, <code>/readme-update</code>); (c) audit-only v1, add scaffold later</td><td>Substrate (section-schema + rubric + simulated-reader) is amortised once; mode selection by README presence is the discoverable UX; three-skill split would force re-loading the same context.</td></tr>
+<tr><td>D2</td><td>Prose-level polish delegated to <code>/polish</code> — not duplicated.</td><td>(a) duplicate /polish's voice-preservation logic; (b) delegate to /polish; (c) write prose freely and skip voice checks</td><td>/polish already ships lock zones + per-finding approval + PRESERVE_VOICE_CONFLICT. Duplicating is waste; skipping voice is the README-AI failure mode.</td></tr>
+<tr><td>D3</td><td>Severity tiers in rubric (blocker / friction / nit).</td><td>(a) flat pass/fail; (b) 3-tier severity; (c) 5-point Likert</td><td>Flat overwhelms reviewers on existing-README audit (premortem #3); Likert is mushy. Three tiers map cleanly to "must-fix / should-fix / nice-to-have" and to auto-apply policy. Target proportions in the ~15-check rubric: <strong>≈ 4 blockers / 7 friction / 4 nits</strong>. Auto-apply policy: <em>only blockers and mechanical-friction checks (banned-phrase removal, hero-line trimming) auto-apply; structural-friction findings require per-finding approval; nits surface in the report but do not gate the diff preview</em>.</td></tr>
+<tr><td>D4</td><td>5-block opening as the opinionated default for non-root repo types.</td><td>(a) 5-block opening; (b) FastAPI-style quickstart-first; (c) Stripe-style task-recipes; (d) YC pitch-arc</td><td>The 5-block shape (hero → proof → show-don't-tell → install → why) is the convergent pattern across FastAPI, ripgrep, htmx, Stripe, Tailwind, Astro, shadcn. Convergence is signal.</td></tr>
+<tr><td>D5</td><td>Map+identity opening for monorepo-root / plugin-marketplace-root.</td><td>(a) treat root same as package; (b) map+identity (contents-table replaces show-don't-tell); (c) link-only root with no body</td><td>The root's job is different — it answers "what lives here?" not "what does this do?". Show-don't-tell at root is misleading (no single demo represents the family). Validated against agent-skills, kubernetes/kubernetes, Babel, Next.js root READMEs.</td></tr>
+<tr><td>D6</td><td>Simulated-reader runs three personas, capped at 1 iteration.</td><td>(a) 1 iter; (b) run-to-convergence; (c) skip simulation, ship rubric only</td><td>Convergence runs drift the LLM toward "everything looks fine"; 1-iter is the same cap /polish uses (proven). Skipping kills the differentiation vs prior art.</td></tr>
+<tr><td>D7</td><td>Workspace discovery covers 8 manifest formats; unknown layouts → interactive fallback.</td><td>(a) 8 formats + fallback; (b) only the 3 most-common (pnpm, lerna, Cargo); (c) 12+ formats including yarn berry / Bazel / Bun / Rush</td><td>8 covers ≥95% of public repos per ecosystem surveys (A8 testable). Failing safe to interactive on the remaining 5% beats silent misclassification.</td></tr>
+<tr><td>D8</td><td>v1 ships all three modes (<code>--audit</code> + <code>--scaffold</code> + <code>--update</code>); update-mode and its /complete-dev Phase 7.6 hook are opt-in / default-off until validated.</td><td>(a) all three in v1, hook opt-in (Recommended); (b) v1 audit + scaffold, v2 update; (c) v1 audit only</td><td>Shipping all three lets the section taxonomy validate on real /complete-dev runs from day-1; the opt-in flag means a misclassification can't surprise a user mid-release. Audit + scaffold dogfood the substrate; update-mode dogfoods the section-affinity table. Premortem #4 (commit-classifier wrong) is mitigated by the per-section confirm gate plus the patch-suggestion-not-patch semantics (D11 below).</td></tr>
+<tr><td>D11</td><td>Update-mode emits a suggested patch the user applies via /complete-dev — never touches the working tree directly.</td><td>(a) patch working tree directly; (b) emit suggested patch (Recommended); (c) skip update-mode entirely</td><td>/complete-dev is the canonical release entry. Direct working-tree edits during release create a "who wrote this commit?" provenance problem. Suggested-patch keeps the maintainer in the loop and the commit author honest.</td></tr>
+<tr><td>D9</td><td>Diff-preview gate is mandatory before any write; never auto-commit.</td><td>(a) auto-commit when rubric passes; (b) write but don't commit; (c) diff preview + write + don't commit (Recommended)</td><td>/complete-dev is the canonical release entry; /readme is a pre-release operation. Auto-commit would conflict with that contract and surprise the maintainer.</td></tr>
+<tr><td>D10</td><td>The repo-type taxonomy is closed at 7 types for v1.</td><td>(a) closed 7; (b) closed 5; (c) extensible via <code>~/.pmos/readme/types/</code></td><td>Closed lets the rubric variants stay binary and testable. Extensibility is the right v2 move once A8 dogfooding surfaces a real common type the 7 don't cover; until then it's optionality without signal.</td></tr>
+</table>
+</section>
+
+<section id="success-metrics">
+<h2 id="success-metrics">Success Metrics</h2>
+<table>
+<tr><th>Metric</th><th>Baseline</th><th>Target</th><th>Measurement</th></tr>
+<tr><td>Generated README rubric pass on first emit</td><td>0% (skill doesn't exist)</td><td>≥90% of checks pass</td><td>Rubric script pass-rate on the 5-README dogfood set (this repo's plugins).</td></tr>
+<tr><td>Simulated-reader / human-reader friction overlap</td><td>0% (no simulator)</td><td>≥50%</td><td>A/B: 3 READMEs cold-read by a human; simulator runs on same; Jaccard overlap of friction lists. Gate before v1 ships.</td></tr>
+<tr><td>Maintainer-actionable findings on audit</td><td>n/a</td><td>≥5 findings agreed-with on first audit of <em>pmos-toolkit</em>'s own README</td><td>Audit run on day 1; per-finding accept ratio recorded.</td></tr>
+<tr><td>Voice drift on round-trip</td><td>n/a</td><td>&lt;15% drift on sentence-length + vocabulary</td><td>Hand-edited README → audit-mode → diff; voice-diff script (re-using /polish substrate).</td></tr>
+<tr><td>Workspace discovery accuracy</td><td>n/a</td><td>≥19/20 on curated test set</td><td>A8 pre-spec test: Babel, Next.js, Turborepo, Nx, React Native, kubernetes/kubernetes, Cargo workspaces, this repo, etc.</td></tr>
+<tr><td>Skill invocation rate per quarter (lagging)</td><td>0</td><td>≥3× per maintainer per quarter</td><td>Telemetry / self-report after first 4 releases.</td></tr>
+<tr><td>"Would adopt cold" judgement (lagging)</td><td>n/a</td><td>≥3 unrelated readers say "I'd adopt" after reading a scaffold-mode output cold</td><td>Once-off user study post-v1.</td></tr>
+<tr><td>Monorepo audit-all approval rate (lagging)</td><td>n/a</td><td>≥80% of findings approved on first pass for agent-skills root + plugins</td><td>Day-1 dogfood run logged.</td></tr>
+</table>
+</section>
+
+<section id="research-sources">
+<h2 id="research-sources">Research Sources</h2>
+<table>
+<tr><th>Source</th><th>Type</th><th>Key takeaway</th></tr>
+<tr><td><code>docs/pmos/ideate/2026-05-13_readme-skill.html</code></td><td>This repo's ideation artifact</td><td>15 idea variants explored; 5-block opening + map+identity for roots is the convergent pattern; 9 assumptions catalogued (A2/A4/A8 are the riskiest).</td></tr>
+<tr><td>standard-readme spec</td><td>External standard</td><td>Human spec for README structure with no tool enforcement. Adopted as the spine; /readme ships the missing enforcement.</td></tr>
+<tr><td>readme-md-generator (Node CLI)</td><td>Prior art (template-filler)</td><td>~15 prompts, scrapes package.json, emits templated output. Differentiator: no rubric, no code reading beyond manifests.</td></tr>
+<tr><td>README-AI (eli64s/readme-ai)</td><td>Prior art (LLM-driven)</td><td>Multi-backend, tech-stack table, "styles". Failure mode: whole-doc regenerate destroys hand edits; recognizable AI-slop voice; no audit; no diff-mode.</td></tr>
+<tr><td>GitHub Copilot "Generate README"</td><td>Prior art (IDE)</td><td>One-shot generation in GitHub UI. Failure mode: one-shot, no rubric, no incremental update, no audit.</td></tr>
+<tr><td>readme.so</td><td>Prior art (UI)</td><td>Drag-drop section UI; pure template-filler. No introspection, no opinionation.</td></tr>
+<tr><td>Diátaxis framework (Tutorials / How-to / Reference / Explanation)</td><td>External pattern</td><td>Adopted for <em>linkout discipline</em> — README points to docs/ for the four content types rather than inlining them.</td></tr>
+<tr><td>release-please / git-cliff</td><td>Adjacent prior art</td><td>Commit classification → CHANGELOG. Mechanic borrowed for v2 update-mode, target is README sections instead of CHANGELOG.</td></tr>
+<tr><td>vale.sh / alex.js / markdownlint</td><td>Adjacent linters</td><td>Prose / inclusive-language / syntax checking. Complementary, not competing — /readme composes with vale for prose linting if available.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/polish/</code></td><td>This repo's voice-preserving skill</td><td>The delegation target. Lock zones + per-finding approval + PRESERVE_VOICE_CONFLICT + 2-iteration cap — /readme reuses the pattern shape, calls /polish for sentence-level work.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code> §A–§F</td><td>This repo's skill-authoring guide</td><td>Standing acceptance criteria for the produced /readme skill itself (FR-61).</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-eval.md</code></td><td>This repo's 39-check binary rubric</td><td>Phase 6a will grade the /readme implementation against this; the rubric for READMEs is a separate artifact (this is the rubric for the <em>skill itself</em>).</td></tr>
+<tr><td>awesome-readme (matiassingers/awesome-readme)</td><td>External exemplar list</td><td>Curated strong READMEs; the convergent 5-block pattern was distilled from a synth across the top 10 (FastAPI, ripgrep, htmx, Stripe, Tailwind, Astro, shadcn-ui, etc.).</td></tr>
+</table>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">Open Questions</h2>
+<table>
+<tr><th>#</th><th>Question</th></tr>
+<tr><td>Q1</td><td>Should the repo-type taxonomy (currently 7 types) be closed in v1 or extensible via user config at <code>~/.pmos/readme/types/</code>? <em>(Leaning closed for v1, revisit if A8 dogfood surfaces a common type the 7 don't cover.)</em></td></tr>
+<tr><td>Q2</td><td>For monorepo audit-all, should findings be presented per-package (12 separate review streams) or rolled up by severity across all packages (one blocker list)? <em>(Leaning roll-up first pass, drill-down per-package on demand. Validate during /spec.)</em></td></tr>
+<tr><td>Q3</td><td>What is the rubric-variant delta between <em>monorepo-package</em> and <em>library</em>? <em>(Probably: package has no Install / Contributing / License sections — those link up to root. Validate during /spec.)</em></td></tr>
+<tr><td>Q4</td><td><em>(Resolved by D11.)</em> Update-mode emits a suggested patch the user applies via /complete-dev — never touches the working tree directly.</td></tr>
+<tr><td>Q5</td><td>How are A2 (rubric distinguishes slop), A4 (simulated-reader is real signal), A8 (workspace discovery ≥19/20) experimentally validated <em>before</em> /spec? <em>(Ideation doc says ~1 day each; can /readme's own /spec phase fold these in as a Phase 0 validation step, or do they happen pre-/spec as a manual exercise?)</em></td></tr>
+<tr><td>Q6</td><td>Should /readme be a pmos-toolkit skill or its own plugin? <em>(Leaning pmos-toolkit — composes with /polish, /verify, /complete-dev; isolating it as a separate plugin breaks those calls.)</em></td></tr>
+<tr><td>Q7</td><td>For the rubric's banned-phrase list, is the v1 set closed (15-20 phrases curated by author taste) or user-extensible via <code>~/.pmos/readme/banned-phrases.yaml</code>? <em>(Leaning closed for v1, dogfood loop opens it via /retro feedback.)</em></td></tr>
+</table>
+</section>
+
+<section id="review-log">
+<h2 id="review-log">Review Log</h2>
+<table>
+<tr><th>Loop</th><th>Findings</th><th>Changes made</th></tr>
+<tr><td>1 (initial write)</td><td>Drafted from ideation seed; 11 sections; both opening shapes covered; 10 design decisions; 8 success metrics; 13 research sources; 7 open questions; 2 candidate alternatives rejected with rationale.</td><td>—</td></tr>
+<tr><td>2 (gap analysis)</td><td>7 findings — F1 severity-mix unspecified · F2 cross-file rules not enumerated · F3 human-baseline collection undefined · F4 manifest-count ambiguity · F5 v1/v2 scope split · F6 settings.yaml-absent fallback · F7 interactive prompt batching cap.</td><td>F1: added 4/7/4 split + auto-apply policy to D3. F2: enumerated R1–R4 cross-file rules in Solution Direction (A9 clarity test deferred to /spec). F3: added human-baseline collection method to Goals. F4: clarified 8 manifests + pmos discriminator in Non-Goals. F5: scope expanded — update-mode + /complete-dev Phase 7.6 hook now IN v1 (opt-in/default-off); D8 rewritten; D11 added; v2-deferred journey reframed; Q4 resolved by D11. F6: added settings-absent fallback to Edge Cases. F7: added ≤4-per-call batching cap + scaffold-flow question cap (≤6 total) to journeys.</td></tr>
+</table>
+
+<h3 id="6-gate-exit-status">6-gate exit status</h3>
+<ol>
+<li>✓ Both lenses ran (structural + product-critique) in loop 2; polish lens covered in final write.</li>
+<li>✓ Findings logged (7 surfaced in loop 2; loop 1 produced no gaps because the ideation seed was already structured).</li>
+<li>✓ Dispositions captured via AskUserQuestion batch (4 prompts covering 7 findings — F1/F2/F5/F7-batch).</li>
+<li>⏳ User explicit confirmation pending (next action).</li>
+<li>✓ Decision coverage — 11 decisions (D1–D11) covering substrate split, prose delegation, severity tiers, opening shapes, simulated-reader cap, workspace discovery, v1 scope, monorepo opening, diff-preview gate, taxonomy closure, patch-suggestion semantics.</li>
+<li>✓ Zero open clarifications — Q1–Q7 are knowingly-deferred questions, not pending TODOs; Q4 is resolved-in-doc.</li>
+</ol>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  "doc": "01_requirements.html",
+  "ids": [
+    "problem",
+    "who-experiences-this",
+    "why-now",
+    "goals-and-non-goals",
+    "goals",
+    "non-goals",
+    "user-experience-analysis",
+    "motivation",
+    "friction-points",
+    "satisfaction-signals",
+    "solution-direction",
+    "overview",
+    "three-candidate-approaches-considered",
+    "user-journeys",
+    "primary-journey-audit-an-existing-readme",
+    "primary-journey-scaffold",
+    "alternate-journey-monorepo",
+    "alternate-journey-update-mode-v2-deferred",
+    "error-journeys",
+    "empty-states-and-edge-cases",
+    "design-decisions",
+    "success-metrics",
+    "research-sources",
+    "open-questions",
+    "review-log"
+  ]
+}

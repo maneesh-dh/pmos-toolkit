@@ -1,0 +1,19 @@
+{
+  "packages": [
+    {
+      "manifest_source": "go.work",
+      "path": "staging/src/kube-apiserver"
+    },
+    {
+      "manifest_source": "go.work",
+      "path": "staging/src/kube-controller-manager"
+    },
+    {
+      "manifest_source": "go.work",
+      "path": "staging/src/kubelet"
+    }
+  ],
+  "primary": "go.work",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

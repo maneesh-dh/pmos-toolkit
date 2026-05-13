@@ -1,0 +1,23 @@
+{
+  "packages": [
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "apps/docs"
+    },
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "apps/web"
+    },
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "packages/config"
+    },
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "packages/ui"
+    }
+  ],
+  "primary": "package.json#workspaces",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

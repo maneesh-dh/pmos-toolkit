@@ -1,0 +1,15 @@
+{
+  "packages": [
+    {
+      "manifest_source": "pyproject.toml#tool.uv.workspace",
+      "path": "pkgs/bar"
+    },
+    {
+      "manifest_source": "pyproject.toml#tool.uv.workspace",
+      "path": "pkgs/foo"
+    }
+  ],
+  "primary": "pyproject.toml#tool.uv.workspace",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

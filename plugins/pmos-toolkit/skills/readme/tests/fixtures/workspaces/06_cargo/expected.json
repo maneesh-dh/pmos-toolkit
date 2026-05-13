@@ -1,0 +1,15 @@
+{
+  "packages": [
+    {
+      "manifest_source": "Cargo.toml#workspace",
+      "path": "crates/bar"
+    },
+    {
+      "manifest_source": "Cargo.toml#workspace",
+      "path": "crates/foo"
+    }
+  ],
+  "primary": "Cargo.toml#workspace",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

@@ -1,0 +1,6 @@
+[project]
+name = "ruff"
+version = "0.0.0"
+
+[tool.uv.workspace]
+members = ["crates/*"]

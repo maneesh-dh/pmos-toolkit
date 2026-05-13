@@ -1,0 +1,23 @@
+{
+  "packages": [
+    {
+      "manifest_source": "pnpm-workspace.yaml",
+      "path": "packages/core"
+    },
+    {
+      "manifest_source": "pnpm-workspace.yaml",
+      "path": "packages/parser"
+    },
+    {
+      "manifest_source": "pnpm-workspace.yaml",
+      "path": "codemods/lint"
+    },
+    {
+      "manifest_source": "pnpm-workspace.yaml",
+      "path": "codemods/upgrade"
+    }
+  ],
+  "primary": "pnpm-workspace.yaml",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

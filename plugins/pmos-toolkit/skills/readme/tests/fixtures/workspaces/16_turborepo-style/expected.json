@@ -1,0 +1,21 @@
+{
+  "packages": [
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "apps/api"
+    },
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "apps/web"
+    },
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "packages/shared"
+    }
+  ],
+  "primary": "package.json#workspaces",
+  "repo_type": "monorepo-root",
+  "secondaries": [
+    "turbo.json"
+  ]
+}

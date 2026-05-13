@@ -1,0 +1,15 @@
+{
+  "packages": [
+    {
+      "manifest_source": "pyproject.toml#tool.uv.workspace",
+      "path": "crates/ruff_formatter"
+    },
+    {
+      "manifest_source": "pyproject.toml#tool.uv.workspace",
+      "path": "crates/ruff_linter"
+    }
+  ],
+  "primary": "pyproject.toml#tool.uv.workspace",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

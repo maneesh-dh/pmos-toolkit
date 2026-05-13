@@ -1,0 +1,15 @@
+{
+  "packages": [
+    {
+      "manifest_source": "go.work",
+      "path": "moduleA"
+    },
+    {
+      "manifest_source": "go.work",
+      "path": "moduleB"
+    }
+  ],
+  "primary": "go.work",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

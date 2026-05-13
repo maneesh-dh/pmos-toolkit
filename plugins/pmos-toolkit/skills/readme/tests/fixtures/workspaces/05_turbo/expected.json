@@ -1,0 +1,17 @@
+{
+  "packages": [
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "packages/bar"
+    },
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "packages/foo"
+    }
+  ],
+  "primary": "package.json#workspaces",
+  "repo_type": "monorepo-root",
+  "secondaries": [
+    "turbo.json"
+  ]
+}

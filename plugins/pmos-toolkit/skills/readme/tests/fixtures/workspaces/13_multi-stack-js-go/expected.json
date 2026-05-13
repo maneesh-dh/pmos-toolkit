@@ -1,0 +1,25 @@
+{
+  "packages": [
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "web/apps/frontend"
+    },
+    {
+      "manifest_source": "package.json#workspaces",
+      "path": "web/packages/ui"
+    },
+    {
+      "manifest_source": "go.work",
+      "path": "services/api"
+    },
+    {
+      "manifest_source": "go.work",
+      "path": "services/worker"
+    }
+  ],
+  "primary": "package.json#workspaces",
+  "repo_type": "monorepo-root",
+  "secondaries": [
+    "go.work"
+  ]
+}

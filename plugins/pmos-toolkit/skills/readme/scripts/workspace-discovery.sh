@@ -356,11 +356,38 @@ sys.stdout.write("\n")
 PY
 }
 
+is_enumerable_manifest() {
+  # nx.json + turbo.json are descriptors only (FR-WS-3 / A8): never enumerate.
+  case "$1" in
+    "nx.json"|"turbo.json") return 1 ;;
+    *) return 0 ;;
+  esac
+}
+
 discover() {
   local root="$1"
   [ -d "$root" ] || readme::die "not a directory: $root"
   local detected
   detected="$(probe_manifests "$root")"
+
+  # T10 FR-WS-6 long-tail fallback: no supported manifest detected -> emit
+  # advisory `unknown layout` envelope and exit 0. (Marketplace probe is a
+  # future hook; for now "no supported manifest" is the sole gate.)
+  if [ -z "$detected" ]; then
+    python3 - <<'PY'
+import json, sys
+json.dump({
+    "detected": "unknown layout",
+    "primary": None,
+    "secondaries": [],
+    "packages": [],
+    "repo_type": "unknown",
+}, sys.stdout)
+sys.stdout.write("\n")
+PY
+    return 0
+  fi
+
   local ranked
   ranked="$(printf '%s\n' "$detected" | apply_f15_precedence)"
   local primary=""
@@ -383,22 +410,71 @@ EOF
   if [ -n "$primary" ]; then
     pkg_lines="$(enumerate_packages "$root" "$primary")" || true
   fi
-  # Build a JSON array of {path, manifest_source} objects (T10 will refine
-  # manifest_source for multi-stack; T9 uses the primary uniformly).
+
+  # T10 MS01 multi-stack: for each enumerable secondary, run enumeration and
+  # append its packages IFF the path set is disjoint from the primary's. A
+  # non-disjoint secondary (e.g. lerna.json sitting next to package.json
+  # workspaces, both pointing at packages/*) is treated as an alias of the
+  # primary and contributes no extra rows. nx.json / turbo.json are
+  # descriptors only and never enumerate.
+  local primary_pkgs="$pkg_lines"
+  local -a multi_stack_blocks
+  multi_stack_blocks=()
+  if [ "${#secondaries[@]}" -gt 0 ]; then
+    local sec
+    for sec in "${secondaries[@]}"; do
+      if is_enumerable_manifest "$sec"; then
+        local sec_pkgs
+        sec_pkgs="$(enumerate_packages "$root" "$sec" 2>/dev/null)" || true
+        if [ -n "$sec_pkgs" ]; then
+          # Disjoint check: any overlap with primary set -> skip enumeration.
+          local overlap
+          overlap="$(printf '%s\n---\n%s\n' "$primary_pkgs" "$sec_pkgs" | python3 -c '
+import sys
+raw = sys.stdin.read().split("\n---\n", 1)
+prim = set([l for l in raw[0].splitlines() if l.strip()])
+sec  = set([l for l in (raw[1] if len(raw) > 1 else "").splitlines() if l.strip()])
+print("1" if (prim & sec) else "0")
+')"
+          if [ "$overlap" = "0" ]; then
+            # Encode as "<manifest_source>\n<path1>\n<path2>..." block, then a
+            # blank-line separator. Consumed by the python emitter below.
+            multi_stack_blocks+=("$sec")
+            multi_stack_blocks+=("$sec_pkgs")
+          fi
+        fi
+      fi
+    done
+  fi
+
+  # Build a JSON array of {path, manifest_source} rows. Primary rows first
+  # (preserving T9 order), then each disjoint secondary's rows tagged with
+  # its own manifest_source (MS01).
   local packages_json
-  packages_json="$(printf '%s\n' "$pkg_lines" | python3 -c '
+  # Bash 3.2 + `set -u` quirk: expanding an empty array with `${arr[@]}` is
+  # an "unbound variable" error. Use `${arr[@]+"${arr[@]}"}` to no-op when
+  # empty. (Same idiom as readme::glob_resolve's argv expansion.)
+  packages_json="$(python3 - "$primary" "$primary_pkgs" ${multi_stack_blocks[@]+"${multi_stack_blocks[@]}"} <<'PY'
 import sys, json
-ms = ""
-if len(sys.argv) > 1:
-    ms = sys.argv[1]
+args = sys.argv[1:]
+primary = args[0]
+primary_pkgs = args[1]
+pairs = args[2:]  # alternating: sec_name, sec_pkgs_block
 pkgs = []
-for line in sys.stdin.read().splitlines():
+for line in primary_pkgs.splitlines():
     line = line.strip()
-    if not line:
-        continue
-    pkgs.append({"path": line, "manifest_source": ms})
+    if line:
+        pkgs.append({"path": line, "manifest_source": primary})
+for i in range(0, len(pairs), 2):
+    sec_name = pairs[i]
+    block = pairs[i+1] if i+1 < len(pairs) else ""
+    for line in block.splitlines():
+        line = line.strip()
+        if line:
+            pkgs.append({"path": line, "manifest_source": sec_name})
 print(json.dumps(pkgs))
-' "$primary")"
+PY
+)"
   if [ "${#secondaries[@]}" -eq 0 ]; then
     emit_json "$primary" "$packages_json"
   else
@@ -409,34 +485,50 @@ print(json.dumps(pkgs))
 # --- selftest -----------------------------------------------------------------
 
 selftest() {
-  # T8 stub selftest: confirm the 8 packaged fixtures detect the expected primary.
-  # T10 will land the real 20-repo gate.
+  # T10 real gate: compare each fixture's `discover` output to its
+  # sibling expected.json (sort-keys-normalized). Pass gate is ≥19/20.
   local fixroot="$HERE/../tests/fixtures/workspaces"
-  local pass=0 fail=0
-  # heredoc + IFS-read for tabular data (Bash 3.2-portable).
-  while IFS='|' read -r dir expected; do
-    [ -n "$dir" ] || continue
-    local got
-    got="$(discover "$fixroot/$dir" | python3 -c 'import json,sys;print(json.load(sys.stdin).get("primary") or "")')"
-    if [ "$got" = "$expected" ]; then
-      printf '  OK   %s -> %s\n' "$dir" "$got"
+  local pass=0 fail=0 total=0
+  local -a misses
+  misses=()
+  local fixture_dir fname expected_file actual
+  for fixture_dir in "$fixroot"/*/; do
+    [ -d "$fixture_dir" ] || continue
+    total=$((total + 1))
+    fname="$(basename "$fixture_dir")"
+    expected_file="$fixture_dir/expected.json"
+    if [ ! -f "$expected_file" ]; then
+      printf '  FAIL %s (no expected.json)\n' "$fname"
+      fail=$((fail + 1))
+      misses+=("$fname:no-expected")
+      continue
+    fi
+    actual="$(discover "$fixture_dir" 2>/dev/null)" || {
+      printf '  FAIL %s (script error)\n' "$fname"
+      fail=$((fail + 1))
+      misses+=("$fname:script-error")
+      continue
+    }
+    if python3 - "$actual" "$expected_file" <<'PY'
+import json, sys
+a = json.loads(sys.argv[1])
+b = json.load(open(sys.argv[2]))
+sys.exit(0 if json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True) else 1)
+PY
+    then
+      printf '  OK   %s\n' "$fname"
       pass=$((pass + 1))
     else
-      printf '  FAIL %s -> got=%s want=%s\n' "$dir" "$got" "$expected"
+      printf '  FAIL %s (diff)\n' "$fname"
       fail=$((fail + 1))
+      misses+=("$fname:diff")
     fi
-  done <<'TABLE'
-01_pnpm|pnpm-workspace.yaml
-02_npm-workspaces|package.json#workspaces
-03_lerna|lerna.json
-04_nx|package.json#workspaces
-05_turbo|package.json#workspaces
-06_cargo|Cargo.toml#workspace
-07_go-work|go.work
-08_uv|pyproject.toml#tool.uv.workspace
-TABLE
-  printf 'selftest: %d/%d\n' "$pass" "$((pass + fail))"
-  [ "$fail" -eq 0 ]
+  done
+  printf 'selftest: %d/%d pass (gate >=19/20)\n' "$pass" "$total"
+  if [ "${#misses[@]}" -gt 0 ]; then
+    printf 'misses: %s\n' "${misses[*]}"
+  fi
+  [ "$pass" -ge 19 ]
 }
 
 # --- main ---------------------------------------------------------------------

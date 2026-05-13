@@ -1,0 +1,15 @@
+{
+  "packages": [
+    {
+      "manifest_source": "lerna.json",
+      "path": "packages/bar"
+    },
+    {
+      "manifest_source": "lerna.json",
+      "path": "packages/foo"
+    }
+  ],
+  "primary": "lerna.json",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

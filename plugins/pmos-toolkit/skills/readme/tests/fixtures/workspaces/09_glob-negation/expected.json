@@ -1,0 +1,15 @@
+{
+  "packages": [
+    {
+      "manifest_source": "pnpm-workspace.yaml",
+      "path": "packages/alpha"
+    },
+    {
+      "manifest_source": "pnpm-workspace.yaml",
+      "path": "packages/beta"
+    }
+  ],
+  "primary": "pnpm-workspace.yaml",
+  "repo_type": "monorepo-root",
+  "secondaries": []
+}

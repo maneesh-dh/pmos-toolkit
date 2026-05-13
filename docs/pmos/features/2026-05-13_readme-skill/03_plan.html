@@ -1,0 +1,1531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="pmos:phase" content="plan">
+<meta name="pmos:tier" content="3">
+<meta name="pmos:slug" content="readme-skill">
+<meta name="pmos:type" content="feature">
+<meta name="pmos:status" content="Approved-for-execute">
+<meta name="pmos:execution_mode" content="subagent-driven">
+<meta name="pmos:status_confirmed" content="2026-05-13">
+<meta name="pmos:commit_cadence" content="per-task">
+<meta name="pmos:contract_version" content="1">
+<meta name="pmos:spec_ref" content="02_spec.html">
+<meta name="pmos:requirements_ref" content="01_requirements.html">
+<title>/readme skill — Implementation Plan</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:980px;margin:2em auto;padding:0 1em;line-height:1.55;color:#222}
+h1{border-bottom:2px solid #333;padding-bottom:.3em}
+h2{margin-top:2em;border-bottom:1px solid #ddd;padding-bottom:.2em}
+h3{margin-top:1.5em}
+h4{margin-top:1.1em}
+table{border-collapse:collapse;width:100%;margin:.5em 0;font-size:.93em}
+th,td{border:1px solid #ccc;padding:.4em .55em;text-align:left;vertical-align:top}
+th{background:#f4f4f4}
+code{background:#f0f0f0;padding:.1em .3em;border-radius:3px;font-size:.93em}
+pre{background:#f6f6f6;border:1px solid #ddd;padding:.7em;overflow-x:auto;font-size:.88em;line-height:1.4}
+section{margin-bottom:1em}
+.meta{color:#555;font-size:.9em}
+.note{background:#fff8e1;border-left:4px solid #ffb300;padding:.5em .8em;margin:.7em 0;font-size:.95em}
+.task{background:#fafbfc;border:1px solid #e1e4e8;border-radius:5px;padding:.8em 1em;margin:1em 0}
+.task h4{margin-top:0}
+.fields{font-size:.92em;color:#444}
+.fields div{margin:.15em 0}
+</style>
+</head>
+<body>
+<header>
+<h1>/readme skill — Implementation Plan</h1>
+<p class="meta"><strong>Tier:</strong> 3 — Feature · <strong>Type:</strong> feature · <strong>Feature:</strong> readme-skill · <strong>Date:</strong> 2026-05-13 · <strong>Status:</strong> Approved-for-execute ·<strong>Commit cadence:</strong> per-task · <strong>Execution mode:</strong> subagent-driven (proposed) · <strong>Spec:</strong> <a href="02_spec.html">02_spec.html</a> · <strong>Requirements:</strong> <a href="01_requirements.html">01_requirements.html</a></p>
+</header>
+<main>
+
+<section id="overview">
+<h2 id="overview">Overview</h2>
+<p>Build the <code>/readme</code> skill at <code>plugins/pmos-toolkit/skills/readme/</code> per <a href="02_spec.html">02_spec.html</a>. The work is a thin vertical slice through every layer first (T1 tracer bullet: minimal audit on a fixture README), then widens outward — full rubric, workspace discovery, simulated-reader, scaffold mode, update-mode hook, monorepo cross-file rules, voice-diff, integration suite. Skill-patterns.md §A–§F drives the SKILL.md/reference/scripts shape (FR-A1..FR-F2).</p>
+<p><strong>Done when:</strong> <code>SKILL.md</code> + 6 reference files + 4 bundled scripts (each with <code>--selftest</code> exit 0) + 7 integration tests (each exits 0) all land at <code>plugins/pmos-toolkit/skills/readme/</code>; <code>scripts/rubric.sh --selftest</code> reports ≥85% A2 agreement (NFR-2 regression gate); <code>scripts/workspace-discovery.sh --selftest</code> reports ≥19/20 across the fixture set (G5 / A8 gate); audit on this repo's root README emits ≥5 approved findings (G3); audit on the /readme-emitted scaffold output produces zero diff (NFR-2 idempotency); <code>feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</code> exits 0 on the <code>[D]</code> checks.</p>
+<p><strong>Done-when walkthrough:</strong> A maintainer runs <code>/readme</code> inside this repo's root. Mode-resolver detects <code>README.md</code> → defaults to <code>--audit</code>, logs <code>mode: audit (existing README detected)</code>. Workspace-discovery probes 8 manifests; <code>plugins/*/</code> + <code>.claude-plugin/marketplace.json</code> are absent so it classifies as <em>monorepo-root</em> via the <code>plugins/</code>-without-marketplace.json branch; logs <code>workspace: detected 0 packages via marketplace fallback; repo_type=plugin-marketplace-root</code>. <code>rubric.sh README.md --variant plugin-marketplace-root</code> emits TSV; 4 blocker checks fire on the existing README; 3 mechanical findings auto-apply; 5 structural findings surface via AskUserQuestion (4-per-call). 3 simulated-reader subagents dispatch in parallel; each returns persona-friction JSON; parent substring-grep validates every quote against README source (FR-SR-3); 2 friction findings merge into the stream. Unified diff preview prints with <code>=== package: root (audit) ===</code> header. User picks <em>Apply all (Recommended)</em>. Atomic write to <code>README.md.tmp.&lt;pid&gt;</code> + rename(2). Chat closes with <code>README written to README.md. Run /complete-dev to include it in the release commit.</code> Total wall-clock: ~25s (NFR-1).</p>
+<p><strong>Execution order:</strong></p>
+<pre>
+Phase 1 — Tracer bullet (audit, minimal)
+  T1 [tracer] SKILL.md skeleton + frontmatter
+  T2 rubric.sh skeleton + 1 check + --selftest
+  T3 mode-resolver + findings-aggregator + atomic-write minimum
+       (demoable: /readme on fixture README, 1 finding, no diff)
+                │
+Phase 2 — Full rubric & section schema           [P with Phase 3]
+  T4 reference/rubric.yaml — 15 checks
+  T5 reference/section-schema.yaml + commit_affinity
+  T6 reference/opening-shapes.md (per-type)
+  T7 rubric.sh widens to 15 checks + 7 variants + auto-apply
+                │
+Phase 3 — Workspace discovery                    [P with Phase 2]
+  T8  workspace-discovery.sh skeleton + 8 manifests
+  T9  glob negation + exclude arrays + object-form + pnpm filter
+  T10 MS01 multi-stack + 20-repo fixture set + --selftest ≥19/20
+                │
+Phase 4 — Simulated-reader (parallel personas)
+  T11 reference/simulated-reader.md (3 persona prompts)
+  T12 parallel-Task dispatch + 120s timeout + FR-SR-3 validation
+  T13 theater check (FR-SR-5) + --skip-simulated-reader flag
+                │
+Phase 5 — Scaffold mode + repo-miner             [P with Phase 6]
+  T14 mode-resolver extension (--scaffold, composition rules)
+  T15 repo-miner subagent dispatch + return-shape validation
+  T16 scaffold flow: ≤6 Q cap → draft → rubric → simulated-reader
+                │
+Phase 6 — Update mode + commit-classifier        [P with Phase 5]
+  T17 commit-classifier.sh + --selftest
+  T18 update-mode flow + FR-UP-3 patch-fail guard
+  T19 opt-in gate (dual flag) + git-add-only stage
+                │
+Phase 7 — Cross-file rules (monorepo)
+  T20 reference/cross-file-rules.md + A9 clarity-test methodology
+  T21 R1/R2 (link existence) + R3 warn-with-override + R4 hero-dup
+  T22 monorepo unified diff (D15) + per-package roll-up
+                │
+Phase 8 — Voice delegation
+  T23 voice-diff.sh wrapping /polish substrate + --selftest
+  T24 FR-V-2 suggest /polish follow-up line in output
+                │
+Phase 9 — Integration tests + dogfood
+  T25 7 integration scripts in tests/integration/
+  T26 Dogfood: audit this repo's root + 5 plugins (G1, G3 gate)
+                │
+TN — Final verification (lint, all selftests, integration suite,
+     /skill-eval, idempotency check, dogfood G1≥90%)
+</pre>
+<p class="meta">Parallelizable marks <code>[P]</code> indicate phase pairs that touch disjoint files. <code>/execute --subagent-driven</code> can run T2 || T8 in wave-1, T4 || T5 || T6 || T9 || T11 in wave-2, etc. The deterministic wave planner (deps + file-conflict relation) handles wave assignment; phases here are a logical grouping for /verify, not a strict ordering.</p>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log">Decision Log</h2>
+<p>Architecture decisions D1–D16 + MS01 inherit from <a href="02_spec.html#decision-log">02_spec.html §4</a>. Entries below are implementation-specific decisions made during planning.</p>
+<table>
+<tr><th>#</th><th>Decision</th><th>Options considered</th><th>Rationale</th></tr>
+<tr><td>P1</td><td>Tracer-bullet T1 hardcodes a single rubric check (<em>hero-line presence</em>) and skips simulated-reader entirely. Subsequent tasks widen each layer.</td><td>(a) T1 implements all 15 rubric checks + 3 personas; (b) T1 minimal end-to-end with 1 check, no personas (Recommended); (c) T1 schema-only (no end-to-end behavior)</td><td>The tracer-bullet's job is to prove the architecture (mode-resolver → rubric → aggregator → diff → atomic write) survives contact with reality, NOT to deliver value. 1 check is enough to exercise every wire. Widening rubric and adding personas in later tasks keeps each PR small. Per <a href="02_spec.html#user-journeys">spec §5.1</a> the layers are: mode-resolver → workspace-discovery → rubric → findings aggregator → simulated-reader → diff preview → atomic write. T1 exercises 5 of 7; personas and full workspace probing land in P4/P3.</td></tr>
+<tr><td>P2</td><td>Bundled scripts written in bash + node + jq (no Python). Each script has its own <code>--selftest</code> mode (FR-E2). Test runner is a top-level <code>tests/run-all.sh</code> that iterates self-tests + integration scripts.</td><td>(a) Python scripts (richer parsing); (b) bash + node + jq (Recommended — matches existing skills); (c) pure bash (no JSON tooling)</td><td>The host repo's existing skill scripts (e.g., <code>feature-sdlc/tools/skill-eval-check.sh</code>) are bash + node + jq. Matching the stack reduces dep surface and aligns with NFR-5. Node is required for YAML parsing (no jq YAML support); jq for JSON. Python would add a third runtime with no offsetting benefit. Self-tests embedded in each script (per FR-E2) avoid a separate test harness.</td></tr>
+<tr><td>P3</td><td>Three subagent calls in T12 dispatch via separate Task tool calls in a single response (parallel by harness scheduling), not via a shell <code>wait</code> primitive. The /readme skill body invokes the Task tool 3× concurrently per <a href="02_spec.html#decision-log">D13</a>.</td><td>(a) Background-bash with wait; (b) 3× Task in one response — harness runs in parallel (Recommended); (c) Sequential dispatch with explicit "parallel" annotation (no actual concurrency)</td><td>The Claude Code harness schedules independent Task calls concurrently when emitted in a single response; this is the canonical way to fan out subagents (matches /verify multi-agent and /grill reviewer patterns). Background-bash with shell-level wait can't carry per-call timeouts or per-call return-shape validation. Sequential-with-annotation defeats the purpose (D13 wants 3× wall-clock reduction). Per-call 120s timeout is wired via the Task tool's timeout option; on platforms without Task, fall back to sequential per <a href="02_spec.html#api-contracts">§9.2.1</a>.</td></tr>
+<tr><td>P4</td><td>YAML manifest parsing in bash scripts uses a thin node one-liner (<code>node -e 'console.log(JSON.stringify(require("js-yaml").load(require("fs").readFileSync(process.argv[1],"utf8"))))'</code>) gated behind a <code>command -v node</code> probe; on absence, the script warns and continues with reduced functionality where possible.</td><td>(a) yq dependency (yq is not universally installed); (b) python -c yaml.safe_load; (c) node + js-yaml (Recommended — node is required anyway by template substrate); (d) bash-only line-parse</td><td>Spec NFR-5 documents bash≥4, jq, node, coreutils as the dep set. yq adds another binary not commonly preinstalled; python rotates the runtime stack. Node is already required (Claude Code runs on node). <code>js-yaml</code> is a transitive dep through Claude Code's own bundle (we use it via <code>node -e</code> with require). On <code>js-yaml</code>-absent we fall back to a regex skim of the YAML's top-level keys (sufficient for workspace-manifest precedence checks; flagged as advisory).</td></tr>
+<tr><td>P5</td><td>Fixture monorepos in <code>tests/fixtures/workspaces/</code> are tarball-stored as minimal stub trees (only the manifest files needed for discovery), NOT full clones. 20 fixtures average ~500 bytes each.</td><td>(a) Git submodules pointing at real repos (Babel, Next, …); (b) Stub manifest trees, hand-authored (Recommended); (c) Mock vfs in-memory only</td><td>(a) adds 5 GB of dependency surface and bottlenecks on network in CI; (b) the workspace-discovery probes only the manifest files (FR-WS-1), so a 3-line <code>pnpm-workspace.yaml</code> stub exercises the same code path as the real Babel repo; the A8 proxy used WebFetch on real repos, the regression gate uses stubs. (c) defeats the file-system-probe nature of the script. Stubs encode the manifest patterns we want to regress against (glob negation, exclude arrays, object-form, multi-stack); real-repo re-runs happen pre-release per A8 follow-up.</td></tr>
+<tr><td>P6</td><td>Integration tests use a per-test temp directory under <code>$(mktemp -d)</code>; each test sets up a fixture tree, invokes the script under test, asserts on output via grep/jq, cleans up via <code>trap</code>. No global mutable state.</td><td>(a) Shared <code>tests/scratch/</code> dir; (b) per-test <code>mktemp -d</code> (Recommended); (c) Docker-isolated tests</td><td>Idempotency (NFR-2) demands each test runs against a known-clean fs. (a) cross-contaminates between tests; (c) overweight for shell-script integration. <code>mktemp -d</code> + <code>trap 'rm -rf "$tmp"' EXIT</code> is the conventional bash pattern and runs sub-second per test.</td></tr>
+<tr><td>P7</td><td>The bundled scripts MUST source a shared helper file <code>plugins/pmos-toolkit/skills/readme/scripts/_lib.sh</code> that exposes <code>readme::log</code>, <code>readme::yaml_get</code>, <code>readme::die</code>. Each script header notes the dep.</td><td>(a) Inline duplicated helpers per script; (b) shared <code>_lib.sh</code> (Recommended); (c) external command-line tool</td><td>4 scripts × similar logging/yaml-parse/error-exit logic = duplication. <code>_lib.sh</code> consolidates ~30 LOC per script. NFR-3 (observability) demands consistent log-line formatting; centralizing it in the helper avoids drift between scripts. The dep is internal to the skill (no external install), so portability is not affected. Source it via <code>source "${BASH_SOURCE[0]%/*}/_lib.sh"</code> (relative path safe from any invocation cwd).</td></tr>
+<tr><td>P8</td><td>SKILL.md body targets ≤480 lines (under the 500 hard line per FR-C1); content over 480 lines deflates to <code>reference/*</code>. Body covers: announce + Platform Adaptation + Track Progress + When to Use + Core Pattern + Implementation (mode-resolver, rubric, simulated-reader, diff/write) + Anti-patterns + Capture Learnings.</td><td>(a) Target ≤500 (the hard cap); (b) target ≤480 (safety margin, Recommended); (c) accept 501–800 with pass-with-note</td><td>NFR-6 / FR-C1 admits 501–800 with a justified pass-with-note, but a 480 target leaves headroom for review-loop additions without tipping past 500. The pmos-toolkit existing skills (/grill, /spec) sit between 400–500. Skill-eval Phase 6a binary check <code>c-body-line-budget</code> [D] passes at &lt;500; passing with margin avoids re-iterating.</td></tr>
+<tr><td>P9</td><td>Test harness for the simulated-reader contract uses a <code>tests/mocks/simulated_reader_stub.sh</code> that echoes canned JSON; the parent /readme skill detects the stub via env var <code>READMER_PERSONA_STUB=path</code> and sources it instead of dispatching Task. Test-only — never set in production.</td><td>(a) Mock Task tool inside the test harness; (b) env-var-gated stub (Recommended); (c) record/replay against real Task</td><td>Testing the FR-SR-3 substring-validation logic requires deterministic persona output. The Task tool isn't mockable from inside a bash test. An env-var-gated stub keeps the code path identical (the skill body branches in one well-defined spot) and lets <code>cross_file_rules.sh</code>-style tests exercise validation deterministically. The env var is documented in SKILL.md ## Platform Adaptation as a testing aid; not user-facing.</td></tr>
+<tr><td>P10</td><td>Snapshot-commit on dirty tree (FR-OUT-4 / E11) uses <code>git commit -m "snapshot: pre-/readme-rewrite"</code> on JUST the README path: <code>git add &lt;readme&gt; &amp;&amp; git commit -m "..." &lt;readme&gt;</code>. Other unstaged changes are NOT pulled in.</td><td>(a) <code>git stash</code> + restore at end; (b) snapshot-commit README-only path (Recommended); (c) refuse on any dirty tree</td><td>FR-OUT-4 says "snapshot-commit first" but is silent on scope. Stash is fragile (interaction with conflicts, untracked files). Refusing breaks the "non-destructive" contract (rollback §14 row 6 — atomic write, never auto-commit the new README, snapshot if dirty). Pathspec'd commit isolates the README's prior contents in git history without touching the rest of the user's working tree, matching the principle of /readme being non-intrusive.</td></tr>
+<tr><td>P11</td><td>SKILL.md ## Implementation subsections are append-only across tasks. A task that adds a new subsection (mode-resolver, simulated-reader, scaffold, update, cross-file, voice) MUST append at the bottom of ## Implementation; tasks that extend an existing subsection MUST insert at the end of that subsection. No mid-subsection rewrites of prior tasks' content.</td><td>(a) Free-form edits, wave planner serializes; (b) Append-only convention per ## Implementation subsection (Recommended); (c) One task owns SKILL.md exclusively (anti-parallel)</td><td>12 tasks modify SKILL.md (R9 covers wave serialization). Append-only convention prevents tasks-2-through-N from rewriting task-1's earlier content during a parallel wave (controller-commits-post-wave still gives clean per-task commits, but the diff is bounded). Each task's Steps section now ends with a pre-flight grep asserting prior subsections still exist before appending; on missing prior subsection → hard-fail (a prior task didn't land). Mirrors P7's _lib.sh append-only pattern. (c) defeats the wave-driven parallelism the user picked.</td></tr>
+</table>
+</section>
+
+<section id="code-study-notes">
+<h2 id="code-study-notes">Code Study Notes</h2>
+<p class="meta">Glossary inherited from <a href="02_spec.html">02_spec.html</a> §16/§7 — the plan introduces no new domain terms.</p>
+
+<h3 id="patterns-to-follow">Patterns to follow</h3>
+<ul>
+<li><code>plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh</code> — canonical pattern for a bundled bash script that emits TSV + has structured exit codes (0/1/2). T2, T17, T23 reuse this shape (rubric.sh, commit-classifier.sh, voice-diff.sh).</li>
+<li><code>plugins/pmos-toolkit/skills/grill/SKILL.md</code> §Phase 1 — reviewer-subagent contract (FR-50/51/52): chrome-strip → enumerate sections → quote validation. T12 (simulated-reader parent-side validation) mirrors this pattern verbatim; FR-SR-3 spec quote is "FR-50/51/52 pattern from /grill".</li>
+<li><code>plugins/pmos-toolkit/skills/spec/SKILL.md</code> — Phase 0 pipeline-setup-block + non-interactive-block (canonical inlined blocks). T1's SKILL.md MUST include both blocks byte-for-byte. The blocks live in <code>_shared/pipeline-setup.md</code> and <code>_shared/non-interactive.md</code> respectively.</li>
+<li><code>plugins/pmos-toolkit/skills/_shared/html-authoring/assets/chrome-strip.js</code> — node-based source de-chroming used by /feature-sdlc and /grill as reviewer input. Not used by /readme directly (README.md is plain markdown), but its <code>process.argv</code> + stdout pattern is the template for /readme's node one-liner shells in scripts.</li>
+<li><code>plugins/pmos-toolkit/skills/polish/reference/voice-sampling.md</code> — voice-preservation substrate that <code>voice-diff.sh</code> wraps (FR-V-3, FR-V-4). T23 sources voice metrics from this file; on substrate absence emits the documented graceful warn.</li>
+</ul>
+
+<h3 id="existing-code-to-reuse">Existing code to reuse</h3>
+<ul>
+<li><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code> §A–§F — cited at the top of SKILL.md per FR-61; the implementation must conform. T1 cites; T4-T26 honor §C/§D/§E rules transitively.</li>
+<li><code>plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh</code> — invoked by TN's verification suite and Phase 6a (/skill-eval gate). NOT reimplemented; called as-is.</li>
+<li><code>plugins/pmos-toolkit/skills/polish/scripts/</code> (if present at /execute time) — substrate for voice-diff.sh; resolved via <code>find plugins/pmos-toolkit/skills/polish/ -name 'voice*'</code> at runtime per FR-V-4. Polish currently exposes <code>reference/voice-sampling.md</code> + <code>tests/fixtures/voice-preserve.md</code>; voice-diff.sh implements the metrics described therein (sentence-length delta, Jaccard new-tokens).</li>
+<li><code>plugins/pmos-toolkit/skills/_shared/interactive-prompts.md</code> — AskUserQuestion fallback contract; SKILL.md's Platform Adaptation section cites it.</li>
+<li><code>plugins/pmos-toolkit/skills/_shared/non-interactive.md</code> — canonical inlined block (FR-01–FR-09 cross-cutting non-interactive contract); SKILL.md's Phase 0 includes it byte-for-byte.</li>
+</ul>
+
+<h3 id="constraints-discovered">Constraints discovered</h3>
+<ul>
+<li><strong>No <code>assets/</code> in this feature folder.</strong> The earlier /spec / /grill artifacts here use the minimal inline-CSS HTML style rather than the <code>_shared/html-authoring/</code> substrate. This is a known /retro item; /plan continues the same minimal style for output consistency. /execute does NOT need to touch <code>_shared/html-authoring/</code>.</li>
+<li><strong>Plugin marketplace classification.</strong> This repo's root README sits above <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code>. FR-WS-5 classifies <em>plugin-marketplace-root</em> on <code>plugins/*/</code> + <code>.claude-plugin/marketplace.json</code>; the repo HAS <code>plugins/</code> + plugin.json but NO marketplace.json. T7 must either (a) add a marketplace.json detection branch, or (b) widen the classifier to "any <code>plugins/&lt;p&gt;/</code> + a plugin.json signals marketplace-root". Decision deferred to T7 (review with maintainer at that point); spec FR-WS-5 anticipates "Ambiguous → AskUserQuestion fallback persisted in <code>.pmos/readme.config.yaml</code>" which covers the gap.</li>
+<li><strong>The skill body MUST inline both canonical blocks verbatim.</strong> <code>tools/audit-recommended.sh</code> (existing pmos-toolkit invariant) greps for <code>&lt;!-- non-interactive-block:start --&gt;</code> + <code>&lt;!-- pipeline-setup-block:start --&gt;</code>. Skipping either inlining breaks downstream auditing. T1 mandatory.</li>
+<li><strong>The skill is DOGFOODED at TN against this repo's READMEs.</strong> If TN's <code>/readme --audit</code> on the root README produces &lt;5 findings on first run, G3 fails. Phase 9 (T26) wires the dogfood test; failure here is a plan-level Done-when miss, not a test failure. The integration test must run on the LIVE repo files (`README.md` at repo root), not on fixtures, to faithfully measure G3.</li>
+<li><strong>FR-CF-5 A9 clarity test runs at design-time, not runtime.</strong> Rules R1–R4 must be deterministic binary checks (no human judgment). Each rule's "design-time test result" is recorded in <code>reference/cross-file-rules.md</code> when the file is authored (T20). This is a one-shot artifact, not a runtime gate.</li>
+<li><strong>Voice substrate uses <code>find</code> at runtime (FR-V-4).</strong> <code>voice-diff.sh</code> shells <code>find plugins/pmos-toolkit/skills/polish/ -name 'voice*'</code> instead of hardcoding paths; this absorbs future renames in /polish.</li>
+</ul>
+
+<h3 id="stack-signals">Stack signals</h3>
+<ul>
+<li><strong>Primary stack:</strong> bash + node + jq (matches existing pmos-toolkit skill bundles). Dep set per NFR-5: bash≥4, coreutils, jq, node (with optional <code>js-yaml</code>).</li>
+<li><strong>Host repo manifest signals:</strong> <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> + <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code> (skill marketplace pattern); no <code>package.json</code> at repo root, no <code>Cargo.toml</code>, no <code>go.mod</code>. Tests are <code>.sh</code> scripts.</li>
+<li><strong>Test framework:</strong> none (bash + grep + jq assertions). Pattern mirrors <code>feature-sdlc/tools/skill-eval-check.sh</code>'s TSV-emit + parent grep approach.</li>
+<li><strong>Lint:</strong> <code>shellcheck</code> for bash scripts; informal markdown lint (existing repo doesn't run automated md lint).</li>
+<li><strong>Reference system (greenfield substitute, FR-91):</strong> /grill (parent-side validation), /polish (voice substrate), /spec (canonical inlined-block patterns), /feature-sdlc (bundled tools/ + substrate use). Stack signals justified against these existing peers.</li>
+</ul>
+</section>
+
+<section id="prerequisites">
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>Worktree active at <code>/Users/maneeshdhabria/Desktop/Projects/agent-skills-readme-skill</code>; branch <code>feat/readme-skill</code>; clean tree (state.yaml verified).</li>
+<li><code>plugins/pmos-toolkit/skills/readme/</code> does NOT yet exist (this plan creates it).</li>
+<li>Host repo's <code>bash --version</code> ≥ 4, <code>jq --version</code> ≥ 1.6, <code>node --version</code> ≥ 18. All three present (verified at /execute Phase 0).</li>
+<li>For T23 (voice-diff.sh): <code>plugins/pmos-toolkit/skills/polish/</code> must exist (it does — voice-sampling.md + fixtures verified Phase 2 code study).</li>
+<li>For T26 (dogfood): <code>README.md</code> + each <code>plugins/&lt;p&gt;/README.md</code> readable at audit time (T26 does NOT modify; it asserts on findings count).</li>
+<li><code>~/.pmos/learnings.md</code> may have entries under <code>## /readme</code> — none expected on first run; /complete-dev Phase 8 will bootstrap the header. NO entries land via /execute (release-prereq scope per FR-63).</li>
+</ul>
+</section>
+
+<section id="file-map">
+<h2 id="file-map">File Map</h2>
+<p class="meta">Index — tasks are source of truth (FR-23). Every "Files:" entry below maps back to a task.</p>
+<table>
+<tr><th>Action</th><th>File</th><th>Responsibility</th><th>Task</th></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></td><td>Skill body — frontmatter + Platform Adaptation + Track Progress + non-interactive-block + pipeline-setup-block + body + anti-patterns + capture-learnings</td><td>T1, T4 (rubric refs), T11 (simulated-reader refs), T14 (mode-resolver), T16 (scaffold), T18 (update), T22 (cross-file), T24 (voice)</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/reference/rubric.yaml</code></td><td>15 binary rubric checks; 7 repo-type variants; banned-phrase list</td><td>T4</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/reference/section-schema.yaml</code></td><td>Standard-readme spine + Diátaxis linkout slots + commit_affinity table</td><td>T5</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/reference/opening-shapes.md</code></td><td>5-block + map+identity opening patterns; per-type table</td><td>T6</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md</code></td><td>3 persona prompts (evaluator/adopter/contributor) + return-shape JSON Schema + parent-side validation contract</td><td>T11</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/reference/rubric-development.md</code></td><td>Validate→fix→repeat eval-driven dev loop for rubric authoring (FR-E3)</td><td>T4</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/reference/cross-file-rules.md</code></td><td>R1–R4 specifications + A9 clarity-test design-time results</td><td>T20</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/scripts/_lib.sh</code></td><td>Shared bash helpers (readme::log, readme::yaml_get, readme::die)</td><td>T2 (initial); extended by T7, T9, T17, T23</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh</code></td><td>Apply rubric to a README; emit TSV; <code>--selftest</code> against fixtures</td><td>T2 (skeleton, 1 check), T7 (15 checks + 7 variants)</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh</code></td><td>Probe 8 manifests; emit JSON; <code>--selftest</code> ≥19/20</td><td>T8 (skeleton + 8 manifests), T9 (glob semantics), T10 (MS01 + fixture set)</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/scripts/voice-diff.sh</code></td><td>Wrap /polish voice metrics; emit JSON; <code>--selftest</code></td><td>T23</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/scripts/commit-classifier.sh</code></td><td>Parse commit range → section affinity; emit JSON; <code>--selftest</code></td><td>T17</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/strong/</code></td><td>5 hand-curated strong README fixtures (A2 proxy set)</td><td>T2 (skeleton); T7 expands</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/slop/</code></td><td>5 synthesized slop README fixtures (A2 proxy set)</td><td>T2 (skeleton); T7 expands</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/fixtures/workspaces/</code></td><td>20 stub workspace fixtures covering 8 manifests + multi-stack + edge cases</td><td>T10</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/fixtures/commits/</code></td><td>Synthetic commit ranges for commit-classifier --selftest</td><td>T17</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/mocks/simulated_reader_stub.sh</code></td><td>Stub persona output for FR-SR-3 contract tests (env-var-gated, P9)</td><td>T12, T13</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/scaffold_greenfield.sh</code></td><td>End-to-end scaffold-mode integration test</td><td>T25</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/audit_clean.sh</code></td><td>NFR-2 idempotency assertion on /readme-emitted scaffold</td><td>T25</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/audit_cluttered.sh</code></td><td>≤20-line structural diff assertion on good-but-cluttered fixture</td><td>T25</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/compose_audit_scaffold.sh</code></td><td>D16 + FR-MODE-3 mixed-mode invocation on monorepo fixture</td><td>T25</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/multi_stack_grafana_style.sh</code></td><td>FR-WS-4 MS01 multi-stack assertion (JS + Go fixture)</td><td>T25</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/update_hook_dry_run.sh</code></td><td>FR-UP-3 patch-drop + FR-UP-4 opt-in assertions</td><td>T25</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/cross_file_rules.sh</code></td><td>R1–R4 firing assertions + R3 warn-with-override (not blocker)</td><td>T25</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code></td><td>Top-level test runner: iterates self-tests + integration scripts; exits 1 on any fail</td><td>T25</td></tr>
+</table>
+<p class="meta">No Modify/Move/Rename/Delete actions in this plan — /readme is entirely new code at a new path. Release-prerequisite file edits (README row, plugin.json bump, changelog, learnings header) are OUT OF SCOPE per <a href="02_spec.html#release-prerequisites">spec §15</a> + FR-63; those are /complete-dev's Phase 8.</p>
+</section>
+
+<section id="risks">
+<h2 id="risks">Risks</h2>
+<table>
+<tr><th>#</th><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Severity</th><th>Mitigation</th><th>Mitigation in</th></tr>
+<tr><td>R1</td><td>Simulated-reader subagent contract drift — persona output diverges from the FR-SR-3 substring-validation expectation, hard-failing every /readme run.</td><td>Medium</td><td>High</td><td>High</td><td>Stub-driven contract test in <code>tests/mocks/simulated_reader_stub.sh</code> exercises (a) valid quotes (pass), (b) altered quotes (hard-fail per FR-SR-3), (c) empty friction (theater-check re-prompt per FR-SR-5). Run on every /execute and TN. Real Task dispatches validate against the same parent code path.</td><td>T12, T13</td></tr>
+<tr><td>R2</td><td>Workspace-discovery misclassifies this repo (plugins/* + plugin.json but no marketplace.json) — FR-WS-5 ambiguity surfaces as a /readme audit failure on the host repo, blocking dogfood G3.</td><td>High</td><td>Medium</td><td>High</td><td>T7 widens the classifier explicitly: <code>plugins/&lt;p&gt;/.claude-plugin/plugin.json</code> + no marketplace.json → plugin-marketplace-root; <code>.claude-plugin/marketplace.json</code> present → plugin-marketplace-root; classifier persists user override in <code>.pmos/readme.config.yaml :: repo_type</code> on AskUserQuestion fallback. T10's fixture <code>plugin-marketplace-no-mp-json</code> regresses this exact case.</td><td>T7, T10, T26</td></tr>
+<tr><td>R3</td><td>Voice substrate path resolves differently across pmos-toolkit versions — FR-V-4 <code>find</code> shells onto a path that has moved; G4 voice gate silently skips.</td><td>Medium</td><td>Medium</td><td>Medium</td><td>voice-diff.sh's --selftest asserts substrate-found-at-runtime (exit 1 if <code>find</code> returns 0 results). NFR-3 chat warn line emits explicit "voice-diff substrate not found; G4 gate skipped" so silent skip becomes audible. /verify Phase 7 dogfood re-runs the gate.</td><td>T23, TN</td></tr>
+<tr><td>R4</td><td>Phase 2/3 parallel waves touch the shared <code>_lib.sh</code> file — wave-1 (T2) creates it, wave-2 (T7, T9, T17, T23) extend it concurrently with merge conflicts on every wave end.</td><td>Medium</td><td>Low</td><td>Low</td><td>The wave planner detects file-conflict relation on _lib.sh and serializes its writers. T2 creates _lib.sh with the minimal helper set; subsequent extensions are append-only (new functions, no rewrites of existing ones). The planner places the EXTENSIONS on independent waves keyed by other file conflicts; /execute's controller-commits-post-wave merges them in deterministic order. P7 documents the append-only convention; T7 enforces it with a pre-flight grep.</td><td>T2, T7, T17, T23</td></tr>
+<tr><td>R5</td><td>Update-mode patch-fail (FR-UP-3) blocks too many /complete-dev runs — over-aggressive blocker definition makes M1 "cleared for default-on" unreachable.</td><td>Low</td><td>Medium</td><td>Low</td><td>FR-UP-3 already drops the patch (not the release); release proceeds unpatched. T18 wires the /retro finding line so unblock-reasons surface. M1 cleared-criterion (≥3 runs zero drops) is post-v1 and not a v1-gating concern. Hot-fix path: disable hook via the dual opt-in flag (FR-UP-4).</td><td>T18, T19, /retro</td></tr>
+<tr><td>R6</td><td>20-fixture workspace set under-covers a real-world manifest pattern (e.g., a yarn workspaces nohoist edge case) — A8 regression gate passes but production /readme fails on a real grafana-like repo.</td><td>Medium</td><td>Medium</td><td>Medium</td><td>The fixture set is hand-derived from the A8 proxy on 20 real repos (Babel, Next, Turborepo, …). Real-repo re-run is queued for /verify Phase 7 (NFR-3 / spec §16 row "A8 proxy report"). T10 fixtures encode each manifest shape that the proxy surfaced. Post-v1 dogfood adds 20+ more on encounter.</td><td>T10, /verify</td></tr>
+<tr><td>R7</td><td>Skill-patterns.md §A–§F binary checks (FR-A1..FR-F2) fail on T1's first SKILL.md emit — skill-eval Phase 6a iteration 1 surfaces 5+ findings, eating the 2-iteration cap before Phase 7.</td><td>Medium</td><td>Medium</td><td>Medium</td><td>T1 inlines BOTH canonical blocks (<code>&lt;!-- pipeline-setup-block --&gt;</code> + <code>&lt;!-- non-interactive-block --&gt;</code>) byte-for-byte from <code>_shared/</code>. T1 includes inline self-check: <code>grep -c "non-interactive-block:start" SKILL.md == 1</code> and <code>line_count(SKILL.md) ≤ 480</code> (P8). FR-A2 ≥5 trigger phrases hard-coded in the description: "audit my README", "scaffold a README", "fix my README", "generate a README", "review my README structure", "/readme".</td><td>T1, /skill-eval</td></tr>
+<tr><td>R8</td><td>Dogfood (T26) at TN finds &lt;5 approvable findings on this repo's root README — G3 gate fails, blocking /verify clearance.</td><td>Low</td><td>High</td><td>Medium</td><td>T26 is advisory (warn-but-exit-0 per Loop-1 disposition); /verify Phase 7 owns the G1/G3 gate via accepted_residuals[] (mirrors A2/A4 residual treatment from spec Phase 0 Validation). The existing root README is large (~50 lines); a 15-check rubric will likely find ≥5 issues. If &lt;5 surface, T26 emits a warn and the residual is recorded for /verify reconciliation per Phase 6a semantics.</td><td>T26, /verify</td></tr>
+<tr><td>R9</td><td>Twelve tasks (T1, T3, T12, T13, T14, T15, T16, T18, T19, T21, T22, T24) modify <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code>. In a <code>--subagent-driven</code> /execute run, parallel waves touching the same file produce merge conflicts on every wave end.</td><td>High</td><td>Medium</td><td>High</td><td>The wave planner detects file-conflict relation on SKILL.md and serializes its writers. Per P11, all SKILL.md edits are append-only at ## Implementation subsection level (new subsections at the bottom; in-subsection extensions at the end of the subsection). Each task's Steps end with a pre-flight grep asserting prior subsections still exist; on missing prior subsection → hard-fail (a prior task didn't land). Controller-commits-post-wave preserves per-task git history. Mirrors R4's _lib.sh treatment + P7's append-only convention.</td><td>P11, T1, T3, T12–T24</td></tr>
+</table>
+</section>
+
+<section id="rollback">
+<h2 id="rollback">Rollback</h2>
+<p>/readme is non-destructive by design (atomic write, snapshot-commit, never auto-commits). The skill-bundle drop itself is reversible at the git layer; per-feature rollback paths:</p>
+<ul>
+<li><strong>Bundled scripts regress (selftest fails post-merge):</strong> revert the offending commit via <code>git revert &lt;sha&gt;</code> at <code>plugins/pmos-toolkit/skills/readme/</code> scope. No external side effects.</li>
+<li><strong>Update-mode misbehaves on a /complete-dev run:</strong> flip <code>~/.pmos/readme/config.yaml :: phase_7_6_hook_enabled: false</code> (per-user) or set <code>.pmos/complete-dev.lastrun.yaml :: readme_update_hook: false</code> (per-repo). Either disables the hook immediately; no /readme bundle changes needed.</li>
+<li><strong>Skill misbehaves on a user repo:</strong> <code>git checkout HEAD &lt;readme-path&gt;</code> reverts the README; the snapshot-commit (E11) provides the prior version if the dirty-tree path was hit.</li>
+<li><strong>Whole-skill rollback:</strong> the v1 ship is one feature-branch merge. <code>git revert &lt;merge-sha&gt;</code> at the parent merges back to pre-/readme state. Tag rollback per <code>/complete-dev</code> release-recipes.</li>
+</ul>
+</section>
+
+<section id="tasks">
+<h2 id="tasks">Tasks</h2>
+
+<h3 id="phase-1-tracer">Phase 1: Tracer bullet — minimal audit end-to-end</h3>
+<p class="meta"><strong>Phase rationale:</strong> prove the architecture (mode-resolver → workspace-discovery stub → rubric.sh → findings aggregator → diff preview → atomic write) survives contact with reality on a single fixture README with a single rubric check. Risky integration points exercised: SKILL.md frontmatter compliance (FR-A1..FR-F2), bash-script-bundle wiring (FR-E1/E2/E3), TSV-emit + parent-grep pattern (mirrors /grill). Demoable: a maintainer runs <code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh tests/fixtures/rubric/slop/01_no-hero.md</code> and gets <code>FAIL: hero-line-presence</code>, then runs <code>/readme</code> on the same fixture and sees the finding emitted to chat with a diff preview showing the proposed hero line. No simulated-reader, no monorepo, no scaffold; widening happens in later phases.</p>
+
+<div class="task">
+<h4 id="t1">T1: SKILL.md skeleton + frontmatter (tracer bullet, layer 1 of 5)</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Create <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code> with frontmatter + canonical blocks + minimum body to register as a slash command and announce.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-skill-patterns">FR-A1, FR-A2, FR-B1, FR-B2, FR-C1, FR-D1, FR-D2, FR-D3, FR-D4, FR-F1, FR-F2</a></div>
+<div><strong>Depends on:</strong> none</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature (test: feature-sdlc/tools/skill-eval-check.sh --target claude-code asserts on frontmatter shape)</div>
+<div><strong>Data:</strong> none</div>
+<div><strong>Slice shape:</strong> vertical — exercises SKILL.md registration + frontmatter validation; the tracer bullet's 1st of 5 layers</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Write failing test (will fail because skill dir doesn't exist):
+<pre>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</pre>
+Expected: exit 1, missing <code>SKILL.md</code> reported.</li>
+<li>Create directory: <code>mkdir -p plugins/pmos-toolkit/skills/readme/</code>.</li>
+<li>Write <code>SKILL.md</code>. Frontmatter MUST include:
+<pre>---
+name: readme
+description: Audit, scaffold, or update READMEs against a 15-check rubric and 3-persona simulated reader. Use this whenever the user asks to "audit my README", "scaffold a README", "fix my README", "generate a README", "review my README structure", or invokes /readme. Three modes share one substrate (--audit, --scaffold, --update &lt;commit-range&gt;); monorepo-aware (8 workspace manifests + multi-stack); voice work delegated to /polish; never auto-commits.
+user-invocable: true
+argument-hint: "[--audit|--scaffold|--update &lt;commit-range&gt;] [--audit-all|--audit-one &lt;pkg&gt;|--scaffold-missing|--root-only] [--format md] [--skip-simulated-reader] [--non-interactive|--interactive] [&lt;repo-path&gt;]"
+---</pre>
+Body skeleton (≤480 lines per P8): announce line ("Using /readme to ...") → ## Platform Adaptation → ## Track Progress → ## Phase 0: Pipeline setup (inline pipeline-setup-block from <code>_shared/pipeline-setup.md</code>, byte-for-byte) → inline non-interactive-block from <code>_shared/non-interactive.md</code>, byte-for-byte → ## When to Use → ## Core Pattern → ## Implementation (5 subsections, mostly TBD-cited at this point) → ## Anti-Patterns → ## Phase N: Capture Learnings (cites <code>learnings/learnings-capture.md</code>).</li>
+<li>Inline-validate (these are Phase 4 review-loop checks, but tracer-bullet pre-flights them):
+<pre>grep -c "^name: readme$" SKILL.md  # expect 1
+grep -c "non-interactive-block:start" SKILL.md  # expect 1
+grep -c "pipeline-setup-block:start" SKILL.md  # expect 1
+wc -l SKILL.md  # expect ≤480
+grep -cE "(audit my README|scaffold a README|fix my README|generate a README|review my README structure)" SKILL.md  # expect ≥5</pre></li>
+<li>Re-run the skill-eval-check (now passes for frontmatter; remaining [D] checks fail awaiting other tasks):
+<pre>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</pre>
+Expected: frontmatter checks pass; rest of [D] checks fail (no scripts/, no reference/ yet — picked up in T2+).</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/SKILL.md
+git commit -m "feat(T1): /readme SKILL.md skeleton + canonical blocks"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</code> — frontmatter checks (a-name-matches-dir, b-description-≥5-triggers, c-body-line-budget, a-argument-hint-coverage) report pass.</li>
+<li>Manual: <code>head -50 plugins/pmos-toolkit/skills/readme/SKILL.md</code> — frontmatter is byte-clean YAML; no embedded workflow in description (FR-B1); description is assertively phrased (FR-B2).</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t2">T2: rubric.sh skeleton + 1 check + --selftest (tracer bullet, layer 2 of 5)</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Bash script that applies 1 rubric check (hero-line presence) to a README path and emits TSV; ships with a <code>--selftest</code> mode that runs the check against 1 strong + 1 slop fixture.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-rubric">FR-RUB-1, FR-RUB-5, FR-RUB-6, FR-E1, FR-E2, FR-E3</a></div>
+<div><strong>Depends on:</strong> none</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Data:</strong> 1 strong README fixture, 1 slop README fixture (hand-authored at this task; widened to 5+5 in T7)</div>
+<div><strong>Slice shape:</strong> vertical — layer 2 of 5 in T1's tracer-bullet path (the rubric layer)</div>
+<div><strong>Requires state from:</strong> none</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/scripts/_lib.sh</code> (helpers: readme::log, readme::die)</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/strong/01_hero-line.md</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/slop/01_no-hero.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Write the test first (failing):
+<pre>cd plugins/pmos-toolkit/skills/readme/
+bash scripts/rubric.sh tests/fixtures/rubric/slop/01_no-hero.md
+# Expected: exit 1, TSV line "hero-line-presence\tFAIL\tHEAD\t1\tNo hero line found"</pre>
+Test fails — rubric.sh does not exist.</li>
+<li>Author the 2 fixtures.
+<ul>
+<li><code>strong/01_hero-line.md</code>: starts with H1 + a 1-sentence hero line. Example: <code># ripgrep\n\nripgrep is a line-oriented search tool that recursively searches the current directory for a regex pattern.\n</code></li>
+<li><code>slop/01_no-hero.md</code>: starts with H1 + a Features list. Example: <code># Project Name\n\n## Features\n\n- Fast\n- Reliable\n</code></li>
+</ul></li>
+<li>Author <code>_lib.sh</code> with minimum helpers:
+<pre>#!/usr/bin/env bash
+# _lib.sh — shared helpers for /readme bundled scripts. Bash ≥ 4 required.
+readme::log() { printf '[/readme] %s\n' "$*" &gt;&amp;2; }
+readme::die() { readme::log "ERROR: $*"; exit 2; }</pre></li>
+<li>Author <code>rubric.sh</code>:
+<pre>#!/usr/bin/env bash
+# rubric.sh &lt;readme-path&gt; [--variant &lt;type&gt;] | --selftest
+# Deps: bash ≥ 4, coreutils. Exit 0 (all pass), 1 (any fail), 2 (script error).
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)"
+source "$HERE/_lib.sh"
+
+check_hero_line() {
+  local path="$1"
+  # Hero line = the first non-blank, non-H1 line after the H1.
+  local hero
+  hero=$(awk 'NR==1 &amp;&amp; /^# / {h1=1; next} h1 &amp;&amp; NF &amp;&amp; !/^#/ {print; exit}' "$path")
+  if [[ -z "$hero" ]]; then
+    printf 'hero-line-presence\tFAIL\tHEAD\t1\tNo hero line found\n'
+    return 1
+  fi
+  printf 'hero-line-presence\tPASS\tHEAD\t1\t\n'
+  return 0
+}
+
+main() {
+  if [[ "${1:-}" == "--selftest" ]]; then
+    local fail=0
+    check_hero_line "$HERE/../tests/fixtures/rubric/strong/01_hero-line.md" || fail=1
+    check_hero_line "$HERE/../tests/fixtures/rubric/slop/01_no-hero.md" &amp;&amp; fail=1 || true
+    # Strong must pass; slop must fail. fail=1 if either gate breaks.
+    [[ $fail -eq 0 ]] &amp;&amp; { readme::log "selftest: PASS"; exit 0; } || { readme::log "selftest: FAIL"; exit 1; }
+  fi
+  [[ -f "${1:-}" ]] || readme::die "usage: rubric.sh &lt;readme-path&gt; [--variant &lt;type&gt;] | --selftest"
+  check_hero_line "$1" &amp;&amp; exit 0 || exit 1
+}
+main "$@"</pre></li>
+<li>Run the test (now passing):
+<pre>chmod +x plugins/pmos-toolkit/skills/readme/scripts/rubric.sh
+bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/slop/01_no-hero.md
+# Expected: exit 1, "hero-line-presence\tFAIL\tHEAD\t1\tNo hero line found" on stdout
+bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest
+# Expected: exit 0, "[/readme] selftest: PASS" on stderr</pre></li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/scripts/ plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/
+git commit -m "feat(T2): rubric.sh skeleton + 1 check + selftest"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest</code> — exits 0; "selftest: PASS" on stderr.</li>
+<li><code>shellcheck plugins/pmos-toolkit/skills/readme/scripts/rubric.sh plugins/pmos-toolkit/skills/readme/scripts/_lib.sh</code> — no errors.</li>
+<li>Behavioral: strong fixture exits 0; slop fixture exits 1 with the expected TSV line.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t3">T3: SKILL.md mode-resolver + findings-aggregator + atomic-write min (tracer bullet, layer 3-5 of 5)</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Extend SKILL.md's body so that <code>/readme</code> in a repo with a README detects audit mode, shells <code>rubric.sh</code>, emits findings to chat, and shows an empty diff preview (no findings → no diff). End-to-end tracer demoable.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-modes">FR-MODE-1, FR-MODE-4, FR-OUT-1, FR-OUT-2, FR-OUT-4, FR-OUT-5</a></div>
+<div><strong>Depends on:</strong> T1, T2</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Data:</strong> the slop fixture from T2</div>
+<div><strong>Slice shape:</strong> vertical — layers 3-5 of the tracer bullet (mode-resolver + aggregator + atomic-write paths, sans simulated-reader)</div>
+<div><strong>Requires state from:</strong> T1's SKILL.md (extended), T2's rubric.sh (invoked)</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code> (extend ## Implementation with mode-resolver, single-file audit flow, atomic-write rules)</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit.sh</code> (drives the whole tracer bullet end-to-end as an integration test)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Write the integration test first (failing — flow doesn't exist yet):
+<pre>#!/usr/bin/env bash
+# tracer_audit.sh — Phase 1 tracer-bullet end-to-end smoke
+set -euo pipefail
+tmp=$(mktemp -d); trap "rm -rf $tmp" EXIT
+cp plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/slop/01_no-hero.md "$tmp/README.md"
+cd "$tmp"
+# At this point /readme is a skill — invoked via slash command, not directly. Per /plan Loop-1 F3
+# disposition: tracer_audit.sh is a CONTRACT TEST (atomic-write + rubric.sh integration); real
+# /readme slash-command dispatch is exercised only in T26's dogfood pass, which is the canonical
+# end-to-end /readme test. Splitting into 2 scripts (contract + manual smoke) is explicitly NOT done
+# (over-engineering for a tracer slice).
+bash "$OLDPWD/plugins/pmos-toolkit/skills/readme/scripts/rubric.sh" README.md &amp;&amp; { echo "expected fail on slop"; exit 1; } || true
+# Atomic write contract: rubric.sh produced a finding; the *skill* (not the script) would
+# emit a diff preview and offer to apply. We simulate the write here.
+mv README.md README.md.tmp.42
+{ echo "# Project Name"; echo; echo "Project Name does &lt;one-sentence what + who + why&gt;."; cat README.md.tmp.42 | tail -n +2; } &gt; README.md
+[[ -f README.md ]] &amp;&amp; ! [[ -f README.md.tmp.42 ]] || { echo "atomic-write contract broken"; exit 1; }
+echo "tracer_audit: PASS"</pre></li>
+<li>Extend SKILL.md ## Implementation. Add a "Single-file audit flow" subsection that documents the in-skill procedure: (a) parse argv for --audit/--scaffold/--update mutual exclusion → resolve mode; (b) detect README.md presence at repo-path; (c) shell <code>${CLAUDE_PLUGIN_ROOT}/skills/readme/scripts/rubric.sh README.md</code> → parse TSV; (d) emit chat log line <code>mode: audit (existing README detected)</code> + <code>rubric: N pass / M fail</code>; (e) batch findings via AskUserQuestion ≤4 per call (cited from <a href="02_spec.html#fr-output">FR-OUT-2</a>); (f) atomic write via temp + rename(2); (g) close with <code>README written to &lt;path&gt;. Run /complete-dev to include it in the release commit.</code>
+<br>Use portable paths only: <code>${CLAUDE_PLUGIN_ROOT}</code>, never absolute (FR-C1).
+<br>Body line count after this task must stay ≤480 (P8). If pushing the limit, defer details to a reference file (TBD in T4).</li>
+<li>Author the integration test from step 1.</li>
+<li>Run:
+<pre>chmod +x plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit.sh
+bash plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit.sh
+# Expected: exit 0, "tracer_audit: PASS"</pre></li>
+<li>Re-run skill-eval-check; tracer bullet's [D] checks should pass for body-content, even though many feature-completeness checks remain pending.</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/SKILL.md plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit.sh
+git commit -m "feat(T3): /readme tracer bullet — mode-resolver + aggregator + atomic write"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit.sh</code> — exits 0; "tracer_audit: PASS".</li>
+<li><code>wc -l plugins/pmos-toolkit/skills/readme/SKILL.md</code> — still ≤480.</li>
+<li>Manual eyeball: SKILL.md ## Implementation references <code>${CLAUDE_PLUGIN_ROOT}</code> (no absolute path).</li>
+<li><strong>End-to-end demoable:</strong> a maintainer can run the tracer integration test and see the rubric → atomic-write contract exercised on the slop fixture, with the README rewritten via temp+rename.</li>
+</ul>
+</div>
+
+<h3 id="phase-2-rubric">Phase 2: Full rubric &amp; section schema</h3>
+<p class="meta"><strong>Phase rationale:</strong> widen T2's 1-check rubric to 15 checks across 7 repo-type variants; encode the standard-readme spine and per-type opening shapes in <code>reference/</code>. T4–T6 are reference-file authoring (independent files, P-able). T7 wires the widened rubric back into the script. Demoable after T7: <code>rubric.sh README.md --variant library</code> on a hand-authored library README returns ≥12/15 PASS.</p>
+
+<div class="task">
+<h4 id="t4">T4: reference/rubric.yaml — 15 binary checks + banned-phrase list + rubric-development.md</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Author the canonical rubric as YAML — 15 checks split ~4 blockers / 7 friction / 4 nits; closed banned-phrase list; eval-driven dev loop document.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-rubric">FR-RUB-1, FR-RUB-3, FR-RUB-4, FR-E3</a></div>
+<div><strong>Depends on:</strong> none (parallel with T5, T6, T8 at /execute time)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> no — config/schema (FR-105 — declarative file, validation happens in T7 when rubric.sh consumes it)</div>
+<div><strong>Slice shape:</strong> config — declarative rubric spec; the test surface is in T7's widened rubric.sh self-test</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/reference/rubric.yaml</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/reference/rubric-development.md</code> (ToC in first ~15 lines per FR-C3)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Sketch the 15 checks. Working set per spec §6.2 D3:
+<ul>
+<li><strong>Blockers (~4):</strong> hero-line-presence, install-or-quickstart-presence, what-it-does-in-60s, no-banned-phrases.</li>
+<li><strong>Friction (~7):</strong> tldr-fits-screen, code-example-runnable-as-shown, links-resolve, no-marketing-hyperbole, sections-in-recommended-order, contributing-link-or-section, license-present.</li>
+<li><strong>Nits (~4):</strong> badges-not-stale, anchor-links-resolve, image-alt-text, line-length-soft-cap.</li>
+</ul>
+Document each check's: id (kebab-case), severity (blocker|friction|nit), description, pass_when (binary predicate), fix_note_template, auto_apply (true|false).</li>
+<li>Encode the banned-phrase closed list under <code>banned_phrases:</code>. Initial set (FR-RUB-4 / Q7): "blazing fast", "blazing-fast", "lightning fast", "lightning-fast", "production-ready", "battle-tested", "industry-leading", "best-in-class", "next-generation", "cutting-edge", "robust", "comprehensive", "powerful", "seamless".</li>
+<li>Encode <code>variants:</code> map per FR-RUB-2:
+<pre>variants:
+  library:    {overrides: [hero-line-presence, install-or-quickstart-presence, ...]}
+  cli:        {overrides: [...]}
+  plugin:     {overrides: [...]}
+  app:        {overrides: [...]}
+  monorepo-root:         {overrides: [...], adds: [contents-table-presence]}
+  monorepo-package:      {overrides: [...], removes: [install-or-quickstart-presence, contributing-link-or-section, license-present], adds: [link-up-to-root]}
+  plugin-marketplace-root: {overrides: [...], adds: [contents-table-presence, per-plugin-link-table]}</pre></li>
+<li>Author <code>rubric-development.md</code> (FR-E3 eval-driven dev): ToC in first 15 lines; sections: §1 Purpose (validate→fix→repeat); §2 Fixture-extension procedure (when adding a new fixture, what to assert); §3 A2 regression gate (≥85% agreement); §4 How to add a new check (worked example); §5 How to add a new variant (worked example); §6 Banned-phrase extension protocol (link to FR-RUB-4 + ~/.pmos/readme/banned-phrases.yaml).</li>
+<li>Inline-validate rubric.yaml:
+<pre>node -e 'console.log(JSON.stringify(require("js-yaml").load(require("fs").readFileSync("plugins/pmos-toolkit/skills/readme/reference/rubric.yaml","utf8")).checks.length))'
+# Expected: 15</pre></li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/reference/rubric.yaml plugins/pmos-toolkit/skills/readme/reference/rubric-development.md
+git commit -m "feat(T4): rubric.yaml — 15 checks, 7 variants + rubric-development.md"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>node -e ...</code> (above) — prints 15.</li>
+<li><code>grep -c "^- id:" plugins/pmos-toolkit/skills/readme/reference/rubric.yaml</code> — ≥15 (one per check).</li>
+<li><code>grep -c "blocker\|friction\|nit" plugins/pmos-toolkit/skills/readme/reference/rubric.yaml</code> — ≥15 (severity tag per check).</li>
+<li><code>head -15 plugins/pmos-toolkit/skills/readme/reference/rubric-development.md</code> — contains a ToC.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t5">T5: reference/section-schema.yaml + commit_affinity</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Standard-readme spine + Google Status/Maintainers + Diátaxis Documentation linkout + per-type variants + <code>commit_affinity</code> table for /update mode.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-section-schema">FR-SS-1, FR-SS-2, FR-SS-3</a></div>
+<div><strong>Depends on:</strong> none</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> no — config/schema</div>
+<div><strong>Slice shape:</strong> config</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/reference/section-schema.yaml</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Author <code>section-schema.yaml</code>:
+<pre>spine:
+  - Title
+  - Short Description
+  - TOC                       # optional under 100 lines
+  - Install
+  - Usage
+  - Contributing
+  - License
+augmentations:
+  - Status                    # google.dev/style/readmes
+  - Maintainers               # google.dev/style/readmes
+  - Documentation             # Diátaxis linkout
+commit_affinity:
+  feat:           [Features, Usage, Quickstart]
+  fix:            [Changelog, Troubleshooting]
+  docs:           [Documentation, Usage]
+  feat!:          [Migration, Changelog]
+  fix!:           [Migration, Changelog]
+  BREAKING CHANGE: [Migration, Changelog]
+  refactor:       []
+  perf:           []
+  test:           []
+  chore:          []
+variants:
+  monorepo-root:    {append: [Packages]}
+  plugin-marketplace-root: {append: [Plugins]}
+  monorepo-package: {drop: [Install, Contributing, License], append: [Link Up]}</pre></li>
+<li>Inline-validate:
+<pre>node -e 'const y=require("js-yaml").load(require("fs").readFileSync("plugins/pmos-toolkit/skills/readme/reference/section-schema.yaml","utf8")); console.log(y.spine.length, Object.keys(y.commit_affinity).length, Object.keys(y.variants).length)'
+# Expected: 7 11 3 (or similar shape — assert ≥7 spine entries, ≥10 affinity keys, ≥3 variants)</pre></li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/reference/section-schema.yaml
+git commit -m "feat(T5): section-schema.yaml — standard-readme spine + commit_affinity"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>node -e ...</code> (above) — 7 spine entries, ≥10 affinity keys, ≥3 variants.</li>
+<li><code>grep -c "BREAKING CHANGE" plugins/pmos-toolkit/skills/readme/reference/section-schema.yaml</code> — 1.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t6">T6: reference/opening-shapes.md — per-type opening patterns</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Document the 5-block (library/CLI/plugin/app/monorepo-package) + map+identity (monorepo-root/plugin-marketplace-root) opening shapes; worked examples per type.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-section-schema">FR-SS-2</a>, <a href="02_spec.html#decision-log">D5</a></div>
+<div><strong>Depends on:</strong> none</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> no — docs</div>
+<div><strong>Slice shape:</strong> config — reference doc consumed by the scaffold flow (T16) and rubric checks (T7)</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/reference/opening-shapes.md</code> (ToC in first ~15 lines per FR-C3)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Author the file with ToC + §1 5-block pattern (hero → proof → show-don't-tell → install → why) with a worked example for each of: library, CLI, plugin, app, monorepo-package. §2 map+identity pattern (hero → proof → contents-table → canonical-entry quickstart → why-these-pieces) for monorepo-root and plugin-marketplace-root. §3 Anti-patterns (Features section as opening; long preamble; install-before-what).</li>
+<li>Each worked example shows ~10-line README snippet + a one-line "what this rubric check fires on" annotation.</li>
+<li>Length: aim ~150–200 lines (well under §C reference-file cap).</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/reference/opening-shapes.md
+git commit -m "feat(T6): opening-shapes.md — 5-block + map+identity per type"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>head -15 plugins/pmos-toolkit/skills/readme/reference/opening-shapes.md</code> — ToC present.</li>
+<li><code>grep -cE "^### (library|cli|plugin|app|monorepo-root|monorepo-package|plugin-marketplace-root)" plugins/pmos-toolkit/skills/readme/reference/opening-shapes.md</code> — ≥7.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t7">T7: rubric.sh widens to 15 checks + 7 variants + auto-apply</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Extend the T2 skeleton to all 15 checks across 7 repo-type variants; auto-apply mechanical findings (FR-RUB-3); selftest asserts ≥85% A2 agreement on the 5+5 fixture set.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-rubric">FR-RUB-1, FR-RUB-2, FR-RUB-3, FR-RUB-5, FR-RUB-6</a></div>
+<div><strong>Depends on:</strong> T2 (skeleton), T4 (rubric.yaml), T5 (section-schema), T6 (opening-shapes)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature (each new check has a test pair)</div>
+<div><strong>Data:</strong> 5 strong + 5 slop fixtures (T2 had 1+1; T7 extends to 5+5)</div>
+<div><strong>Slice shape:</strong> vertical — extends the rubric layer of the tracer bullet to full-width</div>
+<div><strong>Requires state from:</strong> T4's rubric.yaml (consumed), T2's _lib.sh (extended)</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh</code> (extend to 15 checks + variants)</li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/scripts/_lib.sh</code> (append <code>readme::yaml_get</code> helper)</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/strong/02_..05_*.md</code> (4 more strong fixtures)</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/slop/02_..05_*.md</code> (4 more slop fixtures)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>For each of the 14 new checks, write the test pair first:
+<pre>for check in install-or-quickstart-presence what-it-does-in-60s no-banned-phrases ...; do
+  # Strong fixture: passes
+  bash scripts/rubric.sh "$strong_fixture" | grep -q "^$check\tPASS" || { echo "T7 fail: $check on strong"; exit 1; }
+  # Slop fixture: fails
+  bash scripts/rubric.sh "$slop_fixture" | grep -q "^$check\tFAIL" || { echo "T7 fail: $check on slop"; exit 1; }
+done</pre></li>
+<li>Author the 4 new strong fixtures + 4 new slop fixtures (one per check group). Cross-cover: hero-line, install/quickstart, what-it-does, banned-phrases, tldr-fit, code-example, links, marketing-hyperbole, section-order, contributing, license, badges-not-stale, anchor-links, image-alt-text, line-length.</li>
+<li>Extend <code>_lib.sh</code>:
+<pre>readme::yaml_get() {
+  # Usage: readme::yaml_get path.to.key &lt;yaml-file&gt;
+  command -v node &gt;/dev/null || { readme::log "warn: node absent; yaml-get returns nothing"; return 1; }
+  node -e 'const y=require("js-yaml").load(require("fs").readFileSync(process.argv[1],"utf8")); const p=process.argv[2].split("."); let v=y; for (const k of p) v=v?.[k]; console.log(typeof v==="object"?JSON.stringify(v):v??"");' "$2" "$1"
+}</pre>
+This is the runtime YAML reader for rubric.yaml.</li>
+<li>Refactor <code>rubric.sh</code>: 15 <code>check_*</code> functions, dispatched by name from a checks-array loaded from rubric.yaml. Per FR-RUB-2 variant logic: if <code>--variant &lt;type&gt;</code> is set, drop/swap/append per the variants map in rubric.yaml.</li>
+<li>Per FR-RUB-3 auto-apply: <code>--auto-apply</code> flag (off by default) emits patched README to stdout with mechanical fixes (banned-phrase strikethrough, hero-line trim). Auto-apply policy table per check (column <code>auto_apply: true|false</code> in rubric.yaml).</li>
+<li>Append append-only helpers to <code>_lib.sh</code> per P7 / R4 (NEVER rewrite existing helpers — pre-flight grep asserts presence of existing functions before writing).</li>
+<li>Run the widened selftest:
+<pre>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest
+# Expected: exit 0; "selftest: PASS (15 checks; A2 agreement 100% on 10 fixtures)"</pre>
+A2 gate per FR-E3 / spec §13.1: assert agreement ≥85% across 10 fixtures (strong: ≥12/15 PASS, slop: ≤8/15 PASS).</li>
+<li>Inline-validate body line count of SKILL.md hasn't changed (only scripts touched).</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/scripts/ plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/
+git commit -m "feat(T7): rubric.sh widens to 15 checks + 7 variants + auto-apply"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest</code> — exits 0; A2 agreement ≥85%.</li>
+<li><code>shellcheck plugins/pmos-toolkit/skills/readme/scripts/rubric.sh</code> — no errors.</li>
+<li>Behavioral: <code>bash scripts/rubric.sh tests/fixtures/rubric/strong/01_hero-line.md --variant library</code> emits TSV for 15 checks; ≥12 PASS.</li>
+<li>Behavioral: <code>bash scripts/rubric.sh tests/fixtures/rubric/slop/01_no-hero.md --variant library</code> emits TSV; ≤8 PASS (≥7 FAIL).</li>
+</ul>
+</div>
+
+<h3 id="phase-3-workspace">Phase 3: Workspace discovery</h3>
+<p class="meta"><strong>Phase rationale:</strong> implement the 8-manifest probe + MS01 multi-stack + the 20-repo fixture self-test. Parallel-safe with Phase 2 (touches disjoint files). Demoable after T10: <code>workspace-discovery.sh --selftest</code> reports ≥19/20.</p>
+
+<div class="task">
+<h4 id="t8">T8: workspace-discovery.sh skeleton + 8 manifests + F15 precedence</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Bash script that probes the 8 supported manifest files at <code>&lt;repo-root&gt;</code>, applies F15 precedence on multi-manifest single-stack repos, emits JSON.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-workspace">FR-WS-1, FR-WS-3, FR-WS-5</a></div>
+<div><strong>Depends on:</strong> T2's _lib.sh (sourced)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Data:</strong> 8 stub fixtures (one per manifest) authored inline</div>
+<div><strong>Slice shape:</strong> vertical — exercises workspace-discovery layer of the architecture (separate vertical from rubric)</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/workspaces/01_pnpm/pnpm-workspace.yaml</code> + minimal package tree</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/workspaces/02_npm-workspaces/package.json</code> + minimal package tree</li>
+<li>Create: 6 more stub fixtures covering each of the remaining manifests (lerna, nx, turbo, Cargo, go.work, uv)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Write failing test:
+<pre>bash plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh plugins/pmos-toolkit/skills/readme/tests/fixtures/workspaces/01_pnpm/ | jq .primary
+# Expected: "pnpm-workspace.yaml"</pre></li>
+<li>Author the 8 stub fixtures. Each is a 3-line workspace manifest + ≥2 minimal package dirs containing only a package.json (or Cargo.toml, etc) with name+version.</li>
+<li>Author the script. Structure:
+<pre>#!/usr/bin/env bash
+# workspace-discovery.sh &lt;repo-root&gt; | --selftest
+# Probes 8 supported manifest formats; applies F15 precedence; emits JSON.
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)"
+source "$HERE/_lib.sh"
+
+probe_manifests() {
+  local root="$1"; local manifests=()
+  [[ -f "$root/pnpm-workspace.yaml" ]] &amp;&amp; manifests+=("pnpm-workspace.yaml")
+  # node parse for package.json#workspaces shape (array vs object form per FR-WS-2)
+  if [[ -f "$root/package.json" ]]; then
+    node -e '...' &amp;&amp; manifests+=("package.json#workspaces") || true
+  fi
+  [[ -f "$root/lerna.json" ]] &amp;&amp; manifests+=("lerna.json")
+  [[ -f "$root/nx.json" ]] &amp;&amp; manifests+=("nx.json")
+  [[ -f "$root/turbo.json" ]] &amp;&amp; manifests+=("turbo.json")
+  [[ -f "$root/Cargo.toml" ]] &amp;&amp; grep -q '^\[workspace\]' "$root/Cargo.toml" &amp;&amp; manifests+=("Cargo.toml#workspace")
+  [[ -f "$root/go.work" ]] &amp;&amp; manifests+=("go.work")
+  [[ -f "$root/pyproject.toml" ]] &amp;&amp; grep -q '^\[tool.uv.workspace\]' "$root/pyproject.toml" &amp;&amp; manifests+=("pyproject.toml#tool.uv.workspace")
+  printf '%s\n' "${manifests[@]}"
+}
+
+apply_f15_precedence() {
+  # User-override → Cargo → pnpm-workspace → package.json#workspaces → go.work → uv
+  # lerna.json defers to package.json#workspaces (FR-WS-3 clarified)
+  # nx.json/turbo.json: NOT enumeration sources
+  ...
+}
+
+# selftest, main dispatch ...</pre></li>
+<li>Run the test (now passing):
+<pre>bash plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh plugins/pmos-toolkit/skills/readme/tests/fixtures/workspaces/01_pnpm/ | jq .
+# Expected: {"primary":"pnpm-workspace.yaml","secondaries":[],"packages":[...],"repo_type":"monorepo-root"}</pre></li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh plugins/pmos-toolkit/skills/readme/tests/fixtures/workspaces/
+git commit -m "feat(T8): workspace-discovery.sh skeleton + 8 manifests + F15"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>shellcheck plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh</code> — no errors.</li>
+<li>8 fixture invocations all emit non-empty JSON with correct <code>primary</code> field.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t9">T9: glob negation + exclude arrays + object-form + pnpm filter (FR-WS-2)</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Honor all 4 glob/manifest semantics surfaced by A8: glob negation (<code>!private/*</code> in react-native), exclude arrays (Cargo workspace), object-form package.json#workspaces (grafana), pnpm <code>packages:</code> only (ignore catalog/overrides/patchedDependencies).</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-workspace">FR-WS-2</a></div>
+<div><strong>Depends on:</strong> T8 (extends)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature (each glob semantic has a fixture pair)</div>
+<div><strong>Data:</strong> 4 new edge-case fixtures</div>
+<div><strong>Slice shape:</strong> vertical — extends the workspace-discovery vertical</div>
+<div><strong>Requires state from:</strong> T8's workspace-discovery.sh</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh</code></li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/scripts/_lib.sh</code> (append <code>readme::glob_resolve</code> helper — append-only per P7)</li>
+<li>Create: 4 edge-case fixtures (<code>03_glob-negation/</code>, <code>04_cargo-exclude/</code>, <code>05_object-form/</code>, <code>06_pnpm-filter/</code>)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Write test pair per semantic:
+<pre>bash workspace-discovery.sh tests/fixtures/workspaces/03_glob-negation/ | jq '.packages | length'
+# Expected: matches expected count (excludes the negated path)
+bash workspace-discovery.sh tests/fixtures/workspaces/04_cargo-exclude/ | jq '.packages[].path' | grep -v &lt;excluded-path&gt;
+# Expected: excluded path NOT in output
+bash workspace-discovery.sh tests/fixtures/workspaces/05_object-form/ | jq '.packages | length'
+# Expected: matches packages array length
+bash workspace-discovery.sh tests/fixtures/workspaces/06_pnpm-filter/ | jq '.packages | length'
+# Expected: matches packages: key length, ignores catalog: and overrides:</pre></li>
+<li>Author 4 fixtures.</li>
+<li>Extend the glob resolver in <code>workspace-discovery.sh</code> + <code>_lib.sh</code>'s new <code>readme::glob_resolve</code>: shell-glob expansion of each pattern; filter excluded entries (regex match against <code>!pattern</code> or against the <code>exclude:</code> array). For object-form package.json#workspaces, read <code>workspaces.packages[]</code> via node JSON parse.</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/scripts/ plugins/pmos-toolkit/skills/readme/tests/fixtures/workspaces/
+git commit -m "feat(T9): glob negation + exclude + object-form + pnpm filter (FR-WS-2)"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li>All 4 new fixture tests pass.</li>
+<li><code>shellcheck</code> clean.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t10">T10: MS01 multi-stack + 20-fixture set + --selftest ≥19/20</h4>
+<div class="fields">
+<div><strong>Goal:</strong> When ≥2 supported manifests have disjoint package sets (grafana-style JS + Go), emit BOTH stacks with per-package <code>manifest_source</code>. Selftest exercises all 20 stub fixtures (the A8 proxy set); assert ≥19/20 pass.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-workspace">FR-WS-4, FR-WS-5, FR-WS-6</a>, <a href="02_spec.html#decision-log">MS01</a></div>
+<div><strong>Depends on:</strong> T8, T9</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Data:</strong> 10 more stub fixtures (T8 has 8, T9 added 4, total 12 → adds 8 more = 20 total covering all manifests + multi-stack + long-tail-fallback)</div>
+<div><strong>Slice shape:</strong> vertical — closes the workspace-discovery vertical with full MS01 + regression gate</div>
+<div><strong>Requires state from:</strong> T8 + T9 workspace-discovery.sh</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh</code></li>
+<li>Create: 8 more stub fixtures including the multi-stack <code>13_multi-stack-js-go/</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Write test for MS01:
+<pre>bash workspace-discovery.sh tests/fixtures/workspaces/13_multi-stack-js-go/ | jq '.packages[].manifest_source' | sort -u
+# Expected: 2 distinct values (package.json#workspaces and go.work)</pre></li>
+<li>Author 8 more stubs (named per real-repo template — babel, next, turborepo, kubernetes, ruff, lerna-classic, multi-stack-js-go, long-tail-bazel — total 20 fixtures).</li>
+<li>Implement MS01 path in <code>workspace-discovery.sh</code>: if multiple manifests resolved and their package paths have ≥1 disjoint element, emit BOTH; each package labeled with its <code>manifest_source</code>. The workspace-scope prompt option lives in SKILL.md (T22) — script just emits the data.</li>
+<li>Implement long-tail fallback per FR-WS-6: no supported manifest + no plugin-marketplace signal → emit <code>{"detected":"unknown layout"}</code> + exit 0 (advisory).</li>
+<li>Add the selftest:
+<pre># inside workspace-discovery.sh --selftest
+local pass=0 fail=0
+for fixture in "$HERE/../tests/fixtures/workspaces/"*/; do
+  result=$(bash "$0" "$fixture" 2&gt;/dev/null) || { ((fail++)); continue; }
+  expected=$(cat "$fixture/expected.json" 2&gt;/dev/null) || continue
+  diff &lt;(jq -S . &lt;&lt;&lt; "$result") &lt;(jq -S . &lt;&lt;&lt; "$expected") &gt;/dev/null &amp;&amp; ((pass++)) || ((fail++))
+done
+readme::log "selftest: $pass pass / $fail fail (gate ≥19/20)"
+[[ $pass -ge 19 ]] &amp;&amp; exit 0 || exit 1</pre>
+Each fixture has an <code>expected.json</code> beside it documenting the canonical output (jq -S sort-normalized).</li>
+<li>Run:
+<pre>bash plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh --selftest
+# Expected: exit 0; "selftest: ≥19 pass / ≤1 fail (gate ≥19/20)"</pre></li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh plugins/pmos-toolkit/skills/readme/tests/fixtures/workspaces/
+git commit -m "feat(T10): MS01 multi-stack + 20-fixture set + --selftest ≥19/20"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh --selftest</code> — exits 0; ≥19/20.</li>
+<li>Behavioral: <code>bash workspace-discovery.sh tests/fixtures/workspaces/13_multi-stack-js-go/</code> emits BOTH stacks; <code>manifest_source</code> distinguishes packages.</li>
+</ul>
+</div>
+
+<h3 id="phase-4-simulated-reader">Phase 4: Simulated-reader (parallel personas)</h3>
+<p class="meta"><strong>Phase rationale:</strong> wire the 3-persona parallel-dispatch flow per D13; implement FR-SR-3 substring validation (mirrors /grill FR-50/51/52 pattern); add theater-check (FR-SR-5) + <code>--skip-simulated-reader</code> escape (FR-SR-6). Demoable after T13: invoking /readme on a fixture README dispatches 3 Tasks in parallel, gets persona-friction JSON back, validates quotes, merges into rubric stream.</p>
+
+<div class="task">
+<h4 id="t11">T11: reference/simulated-reader.md — 3 persona prompts + return-shape contract</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Author the 3 persona definitions + the parent-side validation contract.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-simulated-reader">FR-SR-1, FR-SR-3</a>, <a href="02_spec.html#api-contracts">§9.2.1</a></div>
+<div><strong>Depends on:</strong> none</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> no — docs</div>
+<div><strong>Slice shape:</strong> config</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md</code> (ToC in first ~15 lines)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Author with: ToC; §1 The three personas (evaluator-60s / adopter-5min / contributor-30min) — each with task framing, anti-script ("you are NOT a reviewer; you are a reader who can leave"), bounce-trigger examples; §2 Return shape (the JSON Schema from spec §9.2.1) + the FR-SR-3 quote validation contract (≥40-char verbatim substring); §3 Theater-check escape (FR-SR-5); §4 Parent-side validation reference (mirrors /grill FR-50/51/52 pattern; cites <code>plugins/pmos-toolkit/skills/grill/SKILL.md</code>).</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md
+git commit -m "feat(T11): simulated-reader.md — 3 personas + return-shape contract"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>head -15 plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md</code> — ToC present.</li>
+<li><code>grep -c "evaluator\|adopter\|contributor" plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md</code> — ≥3.</li>
+<li><code>grep -c "≥40-char\|substring-grep" plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md</code> — ≥1 (FR-SR-3 contract surfaced).</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t12">T12: SKILL.md — parallel Task dispatch + FR-SR-3 substring validation</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Extend SKILL.md's ## Implementation with the per-persona Task-tool dispatch protocol; documenting 3 concurrent calls; the 120s per-call timeout; and the parent-side substring-grep validation against the un-stripped README source.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-simulated-reader">FR-SR-1, FR-SR-2, FR-SR-3</a>, <a href="02_spec.html#decision-log">D13, P3</a></div>
+<div><strong>Depends on:</strong> T11 (cites)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature (the stub-driven contract test runs in T13)</div>
+<div><strong>Slice shape:</strong> vertical — wires the simulated-reader layer of the architecture</div>
+<div><strong>Requires state from:</strong> T1's SKILL.md, T11's simulated-reader.md</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Extend ## Implementation with a "Simulated-reader pass" subsection. Document: (a) 3 Task invocations in ONE response (parallel scheduling per P3); (b) per-call body inlines persona prompt from reference/simulated-reader.md + the un-stripped README markdown; (c) per-call timeout 120s; on timeout, log warn and skip that persona (NFR-4); (d) parent receives 3 JSON returns; (e) FR-SR-3 substring-grep every <code>quote</code> against README source; any miss → hard-fail with <code>simulated-reader returned quote not found in README: &lt;prefix-30&gt;…</code>; pause with failure dialog; (f) merge passing personas' friction into rubric stream, severity-tagged; (g) dedupe duplicates (same line ±2).</li>
+<li>Cross-reference SKILL.md → reference/simulated-reader.md for full persona definitions (per §C "references one level deep").</li>
+<li>Check line count: ≤480 (P8).</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/SKILL.md
+git commit -m "feat(T12): SKILL.md — parallel Task dispatch + FR-SR-3 validation"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "Task.*parallel\|3 concurrent\|FR-SR-3" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥1.</li>
+<li><code>wc -l plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≤480.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t13">T13: theater-check + --skip-simulated-reader flag + stub-driven contract test</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Implement the FR-SR-5 theater-check (empty friction + rubric ≥3 findings → re-prompt once with bounce-suffix) + the FR-SR-6 CLI flag; wire the env-var-gated stub (P9) for testing.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-simulated-reader">FR-SR-4, FR-SR-5, FR-SR-6</a></div>
+<div><strong>Depends on:</strong> T12</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Data:</strong> stub returns 3 canned outputs: (a) valid quotes; (b) altered quotes (1-char casing slip); (c) empty friction</div>
+<div><strong>Slice shape:</strong> vertical — closes the simulated-reader vertical</div>
+<div><strong>Requires state from:</strong> T12's SKILL.md</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/mocks/simulated_reader_stub.sh</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Author the stub:
+<pre>#!/usr/bin/env bash
+# simulated_reader_stub.sh — canned persona output for FR-SR-3 contract tests.
+# Triggered by READMER_PERSONA_STUB env var pointing at this script.
+case "$1" in
+  --persona=evaluator) cat &lt;&lt;'EOF'
+{"persona":"evaluator","friction":[{"quote":"&lt;valid 40-char substring from README&gt;","line":3,"severity":"friction","message":"hero line too generic"}]}
+EOF
+  ;;
+  --persona=adopter)  cat &lt;&lt;'EOF'
+{"persona":"adopter","friction":[]}
+EOF
+  ;;
+  --persona=contributor) cat &lt;&lt;'EOF'
+{"persona":"contributor","friction":[{"quote":"&lt;ALTERED quote that does NOT substring-match&gt;","line":15,"severity":"friction","message":"contributing section missing"}]}
+EOF
+  ;;
+esac</pre></li>
+<li>Extend SKILL.md ## Implementation: (a) theater-check after collecting persona returns — if persona K returns empty friction AND rubric scored ≥3 findings, re-dispatch persona K with bounce-suffix appended ("you have alternatives and 90 seconds; what makes you bounce?"); accept second-pass result even if still empty; (b) FR-SR-6 <code>--skip-simulated-reader</code> flag short-circuits the entire phase with chat log <code>simulated-reader: skipped (--skip-simulated-reader)</code>.</li>
+<li>Verify the stub-driven contract: parent substring-grep correctly hard-fails on the altered contributor quote.
+<pre># manual harness (also covered in T25's cross_file_rules.sh)
+READMER_PERSONA_STUB=plugins/pmos-toolkit/skills/readme/tests/mocks/simulated_reader_stub.sh \
+  &lt;invoke skill on fixture&gt;
+# Expected: hard-fail with "simulated-reader returned quote not found in README: &lt;ALTERED qu...&gt;"</pre></li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/SKILL.md plugins/pmos-toolkit/skills/readme/tests/mocks/
+git commit -m "feat(T13): theater-check + --skip-simulated-reader + stub contract"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li>Stub-driven contract test surfaces hard-fail on altered quote (R1 mitigation).</li>
+<li><code>grep -c "skip-simulated-reader\|theater-check\|bounce-suffix" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥3.</li>
+</ul>
+</div>
+
+<h3 id="phase-5-scaffold">Phase 5: Scaffold mode + repo-miner</h3>
+<p class="meta"><strong>Phase rationale:</strong> add the scaffold path (greenfield repo, no README). Repo-miner subagent gathers data; ≤6 Q&amp;A cap; per-type opening shape applied; rubric + simulated-reader passes; diff preview. Parallel with Phase 6. Demoable: <code>/readme</code> on a fixture repo with no README emits a draft README; rubric pass.</p>
+
+<div class="task">
+<h4 id="t14">T14: SKILL.md — mode-resolver extension + composition rules (D16)</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Extend the SKILL.md mode-resolver to handle <code>--scaffold</code>, mode-composition (<code>--audit + --scaffold</code> per D16), and the mutual-exclusion of <code>--update</code>.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-modes">FR-MODE-1, FR-MODE-2, FR-MODE-3, FR-MODE-4</a></div>
+<div><strong>Depends on:</strong> T1, T3 (mode-resolver base)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Slice shape:</strong> vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Test cases for mode resolution (these are encoded in SKILL.md as expected-behavior tables, validated in T25 integration tests):
+<ul>
+<li>No README + no flags → <code>--scaffold</code></li>
+<li>README + no flags → <code>--audit</code></li>
+<li>README + <code>--scaffold</code> → composition (mode=audit+scaffold per D16, monorepo with mixed-presence)</li>
+<li>Any + <code>--update &lt;range&gt;</code> alongside <code>--audit</code> or <code>--scaffold</code> → exit 64 with <code>--update is mutually exclusive with --audit/--scaffold</code></li>
+</ul></li>
+<li>Update SKILL.md ## Implementation with the resolution table. Emit chat log line <code>mode: &lt;resolved&gt; (source: cli|default-readme-present|default-readme-absent)</code> per FR-MODE-4.</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/SKILL.md
+git commit -m "feat(T14): mode-resolver — --scaffold + composition + --update exclusion"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "FR-MODE-1\|FR-MODE-2\|FR-MODE-3\|FR-MODE-4" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥4.</li>
+<li>Mode-resolution truth table present in SKILL.md.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t15">T15: SKILL.md — repo-miner subagent dispatch + return-shape validation</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Document the repo-miner subagent contract per spec §9.2.2; parent parses return JSON; validates fields; falls back to AskUserQuestion on missing data.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#api-contracts">§9.2.2</a>, <a href="02_spec.html#user-journeys">§5.2 step 3</a></div>
+<div><strong>Depends on:</strong> T14</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Slice shape:</strong> vertical — extends scaffold flow</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Extend ## Implementation with the repo-miner Task dispatch protocol: prompt body inlines supported-manifest list + repo-root path; return shape JSON Schema per §9.2.2; parent validates fields (name, entry_point, license, contributors, repo_type_hint); on missing-field fallback to AskUserQuestion.</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/SKILL.md
+git commit -m "feat(T15): repo-miner subagent dispatch + return validation"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "repo-miner\|repo_type_hint" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥2.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t16">T16: SKILL.md — scaffold flow with ≤6 question cap + per-type draft</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Complete the scaffold path: repo-miner → workspace-discovery → ≤6 Q AskUserQuestion → per-type opening shape (from opening-shapes.md) → draft README → rubric pass + simulated-reader pass → diff preview → atomic write.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-output">FR-OUT-3</a>, <a href="02_spec.html#user-journeys">§5.2</a>, <a href="02_spec.html#edge-cases">E2</a></div>
+<div><strong>Depends on:</strong> T6, T11, T13, T14, T15</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Slice shape:</strong> vertical — closes the scaffold-mode vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Extend ## Implementation with the scaffold flow. Detail: (a) repo-miner Task dispatch (T15); (b) workspace-discovery script call → resolves repo_type; (c) ≤6 Q AskUserQuestion per FR-OUT-3 — beyond the cap, emit stub README with <code>&lt;!-- TODO(/readme): &lt;reason&gt; --&gt;</code> markers; (d) draft README assembled from opening-shapes.md per-type + section-schema.yaml spine; (e) rubric pass + simulated-reader pass; (f) diff preview ("here is the README that would land") → user confirms → atomic write.</li>
+<li>E2 path: empty repo (manifest only, no callable entry) → emit 5-block stub with TODO markers, never invent commands.</li>
+<li>Commit:
+<pre>git add plugins/pmos-toolkit/skills/readme/SKILL.md
+git commit -m "feat(T16): scaffold flow — ≤6 Q cap + per-type draft + rubric/simreader"</pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "FR-OUT-3\|≤6 question\|TODO(/readme)" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥3.</li>
+<li><code>wc -l plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≤480.</li>
+</ul>
+</div>
+
+<h3 id="phase-6-update">Phase 6: Update mode + commit-classifier</h3>
+<p class="meta"><strong>Phase rationale:</strong> wire the Phase 7.6 hook flow. commit-classifier.sh parses a commit range → impacted sections via section-schema commit_affinity. SKILL.md adds the update-mode flow + FR-UP-3 patch-fail guard + the dual opt-in gate (FR-UP-4). Parallel with Phase 5.</p>
+
+<div class="task">
+<h4 id="t17">T17: commit-classifier.sh + --selftest</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Bash script: parse a commit range (<code>&lt;base&gt;..HEAD</code>); per-commit map subject to impacted sections via section-schema.yaml; emit JSON; <code>--selftest</code> against synthetic commit fixtures.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-update">FR-UP-1, FR-UP-2</a>, <a href="02_spec.html#fr-section-schema">FR-SS-3</a></div>
+<div><strong>Depends on:</strong> T5 (consumes section-schema.yaml)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Data:</strong> synthetic commit-range fixtures (3 small git fixture repos with hand-authored commit logs)</div>
+<div><strong>Slice shape:</strong> vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/scripts/commit-classifier.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/commits/</code> (3 micro-git-repo fixtures)</li>
+<li>Modify: <code>_lib.sh</code> (append-only helper if needed)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Test pair:
+<pre>bash commit-classifier.sh tests/fixtures/commits/01_feat-only/ HEAD~3..HEAD | jq '.sections[]'
+# Expected: "Features" "Usage" "Quickstart"
+bash commit-classifier.sh tests/fixtures/commits/02_no-conv-commit/ HEAD~2..HEAD
+# Expected: empty + warn "no conventional-commit subjects" (FR-UP-2)</pre></li>
+<li>Author fixtures: tiny git repos with hand-crafted commits. Each fixture has a setup script that creates the git history at test time (preserves fixture authorship over time).</li>
+<li>Author <code>commit-classifier.sh</code>. Parse each commit subject via the conventional-commit regex; map to sections via the commit_affinity table loaded from section-schema.yaml (using <code>readme::yaml_get</code> from _lib.sh).</li>
+<li>Selftest asserts: feat-only fixture → {Features, Usage, Quickstart}; no-conv-commit fixture → empty + warn; BREAKING CHANGE fixture → {Migration, Changelog}.</li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash scripts/commit-classifier.sh --selftest</code> — exits 0.</li>
+<li><code>shellcheck</code> clean.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t18">T18: SKILL.md — update-mode flow + FR-UP-3 patch-fail guard</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Wire the update-mode flow in SKILL.md: commit-classifier → per-section AskUserQuestion → re-run rubric on patched README → if any blocker fails, drop patch; log JSON to <code>.pmos/readme/update.log</code>; emit /retro finding.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-update">FR-UP-1, FR-UP-2, FR-UP-3</a>, <a href="02_spec.html#edge-cases">E12, E13</a></div>
+<div><strong>Depends on:</strong> T17, T7 (rubric)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — bug-fix-like (regression: ensure patch-drop emits the log line and does NOT block release)</div>
+<div><strong>Slice shape:</strong> vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Extend ## Implementation: update-mode subsection. Documents: (a) call commit-classifier.sh on the provided range; (b) per impacted section, AskUserQuestion (Apply/Modify/Skip/Defer, ≤4 per call); (c) on approval, stage draft patch in working tree; (d) re-run rubric.sh on patched README; (e) FR-UP-3: if any blocker check fails, ABORT patch (revert working tree); log <code>{"event":"patch_dropped","reason":"rubric_blocker_fail","failed_checks":[...]}</code> to <code>.pmos/readme/update.log</code>; emit /retro finding; release proceeds unpatched; (f) on rubric pass, the patched README stays staged via <code>git add</code> only — no commit.</li>
+<li>E12 path: commit range with zero conv-commits → no-op + warn "README update skipped — commit signal ambiguous".</li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "FR-UP-3\|patch_dropped\|update.log" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥3.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t19">T19: SKILL.md — opt-in dual flag gate + git-add-only stage</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Document the FR-UP-4 dual opt-in gate: hook fires only when BOTH <code>~/.pmos/readme/config.yaml :: phase_7_6_hook_enabled: true</code> AND <code>.pmos/complete-dev.lastrun.yaml :: readme_update_hook: true</code> are set. Document FR-UP-5 staging-only contract.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-update">FR-UP-4, FR-UP-5</a></div>
+<div><strong>Depends on:</strong> T18</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature (the dual-flag gate is regression-tested by T25's update_hook_dry_run.sh)</div>
+<div><strong>Slice shape:</strong> vertical — closes update-mode vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Extend ## Implementation update-mode subsection: document the dual-flag check at entry. Either flag absent/false → no-op with chat warn <code>/readme --update skipped: opt-in not set (phase_7_6_hook_enabled=&lt;v1&gt; AND readme_update_hook=&lt;v2&gt;)</code>; both true → proceed.</li>
+<li>FR-UP-5 contract: patched README staged via <code>git add &lt;readme-path&gt;</code> only; no git commit by /readme. /complete-dev's commit flow picks it up.</li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "phase_7_6_hook_enabled\|readme_update_hook\|FR-UP-4\|FR-UP-5" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥4.</li>
+</ul>
+</div>
+
+<h3 id="phase-7-cross-file">Phase 7: Cross-file rules (monorepo)</h3>
+<p class="meta"><strong>Phase rationale:</strong> R1 (root links to packages), R2 (packages link up), R3 (Install/Contributing/License root-only — warn-with-override), R4 (no duplicate hero text). A9 clarity-test at design-time documents each rule's binary determinism. SKILL.md adds the monorepo unified-diff (D15) + per-package roll-up.</p>
+
+<div class="task">
+<h4 id="t20">T20: reference/cross-file-rules.md — R1–R4 + A9 clarity-test results</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Author the reference doc that specifies R1–R4 + the A9 design-time clarity-test results per rule.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-cross-file">FR-CF-1, FR-CF-2, FR-CF-3, FR-CF-4, FR-CF-5</a></div>
+<div><strong>Depends on:</strong> none</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> no — docs (the rules are tested in T21 implementation + T25 integration)</div>
+<div><strong>Slice shape:</strong> config</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/reference/cross-file-rules.md</code> (ToC in first ~15 lines)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Author with ToC + per-rule sections: §R1 link existence (binary; A9 PASS); §R2 link-up presence (binary; A9 PASS); §R3 Install/Contributing/License root-only WARN-WITH-OVERRIDE (3-valued: clean / divergent-byte-for-byte / legitimately-divergent — A9 PASS as 3-valued with explicit override path persisted in .pmos/readme.config.yaml); §R4 no duplicate hero text (binary; A9 PASS); §Methodology — how A9 was evaluated for each rule (cite the example cases tested).</li>
+<li>Per FR-CF-5: rules failing A9 demote to friction-tier advisory; doc records that R1/R2/R4 pass binary, R3 is 3-valued (legitimately so).</li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>head -15 plugins/pmos-toolkit/skills/readme/reference/cross-file-rules.md</code> — ToC.</li>
+<li><code>grep -c "R1\|R2\|R3\|R4\|A9" plugins/pmos-toolkit/skills/readme/reference/cross-file-rules.md</code> — ≥5.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t21">T21: SKILL.md — R1/R2/R3/R4 implementation + auto-fix paths</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Wire R1–R4 into the audit flow: detect rule violations during cross-file pass; per-rule auto-fix paths (R1 create-or-update contents-table with explicit prompt; R2 append link-up line; R3 replace-with-link-up or persist variance override; R4 surface as friction).</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-cross-file">FR-CF-1, FR-CF-2, FR-CF-3, FR-CF-4</a></div>
+<div><strong>Depends on:</strong> T20 (cites)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Slice shape:</strong> vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Extend ## Implementation with a "Cross-file rules (monorepo)" subsection. Per rule:
+<ul>
+<li>R1: scan root README for contents-table; resolve each workspace package; assert each package is referenced. Auto-fix: <em>append missing entries</em> when table exists; <em>structural rewrite — surface AskUserQuestion ("root README has no contents-table — add one? [show preview]")</em> when no table.</li>
+<li>R2: scan each package README for a relative link back to root README. Auto-fix: append link-up line at end-of-readme (configurable section).</li>
+<li>R3: scan each package README for Install/Contributing/License sections. Auto-fix offers "replace with link-up to root" OR "mark legitimate variance" (persists in .pmos/readme.config.yaml).</li>
+<li>R4: cross-compare hero lines between root and each package. Surface duplicates as friction (no auto-fix — voice-sensitive).</li>
+</ul></li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "R1\|R2\|R3\|R4" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥4.</li>
+<li><code>grep -c "package_variance" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥1 (R3 override).</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t22">T22: SKILL.md — monorepo unified diff (D15) + per-package roll-up</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Implement the audit-all monorepo flow: workspace-scope AskUserQuestion (audit-all / audit-one / scaffold-missing / root-only / "include all stacks" when MS01); per-package iteration; cross-file rule pass; findings rolled up by severity (first pass) with per-package drill-down on demand; single unified diff (D15) with per-file headers; one final approval.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#user-journeys">§5.4</a>, <a href="02_spec.html#decision-log">D15</a>, <a href="02_spec.html#fr-workspace">FR-WS-4</a>, <a href="02_spec.html#fr-output">FR-OUT-1</a></div>
+<div><strong>Depends on:</strong> T10 (workspace), T13 (sim-reader), T21 (cross-file)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Slice shape:</strong> vertical — closes the monorepo audit-all vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Extend ## Implementation with the monorepo orchestration: invoke workspace-discovery.sh; on multi-stack output, present workspace-scope prompt with "Include all stacks (JS + Go + …)" option; on selection, iterate packages; apply rubric variant per repo_type; cross-file rule pass; aggregate findings by severity (blockers across packages first, then friction, then nits); per-package drill-down on user request; single unified diff per FR-OUT-1 with <code>=== package: &lt;name&gt; (audit|scaffold) ===</code> headers; one final <em>Apply all / Reject all / Cancel</em> prompt; atomic-multi-write (per-file temp+rename).</li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "FR-OUT-1\|audit-all\|workspace-scope" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥3.</li>
+</ul>
+</div>
+
+<h3 id="phase-8-voice">Phase 8: Voice delegation</h3>
+<p class="meta"><strong>Phase rationale:</strong> wrap /polish's voice-preservation substrate; expose <code>voice-diff.sh</code> for G4 (sentence-length delta &lt;15% AND Jaccard ≥0.7); add the FR-V-2 follow-up <code>Suggest: /polish &lt;path&gt; ...</code> line at the end of /readme output.</p>
+
+<div class="task">
+<h4 id="t23">T23: voice-diff.sh wrapping /polish substrate + --selftest</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Bash script: <code>voice-diff.sh &lt;pre&gt; &lt;post&gt;</code> returns JSON <code>{sentence_len_delta_pct, jaccard_new_tokens}</code>. Resolves /polish substrate via runtime <code>find</code> (FR-V-4); on absence, graceful warn (gate skipped).</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-voice">FR-V-3, FR-V-4</a></div>
+<div><strong>Depends on:</strong> none (T2's _lib.sh sourced)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Data:</strong> 2 hand-edited fixtures (pre/post pair) with known sentence-len delta + Jaccard</div>
+<div><strong>Slice shape:</strong> vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/scripts/voice-diff.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/voice/{pre,post}.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Test pair:
+<pre>bash voice-diff.sh tests/fixtures/voice/pre.md tests/fixtures/voice/post.md | jq '.sentence_len_delta_pct &lt; 15 and .jaccard_new_tokens &gt;= 0.7'
+# Expected: true</pre></li>
+<li>Hand-author the fixtures so the known sentence-len delta and Jaccard fall within the gate.</li>
+<li>Author voice-diff.sh:
+<pre>set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" &amp;&amp; pwd)"
+source "$HERE/_lib.sh"
+
+resolve_polish_substrate() {
+  find plugins/pmos-toolkit/skills/polish/ -name 'voice*' 2&gt;/dev/null | head -1
+}
+
+main() {
+  if [[ "${1:-}" == "--selftest" ]]; then
+    local pre="$HERE/../tests/fixtures/voice/pre.md"
+    local post="$HERE/../tests/fixtures/voice/post.md"
+    bash "$0" "$pre" "$post" | jq -e '.sentence_len_delta_pct &lt; 15 and .jaccard_new_tokens &gt;= 0.7' &gt;/dev/null
+    [[ $? -eq 0 ]] &amp;&amp; { readme::log "selftest: PASS"; exit 0; } || { readme::log "selftest: FAIL"; exit 1; }
+  fi
+  local pre="${1?usage: voice-diff.sh &lt;pre&gt; &lt;post&gt;}"
+  local post="${2?usage: voice-diff.sh &lt;pre&gt; &lt;post&gt;}"
+  local substrate; substrate=$(resolve_polish_substrate)
+  [[ -z "$substrate" ]] &amp;&amp; { readme::log "warn: voice-diff substrate not found; G4 gate skipped"; printf '{"sentence_len_delta_pct":null,"jaccard_new_tokens":null,"substrate":null}\n'; exit 0; }
+  # Compute metrics (impl detail: node script implementing the formulas from polish/reference/voice-sampling.md)
+  node -e '/* delta + jaccard impl */' "$pre" "$post"
+}
+main "$@"</pre></li>
+<li>Run:
+<pre>bash plugins/pmos-toolkit/skills/readme/scripts/voice-diff.sh --selftest
+# Expected: exit 0; "selftest: PASS"</pre></li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash voice-diff.sh --selftest</code> — exits 0.</li>
+<li>Substrate absence test (rename polish dir temporarily, re-run): graceful warn + null fields, never crash.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t24">T24: SKILL.md — FR-V-2 suggest /polish follow-up + voice gate wiring</h4>
+<div class="fields">
+<div><strong>Goal:</strong> SKILL.md ## Implementation closes the audit flow with the FR-V-2 follow-up line when structural rewrites brush the prose line; voice-diff.sh gate (G4) surfaces failures in the diff preview.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#fr-voice">FR-V-1, FR-V-2, FR-V-3</a></div>
+<div><strong>Depends on:</strong> T23</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> yes — new-feature</div>
+<div><strong>Slice shape:</strong> vertical — closes voice vertical</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Extend ## Implementation: (a) FR-V-1 structural-vs-prose boundary — /readme FLAGS banned phrases, /polish REMOVES them; (b) after diff-preview confirm, run voice-diff.sh pre vs post; if G4 gate fails, surface failure as a blocker finding (re-loop the diff preview); (c) FR-V-2: when rewrites brush the prose line, output appends <code>Suggest: /polish &lt;readme-path&gt; --target=sections=&lt;list&gt;</code>.</li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "FR-V-1\|FR-V-2\|FR-V-3\|/polish" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≥4.</li>
+<li><code>wc -l plugins/pmos-toolkit/skills/readme/SKILL.md</code> — ≤480.</li>
+</ul>
+</div>
+
+<h3 id="phase-9-integration">Phase 9: Integration tests + dogfood</h3>
+<p class="meta"><strong>Phase rationale:</strong> all 7 spec'd integration tests + a top-level <code>run-all.sh</code> + the dogfood pass on this repo's READMEs (G1, G3 gate). TN follows.</p>
+
+<div class="task">
+<h4 id="t25">T25: 7 integration scripts + tests/run-all.sh</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Author the 7 integration tests per spec §13.2 + a top-level <code>run-all.sh</code> that iterates self-tests + integration scripts; exits 1 on any failure.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#integration-tests">§13.2</a>, <a href="02_spec.html#reviewer-subagent-tests">§13.3</a></div>
+<div><strong>Depends on:</strong> ALL prior tasks (T1–T24)</div>
+<div><strong>Idempotent:</strong> yes</div>
+<div><strong>TDD:</strong> no — the integration scripts ARE the tests; each is its own assertion. FR-105 exception (per FR-104a precedence: spec type=feature defaults to TDD, override here keyed off "script is the test").</div>
+<div><strong>Data:</strong> uses fixtures from T7, T10, T17 + a new monorepo fixture for T25's compose_audit_scaffold + cross_file_rules tests</div>
+<div><strong>Slice shape:</strong> vertical — closes the test-suite vertical</div>
+<div><strong>Requires state from:</strong> entire skill bundle from T1–T24</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/scaffold_greenfield.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/audit_clean.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/audit_cluttered.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/compose_audit_scaffold.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/multi_stack_grafana_style.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/update_hook_dry_run.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/cross_file_rules.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/monorepo-mixed-readmes/</code> (fixture for compose_audit_scaffold + cross_file_rules)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Author each integration test per spec §13.2. Each: P6 pattern (mktemp -d + trap cleanup) + fixture copy + script invocation + assertions via grep/jq + exit 0/1. Assertions verbatim from spec:
+<ul>
+<li>scaffold_greenfield.sh — assert per-type opening shape emitted; assert ≤200 lines.</li>
+<li>audit_clean.sh — assert NFR-2 idempotency (zero findings, zero diff).</li>
+<li>audit_cluttered.sh — assert ≤20 lines of structural diff.</li>
+<li>compose_audit_scaffold.sh — assert unified diff covers both modes (D16 + FR-MODE-3).</li>
+<li>multi_stack_grafana_style.sh — assert MS01 emits BOTH stacks (FR-WS-4).</li>
+<li>update_hook_dry_run.sh — assert patch-drop on blocker-fail (FR-UP-3); assert no-op when opt-in absent (FR-UP-4).</li>
+<li>cross_file_rules.sh — assert R1–R4 fire; R3 warn-with-override (not blocker).</li>
+</ul></li>
+<li>Author <code>run-all.sh</code>: iterate <code>scripts/*.sh --selftest</code> then <code>tests/integration/*.sh</code>; exit 1 on any non-zero return; print summary.</li>
+<li>Run:
+<pre>bash plugins/pmos-toolkit/skills/readme/tests/run-all.sh
+# Expected: exit 0; "[/readme] run-all: 4 scripts + 7 integration tests = 11 passed"</pre></li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code> — exits 0.</li>
+<li>Each integration script individually exits 0.</li>
+<li><code>shellcheck plugins/pmos-toolkit/skills/readme/tests/**/*.sh</code> — no errors.</li>
+</ul>
+</div>
+
+<div class="task">
+<h4 id="t26">T26: Dogfood pass — /readme on this repo's root + 5 plugins (G1, G3 gate)</h4>
+<div class="fields">
+<div><strong>Goal:</strong> Run <code>/readme --audit</code> on this repo's root README and on 5 plugin READMEs (pmos-toolkit + 4 others by recency). Assert: ≥90% rubric pass-rate on first emit across the 5-README set (G1); ≥5 findings approved on first audit of pmos-toolkit's README (G3); zero rubric failures after applying findings.</div>
+<div><strong>Spec refs:</strong> <a href="02_spec.html#goals">G1, G3</a>, <a href="02_spec.html#rollout-strategy">§14 row 2</a>, <a href="02_spec.html#testing-strategy">§13.4 dogfood</a></div>
+<div><strong>Depends on:</strong> T25 (whole suite passing)</div>
+<div><strong>Idempotent:</strong> yes — dogfood is read-only assertion of rubric pass-rate (findings are NOT applied in T26; that's a separate maintainer action)</div>
+<div><strong>TDD:</strong> no — empirical regression gate. Per /plan Loop-1 F2 disposition: T26 is <strong>advisory</strong> (always exits 0); /verify Phase 7 owns the G1/G3 gate via <code>accepted_residuals[]</code> on any ADVISORY_FAIL, mirroring the A2/A4 residual pattern from spec §Phase 0 Validation.</div>
+<div><strong>Data:</strong> live host repo files (README.md at repo root + plugins/&lt;p&gt;/README.md for 5 plugins)</div>
+<div><strong>Slice shape:</strong> vertical — the final demoable: real /readme audit on real READMEs</div>
+<div><strong>Requires state from:</strong> entire skill bundle</div>
+</div>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/dogfood/run-dogfood.sh</code> (orchestrates the 6 audit invocations, aggregates results)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li>Write dogfood orchestrator:
+<pre>#!/usr/bin/env bash
+# run-dogfood.sh — drives audit on host repo's READMEs; asserts G1 + G3 gates.
+set -euo pipefail
+REPO_ROOT=$(git rev-parse --show-toplevel)
+targets=(
+  "$REPO_ROOT/README.md"
+  "$REPO_ROOT/plugins/pmos-toolkit/README.md"
+  # 4 more: pick by mtime descending or alpha
+)
+total_checks=0; total_pass=0; total_fail=0
+for path in "${targets[@]}"; do
+  result=$(bash "$REPO_ROOT/plugins/pmos-toolkit/skills/readme/scripts/rubric.sh" "$path")
+  pass=$(printf '%s' "$result" | grep -c PASS)
+  fail=$(printf '%s' "$result" | grep -c FAIL)
+  total_pass=$((total_pass+pass)); total_fail=$((total_fail+fail))
+  total_checks=$((total_checks+pass+fail))
+  printf 'dogfood: %s — pass=%d fail=%d\n' "$path" "$pass" "$fail"
+done
+# G1 gate (advisory): ≥90% pass rate across all checks
+pass_pct=$((total_pass * 100 / total_checks))
+# G3 gate (advisory): ≥5 findings on pmos-toolkit README
+pmos_fail=$(bash "$REPO_ROOT/plugins/pmos-toolkit/skills/readme/scripts/rubric.sh" "$REPO_ROOT/plugins/pmos-toolkit/README.md" | grep -c FAIL)
+status_g1="PASS"; [[ $pass_pct -ge 90 ]] || status_g1="ADVISORY_FAIL — residual for /verify"
+status_g3="PASS"; [[ $pmos_fail -ge 5 ]] || status_g3="ADVISORY_FAIL — residual for /verify"
+echo "dogfood: G1 $status_g1 ($pass_pct%) | G3 $status_g3 ($pmos_fail findings)"
+# T26 is advisory per /plan Loop-1 F2: ALWAYS exit 0; /verify Phase 7 owns the gate via accepted_residuals[].
+# If either status is ADVISORY_FAIL, /verify reconciles per Phase 6a semantics (spec §13.5 + dogfood follow-up).
+exit 0</pre></li>
+<li>Run; capture output. If G1 fails: this is a /verify residual — accepted-residuals[] per spec §13.5 + dogfood follow-up.</li>
+<li>Commit.</li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/readme/tests/dogfood/run-dogfood.sh</code> — <strong>always exits 0</strong> (advisory). Chat output reports G1/G3 status as PASS or <code>ADVISORY_FAIL — residual for /verify</code>.</li>
+<li>Manual: read the chat output; on ADVISORY_FAIL the residual is queued for /verify Phase 7 reconciliation per <code>accepted_residuals[]</code> contract.</li>
+</ul>
+</div>
+
+<h3 id="tn-final">TN: Final Verification</h3>
+
+<p><strong>Goal:</strong> Verify the entire /readme bundle works end-to-end.</p>
+
+<ul>
+<li><strong>Lint:</strong> <code>shellcheck plugins/pmos-toolkit/skills/readme/scripts/*.sh plugins/pmos-toolkit/skills/readme/tests/**/*.sh</code> — no errors.</li>
+<li><strong>YAML lint:</strong> <code>for f in plugins/pmos-toolkit/skills/readme/reference/*.yaml; do node -e 'require("js-yaml").load(require("fs").readFileSync(process.argv[1],"utf8"))' "$f"; done</code> — no parse errors.</li>
+<li><strong>Markdown lint:</strong> <code>grep -nE '^\s{4,}#' plugins/pmos-toolkit/skills/readme/SKILL.md plugins/pmos-toolkit/skills/readme/reference/*.md || echo "no over-indented headings"</code> — no over-indented headings.</li>
+<li><strong>Skill-eval check:</strong> <code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</code> — exits 0 on the [D] checks. (The [J] checks are scored by Phase 6a /skill-eval; TN re-runs as a final idempotency gate.)</li>
+<li><strong>Script self-tests:</strong>
+<pre>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest                # exit 0
+bash plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh --selftest   # exit 0; ≥19/20
+bash plugins/pmos-toolkit/skills/readme/scripts/voice-diff.sh --selftest            # exit 0
+bash plugins/pmos-toolkit/skills/readme/scripts/commit-classifier.sh --selftest     # exit 0</pre></li>
+<li><strong>Integration suite:</strong> <code>bash plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code> — exits 0; 4 selftests + 7 integration tests = 11 passed.</li>
+<li><strong>Dogfood:</strong> <code>bash plugins/pmos-toolkit/skills/readme/tests/dogfood/run-dogfood.sh</code> — exits 0 (G1 ≥90% AND G3 ≥5).</li>
+<li><strong>Idempotency check (NFR-2):</strong> run /readme --audit twice on a clean fixture; assert second run produces zero findings, zero diff:
+<pre>tmp=$(mktemp -d); trap "rm -rf $tmp" EXIT
+cp plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/strong/01_hero-line.md "$tmp/README.md"
+cd "$tmp"
+# First audit + apply (manually represented; in production /readme handles)
+bash "$OLDPWD/plugins/pmos-toolkit/skills/readme/scripts/rubric.sh" README.md  # ≥12/15 PASS
+# Second audit — should produce zero failures
+result=$(bash "$OLDPWD/plugins/pmos-toolkit/skills/readme/scripts/rubric.sh" README.md)
+[[ $(printf '%s' "$result" | grep -c FAIL) -eq 0 ]] || { echo "NFR-2 idempotency FAIL"; exit 1; }</pre></li>
+<li><strong>Tracer-bullet still passes:</strong> <code>bash plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit.sh</code> — exits 0.</li>
+<li><strong>Done-when walkthrough:</strong> trace each clause of the plan's Done-when line through a live <code>/readme --audit</code> run on this repo's root README (mode-resolver log → workspace classification log → rubric N pass/M fail → AskUserQuestion batches → parallel simulated-reader dispatches → diff preview → atomic write OR DOES NOT COMMIT note). Match against the Overview's Done-when walkthrough narrative.</li>
+</ul>
+
+<p><strong>Cleanup:</strong></p>
+<ul>
+<li>No temporary files outside the test harness's <code>mktemp -d</code> dirs (each <code>trap</code>s its cleanup).</li>
+<li>No debug logging in production-path SKILL.md or scripts (selftests OK).</li>
+<li><em>No feature flag toggles needed at TN</em> — FR-UP-4 dual-flag opt-in is documented in SKILL.md but defaults to OFF; not flipped here.</li>
+<li>Documentation updates — <strong>OUT OF SCOPE per FR-63</strong>. The README row, plugin.json bumps, changelog entry, and learnings header are <code>/complete-dev</code>'s Phase 8 — see <a href="#release-prerequisites">Release prerequisites</a> below.</li>
+</ul>
+
+</section>
+
+<section id="release-prerequisites">
+<h2 id="release-prerequisites">Release prerequisites</h2>
+<p class="note"><strong>Scope discipline (FR-63 / skill-patterns.md §G):</strong> The items below belong to <code>/complete-dev</code>'s Phase 8 — NOT to <code>/execute</code>'s waves. They appear here verbatim from <a href="02_spec.html#release-prerequisites">spec §15</a> as a pointer; they MUST NOT appear as numbered tasks in <a href="#tasks">§Tasks</a>. Phase 6a (/skill-eval) checks <code>g-release-prereqs-scope</code> [J] and <code>g-plan-grep-clean</code> [D] will fail this plan if any release-prereq leak into <code>## Phase N</code> blocks.</p>
+<ul>
+<li><strong>README row</strong> — add a new row to <code>README.md</code> under <em>### Artifacts &amp; docs</em> (between <code>/polish</code> and <code>/changelog</code>): <code>| /pmos-toolkit:readme | Audit, scaffold, or update READMEs against a 15-check rubric + 3-persona simulated reader; monorepo-aware (8 manifests + multi-stack); voice work delegated to /polish; never auto-commits |</code></li>
+<li><strong>Both <code>plugin.json</code> manifests</strong> — minor version bump (2.46.0 → 2.47.0) in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> and <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code>, in ONE commit (pre-push hook enforces sync per CLAUDE.md).</li>
+<li><strong>Changelog</strong> — entry in <code>docs/pmos/changelog.md</code> describing the new <code>/readme</code> skill + the three modes + the opt-in Phase 7.6 hook.</li>
+<li><strong>Learnings header bootstrap</strong> — add <code>## /readme</code> section header to <code>~/.pmos/learnings.md</code> if absent (idempotent — only append if missing). Header only; no entries.</li>
+<li><strong>CLAUDE.md</strong> — no edits required (skill-authoring conventions section already canonical).</li>
+</ul>
+</section>
+
+<section id="review-log">
+<h2 id="review-log">Review Log</h2>
+<p class="meta">Sidecar: <code>03_plan_review.md</code> when loop findings accumulate (FR-45). Phase 4 of /plan applies loops; results land here as a summary.</p>
+<table>
+<tr><th>Loop</th><th>Findings</th><th>Changes made</th></tr>
+<tr><td>1 (initial)</td><td>Plan drafted from <a href="02_spec.html">02_spec.html</a> after Phase 2 code study. Tracer-bullet pattern applied (T1–T3 across mode/rubric/aggregator/diff/write layers). 9 phases × 26 tasks; ≥3 vertical phases each; 10 implementation decisions (P1–P10); 8 risks; 6 reference files; 4 scripts; 7+1 integration tests. §15 Release prerequisites declared OUT OF SCOPE per FR-63. Code study notes flag the plugin-marketplace-no-marketplace.json classification ambiguity (R2) for T7 handling.</td><td>—</td></tr>
+<tr><td>2 (self-critique)</td><td>3 design-level findings — [Should-fix] F1: many tasks modify SKILL.md, wave planner must serialize; [Should-fix] F2: T26 hard-exit risks blocking on too-strict gate; [Nit] F3: tracer_audit.sh tests contract not real /readme dispatch. Execution-mode selection: subagent-driven.</td><td>F1 applied — added R9 risk entry (High severity) + P11 decision (SKILL.md ## Implementation append-only convention); F2 applied — T26 softened to advisory (always exits 0); /verify Phase 7 owns G1/G3 gate via accepted_residuals[]; R8 mitigation reworded; F3 applied — comment in tracer_audit.sh expanded to call out T26 cross-ref + explicit "no split". <code>execution_mode: subagent-driven</code> persisted in frontmatter.</td></tr>
+<tr><td>Exit</td><td>All 3 findings applied. No additional gaps surfaced. Status flipped to Approved-for-execute.</td><td>Plan status: Draft → Approved-for-execute (frontmatter to be flipped at close).</td></tr>
+</table>
+</section>
+
+</main>
+</body>
+</html>

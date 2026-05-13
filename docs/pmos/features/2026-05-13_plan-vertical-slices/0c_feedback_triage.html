@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Feedback Triage — /plan vertical slices</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.42.0">
+  <script defer src="assets/viewer.js?v=2.42.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Feedback Triage — /plan vertical slices</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+    <a class="pmos-attribution pmos-attribution--toolbar"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>Feedback source:</strong> &lt;inline-text&gt; (via <code>/skill-sdlc --from-feedback</code>)<br>
+<strong>Target skill:</strong> <code>/plan</code> (plugins/pmos-toolkit/skills/plan/SKILL.md, 869 lines)<br>
+<strong>Mode:</strong> interactive</p>
+
+<h2 id="findings-parsed">Findings (parsed)</h2>
+
+<h3 id="f1">F1: Enforce vertical slices over horizontal layer-wise grouping</h3>
+<ul>
+  <li><strong>severity:</strong> friction</li>
+  <li><strong>one_line:</strong> When /plan breaks a spec into tasks, the resulting task list should prefer end-to-end thin slices over layer-wise grouping (e.g., "all DB migrations, then all API endpoints, then all UI").</li>
+  <li><strong>evidence:</strong> Reference skill (mattpocock/skills to-issues) explicitly: <em>"Each issue is a thin vertical slice that cuts through ALL integration layers end-to-end, NOT a horizontal slice of one layer"</em>; <em>"Each slice delivers a narrow but COMPLETE path through every layer (schema, API, UI, tests)"</em>; <em>"Prefer many thin slices over few thick ones"</em>; "tracer bullet vertical slices".</li>
+  <li><strong>proposed_fix:</strong> Add an explicit mechanism (phase or sub-phase + acceptance criteria) in the skill body. First slice = tracer bullet (minimal end-to-end path proving the architecture). Subsequent slices widen scope. Anti-Patterns list horizontal layering. Phase 4 review check enforces the rule.</li>
+</ul>
+
+<h2 id="critique">Critique (against current /plan SKILL.md)</h2>
+
+<h3 id="c-already-handled">Already handled?</h3>
+<p><strong>No.</strong> The current SKILL.md does not mention "vertical slice", "tracer bullet", or end-to-end slicing anywhere. The concept is genuinely absent.</p>
+
+<h3 id="c-active-anti-signal">Active anti-signal in the current skill</h3>
+<p>The <code>## Phase N: &lt;name&gt;</code> groupings section (lines 511-528) ships a worked example that is <em>literally horizontal</em>:</p>
+<blockquote>
+  <pre>## Phase 1: Schema and Migration
+## Phase 2: API Layer</pre>
+</blockquote>
+<p>This actively trains plans toward the wrong shape. Any fix must pivot this example to a vertical-slice shape, or the rule will be undercut by its own template.</p>
+
+<h3 id="c-near-misses">Near-misses</h3>
+<ul>
+  <li>Phase 2 step 5 ("Trace data flow pipelines") is about completeness verification, not task <em>ordering</em>.</li>
+  <li>Phase 3 says "phases must be deployable slices of 5-10 tasks" — but the unit of "slice" there is the <code>## Phase N</code>, not the task. Each individual TASK is still allowed to be a horizontal cut.</li>
+  <li>"Independently committable" (Anti-Patterns) is necessary-but-not-sufficient for verticality.</li>
+</ul>
+
+<h3 id="c-classification">Classification</h3>
+<ul>
+  <li><strong>classification:</strong> ux-friction — plans still execute, but sequencing degrades quality (no end-to-end proof until late, blast radius of bugs widens, integration risk concentrated at the end).</li>
+  <li><strong>recommendation:</strong> apply — rule is well-defined, reference precedent exists, single SKILL.md to edit.</li>
+  <li><strong>scope_hint:</strong> medium.</li>
+</ul>
+
+<h2 id="disposition">Disposition log</h2>
+<p>(populated after Phase 0c approval)</p>
+
+<h2 id="approved-changes">Approved changes by skill</h2>
+
+<h3 id="plan-changes">/plan</h3>
+<p>(pending approval; the proposed change set is:)</p>
+<ol>
+  <li><strong>New sub-section in Phase 3: "Vertical-Slice Decomposition"</strong> — defines the rule (each task = thin vertical slice cutting through all layers it needs; tracer-bullet first task; many thin slices over few thick ones), the acceptance criteria, and the exception path (refactor/spike tasks declare why they can't be vertical).</li>
+  <li><strong>Pivot the <code>## Phase N</code> worked example</strong> from "Phase 1: Schema and Migration / Phase 2: API Layer" to a vertical-slice grouping (e.g., "Phase 1: Tracer bullet — single record end-to-end / Phase 2: Widen to list + filters / Phase 3: Edit flow"). Add a one-line caveat that horizontal phases are an anti-pattern.</li>
+  <li><strong>Phase 4 structural-checklist item</strong>: "Vertical-slice check — does each task (or, for phase-grouped plans, each <code>## Phase N</code>) cut end-to-end through all layers it touches? Horizontal-layer-only tasks/phases are findings unless explicitly justified as refactor/spike."</li>
+  <li><strong>Anti-Pattern entry</strong>: "Do NOT decompose by layer ('all migrations first, then all endpoints, then all UI') — each task should be a thin vertical slice that proves an end-to-end path. The first task is a tracer bullet."</li>
+  <li><strong>(Optional, low-cost) Phase 2 addition</strong>: a step that identifies the spec's narrowest user-observable behavior and earmarks it as the tracer-bullet candidate for T1.</li>
+</ol>
+
+<h2 id="per-skill-tier">Per-skill tier</h2>
+<ul>
+  <li><code>/plan</code>: <strong>Tier 2</strong> — focused enhancement to one SKILL.md. ~50-80 LOC of additions/edits across Phase 3, Phase 4, Anti-Patterns. No new reference/ files unless a slicing-patterns reference page is later judged worth carving out.</li>
+</ul>
+<p>Run tier (max across in-scope skills): <strong>2</strong>.</p>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_plan-vertical-slices/0c_feedback_triage.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

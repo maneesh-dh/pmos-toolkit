@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Spec — /plan vertical-slice enforcement</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.42.0">
+  <script defer src="assets/viewer.js?v=2.42.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Spec — /plan vertical-slice enforcement</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+    <a class="pmos-attribution pmos-attribution--toolbar" href="https://github.com/maneesh-dhabria/pmos-toolkit#readme" target="_blank" rel="noopener noreferrer" data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>Tier:</strong> 2 · <strong>Requirements ref:</strong> <code>01_requirements.html</code> · <strong>Target skill:</strong> <code>plugins/pmos-toolkit/skills/plan/SKILL.md</code> · <strong>Standing rubric:</strong> <code>reference/skill-patterns.md §A–§F</code></p>
+
+<h2 id="architecture">Architecture</h2>
+<p>Single-file edit. All changes land in <code>plugins/pmos-toolkit/skills/plan/SKILL.md</code>. No new reference/ files, no script changes, no manifest schema changes. The change is structurally additive: one new sub-section in Phase 3, one new step in Phase 2, one new checklist item in Phase 4, one new Anti-Pattern entry, plus an in-place text replacement of the <code>## Phase N</code> worked example. No existing FR is invalidated.</p>
+
+<h2 id="frs">Functional requirements</h2>
+
+<h3 id="fr-vs-01">FR-VS-01: Vertical-Slice Decomposition rule in Phase 3</h3>
+<p>Add a sub-section titled <strong>"Vertical-Slice Decomposition"</strong> immediately after the existing "Task Design Rules" anchor in Phase 3 (around current line 505), BEFORE the "Optional: <code>## Phase N</code> Groupings" sub-section. The sub-section MUST contain, in order:</p>
+<ol>
+  <li><strong>Rule:</strong> "Each task is a thin vertical slice that cuts through every layer it needs (schema, API, UI, tests) to deliver one user-observable behavior end-to-end. A horizontal cut (one layer only) is the wrong shape."</li>
+  <li><strong>Tracer bullet:</strong> "T1 is a tracer bullet — the minimal end-to-end path that proves the architecture works. Prefer the narrowest, dullest, hardcoded-where-needed slice that still exercises every integration layer involved."</li>
+  <li><strong>Preference:</strong> "Prefer many thin slices over few thick ones."</li>
+  <li><strong>Done-when:</strong> "A completed slice is independently demoable or verifiable on its own; it doesn't require T+1 to land before you can show something works."</li>
+  <li><strong>Exception:</strong> "Refactor, schema-only spike, pure-CSS, and config/IaC tasks cannot be vertical. Such tasks MUST declare the exception with a one-line rationale (e.g., <code>**Slice shape:** refactor-prep — extracts the layer T2 needs before its vertical cut.</code>)."</li>
+  <li><strong>Field convention:</strong> "Each task MAY include a <code>**Slice shape:** vertical | refactor-prep | spike | css-only | config</code> field. When omitted, vertical is assumed; non-vertical tasks MUST include it."</li>
+</ol>
+<p>Total addition: ≈25-35 LOC of prose under a single <code>### Vertical-Slice Decomposition</code> heading.</p>
+
+<h3 id="fr-vs-02">FR-VS-02: Pivot the <code>## Phase N</code> worked example</h3>
+<p>The existing template at the "Optional: <code>## Phase N</code> Groupings" sub-section (current lines 511-528) MUST be edited:</p>
+<ul>
+  <li>Replace the example phase names: <code>## Phase 1: Schema and Migration</code> → <code>## Phase 1: Tracer bullet — single record end-to-end</code>; <code>## Phase 2: API Layer</code> → <code>## Phase 2: Widen to list + filters</code>. (Adjust task IDs in the example to reflect the new shape — T1-T3 in Phase 1, T4-T5 in Phase 2.)</li>
+  <li>Update the "Phase rationale" comment to demonstrate why each phase is a deployable vertical slice ("Phase 1 proves the full request→response→render path; Phase 2 widens read paths…").</li>
+  <li>Add a one-line caveat at the END of the "Rules" sub-bullet list: "Phases group <strong>vertical slices</strong>, not layers — see §Vertical-Slice Decomposition above. Horizontal phase names ('all migrations', 'all endpoints', 'all UI') are an anti-pattern."</li>
+</ul>
+
+<h3 id="fr-vs-03">FR-VS-03: Phase 4 structural-checklist item</h3>
+<p>Insert a new numbered item in the "A. Structural Checklist" list of Phase 4 (current lines 666-679), positioned as item 13 (after the current 12-item list). Wording:</p>
+<blockquote>
+  <p>13. <strong>Vertical-slice shape:</strong> Is each task a vertical slice (end-to-end through all layers it touches), or does it declare its <code>**Slice shape:**</code> as <code>refactor-prep | spike | css-only | config</code> with a one-line rationale? Tasks that are pure single-layer cuts with no declared exception are findings. For phase-grouped plans, every <code>## Phase N</code> MUST be a deployable vertical slice; phase names like "Schema Layer" or "API Layer" are findings (see Anti-Pattern below).</p>
+</blockquote>
+
+<h3 id="fr-vs-04">FR-VS-04: Anti-Pattern entry</h3>
+<p>Append a new bullet to the existing <code>## Anti-Patterns (DO NOT)</code> list. Wording:</p>
+<blockquote>
+  <p>- Do NOT decompose by layer — "all migrations first, then all endpoints, then all UI." Each task is a thin <strong>vertical slice</strong> that cuts through every layer it needs to deliver one user-observable behavior. T1 is a <strong>tracer bullet</strong>: the narrowest end-to-end path that proves the architecture. Refactors, spikes, CSS-only, and config-only tasks are the only legitimate exceptions and MUST declare <code>**Slice shape:**</code> with a rationale.</p>
+</blockquote>
+
+<h3 id="fr-vs-05">FR-VS-05: Phase 2 tracer-bullet earmarking step</h3>
+<p>Add a new numbered step to Phase 2 ("Deep Code Study"). Position: after current step 6 (read wireframes), before current step 7 (detect stack signals), renumbering the rest. (Renumbering is acceptable here because Phase 2 has only ~12 steps total and the numbering is sequential — unlike Phase 3..7 which are heavily cross-referenced; per 2026-05-13 learnings the renumber threshold is low when the numbering is local and not cross-referenced.) Wording:</p>
+<blockquote>
+  <p>7. <strong>Identify the tracer-bullet candidate</strong> (FR-VS-05). Scan the spec for the narrowest user-observable behavior — the smallest end-to-end path through every layer the feature touches. Earmark it as the candidate for T1 (the tracer bullet). If the spec offers multiple candidate narrowest paths, pick the one that exercises the riskiest unproven integration point. The result is a one-line note in Code Study Notes: <code>Tracer-bullet candidate: &lt;narrowest behavior&gt; — exercises &lt;layers&gt;.</code></p>
+</blockquote>
+<p><strong>Numbering note:</strong> after this insertion, current step 7 (Detect stack signals) becomes step 8, and so on through step 11. The spec must list the exact renumbering to avoid drift. <em>Decision D1 below records why renumber is acceptable in this case.</em></p>
+
+<h3 id="fr-vs-06">FR-VS-06: No regression in existing FRs</h3>
+<p>All existing FRs (FR-01 through FR-105+, the tier gates, the cap-of-4 review loop, the Skip List sidecar contracts FR-43..FR-43d, the non-interactive halt protocol FR-61a, the operational-modes contract FR-60..FR-65) MUST continue to apply. The change is additive — no existing rule is replaced.</p>
+
+<h3 id="fr-vs-07">FR-VS-07: skill-patterns rubric pass</h3>
+<p>After the change, <code>reference/skill-patterns.md §A–§F</code> still passes for <code>/plan</code>:</p>
+<ul>
+  <li>§A frontmatter: untouched (no new fields needed).</li>
+  <li>§B description / triggering: untouched.</li>
+  <li>§C structure / progressive disclosure: respected — new sub-section is short prose, not a reference dump.</li>
+  <li>§D body content: respected — exact-language additions, no placeholders.</li>
+  <li>§E scripts / tooling: N/A (no scripts added).</li>
+  <li>§F platform-conditional frontmatter: untouched.</li>
+</ul>
+
+<h2 id="decision-log">Decision log</h2>
+<table>
+  <thead><tr><th>#</th><th>Decision</th><th>Options considered</th><th>Rationale</th></tr></thead>
+  <tbody>
+    <tr><td>D1</td><td>Renumber Phase 2 steps 7-11 to 8-12 to insert the tracer-bullet step at position 7.</td><td>(a) renumber as proposed; (b) insert as 6.5; (c) append at end as step 12.</td><td>Phase 2 numbering is local and not cross-referenced elsewhere in the skill (unlike Phase 3..7), so renumbering is cheap. Inserting at logical position (after wireframes read, before stack detection — i.e., between "what does the user see" and "what's the stack") preserves the reading flow. Appending at end (option c) buries the rule.</td></tr>
+    <tr><td>D2</td><td>No separate <code>reference/slicing-patterns.md</code>; the rule lives entirely in SKILL.md body.</td><td>(a) carve out a reference file with examples; (b) inline in SKILL.md.</td><td>Tier-2 scope. Progressive disclosure (skill-patterns.md §C) prefers fewer files when the body can hold it. ~50-80 LOC of additions fits comfortably in the existing 869-line body. If future feedback demands worked examples, the reference file can be added then.</td></tr>
+    <tr><td>D3</td><td>Anti-Pattern uses "do NOT decompose by layer" framing (action), not "horizontal slicing is bad" (abstract noun).</td><td>(a) action framing ("Do NOT…"); (b) abstract ("Horizontal slicing is an anti-pattern…").</td><td>Matches the existing Anti-Patterns list's prose style (every existing bullet starts with "Do NOT"). Consistency wins.</td></tr>
+    <tr><td>D4</td><td>Field convention <code>**Slice shape:** vertical | …</code> is opt-in for vertical tasks, mandatory for non-vertical tasks.</td><td>(a) always emit the field; (b) only emit when non-vertical.</td><td>Option (b). Default-vertical reduces token bloat in plan output (the common case); explicit declaration only when the task IS an exception keeps the signal-to-noise high. Phase 4 check honors this: absent field = assumed vertical; present field with non-vertical value = exception path engaged.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="testing-strategy">Testing / verification strategy</h2>
+<ul>
+  <li><strong>skill-eval rerun:</strong> <code>plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/plan</code> must exit 0 (the [D] half passes) and the [J] reviewer subagent returns no fails against skill-patterns §A–§F.</li>
+  <li><strong>Grep verification (manual, in /verify):</strong> the literal strings "vertical slice", "tracer bullet", "Slice shape", and the new anti-pattern bullet are present at the expected anchors.</li>
+  <li><strong>Negative grep:</strong> the strings "Schema and Migration" and "API Layer" no longer appear as <code>## Phase N: …</code> headings in the example template.</li>
+  <li><strong>Regression smoke:</strong> /plan invocation against an existing spec produces output with the new Phase 3 sub-section visible and the renumbered Phase 2 steps consistent. Done as the final task verification (TN) in 03_plan.</li>
+</ul>
+
+<h2 id="release-prereqs">Release prerequisites (for /complete-dev)</h2>
+<ul>
+  <li>Both <code>plugin.json</code> manifests bumped to <code>2.43.0</code> (minor — new behavior, additive, no breaking changes) — in one commit.</li>
+  <li>CHANGELOG entry under the 2.43.0 release describing the vertical-slice enforcement and the tracer-bullet T1 convention.</li>
+  <li>README — no /plan row exists separately to update (the skill is auto-listed); no action needed.</li>
+  <li>CLAUDE.md — no change needed (the canonical-skill-path / version-sync / release-entry rules are unchanged).</li>
+  <li>Learnings header <code>## /plan</code> already exists in <code>~/.pmos/learnings.md</code>; capture any session-specific learnings into it.</li>
+</ul>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_plan-vertical-slices/02_spec.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer" href="https://github.com/maneesh-dhabria/pmos-toolkit#readme" target="_blank" rel="noopener noreferrer" data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

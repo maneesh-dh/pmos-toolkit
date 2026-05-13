@@ -27,6 +27,12 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
+## Track Progress
+
+This skill has multiple phases. Create one task per phase using your agent's task-tracking tool (e.g., `TaskCreate` in Claude Code, `TodoWrite` equivalent in older harnesses). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+
+---
+
 ## Backlog Bridge
 
 This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skills/backlog/pipeline-bridge.md`.
@@ -200,7 +206,8 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
    - **NOT authoritative for:** visual style, color, typography, spacing, iconography, component library. Tasks should adapt the wireframe to the host app's existing design system and conventions — never copy visual treatment verbatim when it conflicts with the host app.
 
    Every UI task in Phase 3 must cite the wireframe(s) it implements via a `**Wireframe refs:**` field — same discipline as `**Spec refs:**`. This preserves the wireframe→implementation→verification chain for /verify Phase 4 sub-step 3f. If the host app has established patterns (Tailwind tokens, component library, layout conventions) that differ from the wireframe's visual treatment, the task should explicitly say "follow host-app convention X" rather than "match wireframe."
-7. **Detect stack signals** (FR-10). Glob host-repo root for manifest files: `package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`. Compute file-count weight per stack. Log signals to a "Stack signals" subsection of Code Study Notes (FR-100).
+7. **Identify the tracer-bullet candidate** (see Phase 3 §Vertical-Slice Decomposition). Scan the spec for the narrowest user-observable behavior — the smallest end-to-end path through every layer the feature touches. Earmark it as the candidate for T1, the tracer bullet. If the spec offers multiple candidate narrowest paths, pick the one that exercises the riskiest unproven integration point (a new protocol, an unfamiliar library, a cross-service handshake). The result is a one-line note in Code Study Notes, format: `Tracer-bullet candidate: <narrowest behavior> — exercises <layers>; risk it derisks: <unproven integration>.` Phase 3 builds T1 against this candidate.
+8. **Detect stack signals** (FR-10). Glob host-repo root for manifest files: `package.json`, `Gemfile`, `go.mod`, `requirements.txt`, `pyproject.toml`, `Cargo.toml`, `pom.xml`, `composer.json`, `docker-compose.yml`, `Makefile`, `Dockerfile`. Compute file-count weight per stack. Log signals to a "Stack signals" subsection of Code Study Notes (FR-100).
 
    **JS-stack lockfile disambiguation** (FR-10a): map lockfile presence → stack: `package-lock.json` → npm; `pnpm-lock.yaml` → pnpm; `yarn.lock` + no `.yarnrc.yml` → yarn-classic; `yarn.lock` + `.yarnrc.yml` → yarn-berry; `bun.lockb` → bun. When `package.json` is present with no lockfile, default to npm and surface as a low-risk Phase 4 finding.
 
@@ -211,14 +218,14 @@ Study the existing code that will be impacted. This is NOT a skim — you must r
 
    **Greenfield substitute** (FR-91, E2). When no signals are observed, do NOT skip the gate — choose a reference system (the closest existing system the planner can cite) and record the choice in Code Study Notes. **Phase 2 gate:** structural choices must be justified against ≥1 reference system; absence of stack signals is not a license to invent.
 
-8. **Peer-plan conflict scan** (FR-54, FR-54a). Glob `{docs_path}/features/*/03_plan.{html,md}` (excluding the current feature folder). Filter by frontmatter `status` ∈ {`Draft`, `Planned`, `Executing`}. Grep each peer plan for impacted file paths from step 1. On match, add a Risks-table row + an Open Question.
+9. **Peer-plan conflict scan** (FR-54, FR-54a). Glob `{docs_path}/features/*/03_plan.{html,md}` (excluding the current feature folder). Filter by frontmatter `status` ∈ {`Draft`, `Planned`, `Executing`}. Grep each peer plan for impacted file paths from step 1. On match, add a Risks-table row + an Open Question.
 
-9. **Wireframe coverage** (FR-16, FR-16a). If `{feature_folder}/wireframes/` exists, every `*.html` file under it must be referenced by ≥1 task's `**Wireframe refs:**` field OR listed in a `## Wireframes Out of Scope` subsection of the plan. **Vestigial wireframes** (FR-16a): when no UI signal is detected (no UI tasks in the spec) but the wireframes folder exists, auto-emit `## Wireframes Out of Scope` with all wireframes listed.
+10. **Wireframe coverage** (FR-16, FR-16a). If `{feature_folder}/wireframes/` exists, every `*.html` file under it must be referenced by ≥1 task's `**Wireframe refs:**` field OR listed in a `## Wireframes Out of Scope` subsection of the plan. **Vestigial wireframes** (FR-16a): when no UI signal is detected (no UI tasks in the spec) but the wireframes folder exists, auto-emit `## Wireframes Out of Scope` with all wireframes listed.
 
 <!-- defer-only: ambiguous -->
-10. **Spec re-open during planning** (§8.7, E13). When Phase 2 code study contradicts a spec decision (e.g., spec says "use Postgres" but `docker-compose.yml` shows MySQL), halt via `AskUserQuestion`: `Spec decision conflicts with repo standard. {Spec text} vs {observed standard}. How to resolve?` Options: **Halt /plan and update spec** (terminates this run; user re-runs /spec then /plan) / **Document override in spec via Decision Log entry** (open spec, add Decision Log entry citing the divergence with rationale, save, continue planning) / **Accept spec as-is despite divergence** (record decision in plan's Decision Log; proceed with spec's choice) / **Skip — not actually a conflict** (spec was correct; observation was misread). In `--non-interactive` mode this is a high-risk decision with no Recommended option → trigger FR-61a halt protocol (exit code 2 + write `03_plan_blocked.md`).
+11. **Spec re-open during planning** (§8.7, E13). When Phase 2 code study contradicts a spec decision (e.g., spec says "use Postgres" but `docker-compose.yml` shows MySQL), halt via `AskUserQuestion`: `Spec decision conflicts with repo standard. {Spec text} vs {observed standard}. How to resolve?` Options: **Halt /plan and update spec** (terminates this run; user re-runs /spec then /plan) / **Document override in spec via Decision Log entry** (open spec, add Decision Log entry citing the divergence with rationale, save, continue planning) / **Accept spec as-is despite divergence** (record decision in plan's Decision Log; proceed with spec's choice) / **Skip — not actually a conflict** (spec was correct; observation was misread). In `--non-interactive` mode this is a high-risk decision with no Recommended option → trigger FR-61a halt protocol (exit code 2 + write `03_plan_blocked.md`).
 
-11. **Summarize findings** in a "Code Study Notes" section for the plan.
+12. **Summarize findings** in a "Code Study Notes" section for the plan.
 
 **Gate:** You must have read every impacted file before writing a single line of the plan.
 
@@ -259,7 +266,7 @@ The `## Code Study Notes` section MUST contain four subsections — each may be 
 - `### Patterns to follow` — with `file:line` refs
 - `### Existing code to reuse` — file paths + one-line responsibility
 - `### Constraints discovered` — gotchas, hidden invariants
-- `### Stack signals` — the per-stack signals from Phase 2 step 7
+- `### Stack signals` — the per-stack signals from Phase 2 step 8
 
 ### Readability promise (FR-101)
 
@@ -341,7 +348,7 @@ execution_mode: inline | subagent-driven   # set in the closing phase (default: 
 
 ### Stack signals
 
-- [Per-stack signals from Phase 2 step 7. Cite the relevant `_shared/stacks/<stack>.md` file.]
+- [Per-stack signals from Phase 2 step 8. Cite the relevant `_shared/stacks/<stack>.md` file.]
 
 [Each subsection MAY be "None observed" but cannot be omitted.]
 
@@ -504,6 +511,20 @@ File-action verbs (FR-24): `Create`, `Modify`, `Delete`, `Move`, `Rename`, `Test
 
 ### Task Design Rules
 
+#### Vertical-Slice Decomposition
+
+**Rule.** Each task is a thin **vertical slice** that cuts through every layer it needs (schema, API, UI, tests) to deliver one user-observable behavior end-to-end. A horizontal cut — a task that touches only one layer — is the wrong shape. Slices may be **narrow**: hardcoded inputs, single-row fixtures, one happy-path branch are fine in early slices; widen in subsequent tasks.
+
+**Tracer bullet (T1).** The first task is a **tracer bullet** — the minimal end-to-end path that proves the architecture works. Prefer the narrowest, dullest, hardcoded-where-needed slice that still exercises every integration layer the feature touches. The point of T1 is not to deliver value; it is to prove that the chosen architecture survives contact with reality. Risky unproven integration points (a new protocol, an unfamiliar library, a cross-service handshake) MUST be inside T1's path. If the spec has multiple narrow end-to-end candidates, pick the one that exercises the riskiest unproven point.
+
+**Preference.** Prefer **many thin slices** over few thick ones. A plan with 8 tasks where T1-T2 ship a working tracer bullet beats a plan with 4 fat tasks where nothing is end-to-end until T4.
+
+**Done-when (per slice).** A completed slice is independently demoable or verifiable on its own. The check: could you ship just this slice and it would still be a coherent (if narrow) improvement? If the answer requires "wait for the next task to land," the slice is too horizontal.
+
+**Exception path.** Refactors, schema-only spikes, pure-CSS changes, and config/IaC tasks cannot be vertical — there is no end-to-end behavior to deliver. Such tasks MUST declare the exception with a one-line rationale in the **Slice shape** field (see below). A task without an explicit exception declaration is assumed to be a vertical slice.
+
+**Slice shape field.** Each task MAY include a `**Slice shape:** vertical | refactor-prep | spike | css-only | config` field. When omitted, `vertical` is assumed. Non-vertical tasks MUST include the field with a one-line rationale, e.g., `**Slice shape:** refactor-prep — extracts the auth helper T3's vertical cut depends on.` Phase 4 review (item 13) enforces this.
+
 #### Optional: `## Phase N` Groupings (for large plans)
 
 For plans with **more than ~12 tasks**, group tasks under `## Phase N: <name>` headings. Each phase boundary triggers full `/verify` + a `/compact` handshake when /execute reaches the end of the phase (see `execute/SKILL.md` Phase 2.5).
@@ -513,18 +534,18 @@ For plans with **more than ~12 tasks**, group tasks under `## Phase N: <name>` h
 ```markdown
 ## Tasks
 
-## Phase 1: Schema and Migration
-[Phase rationale: 1-2 sentences on why these tasks group as a deployable slice.]
+## Phase 1: Tracer bullet — single record end-to-end
+[Phase rationale: prove the full request → persistence → render path for one record with hardcoded inputs. Riskiest integration points (new auth handshake, new ORM mapping) are inside this slice. Demoable: a user can create-and-see one record by the end of the phase.]
 
-### T1: ...
-### T2: ...
-### T3: ...
+### T1: ... (tracer bullet — minimal end-to-end path)
+### T2: ... (widen T1 with realistic input validation)
+### T3: ... (add the first non-trivial relationship to T1's record)
 
-## Phase 2: API Layer
-[Phase rationale.]
+## Phase 2: Widen — list, filter, edit
+[Phase rationale: with the end-to-end skeleton proven in Phase 1, widen read and mutate paths. Each task remains a vertical slice that ships a user-observable improvement (list view, filter, edit form).]
 
-### T4: ...
-### T5: ...
+### T4: ... (list view of records)
+### T5: ... (filter by status — still end-to-end)
 ```
 
 **Rules:**
@@ -532,6 +553,7 @@ For plans with **more than ~12 tasks**, group tasks under `## Phase N: <name>` h
 - Each phase boundary triggers **full /verify** (multi-agent code review + interactive QA) — slow. Make phases **deployable slices** of 5–10 tasks. Avoid 1–2 task phases (verify cost dwarfs the work).
 - Phases are contiguous: a task belongs to exactly one phase; phase numbering starts at 1; no gaps.
 - Phase 1 always begins at T1.
+- Phases group **vertical slices**, not layers — see §Vertical-Slice Decomposition above. Horizontal phase names ("all migrations", "all endpoints", "all UI") are an anti-pattern: every phase must be a deployable, user-observable slice on its own. Phase 1 is the tracer bullet — narrow but end-to-end through the riskiest unproven integration points.
 
 Plans without `## Phase N` headings continue to work — /execute treats them as a single implicit phase verified once at the end.
 
@@ -676,6 +698,7 @@ Each loop runs BOTH checks:
 10. **Wireframe linkage:** If `{feature_folder}/wireframes/` exists, does every UI-touching task cite a `**Wireframe refs:**` line? Tasks without wireframe refs are gaps unless the task is non-UI.
 11. **Final-verification polish coverage:** Does TN include the hard-reload-every-route step, the force-an-error-path step, the UX polish checklist line, and (if wireframes exist) the wireframe diff line?
 12. **Refactor-before-modify:** Does any task modify a function whose existing structure isn't preserved by the modification? If yes, the prerequisite refactor must be its own numbered sub-step before the additive change.
+13. **Vertical-slice shape:** Is each task a vertical slice (end-to-end through all layers it touches), or does it declare its `**Slice shape:**` as `refactor-prep | spike | css-only | config` with a one-line rationale? A task that is a pure single-layer cut with no declared exception is a finding (propose splitting it into a vertical slice or adding the exception declaration). For phase-grouped plans, every `## Phase N` MUST be a deployable vertical slice — phase names like "Schema Layer" or "API Layer" are findings (see Anti-Pattern: "Do NOT decompose by layer"). The first task (T1) MUST be a tracer bullet (narrowest end-to-end path through the risky integration points); a T1 that is not end-to-end is a finding. See Phase 3 §Vertical-Slice Decomposition.
 
 **B. Design-Level Self-Critique** (catches wrong/shallow task decomposition):
 1. **Reviewer perspective:** If you were sent this plan for review, what comments would you add? Read it as a critical reviewer, not the author — flag tasks with unclear scope, missing verification steps, implicit dependencies, and assumptions about what's "obvious."
@@ -867,3 +890,4 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT let TN's frontend smoke test stop at "renders correctly" — it must include hard-reload, an error-path probe, the UX polish checklist, and (if wireframes exist) a wireframe diff. Polish belongs in the plan, not as a verify afterthought.
 - Do NOT create `## Phase N` groupings of 1–2 tasks — each phase boundary triggers full /verify (multi-agent code review + interactive QA), which dwarfs the implementation cost of a tiny phase. Target 5–10 tasks per phase, or skip phases entirely for small plans.
 - Do NOT skip the execution-mode selection question (Inline vs Subagent-driven) at close — the recorded `execution_mode:` frontmatter value is what `/execute` and `/feature-sdlc` Phase 6 read; omitting it silently forces inline everywhere.
+- Do NOT decompose by layer — "all migrations first, then all endpoints, then all UI." Each task is a thin **vertical slice** that cuts through every layer it needs to deliver one user-observable behavior. T1 is a **tracer bullet**: the narrowest end-to-end path that proves the architecture. Refactors, schema-only spikes, CSS-only, and config-only tasks are the only legitimate exceptions and MUST declare `**Slice shape:**` with a one-line rationale. See Phase 3 §Vertical-Slice Decomposition.

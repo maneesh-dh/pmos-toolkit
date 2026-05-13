@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.41.1: subtle "Created using pmos-toolkit" attribution in HTML chrome
+
+Every HTML artifact emitted by a pmos-toolkit skill now carries a small, muted "Created using pmos-toolkit" link to the GitHub README — one centralized substrate edit, no per-skill changes.
+
+### What's new
+
+- **Attribution in the shared HTML chrome.** `plugins/pmos-toolkit/skills/_shared/html-authoring/template.html` adds an `<a class="pmos-attribution">` in both the toolbar (right of the action buttons) and the footer (inline after `Source:`, separated by a middot). Both link to `https://github.com/maneesh-dhabria/pmos-toolkit#readme` with `target="_blank" rel="noopener noreferrer"`. Styled via a new `.pmos-attribution` class in `assets/style.css`: `--pmos-fs-xs`, italic, `--pmos-muted` color, `opacity: 0.65`, with hover bumping to `opacity: 1` plus a 1px underline at `text-underline-offset: 2px` — subtle by default, clearly clickable on intent. The toolbar variant is hidden in print; the footer attribution prints (it's where source/citation conventionally appears).
+- **Reach.** Inherited automatically by every skill that emits via the substrate: `/requirements`, `/spec`, `/plan`, `/wireframes`, `/prototype`, `/diagram`, `/survey-design`, `/polish`, `/artifact`, `/design-crit`, `/msf-req`, `/msf-wf`, `/grill`, `/creativity`, `/simulate-spec`, plus the pipeline-status and OQ-index artifacts written by `/feature-sdlc`. No per-skill edits.
+- **No reviewer-payload leakage.** `_shared/html-authoring/assets/chrome-strip.js` already extracts only `<h1>` + `<main>`, so the attribution (which sits in `<header>` and `<footer>` chrome) is automatically stripped from the bytes passed to reviewer subagents — no risk of the LLM judge quoting "Created using pmos-toolkit" as a finding.
+
+### Why
+
+Drive adoption without being in users' face. The attribution is discoverable (in chrome on every artifact) but deferential (xs italic muted, opacity 0.65) — readers who care can click through to the README; readers focused on the artifact content barely register it.
+
 ## 2026-05-13 — pmos-toolkit 2.41.0: /complete-dev gains lastrun memory + one-shot defaults confirm + worktree-cleanup moved to after push
 
 `/complete-dev` learns to remember its own answers, asks for them in one consolidated prompt instead of twelve scattered ones, and stops removing the worktree before push tag succeeds (which was severing the `/feature-sdlc --resume` contract).

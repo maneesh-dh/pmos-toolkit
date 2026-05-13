@@ -23,6 +23,12 @@ These instructions use Claude Code tool names. In other environments:
 
 ---
 
+## Track Progress
+
+This skill runs many phases over a potentially long execution. Track progress with your agent's task-tracking tool: in Phase 1, create one tracked task per **plan task** (the live progress view the user watches); update each to in-progress when you start it and completed as soon as it's done — do not batch completions. For multi-session runs, the per-task `{feature_folder}/execute/task-NN.md` logs and per-phase `phase-N.md` logs are the canonical, durable progress record (the resume resolver reads them). If no task-tracking tool is available, track via the `T<N>`-bearing commit subjects and the per-task logs, and report status verbally.
+
+---
+
 ## Backlog Bridge
 
 This skill optionally integrates with `/backlog`. See `plugins/pmos-toolkit/skills/backlog/pipeline-bridge.md`.
@@ -404,11 +410,11 @@ For each wave, in order:
    - **BLOCKED** — assess the blocker: more context → re-dispatch same model; needs more reasoning → re-dispatch a more capable model; too large → split into smaller tasks; plan is wrong → write the defect file (see "Defect handoff" above) and escalate. **Never** re-dispatch the same model with nothing changed. A blocked task stalls only its dependents — already-done tasks stay done.
    - **Stall** (no return / timeout) — re-dispatch that single task focused (focused single-file re-dispatches recover fast).
 3. **Per task, in task-index order — the CONTROLLER (not subagents):**
-   1. **Commit.** `git add` the task's reported file-set and `git commit` with a `T<N>`-bearing subject (`feat(T<N>): …` / `T<N>: …`) — honoring the plan's `commit_cadence` (`per-task` default ⇒ commit now; `per-phase` ⇒ `git add` now, commit at the phase boundary; `manual` ⇒ stage only). The `T<N>` subject is mandatory — the Phase 0.5 resolver greps `\bT[0-9]+\b` from `git log`.
+   1. **Commit / stage.** `git add` the task's reported file-set, then — honoring the plan's `commit_cadence` — `commit_cadence: per-task` (default) ⇒ `git commit` now with a `T<N>`-bearing subject (`feat(T<N>): …` / `T<N>: …`); `per-phase` ⇒ leave it staged and commit the whole phase at the phase boundary; `manual` ⇒ leave it staged for the user. The `T<N>` subject (when a commit is made) is mandatory — the Phase 0.5 resolver greps `\bT[0-9]+\b` from `git log`. The diff handed to the reviewers in step 3 is the per-task commit (`git show <sha>`) when one exists, otherwise the task's staged/working-tree change for its file-set (`git diff --staged -- <files>` / `git diff -- <files>`).
    2. **Write the per-task log** `{feature_folder}/execute/task-NN.md` per the schema above (`status: done`, `files_touched`, body = decisions / deviations / runtime evidence / verification outcome). Honor the runtime-evidence gate: an API/UI task with no runtime evidence is **not done** — re-dispatch the implementer to produce it.
    3. **Two-stage review (this order, no skipping):**
-      - **(i) Spec-compliance reviewer subagent** — dispatch with the *spec-reviewer* template from `subagent-driven.md`: the task requirements + the implementer's claims + the diff (`git show <sha>` / base→head SHAs). It verifies by reading code, not by trusting the report. On `❌` → re-dispatch the **same implementer subagent** with the reviewer's findings to fix → controller commits the fix as `fix(T<N>): address spec-review gap` → re-review. Loop until `✅`.
-      - **(ii) Code-quality reviewer subagent** — only after spec `✅`: dispatch with the *code-quality-reviewer* template from `subagent-driven.md`: the diff + project conventions (`CLAUDE.md`). On Critical/Important findings → implementer fixes → controller commits `fix(T<N>): …` → re-review → loop until approved. Minor findings: note and proceed.
+      - **(i) Spec-compliance reviewer subagent** — dispatch with the *spec-reviewer* template from `subagent-driven.md`: the task requirements + the implementer's claims + the diff (`git show <sha>` / base→head SHAs). It verifies by reading code, not by trusting the report. On `❌` → re-dispatch the **same implementer subagent** with the reviewer's findings to fix → controller commits (or, under `per-phase`/`manual` cadence, re-stages) the fix as `fix(T<N>): address spec-review gap` → re-review. Loop until `✅`.
+      - **(ii) Code-quality reviewer subagent** — only after spec `✅`: dispatch with the *code-quality-reviewer* template from `subagent-driven.md`: the diff + project conventions (`CLAUDE.md`). On Critical/Important findings → implementer fixes → controller commits / re-stages `fix(T<N>): …` → re-review → loop until approved. Minor findings: note and proceed.
       - Reviewer subagents are read-only; you may dispatch the spec-reviewers for several wave tasks concurrently, but the spec→quality **order per task** is mandatory, and code-quality review never starts before that task's spec review is `✅`.
    4. **Mark the task complete** in your task tracker.
 4. **Phase 2.5 phase-boundary check.** If the wave's last task completes a `## Phase N` group, run **Phase 2.5** exactly as in inline mode (`/verify --scope phase`, `phase-N.md` log, `HALT_FOR_COMPACT` unless `--no-halt` / the session-sticky continuation flag). Unchanged.

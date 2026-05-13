@@ -9,6 +9,15 @@ Conventions: written with Claude Code tool names (`Task` for subagent dispatch, 
 general-purpose). On platforms with no subagent tool, the `--subagent-driven` path degrades to
 inline execution per `SKILL.md` Phase 0 — these templates are not used there.
 
+## Contents
+
+- Model selection — picking the cheapest model that can do each role
+- 1. Implementer subagent — dispatched in parallel, one per wave task; implements + tests, does NOT commit
+- 2. Spec-compliance reviewer subagent — verifies code matches the task spec
+- 3. Code-quality reviewer subagent — runs only after spec compliance is ✅
+- 4. Final whole-implementation reviewer subagent — one pass after the last wave
+- Red flags — the subagent-driven path's "never do this" list
+
 ---
 
 ## Model selection
@@ -137,7 +146,9 @@ Task tool (general-purpose, most-capable model):
 
     ## The change to inspect
 
-    Commit(s): <SHA(s)>  (run `git show <sha>` / `git diff <base>..<head>` in <worktree path>)
+    In <worktree path>: the per-task commit `git show <sha>` (when `commit_cadence: per-task`),
+    or — under `per-phase`/`manual` cadence, before the phase commit — the task's staged /
+    working-tree change: `git diff --staged -- <files>` (or `git diff -- <files>`).
 
     ## Your job — verify by reading the actual code
 

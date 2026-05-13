@@ -176,6 +176,20 @@ for r in (l3.get("rules", []) or []):
 
 effective_severity = {rid: r.get("severity") for rid, r in merged.items() if r.get("severity")}
 
+# FR-71 — declarative_delegated_pct = count(rules with delegate_to in
+# {dependency-cruiser, ruff}) / count(rules where tier in {1, 2}). L3-only
+# tier-3 rules are excluded from the denominator: the metric tracks the
+# health of the *shipped* rule pack, not project add-ons. Rounded to 3
+# decimals (plan §T16 step 4).
+declarative_tools = {"dependency-cruiser", "ruff"}
+tier_12_rules = [r for r in merged.values() if r.get("tier") in (1, 2)]
+tier_12_count = len(tier_12_rules)
+delegated_count = sum(1 for r in tier_12_rules if r.get("delegate_to") in declarative_tools)
+if tier_12_count > 0:
+    declarative_delegated_pct = round(delegated_count / tier_12_count, 3)
+else:
+    declarative_delegated_pct = 0.0
+
 # FR-40/41/42/43, D15 — file enumeration.
 DENY_SEGMENTS = (
     "node_modules", ".venv", "__pycache__", "dist", "build",
@@ -264,6 +278,7 @@ print(json.dumps({
     "tier_2_py": tier_2_py,
     "tier_3": tier_3_new,
     "total_loaded": len(merged),
+    "declarative_delegated_pct": declarative_delegated_pct,
     "l3_present": l3_present,
     "stacks_detected": stacks,
     "rule_overrides": rule_overrides,
@@ -1064,7 +1079,9 @@ fi
 
 END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-jq -n \
+# Build the final report JSON. Sort findings per FR-73: severity desc (block
+# < warn < info via 0/1/2 numeric key), then rule_id asc, file asc, line asc.
+REPORT_JSON=$(jq -n \
   --argjson f "$findings_json" \
   --argjson loader "$LOADER_JSON" \
   --argjson tools_skipped "$tools_skipped_json" \
@@ -1086,6 +1103,7 @@ jq -n \
       tier_3: $loader.tier_3,
       total: $loader.total_loaded
     },
+    declarative_delegated_pct: $loader.declarative_delegated_pct,
     l3_present: $loader.l3_present,
     stacks_detected: $loader.stacks_detected,
     config: $loader.config,
@@ -1099,5 +1117,110 @@ jq -n \
     adrs_truncated: $adrs_truncated,
     findings: ($f
       | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
-      | sort_by({block:0, warn:1, info:2}[.severity] // 9, .file, .line, .rule_id))
-  }'
+      | sort_by({block:0, warn:1, info:2}[.severity] // 9, .rule_id, .file, .line))
+  }')
+
+# Emit JSON to stdout (FR-70: stdout = machine-readable only).
+printf '%s\n' "$REPORT_JSON"
+
+# Render stderr summary (FR-72) unless QUIET mode is on.
+if [ "${QUIET:-0}" -ne 1 ]; then
+  REPORT_JSON_FOR_SUMMARY="$REPORT_JSON" \
+  NO_COLOR_ENV="${NO_COLOR:-}" \
+  python3 <<'PY' 1>&2
+import json, os, sys
+
+report = json.loads(os.environ["REPORT_JSON_FOR_SUMMARY"])
+use_color = os.environ.get("NO_COLOR_ENV", "") == "" and sys.stderr.isatty()
+
+def tint(text, code):
+    if not use_color:
+        return text
+    return f"\x1b[{code}m{text}\x1b[0m"
+
+RED_BOLD = "1;31"
+YELLOW = "33"
+DIM = "2"
+
+scan_root = report.get("scan_root", "?")
+dur = report.get("run", {}).get("duration_s", 0)
+stacks = report.get("stacks_detected") or []
+l3 = "present" if report.get("l3_present") else "absent"
+delegated_pct = report.get("declarative_delegated_pct") or 0
+fde = report.get("frontend_declarative_coverage")
+findings = report.get("findings") or []
+exemptions = report.get("exemptions") or {}
+adrs_written = report.get("adrs_written") or []
+adrs_truncated = report.get("adrs_truncated") or []
+tools_skipped = report.get("tools_skipped") or []
+tools_errored = report.get("tools_errored") or []
+
+n_block = sum(1 for f in findings if f.get("severity") == "block")
+n_warn = sum(1 for f in findings if f.get("severity") == "warn")
+n_info = sum(1 for f in findings if f.get("severity") == "info")
+
+lines = []
+stacks_str = ", ".join(stacks) if stacks else "none"
+fde_str = f" · frontend declarative coverage: {int(round(fde * 100))}%" if isinstance(fde, (int, float)) else ""
+lines.append(f"/architecture audit — scan_root={scan_root} duration={dur}s")
+lines.append(
+    f"stacks: {stacks_str} · l3: {l3} · gap-map: {int(round(delegated_pct * 100))}% delegated{fde_str}"
+)
+lines.append(
+    f"findings: {len(findings)} ({n_block} block, {n_warn} warn, {n_info} info) · "
+    f"exemptions applied: {exemptions.get('applied', 0)} · orphan: {exemptions.get('orphan', 0)} · "
+    f"expired: {exemptions.get('expired', 0)}"
+)
+
+if n_block:
+    lines.append("")
+    lines.append(tint(f"block ({n_block}):", RED_BOLD))
+    for f in findings:
+        if f.get("severity") != "block":
+            continue
+        lines.append(
+            f"  {f.get('rule_id')} {f.get('file')}:{f.get('line')} — {f.get('message','')}"
+        )
+
+if n_warn:
+    sample = next((f for f in findings if f.get("severity") == "warn"), None)
+    sample_str = (
+        f" e.g. {sample.get('rule_id')} {sample.get('file')}:{sample.get('line')}"
+        if sample else ""
+    )
+    lines.append(tint(f"warn ({n_warn}):{sample_str}", YELLOW))
+
+if n_info:
+    sample = next((f for f in findings if f.get("severity") == "info"), None)
+    sample_str = (
+        f" e.g. {sample.get('rule_id')} {sample.get('file')}:{sample.get('line')}"
+        if sample else ""
+    )
+    lines.append(tint(f"info ({n_info}):{sample_str}", DIM))
+
+if adrs_truncated:
+    lines.append(
+        f"note: {len(adrs_truncated)} additional block findings not promoted to ADR (cap 5/run)."
+    )
+informational = exemptions.get("informational") or []
+for note in informational:
+    lines.append(f"note: {note}")
+if tools_skipped:
+    lines.append(f"note: tools skipped: {', '.join(tools_skipped)}")
+if tools_errored:
+    lines.append(f"note: tools errored: {len(tools_errored)} (see report.tools_errored)")
+
+if adrs_written:
+    lines.append("")
+    lines.append(f"adrs written ({len(adrs_written)}):")
+    for adr in adrs_written:
+        lines.append(f"  {adr.get('path')}")
+
+# FR-72: cap at 30 lines for clean output. If exceeded, truncate with a note.
+if len(lines) > 30:
+    lines = lines[:29] + [f"... ({len(lines) - 29} more lines truncated; see report.findings)"]
+
+for line in lines:
+    print(line, file=sys.stderr)
+PY
+fi

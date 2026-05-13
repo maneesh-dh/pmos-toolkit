@@ -1,0 +1,146 @@
+schema_version: 1
+rules:
+- id: U001
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy1
+  source: fixture://u001
+  message: L1 rule 1
+  why: L1 fixture rule 1
+- id: U002
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy2
+  source: fixture://u002
+  message: L1 rule 2
+  why: L1 fixture rule 2
+- id: U003
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy3
+  source: fixture://u003
+  message: L1 rule 3
+  why: L1 fixture rule 3
+- id: U004
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy4
+  source: fixture://u004
+  message: L1 rule 4
+  why: L1 fixture rule 4
+- id: U005
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy5
+  source: fixture://u005
+  message: L1 rule 5
+  why: L1 fixture rule 5
+- id: U006
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy6
+  source: fixture://u006
+  message: L1 rule 6
+  why: L1 fixture rule 6
+- id: U007
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy7
+  source: fixture://u007
+  message: L1 rule 7
+  why: L1 fixture rule 7
+- id: U008
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy8
+  source: fixture://u008
+  message: L1 rule 8
+  why: L1 fixture rule 8
+- id: U009
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy9
+  source: fixture://u009
+  message: L1 rule 9
+  why: L1 fixture rule 9
+- id: U010
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy10
+  source: fixture://u010
+  message: L1 rule 10
+  why: L1 fixture rule 10
+- id: U011
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy11
+  source: fixture://u011
+  message: L1 rule 11
+  why: L1 fixture rule 11
+- id: U012
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy12
+  source: fixture://u012
+  message: L1 rule 12
+  why: L1 fixture rule 12
+- id: U013
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy13
+  source: fixture://u013
+  message: L1 rule 13
+  why: L1 fixture rule 13
+- id: U014
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy14
+  source: fixture://u014
+  message: L1 rule 14
+  why: L1 fixture rule 14
+- id: U015
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy15
+  source: fixture://u015
+  message: L1 rule 15
+  why: L1 fixture rule 15
+- id: U016
+  tier: 1
+  stack: null
+  severity: warn
+  delegate_to: grep
+  check: regex:dummy16
+  source: fixture://u016
+  message: L1 rule 16
+  why: L1 fixture rule 16

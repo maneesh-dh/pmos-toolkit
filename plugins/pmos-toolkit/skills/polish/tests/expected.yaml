@@ -65,3 +65,32 @@ small-but-dense.md:
   word_count_delta_pct: [-25, -5]
   preset: preserve
   iteration_assertion: "iteration 2 triggers (cascading findings); size does NOT short-circuit iteration"
+
+html-doc.html:
+  doc_format: html
+  expected_failures: [1, 5, 9]                       # clutter words + em-dash density + hedging — in prose nodes only
+  word_count_delta_pct: [-15, 0]
+  preset: technical
+  output_extension: ".polished.html"                 # source format honored — NOT .polished.md
+  locked_zone_assertions:
+    - "all element tags and attributes byte-identical post-polish"
+    - "<pre>/<code> block contents byte-identical"
+    - "<a href> URL byte-identical (link text is polishable)"
+    - "short <td>/<th> cells (<8 words) byte-identical"
+    - "<!-- comment --> byte-identical"
+    - "<head>...</head> byte-identical"
+  fidelity_assertion: "all non-prose bytes byte-identical to original; if not, best-effort HTML written + warning surfaced"
+
+bloated-doc.md:
+  doc_format: markdown
+  expected_failures: [1, 4, 5, 9]
+  preset: concise
+  editorial_pass:
+    invoked_with: "--reduce 30-40"                    # or the Phase 2.5 gate picking ~30-40%
+    editor_notes_written: true                        # editor_notes.json produced next to the polished file
+    editor_notes_valid_against: "schemas/editor-notes.schema.json"
+    editor_does_not_rewrite: true                     # editor emits notes only; rewriter applies
+    not_a_polish_iteration: true                      # the editorial pass is not counted toward the 2-iteration cap
+    recritique_cap: 1                                 # at most one re-critique if the target band is missed
+  word_count_delta_pct: [-50, -25]                    # editorial cut + rubric tightening, anchored to ORIGINAL
+  summary_contains: "Editorial pass: target ~30-40%"

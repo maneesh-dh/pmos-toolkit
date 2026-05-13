@@ -1,5 +1,39 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.40.0: /polish honors source format (md or HTML) + opt-in editorial reduction pass
+
+`/polish` learns two things, plus a de-flake of `/feature-sdlc skill`'s `[D] body` checks comes along for the ride.
+
+### What's new
+
+- **Source format honored.** Hand `/polish` a local `.md` and you get `<name>.polished.md`; hand it a local `.html` and you get `<name>.polished.html` — same shape in, same shape out. HTML inputs get HTML-aware lock zones (tags + attributes, `<script>`/`<style>`/`<pre>`/`<code>` contents, HTML comments, `<head>`, short `<td>`/`<th>` cells) and `<h1>`/`<h2>` chunk anchors; the rubric and patches only ever change text between tags. URL and Notion inputs continue to normalize to markdown (their HTML is page chrome, not an authored artifact). After an HTML rewrite, `/polish` verifies all non-prose bytes are byte-identical to the original; if not, it keeps the output but surfaces a loud `⚠ markup outside prose nodes may have shifted — review before replacing` and drops the replace prompt's default-yes — never refuse, never hard-fail.
+- **New "Phase 2.5 — Editorial reduction" (opt-in, runs before the rubric).** Either pass `--reduce <pct|range>` (e.g. `--reduce 30-40` or `--reduce 25`) or pick a target at the gate: `Skip — no reduction (Recommended)` / `~10-20% (light trim)` / `~30-40% (substantial cut)` / `~50%+ (aggressive)` / custom. Skip is a true no-op; the pipeline behaves exactly as before. On a non-Skip target, an **editor subagent** critiques the doc ruthlessly (rephrase / merge / reorder / tighten / cut) and emits structured notes to `editor_notes.json` (validated against the new `schemas/editor-notes.schema.json`); a **rewriter subagent** applies the `risk: low` notes honoring lock zones; `risk: high` notes (structural reorders, large merges) and any `PRESERVE_VOICE_CONFLICT` are surfaced through the existing Phase 5 findings protocol — never auto-applied. If the rewriter falls short of the target band, the editor gets one capped re-critique. The editor pass is **not** a polish iteration — the existing 2-iteration rubric cap is untouched.
+- **`--dry-run` interplay.** With a non-Skip target, the editor still runs and writes `editor_notes.json`; the rewriter and re-critique do not. The dry-run report now includes the editor notes + target reconciliation above the rubric results.
+- **Phase 7 metrics anchored to the original.** The headline `Words: 1,842 → 1,310 (-29%)` is computed against the original ingested doc (not the editor-reduced one), so the % reflects editor cut + rubric tightening together. A new `Editorial pass:` summary line reports target / estimated / actual / applied / skipped / surfaced — or `skipped` / the dry-run variant.
+
+### Changed
+
+- **`/polish` is now `10` phases** (Phase 2.5 inserted between preset selection and the rubric). The "Track Progress" instruction, the platform-adaptation note, the file map, and the anti-patterns all updated; the rubric runs on the *working document* (editor-reduced if Phase 2.5 ran).
+- **`reference/chunking.md`** gains a "Format-aware lock zones" subsection (the markdown set is unchanged; HTML adds its own lock zones); the chunking algorithm cites `<h1>`/`<h2>` (and `<h3>`/`<p>` for oversized) as the HTML analogues.
+- **New files:** `plugins/pmos-toolkit/skills/polish/reference/editorial-pass.md` (editor + rewriter prompt templates, the `editor_notes.json` validate/prune contract, re-critique, HTML fidelity rule), `plugins/pmos-toolkit/skills/polish/schemas/editor-notes.schema.json` (JSON Schema draft-07), and two fixtures — `tests/fixtures/html-doc.html` (HTML round-trip + lock zones) and `tests/fixtures/bloated-doc.md` (a verbose PRD-shaped doc for the reduction pass) — with paired `tests/expected.yaml` contracts.
+
+### Fixed
+
+- **`/feature-sdlc skill`'s deterministic eval was flaky on any skill with a >16KB body.** `tools/skill-eval-check.sh` ran the body-pattern checks as `body | grep -q …`; under `set -o pipefail`, `grep -q` closes the pipe on its first match and the upstream `sed` gets SIGPIPE, so the pipeline reports failure even when the pattern *did* match — flaking `d-platform-adaptation`, `d-learnings-load-line`, `d-capture-learnings-phase`, and `d-progress-tracking`. The body is now cached once and the checks read from a here-string. Same script for `/polish` runs 10/10 clean post-fix.
+
+### Migration
+
+None — additive. The existing markdown path is byte-for-byte unchanged when the editor gate is Skipped (the default). The new `--reduce` flag and the new phase do not require any state changes; `editor_notes.json` is a per-run artifact alongside the polished file.
+
+### References
+
+- Requirements: `docs/pmos/features/2026-05-13_polish-editorial-pass/01_requirements.html`
+- Spec: `docs/pmos/features/2026-05-13_polish-editorial-pass/02_spec.html`
+- Plan: `docs/pmos/features/2026-05-13_polish-editorial-pass/03_plan.html`
+- Feedback triage: `docs/pmos/features/2026-05-13_polish-editorial-pass/0c_feedback_triage.html`
+
+---
+
 ## 2026-05-13 — pmos-toolkit 2.39.0: /execute parallel subagent-driven execution mode
 
 `/execute` can now run a plan by fanning independent tasks out across subagents in parallel, instead of (or in addition to) the single-agent task-by-task loop. The behavior is selected by a flag, the user is asked which mode to use right after `/plan`, and all of the subagent-driven logic lives inside `/execute` itself — nothing outside `plugins/pmos-toolkit/skills/execute/` is required.

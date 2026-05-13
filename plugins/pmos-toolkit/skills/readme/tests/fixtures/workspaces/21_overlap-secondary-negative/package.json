@@ -1,0 +1,5 @@
+{
+  "name": "overlap-secondary-negative-root",
+  "private": true,
+  "workspaces": ["packages/*"]
+}

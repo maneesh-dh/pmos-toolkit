@@ -1,0 +1,8 @@
+{
+  "name": "fixture-marketplace",
+  "version": "0.0.0",
+  "plugins": [
+    { "name": "alpha", "source": "./plugins/alpha" },
+    { "name": "beta",  "source": "./plugins/beta" }
+  ]
+}

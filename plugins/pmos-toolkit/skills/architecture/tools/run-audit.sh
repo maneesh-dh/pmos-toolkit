@@ -716,6 +716,89 @@ if [ "${#TOOLS_SKIPPED[@]}" -gt 0 ]; then
   tools_skipped_json=$(printf '%s\n' "${TOOLS_SKIPPED[@]}" | jq -R . | jq -s .)
 fi
 
+# ── ADR write (T13, FR-60/61/62) ─────────────────────────────────────────────
+# For each block-severity finding (post-effective_severity rewrite), stamp a
+# Nygard ADR at <scan-root>/<adr_path>/ADR-NNNN-<kebab-title>.md. Numbering is
+# monotonic across runs (highest existing +1) and never recycles. Writes are
+# atomic (tmp + mv). No cap yet — T14 adds the 5/run ceiling and --no-adr.
+ADR_PATH_REL="$(echo "$LOADER_JSON" | jq -r '.config.adr_path')"
+# Strip any trailing slash so the joined path stays clean.
+ADR_PATH_REL="${ADR_PATH_REL%/}"
+ADR_DIR="$SCAN_ROOT/$ADR_PATH_REL"
+ADR_TEMPLATE="$SKILL_DIR/reference/adr-template.md"
+adrs_written_json='[]'
+
+block_findings_json=$(jq -n --argjson f "$findings_json" --argjson loader "$LOADER_JSON" '
+  $f
+  | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
+  | map(select(.severity == "block"))
+  | sort_by(.file, .line, .rule_id)
+')
+block_count=$(echo "$block_findings_json" | jq 'length')
+
+if [ "$block_count" -gt 0 ] && [ -f "$ADR_TEMPLATE" ]; then
+  mkdir -p "$ADR_DIR"
+  highest=0
+  shopt -s nullglob
+  for f in "$ADR_DIR"/ADR-[0-9][0-9][0-9][0-9]-*.md; do
+    base=$(basename "$f")
+    num=$(echo "$base" | sed -nE 's/^ADR-([0-9]{4})-.*\.md$/\1/p')
+    if [ -n "$num" ]; then
+      n=$((10#$num))
+      [ "$n" -gt "$highest" ] && highest=$n
+    fi
+  done
+  shopt -u nullglob
+
+  TODAY="$(date -u +%Y-%m-%d)"
+  template_content=$(cat "$ADR_TEMPLATE")
+
+  i=0
+  while [ "$i" -lt "$block_count" ]; do
+    rule_id=$(echo "$block_findings_json" | jq -r ".[$i].rule_id")
+    file_path=$(echo "$block_findings_json" | jq -r ".[$i].file")
+    line_no=$(echo "$block_findings_json" | jq -r ".[$i].line")
+    msg=$(echo "$block_findings_json" | jq -r ".[$i].message // .[$i].rule_id")
+    severity=$(echo "$block_findings_json" | jq -r ".[$i].severity")
+
+    title_slug=$(printf '%s' "$msg" | tr '[:upper:]' '[:lower:]' \
+      | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//' \
+      | cut -c1-60 | sed 's/-$//')
+    [ -z "$title_slug" ] && title_slug="$(printf '%s' "$rule_id" | tr '[:upper:]' '[:lower:]')-finding"
+
+    # Collision-safe monotonic increment (E14: scan picks +1; loop guards
+    # against a same-run duplicate when two block findings produce the same
+    # title_slug or NNNN somehow gets pre-occupied).
+    while :; do
+      highest=$((highest + 1))
+      nnnn=$(printf '%04d' "$highest")
+      target="$ADR_DIR/ADR-$nnnn-$title_slug.md"
+      [ -e "$target" ] || break
+    done
+
+    body="$template_content"
+    body="${body//\{NNNN\}/$nnnn}"
+    body="${body//\{title\}/$msg}"
+    body="${body//\{date\}/$TODAY}"
+    body="${body//\{rule_id\}/$rule_id}"
+    body="${body//\{severity\}/$severity}"
+    body="${body//\{file\}/$file_path}"
+    body="${body//\{line\}/$line_no}"
+
+    tmp="$ADR_DIR/.tmp-$$-$nnnn"
+    printf '%s\n' "$body" > "$tmp"
+    mv "$tmp" "$target"
+
+    rel="$ADR_PATH_REL/ADR-$nnnn-$title_slug.md"
+    adrs_written_json=$(echo "$adrs_written_json" | jq \
+      --arg path "$rel" --arg rid "$rule_id" --arg file "$file_path" \
+      --arg nnnn "$nnnn" --arg title "$title_slug" \
+      '. + [{nnnn: $nnnn, path: $path, rule_id: $rid, file: $file, title: $title}]')
+
+    i=$((i + 1))
+  done
+fi
+
 # ── Frontend declarative coverage (T12, FR-50/51/52) ─────────────────────────
 # Coverage = (TS/JS frontend files) / (TS/JS + Vue SFC files), 2-decimal.
 # Vue files run only L1 grep rules (declarative L2 via dep-cruiser doesn't
@@ -750,6 +833,7 @@ jq -n \
   --argjson tools_skipped "$tools_skipped_json" \
   --argjson tools_errored "$TOOLS_ERRORED_JSON" \
   --argjson fde "$fde_json" \
+  --argjson adrs_written "$adrs_written_json" \
   --arg start "$START" \
   --arg end "$END" \
   --arg root "$SCAN_ROOT" \
@@ -772,6 +856,7 @@ jq -n \
     tools_skipped: $tools_skipped,
     tools_errored: $tools_errored,
     frontend_declarative_coverage: $fde,
+    adrs_written: $adrs_written,
     findings: ($f
       | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
       | sort_by({block:0, warn:1, info:2}[.severity] // 9, .file, .line, .rule_id))

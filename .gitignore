@@ -22,3 +22,6 @@ __pycache__/
 # Skill-local node_modules (e.g. architecture skill's dependency-cruiser devDep)
 plugins/pmos-toolkit/skills/*/node_modules/
 plugins/pmos-toolkit/skills/*/package-lock.json
+
+# Architecture skill — fixture ADRs are write-side-effects of regression runs; never committed.
+plugins/pmos-toolkit/skills/architecture/tests/fixtures/*/docs/

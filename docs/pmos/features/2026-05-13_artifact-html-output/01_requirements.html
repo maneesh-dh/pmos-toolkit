@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>/artifact — HTML output parity — Requirements</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.40.0">
+  <script defer src="assets/viewer.js?v=2.40.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">/artifact — HTML output parity — Requirements</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+<script type="application/json" id="pmos-frontmatter">
+{
+  "date": "2026-05-13",
+  "last_updated": "2026-05-13",
+  "status": "Draft",
+  "tier": "3 — Skill enhancement",
+  "feature_slug": "artifact-html-output",
+  "pipeline_mode": "skill-new",
+  "target_skill": "plugins/pmos-toolkit/skills/artifact/SKILL.md",
+  "target_platform": "claude-code"
+}
+</script>
+
+<section id="problem">
+<h2 id="problem">Problem</h2>
+<p>The <code>/artifact</code> skill produces structured PM/eng artifacts (PRD, Experiment Design, Engineering Design, Discovery). Its <code>SKILL.md</code> <strong>describes</strong> HTML output via the <code>_shared/html-authoring/</code> substrate (added during the v2.33.0 html-artifacts migration), but the contract has eight concrete gaps that prevent its outputs from matching the look-and-feel of other pipeline skills (<code>/requirements</code>, <code>/spec</code>, <code>/plan</code>, <code>/wireframes</code>, <code>/prototype</code>). The result: an <code>/artifact</code> run can emit a valid <code>{slug}.html</code> file, but the reviewer subagent receives raw HTML it was never prompted to handle, the refine flow defaults the output extension to <code>.refined.md</code> regardless of primary format, post-edit <code>sections.json</code> drifts from the on-disk HTML, and the four templates lack explicit MD&rarr;HTML authoring guidance &mdash; so two different runs of <code>/artifact prd</code> can produce structurally divergent HTML even with the same input.</p>
+
+<h3 id="who-experiences-this">Who experiences this?</h3>
+<p>Product managers, engineering managers, and discovery practitioners using <code>/artifact</code> inside a pmos-toolkit pipeline (host-repo developer surface). They expect the artifact viewer (the <code>style.css</code> + <code>viewer.js</code> toolbar, the section-link button, the inlined index, the GFM-backed MD sidecar) to behave identically across every pipeline stage. Drift across stages forces them to mentally translate between styles &mdash; or, worse, leaves stale <code>sections.json</code> companions that break cross-doc anchor resolution from <code>02_spec.html#fr-...</code>.</p>
+
+<h3 id="why-now">Why now?</h3>
+<p>The v2.33.0 html-artifacts migration converted ten pipeline skills + <code>/feature-sdlc</code> to HTML-primary with the substrate. <code>/artifact</code> was migrated <em>partially</em> in the same release (<code>SKILL.md</code> describes the HTML write contract) but the surrounding skill plumbing &mdash; reviewer subagent dispatch, refine flow, update flow, frontmatter shape, sections.json idempotence &mdash; was not. The v2.40.0 polish-skill release exposed similar HTML-fidelity gaps for <code>/polish</code> and resolved them; <code>/artifact</code> is the last pipeline-adjacent skill carrying drift. Closing it before any downstream consumer (a future <code>/artifact</code> &rarr; <code>/spec</code> handshake, or a Notion/Confluence export) ships avoids cascading rework.</p>
+</section>
+
+<section id="goals">
+<h2 id="goals">Goals &amp; Non-Goals</h2>
+
+<h3 id="goals-list">Goals</h3>
+<ul>
+  <li><strong>End-to-end HTML parity:</strong> An <code>/artifact prd full</code> run produces an HTML artifact visually indistinguishable from a sibling <code>02_spec.html</code> &mdash; same toolbar, same fonts, same section-link affordance, same sidebar &mdash; measured by: zero new CSS classes outside the substrate; zero new asset files; <code>diff</code> of the rendered <code>&lt;header&gt;</code> + <code>&lt;footer&gt;</code> regions byte-identical to <code>/spec</code>'s.</li>
+  <li><strong>Reviewer-input-contract parity (FR-50/51/52):</strong> Phase 3's reviewer subagent receives chrome-stripped HTML body + the eval rubric, returns findings with verbatim <code>quote</code> + <code>section_id</code> matching the live <code>{slug}.sections.json</code>; orchestrator hard-fails on any miss. Measured by: a fresh <code>/artifact prd</code> run on a synthetic draft with a planted bad-quote finding produces a hard-fail with the canonical error message format.</li>
+  <li><strong>Refine + update flows format-aware:</strong> <code>/artifact refine &lt;path&gt;</code> defaults the safer output to <code>&lt;path&gt;.refined.html</code> when primary is HTML (not <code>.refined.md</code>); <code>/artifact update</code> appends to <code>&lt;section id="comment-resolution-log"&gt;</code> with an HTML table, not a markdown one. Measured by: refine on a <code>prd.html</code> writes <code>prd.refined.html</code>; update emits a valid <code>&lt;section&gt;</code> wrapper with a <code>&lt;table&gt;</code>.</li>
+  <li><strong>Post-edit fidelity:</strong> After Phase 3 edits the HTML draft and after Phase U.3 update appends rows, the skill re-emits <code>{slug}.sections.json</code> and (when <code>output_format=both</code>) the MD sidecar. Measured by: <code>jq</code> on the regenerated <code>sections.json</code> shows ids in the live HTML; <code>diff</code> of the MD sidecar before/after edit reflects the changes.</li>
+  <li><strong>Explicit MD-template &rarr; HTML authoring contract:</strong> Phase 2.7 carries a paragraph spelling out that the LLM authors the HTML body directly using <code>template.md</code> for section ordering and per-section guidance (matching how <code>/spec</code> and <code>/plan</code> author HTML from outline), with no MD-to-HTML conversion step at write time. Measured by: a new contributor reading Phase 2.7 can describe the rendering path in one sentence.</li>
+  <li><strong>Frontmatter JSON shape:</strong> Phase 2.7's frontmatter example shows the JSON shape inside <code>&lt;script type="application/json" id="pmos-frontmatter"&gt;</code> (not a YAML triple-dash block). Measured by: example block in SKILL.md parses as JSON via <code>jq</code>.</li>
+  <li><strong>assert_heading_ids hook at write time:</strong> Phase 2.7 runs <code>plugins/pmos-toolkit/skills/_shared/html-authoring/assets/</code> heading-id validator (or inline equivalent) before <code>rename(2)</code>. Measured by: a planted <code>&lt;h2&gt;</code> without <code>id</code> hard-fails the write with the canonical error.</li>
+  <li><strong>Substrate-only assets:</strong> No new files added to <code>_shared/html-authoring/assets/</code>. Re-use what's already there (<code>style.css</code>, <code>viewer.js</code>, <code>html-to-md.js</code>, <code>chrome-strip.js</code>). Measured by: <code>git diff --stat</code> of the merge shows zero new files under that path.</li>
+</ul>
+
+<h3 id="non-goals">Non-Goals</h3>
+<ul>
+  <li><strong>NOT</strong> changing the template store at <code>~/.pmos/artifacts/templates/&lt;slug&gt;/template.md</code> &mdash; templates stay MD-shaped (runbook edge case row 4 carve-out). Because the templates are the human-editable authoring surface; HTML rendering happens at write time, not in storage.</li>
+  <li><strong>NOT</strong> introducing a new <code>md-to-html.js</code> renderer in the substrate. Because LLM-direct HTML authoring matches all other pipeline skills and avoids a new dependency surface.</li>
+  <li><strong>NOT</strong> rewriting <code>reviewer-prompt.md</code> from scratch. Because most of its contract (severity rubric, JSON return shape, eval-item-by-item discipline) is sound &mdash; only the input-shape and quote-validation contract change.</li>
+  <li><strong>NOT</strong> migrating the four built-in templates' <code>eval.md</code> files to HTML. Eval criteria stay MD &mdash; they are reviewer input, not render output.</li>
+  <li><strong>NOT</strong> introducing a separate "look-and-feel preset" knob. Because the substrate <em>is</em> the look-and-feel; the four content presets (Concise / Tabular / Narrative / Executive) stay orthogonal.</li>
+  <li><strong>NOT</strong> changing template management flows (<code>template add|list|remove</code>) or preset management flows. Because they operate on the <code>~/.pmos/artifacts/</code> store, not the feature-folder render path.</li>
+</ul>
+</section>
+
+<section id="ux-analysis">
+<h2 id="ux-analysis">User Experience Analysis</h2>
+
+<h3 id="motivation">Motivation</h3>
+<ul>
+  <li><strong>Job to be done:</strong> "I'm running my pipeline; <code>/artifact</code> produced a PRD; I want to share its URL with my team in the same way I share <code>02_spec.html</code> or <code>01_requirements.html</code> &mdash; same viewer, same anchors, same look."</li>
+  <li><strong>Importance / urgency:</strong> Mid-cycle. Users have noticed the visual drift but worked around it (opening the MD sidecar instead, or copy-pasting into Notion). Each instance of "I'll just open the .md" is a slow erosion of the HTML-primary contract.</li>
+  <li><strong>Alternatives:</strong> Continue using the MD sidecar (loses cross-doc anchors); open the <code>.html</code> and tolerate the visual drift (cognitive friction); fork a private renderer (fragments the toolchain).</li>
+</ul>
+
+<h3 id="friction-points">Friction Points</h3>
+<table>
+  <thead><tr><th>Friction Point</th><th>Cause</th><th>Mitigation</th></tr></thead>
+  <tbody>
+    <tr><td>Reviewer subagent hallucinates findings against HTML it wasn't prompted to read</td><td>reviewer-prompt.md says input is markdown; Phase 3 passes raw HTML</td><td>Chrome-strip step + reviewer-prompt update + quote/section validation hard-fail</td></tr>
+    <tr><td>"refine my PRD" produces <code>prd.refined.md</code> not <code>prd.refined.html</code></td><td>extension hardcoded in Phase 3.x</td><td>Mirror primary-format detection</td></tr>
+    <tr><td>sections.json companion goes stale after Phase 3 Edit changes a heading</td><td>No post-edit regeneration step</td><td>Re-emit <code>sections.json</code> + MD sidecar at end of Phase 3 and Phase U.3</td></tr>
+    <tr><td>"will the assets break my pipeline?" — new contributor uncertainty</td><td>No explicit MD&rarr;HTML rendering contract paragraph</td><td>Phase 2.7 contract paragraph &mdash; one sentence, LLM authors directly</td></tr>
+  </tbody>
+</table>
+
+<h3 id="satisfaction-signals">Satisfaction Signals</h3>
+<ul>
+  <li>Opening a <code>/artifact</code>-generated <code>prd.html</code> alongside <code>02_spec.html</code> in two browser tabs: identical toolbar, identical fonts, identical section-link affordance.</li>
+  <li>Anchor links of the form <code>prd.html#§2-problem-customer</code> resolve deterministically across regenerations.</li>
+  <li>Reviewer findings cite verbatim quotes that grep-locate in the source HTML.</li>
+</ul>
+</section>
+
+<section id="solution-direction">
+<h2 id="solution-direction">Solution Direction</h2>
+
+<p>Eight targeted edits to <code>plugins/pmos-toolkit/skills/artifact/</code>, plus a focused update to <code>reviewer-prompt.md</code> and SKILL.md text. No new substrate assets; no template-store changes; no new <code>reference/</code> dir on <code>/artifact</code> (it ships with <code>presets/</code> and <code>templates/</code> only &mdash; no need to add). Concretely:</p>
+
+<ol>
+  <li><strong>SKILL.md Phase 2.7</strong> &mdash; add an explicit paragraph: "Author the HTML body directly using <code>template.md</code> for section ordering and per-section guidance comments. Wrap each <code>## §N</code> as <code>&lt;section id="..."&gt;&lt;h2 id="..."&gt;</code> per <code>_shared/html-authoring/conventions.md</code> §3. No MD&rarr;HTML conversion happens at write time."</li>
+  <li><strong>SKILL.md Phase 2.7</strong> &mdash; replace the YAML-shape frontmatter example with the JSON shape that actually lands in <code>&lt;script type="application/json" id="pmos-frontmatter"&gt;</code>.</li>
+  <li><strong>SKILL.md Phase 2.7</strong> &mdash; add the heading-id assertion step before the atomic rename: <code>node assets/assert_heading_ids.js {slug}.html.tmp</code> (or an equivalent inline grep), hard-fail with canonical error.</li>
+  <li><strong>SKILL.md Phase 3 step 1</strong> &mdash; insert a chrome-strip preamble: "Run <code>node {feature_folder}/assets/chrome-strip.js {slug}.html &gt; /tmp/artifact-reviewer-input.html</code>; pass the stripped HTML inline to the reviewer prompt."</li>
+  <li><strong>SKILL.md Phase 3 step 2</strong> &mdash; add reviewer-return validation (FR-52 parity): (a) <code>section</code> ids returned must subset of <code>{slug}.sections.json</code> ids; (b) every finding's <code>quote</code> (new required field) must be a ≥40-char verbatim substring of the source HTML; (c) hard-fail with canonical error message on either miss.</li>
+  <li><strong>SKILL.md Phase 3 step 3 and Phase U.3</strong> &mdash; at end of edit-applying step, re-emit <code>{slug}.sections.json</code> from the post-edit HTML (parse <code>&lt;h2&gt;</code>/<code>&lt;h3&gt;</code> ids); when <code>output_format=both</code>, re-run the <code>html-to-md.js</code> sidecar pipe.</li>
+  <li><strong>SKILL.md Phase 3.x refine flow</strong> (line 336) &mdash; replace "Overwrite <code>&lt;path&gt;</code> or write to <code>&lt;path&gt;.refined.md</code>?" with a primary-format-aware version: read the file extension; offer <code>.refined.html</code> when primary is HTML, <code>.refined.md</code> only when primary is MD-only legacy.</li>
+  <li><strong>SKILL.md Phase U.4</strong> (update flow Comment Resolution Log) &mdash; replace the markdown table with the HTML emission contract: append/extend a <code>&lt;section id="comment-resolution-log"&gt;</code> block with an HTML <code>&lt;table&gt;</code>; the same row shape; same per-row dates and resolutions.</li>
+  <li><strong>reviewer-prompt.md</strong> &mdash; (a) change "you receive ... a markdown document" to "you receive a chrome-stripped HTML <code>&lt;h1&gt;</code>+<code>&lt;main&gt;</code> body"; (b) add the <code>quote</code> field as required in the JSON output shape, with the contract "<code>quote</code> must be a ≥40-char verbatim substring of the source"; (c) require <code>section</code> ids match the live <code>sections.json</code>.</li>
+</ol>
+
+<p>Two alternatives considered and rejected:</p>
+<ul>
+  <li><strong>Add a <code>md-to-html.js</code> renderer to the substrate.</strong> Rejected: introduces a vendored dependency, doesn't match how <code>/spec</code> + <code>/plan</code> author HTML, and the LLM-direct path is already proven across 10 pipeline skills.</li>
+  <li><strong>Convert the template store to HTML-shape too.</strong> Rejected: templates are the human-editable authoring surface; HTML in storage hurts diffability and pull-request reviews; the runbook §edge-case-row-4 carve-out exists precisely for this.</li>
+</ul>
+</section>
+
+<section id="user-journeys">
+<h2 id="user-journeys">User Journeys</h2>
+
+<h3 id="primary-journey">Primary Journey &mdash; "Generate a PRD that looks like every other pipeline doc"</h3>
+<ol>
+  <li>User in a feature folder runs <code>/artifact prd full --preset narrative</code>.</li>
+  <li>Phase 0 resolves <code>output_format: html (source: settings)</code>.</li>
+  <li>Phase 2.1&ndash;2.6: template + tier + preset + gathered context resolve (unchanged).</li>
+  <li>Phase 2.7: LLM authors <code>prd.html</code> body directly per the new contract paragraph; sections.json built from the in-memory tree; assets copied (idempotent); heading-id assertion passes; atomic rename. Index regen pulls in <code>prd.html</code>.</li>
+  <li>Phase 3: chrome-strip <code>prd.html</code> &rarr; pass to reviewer; reviewer returns findings with <code>quote</code> + <code>section</code>; orchestrator validates; <code>Edit</code> applies high+medium; <code>sections.json</code> + MD sidecar re-emitted at loop end.</li>
+  <li>Phase 4: user runs <code>npx serve docs/pmos/features/&lt;feature&gt;/</code>, opens <code>prd.html</code> &mdash; visually identical to the sibling <code>02_spec.html</code>.</li>
+</ol>
+
+<h3 id="alternate-refine-journey">Alternate &mdash; "Refine an existing PRD"</h3>
+<ol>
+  <li>User runs <code>/artifact refine docs/pmos/features/X/prd.html</code>.</li>
+  <li>Skill reads the primary extension: <code>.html</code>.</li>
+  <li><code>AskUserQuestion</code> offers: "Overwrite <code>prd.html</code> or write to <code>prd.refined.html</code>?" &mdash; default <code>.refined.html</code>.</li>
+  <li>Phase 3 runs against the chosen file; post-edit re-emission.</li>
+</ol>
+
+<h3 id="error-journey">Error journey &mdash; "Reviewer returns a hallucinated quote"</h3>
+<ol>
+  <li>Phase 3 reviewer returns a finding with <code>quote: "lorem ipsum dolor sit amet consectetur"</code>.</li>
+  <li>Orchestrator substring-greps <code>quote</code> against source HTML &mdash; miss.</li>
+  <li>Hard-fail with canonical error: <code>[/artifact] reviewer quote not found in &lt;file&gt;: lorem ipsum dolor sit amet conse...</code></li>
+  <li>Soft-phase failure dialog: Retry / Pause / Abort.</li>
+</ol>
+
+<h3 id="edge-cases">Edge cases</h3>
+<table>
+  <thead><tr><th>Scenario</th><th>Condition</th><th>Expected Behavior</th></tr></thead>
+  <tbody>
+    <tr><td>Legacy MD-only artifact in refine flow</td><td>file extension is <code>.md</code></td><td>Offer <code>.refined.md</code> as before; no HTML path; advise user that refresh-to-HTML happens via re-running <code>/artifact create</code>.</td></tr>
+    <tr><td><code>output_format=md</code></td><td>User passed <code>--format md</code></td><td>Skip HTML write entirely; emit MD only (legacy path); reviewer receives MD (no chrome-strip).</td></tr>
+    <tr><td><code>output_format=both</code></td><td>Settings or CLI</td><td>HTML primary; MD sidecar via <code>html-to-md.js</code> pipe; re-emit sidecar after every Phase 3 / Phase U.3 edit.</td></tr>
+    <tr><td>Assets dir already populated by sibling skill</td><td><code>{feature_folder}/assets/style.css</code> exists</td><td><code>cp -n</code> skips; idempotent; no spurious overwrites.</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="design-decisions">
+<h2 id="design-decisions">Design Decisions</h2>
+<table>
+  <thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+  <tbody>
+    <tr><td>D1</td><td>LLM authors HTML directly (no MD&rarr;HTML renderer)</td><td>(a) LLM authors HTML; (b) add <code>md-to-html.js</code> renderer; (c) hybrid</td><td>Matches all 10 pipeline skills; no new vendored dep; one source of truth for substrate authoring style</td></tr>
+    <tr><td>D2</td><td>Reviewer receives chrome-stripped HTML, returns <code>quote</code> + <code>section</code></td><td>(a) status quo (raw HTML); (b) chrome-strip + quote validation; (c) MD sidecar as reviewer input</td><td>Parity with /feature-sdlc Phase 2a, /spec, /plan reviewer contracts (FR-50/51/52); hallucination guard is the proven mechanism</td></tr>
+    <tr><td>D3</td><td>Refined-output extension mirrors primary</td><td>(a) always <code>.refined.md</code>; (b) mirror primary; (c) ask user every time</td><td>(b) is the principle-of-least-surprise; legacy MD-only still works via (a) when primary is MD</td></tr>
+    <tr><td>D4</td><td>Post-edit re-emission of sections.json + MD sidecar</td><td>(a) static at Phase 2.7; (b) re-emit after every <code>Edit</code>; (c) defer to Phase 4</td><td>(b) keeps companions byte-aligned to source; users grep <code>sections.json</code> at any time during refine loop; the cost is one parse pass</td></tr>
+    <tr><td>D5</td><td>JSON frontmatter (in <code>&lt;script type="application/json"&gt;</code>), not YAML</td><td>(a) keep YAML example; (b) switch to JSON example matching the actual on-disk shape</td><td>SKILL.md should show the actual emitted shape; YAML example was confusing</td></tr>
+    <tr><td>D6</td><td>No new files in <code>_shared/html-authoring/assets/</code></td><td>(a) add <code>assert_heading_ids.js</code> as a substrate file; (b) inline equivalent in skill</td><td>The check is &le;15 LOC; an inline grep + parse keeps the substrate stable. Revisit if 3+ skills need the same check.</td></tr>
+    <tr><td>D7</td><td>Update flow's Comment Resolution Log becomes HTML <code>&lt;section&gt;</code> + <code>&lt;table&gt;</code></td><td>(a) keep markdown table; (b) HTML emission</td><td>HTML-primary contract: the artifact is HTML, every appended block must be HTML; rendering an MD table inside HTML breaks the viewer</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="success-metrics">
+<h2 id="success-metrics">Success Metrics</h2>
+<table>
+  <thead><tr><th>Metric</th><th>Baseline</th><th>Target</th><th>Measurement</th></tr></thead>
+  <tbody>
+    <tr><td>Reviewer hallucination guard (hard-fail rate on planted bad quote)</td><td>0% (no check today)</td><td>100%</td><td>Synthetic-fixture test in /skill-eval rubric</td></tr>
+    <tr><td>Refine flow extension parity</td><td>0% (always <code>.refined.md</code>)</td><td>100%</td><td>Unit test on a sample <code>prd.html</code> input</td></tr>
+    <tr><td>sections.json freshness after Phase 3 edit</td><td>Drifts</td><td>Always re-emitted</td><td><code>diff</code> of pre- vs post-edit <code>sections.json</code> matches live HTML</td></tr>
+    <tr><td>Visual parity with /spec output</td><td>Drift (no toolbar / no sidebar) per existing render</td><td>Byte-identical <code>&lt;header&gt;</code> + <code>&lt;footer&gt;</code> chrome</td><td>HTML diff of substrate-rendered regions</td></tr>
+    <tr><td>skill-eval rubric score</td><td>n/a (skill change)</td><td>100% [D] + [J] pass on Phase 6a iter 1</td><td><code>skill-eval-check.sh</code> + reviewer pass</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="research-sources">
+<h2 id="research-sources">Research Sources</h2>
+<table>
+  <thead><tr><th>Source</th><th>Type</th><th>Key Takeaway</th></tr></thead>
+  <tbody>
+    <tr><td><code>plugins/pmos-toolkit/skills/artifact/SKILL.md</code></td><td>Existing code</td><td>HTML write contract described at Phase 2.7 (lines 215&ndash;238); reviewer dispatch at Phase 3 (lines 260&ndash;295); refine + update flows describe legacy MD paths</td></tr>
+    <tr><td><code>plugins/pmos-toolkit/skills/artifact/reviewer-prompt.md</code></td><td>Existing code</td><td>Reviewer JSON contract; severity rubric; says input is "a markdown document" &mdash; needs HTML-aware update + <code>quote</code> field</td></tr>
+    <tr><td><code>plugins/pmos-toolkit/skills/spec/SKILL.md</code> Phase 5</td><td>Reference impl</td><td>Canonical Phase-5 HTML write contract: atomic write, asset substrate, cache-bust, heading IDs, index regen, MD sidecar &mdash; the template to mirror</td></tr>
+    <tr><td><code>plugins/pmos-toolkit/skills/plan/SKILL.md</code> Phase 3</td><td>Reference impl</td><td>Same write contract as /spec; mirror</td></tr>
+    <tr><td><code>plugins/pmos-toolkit/skills/_shared/html-authoring/conventions.md</code> §3</td><td>Substrate contract</td><td>Heading-id derivation algorithm; section-wrapper rules</td></tr>
+    <tr><td><code>plugins/pmos-toolkit/skills/_shared/html-authoring/chrome-strip.md</code></td><td>Substrate contract</td><td>Algorithm + reference impl (<code>assets/chrome-strip.js</code>) for reviewer-input preparation</td></tr>
+    <tr><td><code>plugins/pmos-toolkit/skills/_shared/html-authoring/index-generator.md</code></td><td>Substrate contract</td><td>Manifest format + phase-rank ordering (§9.1); inlined as <code>&lt;script&gt;</code>, no on-disk <code>_index.json</code></td></tr>
+    <tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code></td><td>Acceptance criteria</td><td>§A&ndash;§F are the binary skill-eval rubric; the result must conform</td></tr>
+    <tr><td>v2.33.0 html-artifacts release memory (project_html_artifacts_shipped.md)</td><td>History</td><td>10 pipeline skills + orchestrator already migrated; /artifact's Phase 2.7 was migrated then but reviewer + refine + update flows were not</td></tr>
+  </tbody>
+</table>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">Open Questions</h2>
+<table>
+  <thead><tr><th>#</th><th>Question</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>Should <code>assert_heading_ids</code> become a substrate file (revisit D6) if /artifact and a future /retro-html migration both need it? <em>Defer: revisit once 3+ skills demand it.</em></td></tr>
+    <tr><td>2</td><td>For <code>output_format=md</code>, should the reviewer still receive raw MD (no chrome-strip) and skip the <code>quote</code>-substring validation? <em>Proposed: yes &mdash; chrome-strip is HTML-specific; MD reviewer falls back to current behavior. Confirm in /spec.</em></td></tr>
+  </tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_artifact-html-output/01_requirements.html</span>
+  </footer>
+</body>
+</html>

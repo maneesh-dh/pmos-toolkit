@@ -365,6 +365,48 @@ When `--update <range>` is passed (per §4 FR-MODE-2), the runtime patches an EX
 
 See [§1: Single-file audit flow](#single-file-audit-flow) for the rubric pass that gates this flow, and [§8: Opt-in dual gate](#8-opt-in-dual-gate) for the FR-UP-4 dual-flag enablement (T19).
 
+### §8: Opt-in dual gate
+
+Update-mode is destructive-by-default in spirit (it overwrites the user's existing README) — so the entry point is **doubly opt-in** per FR-UP-4. Both flags must be `true` for the patch flow (§7) to fire.
+
+**Dual-flag check (FR-UP-4).** At update-mode entry (after §4 resolves `mode == update` and BEFORE invoking the commit-classifier in §7 step 1), read both:
+
+1. **User-global config:** `~/.pmos/readme/config.yaml :: phase_7_6_hook_enabled` (boolean; default `false` if file/key absent).
+2. **Per-run state:** `.pmos/complete-dev.lastrun.yaml :: readme_update_hook` (boolean; default `false` if file/key absent).
+
+**Resolution:**
+
+| `phase_7_6_hook_enabled` | `readme_update_hook` | Action |
+|---|---|---|
+| `true` | `true` | Proceed to §7 |
+| `true` | `false` | No-op + warn |
+| `false` | `true` | No-op + warn |
+| `false` | `false` | No-op + warn |
+| absent | any | No-op + warn (treat absent as `false`) |
+| any | absent | No-op + warn |
+
+**Warn message (chat-log line, single):**
+```
+/readme --update skipped: opt-in not set (phase_7_6_hook_enabled=<v1> AND readme_update_hook=<v2>)
+```
+where `<v1>` and `<v2>` are the resolved values (`true|false|absent`). The user can re-enable with:
+
+- `phase_7_6_hook_enabled`: `printf 'phase_7_6_hook_enabled: true\n' >> ~/.pmos/readme/config.yaml` (create the file if absent).
+- `readme_update_hook`: this is per-run, set by `/complete-dev`'s Phase 0.5 ask when the user opts in to the post-release README update hook (default off). It is NOT set manually.
+
+**Why dual.** The user-global flag (`phase_7_6_hook_enabled`) is the one-time enablement: "yes, I want /readme to participate in /complete-dev's Phase 7.6 hook." The per-run flag (`readme_update_hook`) is the per-release confirmation: "yes, run the hook on THIS release." Either alone is insufficient — the global flag without the per-run confirmation would surprise users; the per-run flag without the global enablement would let /complete-dev silently fire a feature the user never opted into.
+
+**FR-UP-5 — Staging-only contract.** On a successful patch (after §7 step 6 confirms rubric pass on the patched README), `/readme --update`:
+
+1. **Stages** the patched README via `git add <readme-path>` — exactly one path per package in monorepo composition mode.
+2. **Does NOT** call `git commit`. The patched file enters /complete-dev's existing commit machinery alongside the release commit.
+3. **Does NOT** call `git push`. Same reason — push is /complete-dev's job.
+4. Logs to chat: `update-mode: README patched + staged at <path> (rubric <X>/15 pass); /complete-dev will pick it up in the release commit`.
+
+This contract makes `/readme --update` a **patch generator**, not a commit author. The user's release workflow (manual or `/complete-dev`) owns the commit message and branch state.
+
+See [§7: Update-mode flow](#7-update-mode-flow) for the upstream flow gated by this section, and [§4: Mode resolution](#4-mode-resolution) for `--update`'s mutex with `--audit`/`--scaffold`.
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

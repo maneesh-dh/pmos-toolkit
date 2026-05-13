@@ -454,6 +454,18 @@ When `scripts/workspace-discovery.sh` reports composition=`monorepo`, §10 orche
 
 **Composition wiring.** §10 is the entry point for §1 audit / §6 scaffold / §7 update whenever composition=`monorepo`: §1 delegates the iteration + roll-up + diff phases here and consumes the unified diff as its audit output; §6 delegates the missing-pkg detection + scaffold-emit phases here and reuses the same approval gate; §7 update applies §10's diff-and-stage contract per-pkg so workspace-scope update lands as one staged batch for /complete-dev to commit. Per-file flows in §1/§6/§7 remain the contract for `composition=single` repos — §10 is the monorepo overlay, not a replacement.
 
+### §11: Voice delegation
+
+**FR-V-2 — follow-up Suggest line.** After every successful /readme audit-or-scaffold run (§6, §7), emit exactly one chat line on the final turn: `Suggest: /polish <path-to-README.md> — tighten prose without changing meaning.` Non-blocking advisory — exit 0, no AskUserQuestion, no gate. Voice and prose-tightening are /polish's job (see Anti-Patterns); /readme is structure-only. Cite FR-V-2.
+
+**FR-V-3 — voice-drift gate on /polish round-trip.** When the user runs /polish and re-invokes /readme in update mode (§7), gate re-acceptance with `scripts/voice-diff.sh README.md.pre-polish README.md` (forward-cite: ships in T23, parallel Wave 1). Accept iff `sentence_len_delta_pct < 15` AND `jaccard_new_tokens >= 0.7`. On fail, emit `voice-drift detected: /polish materially changed meaning — review diff before accepting`, then AskUserQuestion (prefix `<!-- defer-only: ambiguous -->` so §0b's non-interactive block defers rather than auto-picks). Options: **Accept polished version (Recommended)** / **Reject — keep pre-polish** / **Show diff**. Cite FR-V-3.
+
+**FR-V-4 — substrate-absent graceful warn.** If `find plugins/pmos-toolkit/skills/polish/ -name 'voice*'` returns empty, `voice-diff.sh` writes a stderr warn and falls back to its built-in tokenizer — gate still runs, with chat note `voice-diff: /polish substrate unavailable; using built-in heuristic`. Never block on missing substrate. Cite FR-V-4.
+
+**Worked example** — update-mode + /polish round-trip: `voice-diff.sh` emits `{"sentence_len_delta_pct": 22.4, "jaccard_new_tokens": 0.61, "verdict": "drift"}` → chat renders `voice-drift detected: /polish materially changed meaning — review diff before accepting` → AskUserQuestion (Accept/Reject/Show diff) → final turn appends `Suggest: /polish README.md — tighten prose without changing meaning.`
+
+**Cross-cites.** §11 fires on the success edge of §6 and §7 (both emit FR-V-2 Suggest as final turn); only §7 can trigger the FR-V-3 drift gate (scaffold has no pre-polish baseline).
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

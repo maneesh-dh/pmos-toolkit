@@ -241,7 +241,7 @@ The per-package loop processes each in declared order (per `workspace-discovery.
 - `--update` + `--audit` or `--scaffold` → exit 64 with the mutex message.
 - `--update` without a `<range>` arg → exit 64: `--update requires a commit range (e.g. main..HEAD)`.
 
-See [§1: Single-file audit flow](#1-single-file-audit-flow) for argv parsing and [§5: Repo-miner subagent](#5-repo-miner-subagent) for scaffold-mode data gathering (T15).
+See [§1: Single-file audit flow](#single-file-audit-flow) for argv parsing and [§5: Repo-miner subagent](#5-repo-miner-subagent) for scaffold-mode data gathering (T15).
 
 ### §5: Repo-miner subagent
 
@@ -322,7 +322,48 @@ When §4 resolves mode to `scaffold` (or per-package `scaffold` within `audit+sc
 - Never auto-pick a license — always defer to the user (per §5 step 4).
 - Never write the README without the diff-preview gate, even with `--auto-apply` (which mechanizes only banned-phrase strikethrough in audit mode, per `reference/rubric.yaml`).
 
-See [§4: Mode resolution](#4-mode-resolution), [§5: Repo-miner subagent](#5-repo-miner-subagent), and the rubric workflow in [§1: Single-file audit flow](#1-single-file-audit-flow).
+See [§4: Mode resolution](#4-mode-resolution), [§5: Repo-miner subagent](#5-repo-miner-subagent), and the rubric workflow in [§1: Single-file audit flow](#single-file-audit-flow).
+
+### §7: Update-mode flow
+
+When `--update <range>` is passed (per §4 FR-MODE-2), the runtime patches an EXISTING README based on commits that landed since the range's base. Update-mode is opt-in (dual-gate, see §8) and patch-only — never destructive. The full FR-UP-3 patch-fail guard ensures a regression cannot ship.
+
+**Steps.**
+
+1. **Classify the commit range.** Invoke `scripts/commit-classifier.sh <repo-root> <range>` (T17). Parse the JSON output: `commits[]` (per-commit type + breaking flag + section affinity) and `sections[]` (union of impacted sections, deduped).
+
+   - **E12 path** (FR-UP-2): if `sections[]` is empty AND a `warn` field is present (`"no conventional-commit subjects"`), short-circuit with chat log `update-mode: README update skipped — commit signal ambiguous (no conventional-commit subjects in <range>)`. No patch attempted; exit 0.
+
+2. **Per-section ask.** For each impacted section in `sections[]`, issue an `AskUserQuestion`:
+   ```
+   question: "Section <Name> impacted by <N> commits. Apply suggested patch?"
+   options:
+     - Apply (Recommended) — apply the LLM-drafted patch verbatim
+     - Modify              — user supplies replacement text next turn
+     - Skip                — drop the patch for this section
+     - Defer               — log to /retro for later
+   ```
+   Batch ≤4 sections per call (per §8.6 of the spec's batching convention). The LLM drafts the per-section patch using the commit subjects + commit_affinity from `reference/section-schema.yaml`.
+
+3. **Stage patches in working tree.** On Apply / Modify, write the patched README to disk (overwriting the existing file). DO NOT git add yet — staging is §8's responsibility.
+
+4. **Re-run rubric on patched README** (per §1). The rubric.sh pass produces a fresh 15-check verdict against the patched file.
+
+5. **FR-UP-3 patch-fail guard.** If ANY blocker check fails in the rubric pass on the patched README:
+   - **Revert the working tree**: `git checkout -- <readme-path>` (or restore the pre-patch buffer if the file was untracked).
+   - **Log to `.pmos/readme/update.log`** (append, JSONL):
+     ```json
+     {"event":"patch_dropped","reason":"rubric_blocker_fail","range":"<range>","failed_checks":["<id>",...],"timestamp":"<ISO-8601>"}
+     ```
+   - **Emit /retro finding** via the `/retro` skill's pending-findings queue (chat log entry + JSON to the retro buffer per the retro skill's contract).
+   - **Release proceeds unpatched** — the existing README ships as-is. The patch failure does NOT block `/complete-dev`.
+   - **Chat log:** `update-mode: patch dropped (rubric blockers: <ids>); README unchanged; finding logged for /retro`.
+
+6. **On rubric pass.** The patched README remains on disk; staging deferred to §8 (`git add` only — no commit by /readme per FR-UP-5).
+
+**E13 path** — Range contains zero commits (e.g., `HEAD..HEAD`): treat same as E12 — chat warn, exit 0, no patch.
+
+See [§1: Single-file audit flow](#single-file-audit-flow) for the rubric pass that gates this flow, and [§8: Opt-in dual gate](#8-opt-in-dual-gate) for the FR-UP-4 dual-flag enablement (T19).
 
 ## Anti-Patterns
 

@@ -1,6 +1,6 @@
 # Changelog
 
-## 2026-05-13 — pmos-toolkit 2.41.0: /artifact HTML output parity
+## 2026-05-13 — pmos-toolkit 2.42.0: /artifact HTML output parity
 
 `/artifact` produces HTML artifacts that look and behave like every other pipeline skill's HTML output — same toolbar, same fonts, same anchors, same companion files. Eight gaps closed:
 

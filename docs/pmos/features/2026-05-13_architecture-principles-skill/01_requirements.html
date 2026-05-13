@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="pmos:tier" content="3">
+  <meta name="pmos:phase" content="requirements">
+  <meta name="pmos:status" content="Draft">
+  <title>/architecture skill — Requirements</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.46.0">
+  <script defer src="assets/viewer.js?v=2.46.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">/architecture skill — Requirements</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+    <a class="pmos-attribution pmos-attribution--toolbar"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="metadata">
+<h2 id="metadata">Metadata</h2>
+<dl>
+  <dt>Date</dt><dd>2026-05-13</dd>
+  <dt>Last updated</dt><dd>2026-05-13</dd>
+  <dt>Status</dt><dd>Draft</dd>
+  <dt>Tier</dt><dd>3 — Feature</dd>
+  <dt>Pipeline mode</dt><dd>skill-new (pmos-toolkit)</dd>
+  <dt>v1 scope</dt><dd>Vertical slice — <code>/architecture audit</code> only. Other modes deferred to v2+.</dd>
+  <dt>Standing acceptance criteria</dt><dd><a href="../../../../plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md"><code>skill-patterns.md §A–§F</code></a> (frontmatter, description triggering, progressive disclosure, body content, scripts, platform-conditional frontmatter)</dd>
+</dl>
+</section>
+
+<section id="problem">
+<h2 id="problem">Problem</h2>
+<p>Engineers driving multi-stage agentic dev cycles (the same audience that lives in <code>/feature-sdlc</code>) inherit, scaffold, and review codebases whose <strong>architectural quality</strong> sits in the gap between syntactic lint (ESLint / Prettier / Ruff) and post-impl behavioural verification (<code>/verify</code>). There is no consistent, opinionated, book-grounded architecture check that fires at the moments where architectural drift compounds: scaffolding a new repo, reviewing a <code>/spec</code>, inheriting a legacy codebase, or merging agent-generated code.</p>
+<p>The OpenAI &ldquo;Harness Engineering&rdquo; (2025) thesis is the structural argument: opinionated, uniform repo structure is the dominant lever for coding-agent productivity — agents do dramatically better in repos with one test runner, one formatter, one deps file, folder-by-feature, explicit layer boundaries. Without a skill that <em>operationalizes</em> that thesis, every repo accretes drift, and every agent run pays the cost.</p>
+
+<h3 id="who-experiences-this">Who experiences this?</h3>
+<p>The pmos-toolkit primary persona: a senior engineer / PM-engineer driving agentic development through <code>/feature-sdlc</code>, reviewing agent-produced code, and frequently inheriting or starting repos. They have read <em>Clean Architecture</em>, <em>Pragmatic Programmer</em>, <em>DDD</em>, and <em>Tidy First?</em> at some point — but cannot hold all the principles in working memory on demand during a 30-minute review window.</p>
+
+<h3 id="why-now">Why now?</h3>
+<p>Three converging signals:</p>
+<ol>
+  <li><strong>The harness-engineering thesis is fresh (May 2025)</strong> and not yet operationalized as tooling — the window to ship an opinionated reference implementation is open.</li>
+  <li><strong><code>/feature-sdlc</code> is in production</strong> at v2.46.0 and Phase 6 (<code>/execute</code>) generates substantial new code per run. The architectural-drift surface is real and measurable.</li>
+  <li><strong>Matt Pocock&rsquo;s <code>improve-codebase-architecture</code></strong> exists as prior art but is single-mode, TS-only, and ruleset-in-prompt — leaving room for a data-driven, multi-tier, citation-rich, multi-stack successor.</li>
+</ol>
+</section>
+
+<section id="goals-and-non-goals">
+<h2 id="goals-and-non-goals">Goals &amp; Non-Goals</h2>
+
+<h3 id="goals">Goals</h3>
+<ul>
+  <li><strong>Consistent, book-grounded architectural feedback on existing repos</strong> — measured by: ≥1 substantive, user-agreed-with violation per <code>/architecture audit</code> run on a real repo within the first 30 days.</li>
+  <li><strong>Citations make every flag a micro-lesson</strong> — measured by: a non-author rating ≥4 of 5 sample violation outputs as &ldquo;educational, not preachy&rdquo;.</li>
+  <li><strong>Principles file accretes by user accretion, not edict</strong> — measured by: ≥1 user-authored L3 override appearing in a real repo&rsquo;s <code>principles.yaml</code> within 30 days of first audit.</li>
+  <li><strong>Wraps, does not reimplement, declarative AST tooling</strong> — measured by: ≥70% of v1 declarative checks delegate to Dependency Cruiser / ts-arch / ruff (gap-map artifact in <code>02_spec</code>).</li>
+  <li><strong>Conforms to pmos skill conventions</strong> — measured by: passes <code>feature-sdlc/reference/skill-eval.md</code> (39-check binary rubric) with zero residuals at Phase 6a.</li>
+</ul>
+
+<h3 id="non-goals">Non-Goals (explicit scope cuts)</h3>
+<ul>
+  <li>NOT shipping <code>/architecture scaffold</code> in v1 — because the scaffold flavor packs need their own design pass (TS variants, Python variants, Node vs Bun, etc.) and v1 vertical-slice principle says ship the highest-standalone-value mode first.</li>
+  <li>NOT shipping <code>/architecture spec-check</code> in v1 — because it requires careful integration with <code>/feature-sdlc</code> Phase 2 and a separate FR pass; defer to v2.</li>
+  <li>NOT shipping <code>/architecture code-check</code> in v1 — because the Phase 6.5 wiring needs the audit-mode prompt + ruleset to be battle-tested first; defer to v3.</li>
+  <li>NOT auto-wiring any <code>/architecture</code> mode as a <code>PostToolUse</code> / <code>SessionStart</code> hook — because hooks are too easy to disable in noise; user-invoked only in v1+.</li>
+  <li>NOT reimplementing AST-based dependency / layer / cycle detection — because Dependency Cruiser (TS) and equivalent Python tooling already exist; delegate.</li>
+  <li>NOT supporting Go / Rust / Java in v1 — because TS + Python covers ≥90% of pmos-toolkit user repos; v2+ as demand emerges.</li>
+  <li>NOT designing a CI-integration story in v1 — because invocation-time use is the unblocked path; CI is a v2 concern.</li>
+</ul>
+</section>
+
+<section id="user-experience-analysis">
+<h2 id="user-experience-analysis">User Experience Analysis</h2>
+
+<h3 id="motivation">Motivation</h3>
+<ul>
+  <li><strong>Job to be done:</strong> &ldquo;When I&rsquo;m reviewing this codebase (mine, inherited, or agent-produced) I want a consistent, opinionated, book-grounded architecture check that flags structural violations <em>with rationale</em>, so my codebase stays maintainable <em>and</em> agent-friendly without me re-deriving every principle from memory.&rdquo;</li>
+  <li><strong>Importance / urgency:</strong> Medium-high. Architectural drift is silent and cumulative; it isn&rsquo;t urgent on day one but compounds painfully by month six. Today the user uses ad-hoc memory of books + occasional ESLint configs; neither operationalizes the harness-engineering thesis.</li>
+  <li><strong>Alternatives:</strong> (a) Run Matt Pocock&rsquo;s <code>improve-codebase-architecture</code> directly (TS-only, audit-only, prompt-embedded ruleset, no citations, no ADR loop); (b) read the books and freelance the review (high cognitive load, inconsistent); (c) run Dependency Cruiser / ts-arch / ArchUnit standalone (deterministic but no semantic checks, no citations); (d) do nothing and let <code>/verify</code> catch what it catches (general-purpose, not architecture-focused).</li>
+</ul>
+
+<h3 id="friction-points">Friction Points</h3>
+<table>
+<tr><th>Friction Point</th><th>Cause</th><th>Mitigation</th></tr>
+<tr><td>&ldquo;Whose tier wins when L1 and L3 conflict?&rdquo;</td><td>Three-tier precedence is non-obvious</td><td>Fixed precedence — project (L3) &gt; stack (L2) &gt; universal (L1) — printed in every violation output</td></tr>
+<tr><td>&ldquo;Why is this rule firing? Where does it come from?&rdquo;</td><td>Rule IDs alone read as bureaucratic</td><td>Every violation cites <code>source: book / chapter / URL</code> inline, e.g. &ldquo;<em>Clean Architecture, ch. 11</em>&rdquo;</td></tr>
+<tr><td>&ldquo;Will this skill nag me about every minor thing?&rdquo;</td><td>Lint-style noise destroys trust within 2 weeks (per F3 premortem)</td><td>Three severities (<code>info</code> / <code>warn</code> / <code>block</code>); only <code>block</code> spawns ADRs; default-mute <code>info</code></td></tr>
+<tr><td>&ldquo;ADR drafts pile up and I never review them.&rdquo;</td><td>ADR-draft fatigue (F1 premortem H-risk)</td><td>Only <code>block</code>-severity structural violations spawn ADR drafts; <code>warn</code> stays inline; cap of 5 draft ADRs per audit run</td></tr>
+<tr><td>&ldquo;The principles file bloats to 2,000 lines.&rdquo;</td><td>Accretion without curation (F1 premortem H-risk)</td><td>Hard cap on L1 universal at 15 rules; every rule requires a source citation; doc-level invariant enforced by audit-mode self-check</td></tr>
+<tr><td>&ldquo;I run this on a Python repo and get nothing useful.&rdquo;</td><td>L1 written against TS may not generalize cleanly</td><td>L1 rules tagged with <code>applies_to: [ts, python, all]</code>; audit mode filters by detected stack; v1 includes ≥5 Python-tagged L2 rules</td></tr>
+</table>
+
+<h3 id="satisfaction-signals">Satisfaction Signals</h3>
+<ul>
+  <li>User reads the cited rationale and recognizes it (&ldquo;ah yes, Clean Architecture ch. 11&rdquo;) — feels educated, not nagged.</li>
+  <li>User accepts a draft ADR within the same session — the loop closed productively.</li>
+  <li>User authors a project-level L3 override within the first week — the principles file is something they own, not endure.</li>
+  <li>The next <code>/verify</code> run on the same repo cites <em>fewer</em> architecture-debt findings than the pre-<code>/architecture audit</code> baseline.</li>
+</ul>
+</section>
+
+<section id="solution-direction">
+<h2 id="solution-direction">Solution Direction</h2>
+
+<p><strong>Composite of ideation Finalists #1 + #2 + #3 + #8 + #10 + #11.</strong> Surface = single skill with sub-modes (F2). Substance = principles-as-data (F2) + tiered rulebook (F3) + harness-engineering scaffold opinion (F8) + ADR-driven persistence (F10) + citation-on-every-violation (F11).</p>
+
+<p><strong>v1 ships only the <code>audit</code> mode.</strong> The skill skeleton, principles substrate, and ADR loop are designed forward-compatible with <code>spec-check</code>, <code>code-check</code>, <code>scaffold</code> in v2-v4 — but only <code>audit</code> is presented as a user surface in v1.</p>
+
+<h3 id="user-observable-behaviour">User-observable behaviour</h3>
+<pre><code>$ /architecture audit [path]
+  → reads principles.yaml (L1 ship + L2 stack-detected + L3 project-overrides)
+  → walks repo (or path if given), detects stack(s)
+  → delegates declarative checks to Dependency Cruiser (TS) / ruff (py) / ts-arch
+  → runs semantic checks via LLM against L1+L2 rules
+  → emits prioritized violation report:
+       [block]  L1-04 Dependency Inversion (Clean Architecture, ch. 11)
+                src/services/email.ts:14 — domain layer depends on infra layer
+                → draft ADR queued at docs/architecture/decisions/0007-...
+       [warn]   L2-TS-03 No barrel files (improve-codebase-architecture)
+                src/utils/index.ts — barrel file re-exports detected
+       [info]   L1-09 Tidy First (Beck, 2024) — refactor candidates listed
+  → user accepts / rejects / edits each draft ADR
+  → accepted ADRs become L3 project overrides in principles.yaml</code></pre>
+
+<h3 id="data-model">Principles data model (high-level)</h3>
+<p><code>principles.yaml</code> ships as a sibling reference file in the skill (v1 ships L1 + a starter L2 per stack). A repo&rsquo;s own <code>.pmos/principles.yaml</code> (if present) supplies L3 overrides — same schema, project-scoped.</p>
+<pre><code>schema_version: 1
+rules:
+  - id: L1-04
+    tier: universal           # universal | stack | project
+    statement: "Dependencies point inward toward higher-level policy."
+    rationale: "Lower-level details (infra, frameworks) should depend on..."
+    source:
+      book: "Clean Architecture"
+      author: "Robert C. Martin"
+      chapter: 11
+      url: null
+    severity: block            # info | warn | block
+    applies_to: [ts, python, all]
+    applies_in: [audit]        # which modes the rule fires in</code></pre>
+
+<h3 id="adr-format">ADR format (decision D-ADR1)</h3>
+<p>Nygard-style ADRs (lightweight): Title / Status / Context / Decision / Consequences. Written to <code>docs/architecture/decisions/NNNN-&lt;slug&gt;.md</code> per Nygard convention. <code>NNNN</code> is the next available 4-digit sequence in that directory.</p>
+
+<h3 id="precedence-rule">Tier precedence (decision D-PREC1)</h3>
+<p>When two rules with the same <code>id</code> appear at different tiers, project (L3) wins over stack (L2) wins over universal (L1). Precedence is printed in every violation output (&ldquo;<em>resolved tier: L3 — see <code>.pmos/principles.yaml</code> line 42</em>&rdquo;).</p>
+
+<h3 id="delegation-strategy">Delegation strategy (decision D-DELEG1)</h3>
+<p>Declarative architectural checks (forbidden-dependency, layer-violation, circular-import) delegate to existing AST tooling:</p>
+<ul>
+  <li><strong>TS:</strong> Dependency Cruiser (cycles, forbidden deps), ts-arch (layer violations).</li>
+  <li><strong>Python:</strong> ruff (deps), pylint --disable-all --enable=cyclic-import, optional <code>import-linter</code> for explicit contracts.</li>
+</ul>
+<p>If a delegated tool is missing, the audit reports the gap as <code>info</code>-severity (&ldquo;install Dependency Cruiser to enable L1-04 deterministic check&rdquo;) — never blocks the run.</p>
+
+<h3 id="installed-shape">Skill installed shape</h3>
+<pre><code>plugins/pmos-toolkit/skills/architecture/
+├── SKILL.md                            # the skill body, must conform to skill-patterns.md §A–§F
+├── principles.yaml                     # L1 universal (≤15 rules) + L2 starter packs (ts, python)
+├── reference/
+│   ├── adr-template.md                 # Nygard format
+│   ├── delegation-map.md               # which rule → which external tool (gap-map artifact)
+│   ├── citations.md                    # full bibliography for every L1/L2 rule
+│   └── modes-roadmap.md                # scaffold/spec-check/code-check forward design notes
+└── tools/
+    └── audit-check.sh                  # determinism harness (delegates to dep-cruiser/ruff)</code></pre>
+</section>
+
+<section id="user-journeys">
+<h2 id="user-journeys">User Journeys</h2>
+
+<h3 id="primary-journey">Primary Journey (Happy Path)</h3>
+<ol>
+  <li>User runs <code>/architecture audit</code> in a TS or Python repo (no arg → audits cwd).</li>
+  <li>Skill loads its shipped <code>principles.yaml</code> (L1 + L2-ts + L2-python), merges in <code>.pmos/principles.yaml</code> (L3) if present.</li>
+  <li>Skill detects the stack(s) (via repo-shape-detection: <code>package.json</code> → ts, <code>pyproject.toml</code>/<code>requirements.txt</code> → python).</li>
+  <li>Skill invokes delegated AST tools — captures their JSON output, maps each violation to the relevant L1/L2 rule by <code>id</code>.</li>
+  <li>Skill runs semantic checks via LLM against L1+L2 rules not covered by AST tools.</li>
+  <li>Skill emits the violation report grouped by severity (<code>block</code> first), each row showing <code>[severity] rule-id rule-title (citation) — file:line — rationale</code>.</li>
+  <li>For each <code>block</code>-severity violation, the skill drafts an ADR under <code>docs/architecture/decisions/</code> (max 5 per run) and lists them for user disposition.</li>
+  <li>User accepts / rejects / edits each draft ADR. Accepted ADRs are written to disk; their <code>Decision</code> sections become L3 overrides appended to <code>.pmos/principles.yaml</code> with a back-link to the ADR file.</li>
+  <li>Skill commits the new ADRs + L3 changes as a single commit: <code>arch: accept N ADRs from /architecture audit run YYYY-MM-DD</code>.</li>
+</ol>
+
+<h3 id="alternate-journeys">Alternate Journeys</h3>
+<ul>
+  <li><strong>Scoped audit:</strong> <code>/architecture audit src/services/</code> — same flow, scoped to one path; only rules that fire within scope are reported.</li>
+  <li><strong>Stack auto-detection ambiguity:</strong> repo has both <code>package.json</code> AND <code>pyproject.toml</code> — skill prompts user (<code>AskUserQuestion</code>) to confirm which stack(s) to audit, defaulting to both with their union of L2 rules.</li>
+  <li><strong>Monorepo with per-area stack markers</strong> (e.g., the <code>book-companion</code> validation target — <code>backend/pyproject.toml</code> + <code>frontend/package.json</code>): skill walks the repo, detects each area&rsquo;s stack from the nearest enclosing marker, runs delegated tools scoped to that area, and emits a per-area section in the report (&ldquo;<code>backend/</code> (python): N violations · <code>frontend/</code> (ts+vue): M violations&rdquo;).</li>
+  <li><strong>Vue SFCs:</strong> <code>.vue</code> files are treated as TS for L1 semantic checks; declarative TS-tooling delegation (Dependency Cruiser) is run on <code>.ts</code>/<code>.tsx</code> only with a per-rule <code>info</code> note flagging the SFC blind spot (v2 candidate: a Vue-SFC dependency extractor).</li>
+  <li><strong>No L3 file yet:</strong> first audit run creates <code>.pmos/principles.yaml</code> with an empty <code>rules: []</code> + the <code>schema_version</code>, so accepted ADRs have somewhere to land.</li>
+  <li><strong>Re-run after acceptance:</strong> the next <code>/architecture audit</code> reads the new L3 overrides — previously-block violations now resolved appear in the report as &ldquo;previously gated by ADR-NNNN, now passes&rdquo;.</li>
+</ul>
+
+<h3 id="error-journeys">Error Journeys</h3>
+<ul>
+  <li><strong>No delegated tool installed:</strong> skill reports a per-rule <code>info</code>-severity gap (&ldquo;install Dependency Cruiser to enable L1-04 deterministic check; falling back to semantic check only&rdquo;). Run continues; semantic-check verdict is marked &ldquo;degraded&rdquo;.</li>
+  <li><strong>Repo has no <code>package.json</code> or <code>pyproject.toml</code>:</strong> skill emits &ldquo;no supported stack detected — v1 supports TS / Python; see <code>reference/modes-roadmap.md</code> for v2+ stacks&rdquo; and exits clean (exit 0).</li>
+  <li><strong>Delegated tool errors:</strong> skill captures stderr, surfaces the rule as <code>info</code>-severity with the tool error inline, continues with semantic check.</li>
+  <li><strong>ADR directory has un-numbered ADRs:</strong> skill warns and uses next-numeric-after-max-found; never overwrites.</li>
+  <li><strong><code>.pmos/principles.yaml</code> has a schema mismatch:</strong> skill aborts with a clear &ldquo;run <code>/architecture migrate</code> to upgrade&rdquo; message (the <code>migrate</code> sub-command is v2; v1 lists the manual edits in the error).</li>
+</ul>
+
+<h3 id="empty-states-and-edge-cases">Empty States &amp; Edge Cases</h3>
+<table>
+<tr><th>Scenario</th><th>Condition</th><th>Expected Behavior</th></tr>
+<tr><td>Clean repo, zero violations</td><td>All rules pass</td><td>Emit one-line summary &ldquo;✓ <em>N</em> rules checked, zero violations.&rdquo; No ADRs queued. Suggest running again after next feature.</td></tr>
+<tr><td>Repo with 50+ violations</td><td>Brownfield / legacy</td><td>Group by severity; emit only top 5 <code>block</code> + count for the rest (&ldquo;48 more — re-run with <code>--all</code> to see&rdquo;). ADR draft cap of 5 still applies — prevents fatigue.</td></tr>
+<tr><td>User rejects every draft ADR</td><td>Disagreement with rule</td><td>Emit &ldquo;no L3 overrides written; consider downgrading these L1 rules in your project via <code>.pmos/principles.yaml</code> mute list.&rdquo; Skill does not auto-mute.</td></tr>
+<tr><td>v1 invoked with mode arg that v1 does not ship</td><td><code>/architecture scaffold</code></td><td>Print &ldquo;mode <code>scaffold</code> not in v1; v1 supports <code>audit</code>. See <code>reference/modes-roadmap.md</code> for the v2+ rollout plan.&rdquo; Exit 0.</td></tr>
+</table>
+</section>
+
+<section id="design-decisions">
+<h2 id="design-decisions">Design Decisions</h2>
+<table>
+<tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr>
+<tr>
+  <td>D1</td>
+  <td>v1 ships only <code>audit</code> mode; <code>spec-check</code>, <code>code-check</code>, <code>scaffold</code> are forward-compatible roadmap items.</td>
+  <td>(a) All four modes v1, (b) audit + code-check v1, (c) audit only v1 (chosen).</td>
+  <td>Vertical-slice principle: ship the highest-standalone-value mode first; battle-test the principles substrate + ADR loop before wiring deeper integrations. Ideation Next Steps #6.</td>
+</tr>
+<tr>
+  <td>D2</td>
+  <td>Skill name = <code>/architecture</code> (directory <code>plugins/pmos-toolkit/skills/architecture/</code>).</td>
+  <td>(a) <code>/arch</code> (ideation default — short), (b) <code>/architecture</code> (chosen — clear), (c) <code>/principles</code>, (d) <code>/house-style</code>.</td>
+  <td>User decision: clarity over brevity; <code>/arch</code> reads as jargon, <code>/architecture</code> reads as intent.</td>
+</tr>
+<tr>
+  <td>D3</td>
+  <td>v1 stack scope = TS + Python from day one.</td>
+  <td>(a) TS-only v1 (ideation default), (b) TS + Python v1 (chosen), (c) L1-only v1.</td>
+  <td>User decision: pmos-toolkit user repos are roughly evenly split TS / Python; shipping one without the other front-loads churn. Doubled authoring load is acceptable given the L1 universal rules generalize.</td>
+</tr>
+<tr>
+  <td>D4</td>
+  <td>ADR format = Nygard (lightweight): Title / Status / Context / Decision / Consequences.</td>
+  <td>(a) Nygard (chosen), (b) MADR, (c) ship both as templates.</td>
+  <td>Lower friction; matches majority of OSS ADR adoption; user can override per-repo by replacing <code>reference/adr-template.md</code> in v2.</td>
+</tr>
+<tr>
+  <td>D5</td>
+  <td>Three-tier rulebook with fixed precedence: project (L3) &gt; stack (L2) &gt; universal (L1).</td>
+  <td>(a) Flat ruleset, (b) two-tier (universal + project), (c) three-tier (chosen).</td>
+  <td>Universal rules generalize but per-stack idioms (no barrels in TS, prefer dataclasses in Python) must override cleanly. Project overrides close the loop with ADRs.</td>
+</tr>
+<tr>
+  <td>D6</td>
+  <td>Hard cap on L1 universal at 15 rules.</td>
+  <td>(a) No cap, (b) cap at 10, (c) cap at 15 (chosen), (d) cap at 25.</td>
+  <td>Hedges the F1 premortem H-risk (principles.yaml bloats to 2,000 lines). 15 is enough to cover SOLID + DDD basics + Tidy First + harness-eng essentials; pressure to fit forces rule quality.</td>
+</tr>
+<tr>
+  <td>D7</td>
+  <td>Delegate declarative checks to existing AST tools (Dependency Cruiser, ts-arch, ruff); do not reimplement.</td>
+  <td>(a) Reimplement, (b) wrap (chosen), (c) skip declarative entirely.</td>
+  <td>Reimplementing collapses into rebuilding F3 (premortem: 3 H-risk failure modes). Wrapping leverages mature tooling; v1&rsquo;s job is the citation-rich semantic layer + ADR loop, not yet-another-architecture-linter.</td>
+</tr>
+<tr>
+  <td>D8</td>
+  <td>Only <code>block</code>-severity violations spawn draft ADRs; <code>warn</code> stays inline; <code>info</code> is muted unless <code>--verbose</code>.</td>
+  <td>(a) Every violation spawns ADR, (b) only block (chosen), (c) user opt-in per rule.</td>
+  <td>Hedges F1 premortem H-risk (ADR-draft fatigue). 5-ADR-per-run cap is the secondary backstop.</td>
+</tr>
+<tr>
+  <td>D9</td>
+  <td>Citation is mandatory on every rule (<code>source: { book, chapter | url }</code>).</td>
+  <td>(a) Optional, (b) mandatory (chosen).</td>
+  <td>Cross-finalist riskiest assumption: users prefer cited violations over terse rule IDs. Making citation a schema invariant forces the &ldquo;micro-lesson&rdquo; UX even as the rulebook grows.</td>
+</tr>
+<tr>
+  <td>D10</td>
+  <td>v1 invocation is user-explicit; no auto-wiring as <code>PostToolUse</code> / <code>SessionStart</code> hook.</td>
+  <td>(a) Hook on day one, (b) opt-in hook v1, (c) manual-only v1 (chosen), (d) <code>/feature-sdlc</code> Phase 6.5 wiring v1.</td>
+  <td>Hooks default-on are noise risk (F2 premortem M-risk); user choice = invocation-time only v1; <code>/feature-sdlc</code> integration is a v2 design item.</td>
+</tr>
+<tr>
+  <td>D11</td>
+  <td>Skill conforms to <code>feature-sdlc/reference/skill-patterns.md §A–§F</code> as the standing acceptance criteria; Phase 6a <code>/skill-eval</code> gates merge.</td>
+  <td>(a) Custom criteria, (b) standard pmos criteria (chosen).</td>
+  <td>Every pmos skill conforms; the eval rubric is the binary forcing function. Citations and unique skill content do not exempt the structural rules.</td>
+</tr>
+</table>
+</section>
+
+<section id="success-metrics">
+<h2 id="success-metrics">Success Metrics</h2>
+<table>
+<tr><th>Metric</th><th>Baseline</th><th>Target</th><th>Measurement</th></tr>
+<tr><td>Substantive violations per audit run</td><td>0 (skill does not exist)</td><td>≥1 user-agreed-with violation per audit run on a real repo</td><td>Manual review of first 5 audit runs within 30 days of ship</td></tr>
+<tr><td>Citation-output rated &ldquo;educational&rdquo;</td><td>n/a</td><td>≥4 of 5 sample violations rated educational, not preachy</td><td>Non-author review of 5 rendered samples before merge</td></tr>
+<tr><td>L3 override accretion</td><td>0</td><td>≥1 user-authored L3 override in a real repo within 30 days</td><td>Inspect <code>.pmos/principles.yaml</code> commit history</td></tr>
+<tr><td>Delegation coverage</td><td>n/a</td><td>≥70% of v1 declarative rules delegate to existing tools</td><td>Gap-map artifact (<code>reference/delegation-map.md</code>) tally</td></tr>
+<tr><td>Skill-patterns conformance</td><td>n/a</td><td>0 residuals at Phase 6a (<code>/skill-eval</code>) before merge</td><td><code>state.yaml.phases.skill-eval.skill_eval.accepted_residuals[] == []</code> at merge time</td></tr>
+<tr><td>L1 rule count</td><td>n/a</td><td>≤15 (hard cap)</td><td>Doc-level invariant; audit-mode self-check fails if exceeded</td></tr>
+<tr><td>Smoke-test pass against named target repo</td><td>n/a</td><td>First audit run against <code>/Users/maneeshdhabria/Desktop/Projects/personal/book-companion</code> emits ≥1 user-agreed-with violation AND ≥0 false-positive blockers</td><td>Manual validation immediately after Phase 6 <code>/execute</code>; results recorded in <code>04_verify_report.html</code></td></tr>
+</table>
+</section>
+
+<section id="research-sources">
+<h2 id="research-sources">Research Sources</h2>
+<table>
+<tr><th>Source</th><th>Type</th><th>Key Takeaway</th></tr>
+<tr><td><a href="../../ideate/2026-05-13_architecture-principles-skill.html">Ideation artifact (2026-05-13)</a></td><td>Internal — ideation</td><td>Composite finalist #1+#2+#3+#8+#10; principles-as-data + ADR loop + harness-eng surface; vertical-slice with audit-first roadmap; cross-finalist riskiest assumptions enumerated.</td></tr>
+<tr><td><a href="https://github.com/mattpocock/skills/tree/main/skills/engineering/improve-codebase-architecture">Matt Pocock — <code>improve-codebase-architecture</code></a></td><td>External — prior art</td><td>Single-mode (audit), TS-only, ruleset-in-prompt. Defines the &ldquo;simple version&rdquo; baseline this skill differentiates from via tiered data + citations + ADR loop + multi-stack.</td></tr>
+<tr><td><a href="https://openai.com/index/harness-engineering/">OpenAI — Harness Engineering (2025)</a></td><td>External — thesis</td><td>Opinionated, uniform repo structure is the dominant lever for coding-agent productivity. Operationalized via this skill&rsquo;s house-style L2 rule packs (v1) and the future <code>scaffold</code> mode (v2+).</td></tr>
+<tr><td>Robert C. Martin — <em>Clean Architecture</em> (2017)</td><td>External — book</td><td>Source for L1 rules on Dependency Inversion (ch. 11), Layer Boundaries (ch. 17), Stable Dependencies Principle.</td></tr>
+<tr><td>Hunt &amp; Thomas — <em>The Pragmatic Programmer</em> (20th anniv. ed.)</td><td>External — book</td><td>Source for L1 rules on Orthogonality, DRY, Tracer Bullets, Configuration over Code.</td></tr>
+<tr><td>Eric Evans — <em>Domain-Driven Design</em> (2003)</td><td>External — book</td><td>Source for L1 rules on Bounded Contexts, Ubiquitous Language in code, Aggregate Boundaries.</td></tr>
+<tr><td>Kent Beck — <em>Tidy First?</em> (2024)</td><td>External — book</td><td>Source for L1 rules on structural-vs-behavioural change separation, small refactors as code review.</td></tr>
+<tr><td>Dependency Cruiser / ts-arch / ArchUnit</td><td>External — tools</td><td>v1 delegation targets for TS declarative checks (cycles, forbidden deps, layer violations).</td></tr>
+<tr><td>ruff / pylint / import-linter</td><td>External — tools</td><td>v1 delegation targets for Python declarative checks.</td></tr>
+<tr><td><a href="https://github.com/joelparkerhenderson/architecture-decision-record">Nygard ADR convention (Joel Parker Henderson)</a></td><td>External — pattern</td><td>Lightweight ADR template: Title / Status / Context / Decision / Consequences. The v1 ADR draft format.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code></td><td>Internal — pmos convention</td><td>Standing acceptance criteria §A–§F (frontmatter, description triggering, progressive disclosure, body content, scripts, platform-conditional frontmatter). Phase 6a <code>/skill-eval</code> rubric.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-eval.md</code></td><td>Internal — pmos convention</td><td>The 39-check binary rubric (deterministic [D] + LLM-judge [J] halves) used as the binary gate at Phase 6a.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/spec/</code> &amp; <code>plugins/pmos-toolkit/skills/verify/</code></td><td>Internal — adjacent skills</td><td>General-purpose design review (<code>/spec</code>) and post-impl behavioural verification (<code>/verify</code>) — <code>/architecture audit</code> is architecture-specific and complementary; future <code>spec-check</code> and <code>code-check</code> modes will plug in alongside, not replace.</td></tr>
+<tr><td><code>/Users/maneeshdhabria/Desktop/Projects/personal/book-companion</code> (user-named smoke-test target)</td><td>External — validation repo</td><td>Read-only shape scan (2026-05-13): monorepo with <code>backend/</code> (Python — 690 <code>.py</code>, ruff + pytest in use) + <code>frontend/</code> (Vue 3 + TypeScript — 408 <code>.ts</code> + 260 <code>.vue</code>). Already a pmos user (<code>.pmos/</code>, <code>CLAUDE.md</code> at 30KB). Surfaces three v1-relevant cases: (i) nested per-area stack markers (separate <code>backend/pyproject.toml</code> + <code>frontend/package.json</code> rather than top-level), (ii) Vue SFCs alongside TS — Dependency Cruiser handles <code>.ts</code> imports but not <code>.vue</code> components cleanly, (iii) <code>dist/</code> artefacts both in <code>backend/</code> and <code>frontend/</code> — audit must respect <code>.gitignore</code>.</td></tr>
+</table>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">Open Questions</h2>
+<table>
+<tr><th>#</th><th>Question</th></tr>
+<tr><td>OQ1</td><td>L1 universal rule list — exact 15 rules and their citations. (Decision point in <code>/spec</code>; draft list TBD before Phase 5.)</td></tr>
+<tr><td>OQ2</td><td>Which Python AST tool does the v1 layer-violation check delegate to? <code>import-linter</code> is the strongest candidate but requires explicit contracts; pylint's <code>cyclic-import</code> is weaker. Decide in <code>/spec</code> via the gap-map.</td></tr>
+<tr><td>OQ3</td><td>Should the L2 stack packs include framework-specific rules (e.g., L2-ts-react, L2-py-fastapi) or stay framework-agnostic in v1? Likely framework-agnostic v1; framework packs in v2.</td></tr>
+<tr><td>OQ4</td><td>How does <code>/architecture audit</code> compose with <code>/verify</code> when both run on the same repo — sibling reports or merged? v1: sibling (each writes its own artifact); merge is a v2+ <code>/verify</code> change.</td></tr>
+<tr><td>OQ5</td><td>Should accepted-ADR-driven L3 overrides include a <code>muted_at: ISO-8601</code> field so the audit can show &ldquo;previously muted, re-fired&rdquo; on a re-run? Defer to <code>/spec</code>.</td></tr>
+<tr><td>OQ6</td><td>The harness-engineering A/B test (ideation Next Step #1) — should it be run during <code>/spec</code> or after v1 ships? Run after ship as a 30-day success-metric check; not a gating prerequisite.</td></tr>
+<tr><td>OQ7</td><td>Naming of the per-repo overrides file — <code>.pmos/principles.yaml</code> (chosen, sits under existing <code>.pmos/</code>) vs <code>docs/architecture/principles.yaml</code> (more discoverable). Confirm in <code>/spec</code>.</td></tr>
+<tr><td>OQ8</td><td><strong>Smoke-test target:</strong> first real-repo validation runs against <code>/Users/maneeshdhabria/Desktop/Projects/personal/book-companion</code>. Should <code>/spec</code> include a read-only shape scan of that repo to bias the L1 + L2 rule selection toward violations it&rsquo;s likely to surface (motivation: avoid v1 shipping rules that don&rsquo;t fire on the only validation target)? Recommended yes, scoped to detecting stack, framework, and layout only — not authoring rules to the repo.</td></tr>
+</table>
+</section>
+
+<section id="review-log">
+<h2 id="review-log">Review Log</h2>
+<table>
+<tr><th>Loop</th><th>Findings</th><th>Changes Made</th></tr>
+<tr><td>1 (initial)</td><td>Initial draft — review loops to run after first user pass.</td><td>—</td></tr>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_architecture-principles-skill/01_requirements.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

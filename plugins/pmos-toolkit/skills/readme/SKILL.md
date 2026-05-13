@@ -284,6 +284,46 @@ In `scaffold` mode (per §4 FR-MODE-2), the runtime dispatches a Task subagent t
 
 See [§4: Mode resolution](#4-mode-resolution) for the upstream gate and [§6: Scaffold flow](#6-scaffold-flow) for the downstream consumer (T16 lands §6).
 
+### §6: Scaffold flow
+
+When §4 resolves mode to `scaffold` (or per-package `scaffold` within `audit+scaffold` composition), the runtime follows the steps below. The terminal output is a draft README (or a stub with TODO markers if data is insufficient), atomically written next to the manifest (per `scripts/workspace-discovery.sh` package paths).
+
+**Steps (per package).**
+
+1. **Repo-miner dispatch (§5).** Get the validated `RepoMinerResult`.
+
+2. **Workspace-discovery (`scripts/workspace-discovery.sh`).** Resolve `repo_type` from the manifest set (refines §5's `repo_type_hint`). For per-package scaffold (composition mode), pass the package path; for top-level greenfield, pass repo root.
+
+3. **≤6 Q user cap (FR-OUT-3).** For required fields the repo-miner returned `null` for AND that workspace-discovery can't infer, prompt the user via `AskUserQuestion`. Hard cap: **6 questions total** across the entire scaffold flow. If unresolved fields remain after 6 Q:
+   - Emit a **stub README** with `<!-- TODO(/readme): <field> — <reason> -->` markers at the points the missing data should go.
+   - Log: `scaffold: question cap reached (6/6); emitting stub with N TODO markers — re-run /readme after filling in`.
+   - This is the E2 path (empty repo, manifest only, no callable entry). Per spec §16 E2: never invent commands; never fabricate APIs.
+
+4. **Per-type opening shape.** Read `reference/opening-shapes.md`; select the shape matching `repo_type` (one of library / cli / plugin / app / monorepo-root / monorepo-package). Apply: hero line, what-it-does-in-60s, install-or-quickstart, runnable example, links. For `unknown` repo_type (T10 long-tail), use the library shape as a default and append `<!-- TODO(/readme): repo_type unresolved — verify scaffold defaults -->`.
+
+5. **Section spine.** Read `reference/section-schema.yaml`; emit sections in spine order (Title → Description/TLDR → Install → Quickstart → Usage → Contributing → License). For each section, fill from `RepoMinerResult`, workspace-discovery output, or user answers. Skip sections the repo-type variant drops (e.g., `cli` drops `## Use as a library`).
+
+6. **Rubric pass (§1).** Run the assembled draft through `rubric.sh --variant <repo_type>`. If <12/15 pass on a draft we're about to land, log warnings inline as TODO markers and continue (do not block — scaffold output is a starting point, not a polished README).
+
+7. **Simulated-reader pass (§2 + §3).** Dispatch the 3-persona pass against the draft. Friction items merge into the diff preview (step 8) as inline comments, NOT into the README content (the user decides whether to act on persona feedback after the diff).
+
+8. **Diff preview + confirm.** Emit the proposed README content to chat: ` ```markdown\n<full draft>\n``` ` followed by:
+   - A `Rubric:` line showing the X/15 score per the rubric pass.
+   - A `Simulated-reader:` block summarising friction per persona (1-line each).
+   - An `AskUserQuestion`: **Write README.md (Recommended)** / **Edit before writing** / **Discard**.
+   - Defer-tag this prompt with `<!-- defer-only: destructive -->` — writing a file is non-reversible from the skill's perspective.
+
+9. **Atomic write (FR-OUT-4).** On confirm, write `<package-path>/README.md` via temp-then-rename. Log to chat: `scaffold: wrote <path> (<bytes> bytes; <line> lines; rubric <X>/15)`.
+
+10. **Per-package iteration.** In `audit+scaffold` composition (D16), repeat steps 1-9 for each absent-README package. Question cap is **per-package** (each gets its own 6-Q budget), not shared across the run.
+
+**Anti-patterns specific to scaffold.** See [## Anti-Patterns](#anti-patterns) for the cross-cutting list; scaffold-specific rules:
+- Never invent commands or APIs not present in the code. Use TODO markers instead.
+- Never auto-pick a license — always defer to the user (per §5 step 4).
+- Never write the README without the diff-preview gate, even with `--auto-apply` (which mechanizes only banned-phrase strikethrough in audit mode, per `reference/rubric.yaml`).
+
+See [§4: Mode resolution](#4-mode-resolution), [§5: Repo-miner subagent](#5-repo-miner-subagent), and the rubric workflow in [§1: Single-file audit flow](#1-single-file-audit-flow).
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

@@ -284,6 +284,20 @@ TODO_RE = re.compile(r'\b(TODO|FIXME|XXX)\b')
 COMMENT_LINE_RE = re.compile(r'^\s*(//|#)')
 CODE_CHARS = set('(){};=')
 HEX = set('0123456789abcdef')
+# U009 hardcoded-credential patterns (block). Use \x22 / \x27 for the quote
+# class instead of literal ["'] — bash 3.2 (default macOS) miscounts unbalanced
+# single quotes across a $(... <<'PY' ...) heredoc once the body grows past a
+# threshold; \xNN keeps the literal quote count in the body even.
+U009_RE = re.compile(
+    r'AKIA[0-9A-Z]{16}'
+    r'|sk-[a-zA-Z0-9]{20,}'
+    r'|(?:api[-_]?key|secret|password|token)\s*=\s*[\x22\x27][A-Za-z0-9_\-]{16,}[\x22\x27]'
+    r'|-----BEGIN [A-Z ]+PRIVATE KEY-----',
+    re.IGNORECASE,
+)
+# U010 stub-on-main-path patterns (block). main-code-path = NOT under
+# tests/ or scripts/ — same path-segment rule as U004.
+U010_RE = re.compile(r'raise\s+NotImplementedError|throw\s+new\s+Error\([\x22\x27]TBD')
 
 def find_ts_function_spans(lines):
     """Return list of (start_line_1idx, end_line_1idx) for top-level functions."""
@@ -407,6 +421,36 @@ for rel in files:
                     "line": idx,
                     "message": "console.log / print( forbidden outside scripts/, tests/",
                     "source_citation": "principles.yaml#U004",
+                    "suppressed_by": None,
+                })
+
+    # U009 — hardcoded credential / API-key patterns (block-severity).
+    # All files in the rule pipeline; no path exclusion (secrets are an
+    # incident wherever they appear).
+    for idx, line in enumerate(lines, 1):
+        if U009_RE.search(line):
+            findings.append({
+                "rule_id": "U009",
+                "severity": "block",
+                "file": rel,
+                "line": idx,
+                "message": "hardcoded credential / API-key pattern detected",
+                "source_citation": "principles.yaml#U009",
+                "suppressed_by": None,
+            })
+
+    # U010 — NotImplementedError / throw new Error('TBD') on main code path
+    # (block-severity). Excludes paths under tests/ or scripts/.
+    if not in_excluded_path:
+        for idx, line in enumerate(lines, 1):
+            if U010_RE.search(line):
+                findings.append({
+                    "rule_id": "U010",
+                    "severity": "block",
+                    "file": rel,
+                    "line": idx,
+                    "message": "stub on main code path: NotImplementedError / TBD",
+                    "source_citation": "principles.yaml#U010",
                     "suppressed_by": None,
                 })
 
@@ -540,5 +584,7 @@ jq -n \
     rule_overrides: $loader.rule_overrides,
     exemptions: $loader.exemptions,
     scanned: ($loader.scanned | del(.files_for_rules)),
-    findings: ($f | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) }))
+    findings: ($f
+      | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
+      | sort_by({block:0, warn:1, info:2}[.severity] // 9, .file, .line, .rule_id))
   }'

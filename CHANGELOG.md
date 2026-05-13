@@ -1,5 +1,21 @@
 # Changelog
 
+## pmos-toolkit 2.45.0 — 2026-05-13
+
+### What's new
+
+- **`/ideate`** — new standalone utility that turns a fuzzy idea into a structured, pressure-tested one-page brief in ~10–15 minutes. Runs a 3-phase loop: **Frame** (HMW + JTBD + success signal + idea-type classification — `new` / `extend` / `fix`), **Expand** (auto-picks 2 techniques from {SCAMPER, Crazy 8s, First Principles, Analogous Inspiration, HMW riffs, Premortem-as-generator, Inversion} based on idea-type, generates 8–15 distinct one-line variants, lets the user pick 1–3 finalists), **Pressure-test** (always-on batch — premortem failure-modes table + Munger inversion bullets + assumption-mapping table; cross-cutting decision table when multiple finalists). Optional Phase 4 Refine. Writes a per-idea HTML artifact (markdown sidecar when `output_format=both`) to `{docs_path}/ideate/{YYYY-MM-DD}_<slug>.html` via the `_shared/html-authoring/` substrate; phase cursor stored in a `<meta name="pmos:ideate-phase">` tag for `--resume <path>` recovery. Standalone — does not load workstream context. Sits **outside** the requirements→spec→plan pipeline (it's pre-requirements) but suggests explicit handoffs in Next Steps (`/requirements`, `/grill`, `/backlog add`) by idea-type. Reference material in `reference/techniques.md`, `reference/idea-type-classifier.md`, `reference/pressure-test-battery.md`, `reference/slug-derivation.md`, `reference/artifact-template.html`.
+
+### Breaking changes
+
+None.
+
+### Internal
+
+- The skill was authored end-to-end via `/feature-sdlc skill` (the `/skill-sdlc` alias); requirements/spec/plan/skill-eval/verify artifacts ship under `docs/pmos/features/2026-05-13_ideation/` as the worked-example reference for future skill-mode runs.
+
+---
+
 ## pmos-toolkit 2.44.0 — 2026-05-13
 
 ### What's new

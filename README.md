@@ -41,7 +41,7 @@ pmos-toolkit/
 | `/pmos-toolkit:spec` | Technical specification from requirements — second pipeline stage |
 | `/pmos-toolkit:simulate-spec` | Pressure-test a spec via scenario trace, fitness critique, interface cross-reference, targeted pseudocode — optional validator between /spec and /plan |
 | `/pmos-toolkit:plan` | Execution plan from a spec — third pipeline stage |
-| `/pmos-toolkit:execute` | Implement a plan end-to-end with TDD and verification |
+| `/pmos-toolkit:execute` | Implement a plan end-to-end with TDD and verification — `--subagent-driven` runs a fresh implementer subagent per task, fans independent tasks out across parallel waves, and puts each task through a two-stage (spec + code-quality) review; default is inline single-agent execution. `/plan` asks which mode at close |
 | `/pmos-toolkit:verify` | Post-implementation verification gate — lint, test, multi-agent code review, interactive QA |
 | `/pmos-toolkit:complete-dev` | End-of-dev orchestrator — merge, deploy per repo norms, capture learnings, /changelog, version bump, commit, tag, push to all remotes. Supersedes legacy /push (which remains available this release; will be removed next release) |
 

@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grill — architecture-principles-skill requirements (2026-05-13)</title>
+  <link rel="stylesheet" href="../assets/style.css?v=2.46.0">
+  <script defer src="../assets/viewer.js?v=2.46.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Grill — architecture-principles-skill requirements (2026-05-13)</h1>
+    <a class="pmos-attribution pmos-attribution--toolbar"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="metadata">
+<h2 id="metadata">Metadata</h2>
+<dl>
+  <dt>Date</dt><dd>2026-05-13</dd>
+  <dt>Target</dt><dd><a href="../01_requirements.html"><code>01_requirements.html</code></a></dd>
+  <dt>Mode</dt><dd>Reviewer-subagent (FR-50/51/52)</dd>
+  <dt>Depth</dt><dd>standard</dd>
+  <dt>Findings</dt><dd>5 (3 block, 2 warn)</dd>
+</dl>
+</section>
+
+<section id="findings">
+<h2 id="findings">Findings (5)</h2>
+
+<h3 id="f1-l1-cap-failure-mode">F1 — L1 cap failure mode unspecified (block · <code>design-decisions</code>)</h3>
+<p><strong>Quote:</strong> &ldquo;<em>Hard cap on L1 universal at 15 rules; every rule requires a source citation; doc-level invariant enforced by audit-mode self-check</em>.&rdquo;</p>
+<p>The 16-th-rule failure-mode is unspecified. /spec must pick one of: abort schema-load · crash run · silently truncate · surface as info-severity. Otherwise /execute will invent the policy.</p>
+
+<h3 id="f2-gap-map-sequencing">F2 — Gap-map sequencing gates /plan estimates (block · <code>goals</code>)</h3>
+<p><strong>Quote:</strong> &ldquo;<em>≥70% of v1 declarative checks delegate to Dependency Cruiser / ts-arch / ruff (gap-map artifact in 02_spec)</em>.&rdquo;</p>
+<p>The 70% goal depends on a gap-map that this doc punts to /spec. /plan needs the gap-map to size LLM-judge surface area. Either elevate gap-map to a /spec Phase-1 deliverable, or weaken the goal to &ldquo;best-effort delegation&rdquo; until v2.</p>
+
+<h3 id="f3-vue-sfc-coverage">F3 — Vue SFC blind spot at named validation target (block · <code>alternate-journeys</code>)</h3>
+<p><strong>Quote:</strong> &ldquo;<em>.vue files are treated as TS for L1 semantic checks; declarative TS-tooling delegation (Dependency Cruiser) is run on …</em>&rdquo;</p>
+<p>book-companion is 260 <code>.vue</code> + 408 <code>.ts</code>. Declarative half covers &lt;40% of frontend modules. Pick (a) Vue SFC extractor, (b) drop Vue from named-target validation, or (c) surface coverage % in the user-facing report.</p>
+
+<h3 id="f4-gitignore-policy">F4 — .gitignore / generated-code policy never lands as a rule (warn · <code>research-sources</code>)</h3>
+<p><strong>Quote:</strong> &ldquo;<em>(iii) dist/ artefacts both in backend/ and frontend/ — audit must respect .gitignore</em>.&rdquo;</p>
+<p>Constraint surfaced in research but no Journey / Open Question / Design Decision lands it. /execute will need an explicit policy (read .gitignore? hardcode a deny-list? both?) or surface thousands of false positives from <code>node_modules/</code>, <code>.venv/</code>, <code>dist/</code>, <code>.pytest_cache/</code>, <code>.ruff_cache/</code>.</p>
+
+<h3 id="f5-adr-mute-mechanism">F5 — ADR-driven mute mechanism is hand-waved (warn · <code>alternate-journeys</code>)</h3>
+<p><strong>Quote:</strong> &ldquo;<em>previously-block violations now resolved appear in the report as &ldquo;previously gated by ADR-NNNN, now passes&rdquo;</em>.&rdquo;</p>
+<p>L3 is a tier-precedence override (rule-level), not a per-site mute layer. Three plausible designs: per-site exemption list (file:line keys) · rule-level mute flag · ADR-to-rule-id mapping table. Pick one in /spec.</p>
+</section>
+
+<section id="recommendation">
+<h2 id="recommendation">Recommendation</h2>
+<p>Proceed to <code>/spec</code>. Surface F1–F5 as explicit FR placeholders in <code>02_spec.html</code> so <code>/plan</code> can size them. Do not re-grill until <code>/spec</code> lands.</p>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_architecture-principles-skill/grills/2026-05-13_01_requirements.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.43.0: /survey-analyse skill
+
+Sister to `/survey-design`: turns a raw survey response export (CSV / TSV / XLSX / XLS / PDF) into a defensible HTML report.
+
+### What's new
+
+- **`/survey-analyse`** — new standalone utility. Eight phases: ingest → user-confirmed schema (column-by-column; no silent auto-classification) → cleaning (straightliners / speeders / incompletes / duplicates / attention checks, with rule counts logged) → per-question analysis via **bundled Python helper modules** under `scripts/helpers/` (`categorical`, `multi_select`, `likert`, `nps`, `ranking`, `matrix`, `numeric`, `stats`, `clean`, `ingest`, `schema`, `pii`) — pure stdlib + `openpyxl` for xlsx; each ships `--selftest`. The LLM authors a per-run `analysis.py` that imports the helpers and runs it via Bash with one consolidated permission ask → open-end thematic coding via **subagent-per-question** (Braun & Clarke 6-phase contract; structured JSON return validated against the verbatim ids) → whole-survey cross-tabs with **Holm correction applied by default** across each segment family (plain-language framing in the report body; technical term in Methodology; `--raw-p-only` opts out) → HTML report through the `_shared/html-authoring/` substrate with executive summary, methodology & limitations, key findings, per-question, open-end themes, cross-tab appendix, data-quality log. Numbers are deterministic across runs on the same cleaned input; narrative + theme names are LLM-generated and disclosed as such. PII in verbatim quotes is **detect-and-warn only** — never auto-redacted. Bundled `reference/` files cover the per-question-type playbook, the thematic-coding contract, the cross-survey statistics (Holm, MoE, weighting), and the cleaning / reporting standards.
+
+### Breaking changes
+
+None.
+
+### Migration
+
+None — additive. New skill auto-discovered from `plugins/pmos-toolkit/skills/`.
+
+---
+
 ## 2026-05-13 — pmos-toolkit 2.42.0: /artifact HTML output parity
 
 `/artifact` produces HTML artifacts that look and behave like every other pipeline skill's HTML output — same toolbar, same fonts, same anchors, same companion files. Eight gaps closed:

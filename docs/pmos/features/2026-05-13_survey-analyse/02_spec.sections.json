@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "artifact": "02_spec.html",
+  "ids": ["meta", "architecture", "file-layout", "run-folder", "control-flow", "api-contracts", "api-helpers", "api-analysispy", "api-themes-subagent", "functional-requirements", "fr-from-requirements", "fr-from-skill-patterns", "non-functional", "testing-strategy", "open-items"],
+  "sections": [
+    {"id": "meta", "level": 2, "title": "Meta", "parent_id": null},
+    {"id": "architecture", "level": 2, "title": "Architecture", "parent_id": null},
+    {"id": "file-layout", "level": 3, "title": "File layout (target)", "parent_id": "architecture"},
+    {"id": "run-folder", "level": 3, "title": "Run folder layout", "parent_id": "architecture"},
+    {"id": "control-flow", "level": 3, "title": "Control flow (8 phases)", "parent_id": "architecture"},
+    {"id": "api-contracts", "level": 2, "title": "API contracts", "parent_id": null},
+    {"id": "api-helpers", "level": 3, "title": "Helper module signatures", "parent_id": "api-contracts"},
+    {"id": "api-analysispy", "level": 3, "title": "Per-run analysis.py shape", "parent_id": "api-contracts"},
+    {"id": "api-themes-subagent", "level": 3, "title": "Phase 5 subagent contract", "parent_id": "api-contracts"},
+    {"id": "functional-requirements", "level": 2, "title": "Functional Requirements", "parent_id": null},
+    {"id": "fr-from-requirements", "level": 3, "title": "From the requirements doc", "parent_id": "functional-requirements"},
+    {"id": "fr-from-skill-patterns", "level": 3, "title": "From skill-patterns.md", "parent_id": "functional-requirements"},
+    {"id": "non-functional", "level": 2, "title": "Non-Functional Requirements", "parent_id": null},
+    {"id": "testing-strategy", "level": 2, "title": "Testing strategy", "parent_id": null},
+    {"id": "open-items", "level": 2, "title": "Open items deferred to /plan", "parent_id": null}
+  ]
+}

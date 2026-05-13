@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Grill Report — 01_requirements (survey-analyse)</title>
+  <link rel="stylesheet" href="../assets/style.css?v=2.38.0">
+  <script defer src="../assets/viewer.js?v=2.38.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Grill Report — 01_requirements (survey-analyse)</h1>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="meta" data-pmos-section="meta">
+  <h2 id="meta">Meta</h2>
+  <dl>
+    <dt>Target</dt><dd><code>../01_requirements.html</code></dd>
+    <dt>Depth</dt><dd>standard</dd>
+    <dt>Questions asked</dt><dd>6</dd>
+    <dt>Date</dt><dd>2026-05-13</dd>
+    <dt>Outcome</dt><dd>Major redesign of D3 / Phase 4 / Phase 5; minor edits to Phase 2 / Phase 6 / Goals / Non-Goals / OQ</dd>
+  </dl>
+</section>
+
+<section id="resolved" data-pmos-section="resolved">
+  <h2 id="resolved">Resolved</h2>
+  <ol>
+    <li><strong>D3 stats engine — fully redesigned.</strong> Drop pandas+scipy as hard deps. Ship bundled per-question-type Python helper modules (<code>categorical.py</code>, <code>multi_select.py</code>, <code>likert.py</code>, <code>nps.py</code>, <code>ranking.py</code>, <code>matrix.py</code>, <code>numeric.py</code>) — pure stdlib + small deps (<code>openpyxl</code> for xlsx); hand-rolled chi-square / column-z-tests. Per run, the LLM authors an <code>analysis.py</code> that imports the helpers and runs via Bash with one consolidated permission ask; helpers emit JSON; LLM narrates on top.</li>
+    <li><strong>Phase 5 (open-end coding) — clarified.</strong> Subagent-per-question for candidate themes, then a thematic-grouping pass consolidates across themes; structured <code>{theme, count, quotes}</code> output.</li>
+    <li><strong>Schema inference — always require user confirmation</strong> before Phase 4 (drop the heuristic-only path).</li>
+    <li><strong>PII — detect-and-warn-only.</strong> Regex-flag emails/phones/proper-name patterns; surface a chat-side count; no auto-redaction.</li>
+    <li><strong>Multiple comparisons — apply Holm correction by default;</strong> report both raw and adjusted p; plain-language framing in the body (technical term stays in Methodology).</li>
+    <li><strong>Reproducibility — numbers deterministic; narrative non-deterministic.</strong> Helper-computed numeric tables are byte-identical across runs; <code>analysis.py</code> is saved as the audit artifact; theme names, exec-summary narrative, quote selection will vary.</li>
+  </ol>
+</section>
+
+<section id="open-deferred" data-pmos-section="open-deferred">
+  <h2 id="open-deferred">Open / Deferred</h2>
+  <ul>
+    <li><strong>OQ1 (numpy/pandas/scipy pinning)</strong> — obsoleted by the redesign; replace with: pin <code>openpyxl</code> minimum version in the helper-module docstrings; no <code>requirements.txt</code>.</li>
+    <li><strong>OQ4 (longitudinal mode)</strong> — still deferred to v2.</li>
+  </ul>
+</section>
+
+<section id="gaps" data-pmos-section="gaps">
+  <h2 id="gaps">Gaps surfaced — must update 01_requirements.html before /spec</h2>
+  <ul>
+    <li><strong>D3</strong> — full rewrite to helper-modules + LLM-authored analysis.py + Bash-runs-it model.</li>
+    <li><strong>Phase 4 description</strong> — rewrite: helpers + per-run script + JSON output → LLM narrates.</li>
+    <li><strong>Phase 5 description</strong> — rewrite: subagent-per-question + thematic grouping (replace the Braun &amp; Clarke 6-phase hand-wave with the concrete subagent contract).</li>
+    <li><strong>Phase 2 description</strong> — rewrite: schema is always user-confirmed.</li>
+    <li><strong>Phase 6 description</strong> — add Holm-correction default + plain-language framing.</li>
+    <li><strong>Goals</strong> — update reproducibility goal: numbers deterministic, narrative not.</li>
+    <li><strong>Non-Goals</strong> — add "no auto-redaction of PII in verbatims (warn only)".</li>
+    <li><strong>OQ table</strong> — drop OQ1; rephrase OQ2 to "applied Holm by default, raw via flag".</li>
+  </ul>
+</section>
+
+<section id="next-step" data-pmos-section="next-step">
+  <h2 id="next-step">Recommended next step</h2>
+  <p>Update <code>01_requirements.html</code> with the 8 edits above (Review Log loop 2); commit; then proceed to <strong>/spec</strong>.</p>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: grills/2026-05-13_01_requirements.html</span>
+  </footer>
+</body>
+</html>

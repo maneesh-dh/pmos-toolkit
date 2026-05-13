@@ -323,7 +323,7 @@ The `Before → After` "Words" delta is computed against the **original ingested
    - URL/inline/Notion inputs: skip the replace prompt.
    - If the HTML fidelity check failed (best-effort HTML), do **not** default the prompt to yes — print the `⚠` warning and let the user decide explicitly.
 
-## Phase 8 — Capture Learnings
+## Phase 8: Capture Learnings
 
 **Run this BEFORE printing the Phase 7 summary block.** The summary's `Learnings captured: <N>` line cannot be filled honestly otherwise. The order is: Phase 6 apply → Phase 7 file write → Phase 8 reflection → Phase 7 summary block + replace prompt.
 

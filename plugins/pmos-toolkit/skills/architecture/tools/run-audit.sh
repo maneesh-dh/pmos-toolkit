@@ -621,6 +621,67 @@ findings_json=$(jq -n \
   --argjson b "$depcruise_findings" \
   '$a + $b')
 
+# ── L2 delegated tool: ruff (T10, FR-31/32/33) ───────────────────────────────
+# Runs only when stacks_detected includes "py". Graceful-degrade per FR-32:
+# missing `ruff` on PATH → tools_skipped += "ruff", findings=[].
+# Invocation: `ruff check --output-format=json --quiet --select=TID252,F401,F403,F405,B006 $SCAN_ROOT`
+# from within $SCAN_ROOT so a project's own pyproject (e.g. ban-relative-imports
+# setting for TID252) is honoured. `--quiet` suppresses the trailing status
+# line that ruff 0.15+ otherwise prints to stdout (would corrupt JSON parse).
+# Code mapping per principles.yaml: TID252→PY001, F401→PY002,
+# F403/F405→PY003, B006→PY004.
+ruff_findings='[]'
+if echo ",$STACKS," | grep -q ',py,'; then
+  echo "[delegated] ruff: check available" 1>&2
+  if command -v ruff >/dev/null 2>&1 && ruff --version >/dev/null 2>&1; then
+    rf_timeout=""
+    if command -v timeout >/dev/null 2>&1; then rf_timeout="timeout 60"
+    elif command -v gtimeout >/dev/null 2>&1; then rf_timeout="gtimeout 60"
+    fi
+    scan_abs="$(cd "$SCAN_ROOT" && pwd)"
+    echo "[delegated] $rf_timeout ruff check --output-format=json --quiet --select=TID252,F401,F403,F405,B006 $scan_abs" 1>&2
+    rf_start=$(date +%s)
+    rf_out=$(cd "$SCAN_ROOT" && $rf_timeout ruff check \
+      --output-format=json --quiet \
+      --select=TID252,F401,F403,F405,B006 \
+      "$scan_abs" 2>/tmp/ruff.err) || true
+    rf_end=$(date +%s)
+    echo "[delegated] duration: $((rf_end-rf_start))s" 1>&2
+    if [ -n "$rf_out" ]; then
+      ruff_findings=$(echo "$rf_out" | jq --arg root "$scan_abs" '[.[] | {
+        rule_id: (
+          if .code == "TID252" then "PY001"
+          elif .code == "F401" then "PY002"
+          elif .code == "F403" or .code == "F405" then "PY003"
+          elif .code == "B006" then "PY004"
+          else ("PY-" + .code) end
+        ),
+        file: (.filename | sub("^" + $root + "/?"; "")),
+        line: (.location.row // 1),
+        severity: (if .severity == "error" then "warn" else "info" end),
+        message: .message,
+        source_citation: (
+          if .code == "TID252" then "principles.yaml#PY001"
+          elif .code == "F401" then "principles.yaml#PY002"
+          elif .code == "F403" or .code == "F405" then "principles.yaml#PY003"
+          elif .code == "B006" then "principles.yaml#PY004"
+          else ("ruff#" + .code) end
+        ),
+        suppressed_by: null
+      }]')
+    fi
+  else
+    echo "[warn] ruff not available; skipping Py L2 declarative checks (FR-32)" 1>&2
+    TOOLS_SKIPPED+=("ruff")
+  fi
+fi
+
+# Merge ruff findings.
+findings_json=$(jq -n \
+  --argjson a "$findings_json" \
+  --argjson b "$ruff_findings" \
+  '$a + $b')
+
 # Build tools_skipped JSON array (empty when no tool was skipped).
 tools_skipped_json='[]'
 if [ "${#TOOLS_SKIPPED[@]}" -gt 0 ]; then

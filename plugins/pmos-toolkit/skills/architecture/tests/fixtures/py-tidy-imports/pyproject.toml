@@ -1,0 +1,11 @@
+[project]
+name = "py-tidy-imports-fixture"
+version = "0.0.0"
+description = "T10 fixture — relative-import + B006; ruff must flag PY-prefixed rules."
+requires-python = ">=3.9"
+
+[tool.ruff]
+src = ["src"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"

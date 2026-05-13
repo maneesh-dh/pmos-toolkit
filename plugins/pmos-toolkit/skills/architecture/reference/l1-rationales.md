@@ -1,5 +1,18 @@
 # L1 Universal Rules — Rationales
 
+## Contents
+
+- [U001 — file LOC > 500](#u001--file-loc--500)
+- [U002 — function LOC > 100](#u002--function-loc--100)
+- [U003 — positional args > 4](#u003--positional-args--4)
+- [U004 — debug logs in src/](#u004--debug-logs-in-src)
+- [U005 — stale TODOs](#u005--stale-todos)
+- [U006 — path depth > 4](#u006--path-depth--4)
+- [U007 — missing file-purpose comment](#u007--missing-file-purpose-comment)
+- [U008 — commented-out code blocks](#u008--commented-out-code-blocks)
+- [U009 — hardcoded credentials (BLOCK)](#u009--hardcoded-credentials-block)
+- [U010 — NotImplementedError on main path (BLOCK)](#u010--notimplementederror-on-main-path-block)
+
 The L1 set is plugin-owned (`principles.yaml`), capped at 15 rules (FR-21), and applies to every repo regardless of stack. v1 ships 10 rules. Each section below carries the rule statement, the *why*, the source citation, and an example violation. Rules surface via the `grep`-family evaluators in `tools/run-audit.sh`.
 
 L3 (project-owned, at `<repo>/.pmos/architecture/principles.yaml`) may relax severity (to `warn` or `info`) or add exemption rows, but may NOT silently drop a universal rule (FR-11).

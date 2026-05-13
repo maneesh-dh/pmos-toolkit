@@ -12,7 +12,13 @@ Audits a repository against tiered architectural principles and emits a JSON rep
 
 **Announce at start:** "Using /architecture to audit the repo against tiered principles."
 
-The skill is read-mostly. It writes ADR files (under `<repo>/docs/adrs/`, capped at 5 per run) and a JSON report to stdout. It does NOT modify source code. The skill's own shape conforms to the generic skill-authoring conventions at `plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md §A–§F` (the standing acceptance criteria).
+The skill is read-mostly. It writes ADR files (under `<repo>/docs/adr/`, capped at 5 per run) and a JSON report to stdout. It does NOT modify source code. The skill's own shape conforms to the generic skill-authoring conventions at `plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md §A–§F` (the standing acceptance criteria).
+
+At Phase 0, the skill reads `~/.pmos/learnings.md` if present; entries under `## /architecture` factor into its approach (skill body wins on conflict; surface conflicts to the user before applying).
+
+## Track Progress
+
+This skill runs 6 phases sequentially against the resolved scan root. Use your agent's task-tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code) to create one task per phase, mark each in-progress when entered, and completed when its artifact lands. If no task tracker is available, the stderr summary line + the JSON report are the durable progress record.
 
 ## Platform Adaptation
 
@@ -85,7 +91,7 @@ L3 may carry `exemptions:` rows that whitelist a `(rule, file)` pair, optionally
 ADR promotion (FR-60/61/62/63):
 
 - Default: every `block`-severity finding without a matching exemption is a candidate. Capped at 5 ADRs written per run (`adrs_truncated[]` lists the dropped ones).
-- ADRs are written to `<scan_root>/docs/adrs/NNNN-<slug>.md` using the Nygard template at [`reference/adr-template.md`](reference/adr-template.md). The `NNNN` is monotonic against the existing ADR directory.
+- ADRs are written to `<scan_root>/docs/adr/NNNN-<slug>.md` using the Nygard template at [`reference/adr-template.md`](reference/adr-template.md). The `NNNN` is monotonic against the existing ADR directory.
 - Atomic write: temp file + `rename(2)`. The skill NEVER overwrites an existing ADR file.
 - `--no-adr` suppresses writes entirely.
 
@@ -113,6 +119,10 @@ Stdout is the canonical artifact: a single JSON object with the shape locked in 
 ```
 
 Stderr carries a human summary: counts by severity, files scanned, ADRs written, tools errored. Findings are sorted (FR-73); the JSON is byte-identical across runs when source state is unchanged — see `tools/check-determinism.sh`.
+
+## Phase 7: Capture Learnings
+
+After the report is emitted, reflect on whether this run surfaced anything worth capturing about `/architecture` itself — false-positive rules, missed coverage gaps, exemption-row gotchas, ADR-promotion friction. Append entries under `## /architecture` in `~/.pmos/learnings.md` for future runs. Proposing zero learnings is a valid outcome; the gate is that the reflection happens.
 
 ## Anti-Patterns (DO NOT)
 

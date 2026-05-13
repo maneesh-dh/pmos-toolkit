@@ -21,11 +21,10 @@ run_one() {
   local assert="$fixture/.assert"
   [ -f "$assert" ] || return 2  # no .assert → skip
 
+  local audit_cmd="bash $SKILL_DIR/tools/run-audit.sh ."
   if (
     cd "$fixture" &&
-    SKILL_DIR="$SKILL_DIR" \
-    FIXTURE="$name" \
-    AUDIT="bash $SKILL_DIR/tools/run-audit.sh ." \
+    export SKILL_DIR FIXTURE="$name" AUDIT="$audit_cmd" &&
     bash .assert
   ) >"$TMP" 2>&1; then
     echo "ok  $name"

@@ -32,9 +32,13 @@ trap 'rm -rf "$TMPDIR_"' EXIT
 # Strip ephemeral fields: run.id, run.started_at, run.finished_at, run.duration_ms.
 STRIP='del(.run.id, .run.started_at, .run.finished_at, .run.duration_ms)'
 
-bash "$RUN_AUDIT" "$SCAN_ROOT" 2>/dev/null | jq "$STRIP" > "$TMPDIR_/a.json"
+# --no-adr suppresses ADR-write side effects so two consecutive runs against the
+# same scan root produce byte-identical findings (FR-67 + FR-73). With ADR writes
+# enabled, the second run sees the first run's ADRs on disk and increments NNNN,
+# which is correct behavior but not a determinism violation.
+bash "$RUN_AUDIT" --no-adr "$SCAN_ROOT" 2>/dev/null | jq "$STRIP" > "$TMPDIR_/a.json"
 sleep 1
-bash "$RUN_AUDIT" "$SCAN_ROOT" 2>/dev/null | jq "$STRIP" > "$TMPDIR_/b.json"
+bash "$RUN_AUDIT" --no-adr "$SCAN_ROOT" 2>/dev/null | jq "$STRIP" > "$TMPDIR_/b.json"
 
 if diff -q "$TMPDIR_/a.json" "$TMPDIR_/b.json" >/dev/null; then
   echo "OK: determinism check passed (2 runs against $SCAN_ROOT yielded byte-identical output)." >&2

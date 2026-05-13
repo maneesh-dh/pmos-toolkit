@@ -208,6 +208,41 @@ This subsection documents the protocol /readme follows after `rubric.sh` returns
 - Used exclusively by `tests/mocks/simulated_reader_stub.sh` for the FR-SR-3 contract test (verifies the parent substring-grep correctly hard-fails on a deliberately altered quote).
 - DO NOT use in production — the env var is unset in the default skill prompt.
 
+### §4: Mode resolution
+
+Modes drive the top-level flow of `/readme`: which subagent dispatches fire, what artifacts get written, how the user is prompted. The resolver runs **after** §1's argv loop has parsed flags.
+
+**FR-MODE-1 — Three primary modes:** `audit` / `scaffold` / `update`. Exactly one mode (or a composition — see FR-MODE-3) is active per invocation.
+
+**FR-MODE-2 — Resolution truth table.**
+
+| Input | README present? | Flags | Resolved mode | Source label |
+|---|---|---|---|---|
+| `/readme path/to/file.md` | yes | none | `audit` | `default-readme-present` |
+| `/readme` (no path, monorepo root) | depends per package | none | per-package — see FR-MODE-3 | `default-readme-absent` (where absent) |
+| `/readme` (greenfield repo) | no | none | `scaffold` | `default-readme-absent` |
+| `/readme` | yes | `--scaffold` | `audit+scaffold` (composition, D16) | `cli` |
+| `/readme` | no | `--audit` | exit 64: `--audit requires a README; pass --scaffold or omit flags` | — |
+| `/readme` | any | `--update <range>` | `update` | `cli` |
+| `/readme` | any | `--update <range> --audit` (or `--scaffold`) | exit 64: `--update is mutually exclusive with --audit/--scaffold` | — |
+
+**FR-MODE-3 — Audit+scaffold composition (D16).** In monorepos where SOME packages have a README and SOME do not, the runtime resolves `audit` for present packages and `scaffold` for absent ones, in a single invocation. Per-package modes are emitted to the chat log:
+```
+mode: audit+scaffold (source: cli)
+  - packages/foo: audit (README present)
+  - packages/bar: scaffold (README absent)
+```
+The per-package loop processes each in declared order (per `workspace-discovery.sh` output). `--scope` may narrow the loop to specific packages (downstream task, T22).
+
+**FR-MODE-4 — Observability.** Emit ONE chat-log line per invocation, format: `mode: <resolved> (source: cli|default-readme-present|default-readme-absent)`. For audit+scaffold composition, emit the multi-line form above. Resolution decisions are auditable in chat without verbose logging.
+
+**Error cases.**
+- `--audit` + no README → exit 64 with the message in the table.
+- `--update` + `--audit` or `--scaffold` → exit 64 with the mutex message.
+- `--update` without a `<range>` arg → exit 64: `--update requires a commit range (e.g. main..HEAD)`.
+
+See [§1: Single-file audit flow](#1-single-file-audit-flow) for argv parsing and [§5: Repo-miner subagent](#5-repo-miner-subagent) for scaffold-mode data gathering (T15).
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

@@ -258,32 +258,145 @@ PY
 
 START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# ── Scanner (T5: enumerated-file-driven; T6+ adds the rest of the rules) ─────
-# Iterate scanned.files_for_rules and run the T1 U004 grep per-file. Severity is
-# rewritten post-grep by jq using effective_severity so L3 demotes/promotes
-# flow through.
-SCANNED_FILES_LIST="$(jq -r '.scanned.files_for_rules[]' <<<"$LOADER_JSON")"
+# ── L1 evaluator (T6 — U001/U002/U003/U006 + U004 from T5) ───────────────────
+# Single python pass over scanned.files_for_rules. Severity is rewritten in the
+# final jq -n via effective_severity, so L3 demotes/promotes flow through.
+# Plan §T6 step 3 calls for bash/awk dispatchers; deviated to python because
+# U002 (brace-balanced function-body length) and U003 (paren-balanced arg list)
+# are stateful per-file and bash awk for both is illegible vs. a 60-LOC python
+# block. Result is identical and verifiable against plan §T6 inline-verify.
+findings_json="$(
+  python3 - "$LOADER_JSON" "$SCAN_ROOT" <<'PY'
+import json, os, re, sys
 
-findings_json='[]'
-if [ -n "$SCANNED_FILES_LIST" ]; then
-  findings_json="$(
-    {
-      while IFS= read -r rel; do
-        [ -n "$rel" ] || continue
-        # U004 applies to .ts/.tsx only; ignore other supported exts here.
-        if [[ "$rel" != *.ts && "$rel" != *.tsx ]]; then
-          continue
-        fi
-        full="$SCAN_ROOT/$rel"
-        [ -f "$full" ] || continue
-        { grep -n 'console\.log' "$full" 2>/dev/null || true; } \
-          | awk -F: -v f="$rel" '{
-              printf "{\"rule_id\":\"U004\",\"severity\":\"warn\",\"file\":\"%s\",\"line\":%s,\"message\":\"console.log forbidden in src/\",\"source_citation\":\"principles.yaml#U004\",\"suppressed_by\":null}\n", f, $1
-            }'
-      done <<<"$SCANNED_FILES_LIST"
-    } | jq -s .
-  )"
-fi
+loader = json.loads(sys.argv[1])
+scan_root = sys.argv[2]
+files = loader["scanned"]["files_for_rules"]
+
+CONSOLE_LOG = re.compile(r'console\.log')
+TS_FN_START = re.compile(r'^\s*(?:export\s+)?(?:async\s+)?function\s+\w+')
+TS_FN_OR_CTOR_SIG = re.compile(r'(?:function\s+\w+|constructor)\s*\(([^)]*)\)')
+
+def find_ts_function_spans(lines):
+    """Return list of (start_line_1idx, end_line_1idx) for top-level functions."""
+    spans = []
+    i = 0
+    n = len(lines)
+    while i < n:
+        if TS_FN_START.match(lines[i]):
+            start = i
+            depth = 0
+            saw_open = False
+            j = i
+            while j < n:
+                for ch in lines[j]:
+                    if ch == '{':
+                        depth += 1
+                        saw_open = True
+                    elif ch == '}':
+                        depth -= 1
+                if saw_open and depth <= 0:
+                    break
+                j += 1
+            spans.append((start + 1, j + 1))
+            i = j + 1
+        else:
+            i += 1
+    return spans
+
+findings = []
+
+for rel in files:
+    full = os.path.join(scan_root, rel)
+    if not os.path.isfile(full):
+        continue
+    try:
+        with open(full, encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except OSError:
+        continue
+
+    # U001 — file > 500 LOC (all supported exts)
+    if len(lines) > 500:
+        findings.append({
+            "rule_id": "U001",
+            "severity": "warn",
+            "file": rel,
+            "line": 1,
+            "message": f"file is {len(lines)} lines; exceeds 500-line cap",
+            "source_citation": "principles.yaml#U001",
+            "suppressed_by": None,
+        })
+
+    # U006 — path depth > 4 after src/
+    parts = rel.replace("\\", "/").split("/")
+    if parts and parts[0] == "src" and (len(parts) - 1) > 4:
+        findings.append({
+            "rule_id": "U006",
+            "severity": "warn",
+            "file": rel,
+            "line": 1,
+            "message": f"path depth {len(parts) - 1} after src/ exceeds 4",
+            "source_citation": "principles.yaml#U006",
+            "suppressed_by": None,
+        })
+
+    is_ts = rel.endswith((".ts", ".tsx"))
+
+    if is_ts:
+        # U004 — console.log forbidden in src/
+        for idx, line in enumerate(lines, 1):
+            if CONSOLE_LOG.search(line):
+                findings.append({
+                    "rule_id": "U004",
+                    "severity": "warn",
+                    "file": rel,
+                    "line": idx,
+                    "message": "console.log forbidden in src/",
+                    "source_citation": "principles.yaml#U004",
+                    "suppressed_by": None,
+                })
+
+        # U002 — TS function body > 100 LOC
+        for start, end in find_ts_function_spans(lines):
+            if (end - start + 1) > 100:
+                findings.append({
+                    "rule_id": "U002",
+                    "severity": "warn",
+                    "file": rel,
+                    "line": start,
+                    "message": f"function body is {end - start + 1} lines; exceeds 100-line cap",
+                    "source_citation": "principles.yaml#U002",
+                    "suppressed_by": None,
+                })
+
+        # U003 — function or constructor with > 4 args
+        # Plan §goal: ">4 args" (≥5 args). 5 args = 4 commas, so commas > 3.
+        # (Plan step text "count commas; emit when > 4" was a one-off slip
+        # vs. the goal; the inline verification expects U003 to fire on the
+        # 5-arg constructor fixture. Following goal-text.)
+        text = "".join(lines)
+        for m in TS_FN_OR_CTOR_SIG.finditer(text):
+            args = m.group(1).strip()
+            if not args:
+                continue
+            commas = args.count(",")
+            arg_count = commas + 1
+            if arg_count > 4:
+                line_no = text[:m.start()].count("\n") + 1
+                findings.append({
+                    "rule_id": "U003",
+                    "severity": "warn",
+                    "file": rel,
+                    "line": line_no,
+                    "message": f"function/constructor has {arg_count} args; exceeds 4",
+                    "source_citation": "principles.yaml#U003",
+                    "suppressed_by": None,
+                })
+
+print(json.dumps(findings))
+PY
+)"
 
 END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 

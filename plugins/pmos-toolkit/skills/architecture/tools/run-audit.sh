@@ -12,6 +12,19 @@ command -v jq >/dev/null 2>&1 || {
   exit 64
 }
 
+command -v python3 >/dev/null 2>&1 || {
+  echo "ERROR: /architecture requires python3 (with PyYAML). Install, then re-run." >&2
+  exit 64
+}
+
+# Plugin-shipped principles.yaml — validator stub (T2). T3 wires the full loader.
+SKILL_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+PLUGIN_YAML="${RUN_AUDIT_PLUGIN_YAML:-$SKILL_DIR/principles.yaml}"
+python3 -c "import sys, yaml; yaml.safe_load(open(sys.argv[1]))" "$PLUGIN_YAML" 2>/tmp/run-audit-yaml.err || {
+  echo "ERROR: plugin principles.yaml at $PLUGIN_YAML failed to parse: $(cat /tmp/run-audit-yaml.err)" >&2
+  exit 64
+}
+
 START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 findings_json="$(

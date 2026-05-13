@@ -12,7 +12,7 @@ Audits a repository against tiered architectural principles and emits a JSON rep
 
 **Announce at start:** "Using /architecture to audit the repo against tiered principles."
 
-The skill is read-mostly. It writes ADR files (under `<repo>/docs/adrs/`, capped at 5 per run) and a JSON report to stdout. It does NOT modify source code. Cite `reference/skill-patterns.md §A–§F` as the standing acceptance criteria for this skill's own shape.
+The skill is read-mostly. It writes ADR files (under `<repo>/docs/adrs/`, capped at 5 per run) and a JSON report to stdout. It does NOT modify source code. The skill's own shape conforms to the generic skill-authoring conventions at `plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md §A–§F` (the standing acceptance criteria).
 
 ## Platform Adaptation
 

@@ -13,18 +13,20 @@
     "satisfaction-signals",
     "solution-direction",
     "overview",
+    "monorepo-cross-file-rules",
     "three-candidate-approaches-considered",
     "user-journeys",
     "primary-journey-audit-an-existing-readme",
     "primary-journey-scaffold",
     "alternate-journey-monorepo",
-    "alternate-journey-update-mode-v2-deferred",
+    "alternate-journey-update-mode",
     "error-journeys",
     "empty-states-and-edge-cases",
     "design-decisions",
     "success-metrics",
     "research-sources",
     "open-questions",
-    "review-log"
+    "review-log",
+    "6-gate-exit-status"
   ]
 }

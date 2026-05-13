@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="pmos:artifact-kind" content="grill-report">
+<meta name="pmos:target" content="../01_requirements.html">
+<title>Grill — /readme requirements (2026-05-13)</title>
+<style>
+body{font-family:-apple-system,system-ui,Segoe UI,Roboto,sans-serif;max-width:920px;margin:2rem auto;padding:0 1rem;line-height:1.55;color:#222}
+h1{border-bottom:2px solid #333;padding-bottom:.4rem}
+h2{margin-top:2rem;border-bottom:1px solid #ccc;padding-bottom:.2rem}
+h3{margin-top:1.4rem}
+.sev-blocker{border-left:4px solid #c0392b;padding:.5rem .8rem;background:#fdedeb;margin:.6rem 0}
+.sev-high{border-left:4px solid #d35400;padding:.5rem .8rem;background:#fdf2e8;margin:.6rem 0}
+.sev-medium{border-left:4px solid #b7950b;padding:.5rem .8rem;background:#fcf8e3;margin:.6rem 0}
+.sev-dropped{border-left:4px solid #888;padding:.5rem .8rem;background:#f3f3f3;margin:.6rem 0;color:#555}
+.quote{font-family:ui-monospace,Menlo,monospace;font-size:.9em;background:#f6f8fa;padding:.15rem .4rem;border-radius:3px;display:inline-block;margin-top:.3rem}
+table{border-collapse:collapse;width:100%;margin:1rem 0}
+th,td{border:1px solid #ccc;padding:.4rem .6rem;text-align:left;vertical-align:top;font-size:.92em}
+th{background:#f0f0f0}
+code{background:#f6f8fa;padding:.05rem .3rem;border-radius:3px}
+</style>
+</head>
+<body>
+<header>
+<h1>Grill Report — /readme skill requirements</h1>
+<p><strong>Target:</strong> <a href="../01_requirements.html">../01_requirements.html</a> · <strong>Depth:</strong> reviewer-subagent (FR-50/51/52) · <strong>Date:</strong> 2026-05-13 · <strong>Findings:</strong> 14 validated + 1 advisory (quote-validation slip)</p>
+</header>
+<main>
+
+<section id="summary">
+<h2 id="summary">Summary</h2>
+<p>Adversarial pass over the Tier-3 requirements doc for the <code>/readme</code> skill. The doc is well-structured but has two blockers (mixed-mode composition rule absent; update-mode section-affinity table referenced but undefined), plus eight high-severity gaps around metric definitions, delegation boundaries, and cross-mode interactions. Loop-3 application proposed (B1/B2 + H1–H8 + M1/M2/M4 + F15 inline; M3 deferred).</p>
+<p><strong>Sections enumerated:</strong> 27 (matches regenerated <code>01_requirements.sections.json</code>). The prior sections.json was stale — loop-2 additions (<code>monorepo-cross-file-rules</code>, <code>6-gate-exit-status</code>) and the journey-id rename were not reflected; regenerated this pass.</p>
+</section>
+
+<section id="findings">
+<h2 id="findings">Findings</h2>
+
+<h3 id="blockers">Blockers (2)</h3>
+
+<div class="sev-blocker"><strong>B1 · overview</strong> — Mixed-mode behavior unspecified. The doc never specifies what happens when a repo legitimately needs two modes (e.g., a monorepo with some packages READMEd and some absent) — is it audit+scaffold in one run, or two invocations, and how is the diff preview unified? <div class="quote">"scaffold-missing (READMEs absent in subset)"</div></div>
+
+<div class="sev-blocker"><strong>B2 · alternate-journey-update-mode</strong> — Section-affinity table is referenced but undefined. The conventional-commit classifier → section-affinity mapping is the load-bearing mechanism for update-mode but the table is not specified, sampled, or located. Where does it live, who authors it, what is its initial content? <div class="quote">"maps to impacted sections via section-schema.yaml's commit-affinity table"</div></div>
+
+<h3 id="high">High (8)</h3>
+
+<div class="sev-high"><strong>H1 · goals</strong> — ≥50% Jaccard threshold is arbitrary. What makes 50% the threshold rather than 30% or 70%, and what happens if the merged human list has only 4 items so Jaccard granularity is coarse? <div class="quote">"simulated-reader friction lists overlap ≥50% with a human cold-reader's friction on the same README"</div></div>
+
+<div class="sev-high"><strong>H2 · goals</strong> — "Voice drift &lt;15%" metric is underspecified. Is it mean sentence-length delta, type-token ratio delta, or something else, and why 15% rather than a perceptual threshold? <div class="quote">"&lt;15% sentence-length / vocabulary drift — measured by a voice-diff script"</div></div>
+
+<div class="sev-high"><strong>H3 · non-goals</strong> — 95% manifest-coverage claim has no citation. Which ecosystem survey supports this, and does the 95% hold weighted by repo-popularity or by raw count? <div class="quote">"the 8 chosen cover ≥95% of public repos"</div></div>
+
+<div class="sev-high"><strong>H4 · overview</strong> — Voice-delegation boundary leaks prose work. "Banned-phrase removal at the token level" is unmistakably a prose/voice judgement. What's the principled line that prevents this from being a backdoor for /readme to do prose work it claims to delegate? <div class="quote">"banned-phrase removal at the token level"</div></div>
+
+<div class="sev-high"><strong>H5 · monorepo-cross-file-rules</strong> — R3 treats legitimate divergence as blocker. Many monorepos (kubernetes/kubernetes, Babel) intentionally have per-package install instructions that differ from root. Why is divergence a blocker rather than a signal of legitimate per-package variance? <div class="quote">"(b) diverge from the root (drift — surface as blocker)"</div></div>
+
+<div class="sev-high"><strong>H6 · alternate-journey-update-mode</strong> — Phase 7.6 staging interaction with /verify is unspecified. The patch is staged but never auto-committed; /complete-dev runs after /verify. What happens if the staged patch fails the rubric or breaks an in-flight commit — does the release abort, proceed without the README change, or block? <div class="quote">"patch is staged but never auto-committed — /complete-dev's existing commit flow picks it up"</div></div>
+
+<div class="sev-high"><strong>H7 · design-decisions</strong> — D10 taxonomy closure has no extension trigger. What's the explicit trigger criterion for adding an 8th repo type for v2, given Q1 is the same question unresolved? <div class="quote">"The repo-type taxonomy is closed at 7 types for v1."</div></div>
+
+<div class="sev-high"><strong>H8 · open-questions</strong> — Q5 is a decision disguised as a question. Three of the riskiest assumptions (A2/A4/A8) gate the skill's value but validation is punted to /spec. If validation comes back negative at /spec time, the entire approach changes. <div class="quote">"How are A2 (rubric distinguishes slop), A4 (simulated-reader is real signal), A8 (workspace discovery ≥19/20) experimentally validated"</div></div>
+
+<h3 id="medium">Medium (4)</h3>
+
+<div class="sev-medium"><strong>M1 · non-goals</strong> — Phase 7.6 "validation criterion" is circular. Who decides a run "clears" it, what's the pass criterion, and what stops this from being permanently default-off because nobody opts in? <div class="quote">"opt-in / default-off until ≥3 real-repo runs and a /retro pass clear it"</div></div>
+
+<div class="sev-medium"><strong>M2 · monorepo-cross-file-rules</strong> — R1 auto-fix assumes a contents-table exists. What happens when R1 fires on a root that doesn't yet have one, and is creating the table itself a structural rewrite requiring approval? <div class="quote">"R1 — Root links to every package."</div></div>
+
+<div class="sev-medium"><strong>M3 · design-decisions</strong> — D6 1-iteration cap reuses a prose-domain argument. /polish operates on prose and /readme operates on structure. Why does the same convergence-drift argument apply? <div class="quote">"Convergence runs drift the LLM toward 'everything looks fine'"</div></div>
+
+<div class="sev-medium"><strong>M4 · open-questions</strong> — Q3 contradicts R3. R3 already forces package READMEs to lack Install/Contributing/License, so Q3 is partially answered yet still listed as open. <div class="quote">"Probably: package has no Install / Contributing / License sections"</div></div>
+
+<h3 id="validation-dropped">Validation-dropped — advisory only (1)</h3>
+
+<div class="sev-dropped"><strong>F15 · empty-states-and-edge-cases</strong> — Multi-manifest disambiguation. When multiple workspace-manifest types coexist (e.g., <code>package.json#workspaces</code> AND <code>pnpm-workspace.yaml</code>, or <code>pyproject.toml</code> + Cargo workspace), discovery behavior is unspecified — does it pick one, merge, or ask? <em>Quote failed FR-52 verbatim substring check (subagent capitalized "Workspace" vs source's lowercase). Substantive concern is real and counted in dispositions.</em></div>
+</section>
+
+<section id="dispositions">
+<h2 id="dispositions">Dispositions</h2>
+<p>User chose "Apply all in a loop-3 requirements revision". Each row maps to an inline edit on <code>../01_requirements.html</code>.</p>
+<table>
+<thead><tr><th>#</th><th>Sev</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td>B1</td><td>blocker</td><td>Add mixed-mode composition rule to <code>overview</code>: audit + scaffold can run in one invocation; the diff preview lists audit-flagged sections and scaffold-created files together; modes are not mutually exclusive.</td></tr>
+<tr><td>B2</td><td>blocker</td><td>Add v0 commit-affinity sketch to <code>alternate-journey-update-mode</code>: table lives in <code>section-schema.yaml</code>, author = skill author, initial content covers conventional-commit types <code>feat / fix / docs / breaking</code> → sections <code>Features / Changelog / Usage / Migration</code>.</td></tr>
+<tr><td>H1</td><td>high</td><td>Revise goal: median Jaccard ≥0.4 across ≥5 README/reader pairs OR (preferred) replace with binary "rubric-flagged friction lands in human top-3 in ≥70% of pairs". Drop the noisy single-pair Jaccard target.</td></tr>
+<tr><td>H2</td><td>high</td><td>Define the voice-diff metric: mean sentence-length delta &lt;15% AND Jaccard of new tokens vs original ≥0.7. Cite /polish substrate as the implementation.</td></tr>
+<tr><td>H3</td><td>high</td><td>Soften "≥95% of public repos" to "8 chosen by deliberate selection across the most-represented ecosystems; v2 extension trigger in D10".</td></tr>
+<tr><td>H4</td><td>high</td><td>Tighten delegation boundary: /readme flags banned phrases (does not remove); /polish removes. Move "token-level removal" out of /readme's scope.</td></tr>
+<tr><td>H5</td><td>high</td><td>Soften R3 from "blocker" to "warn-with-override": surface divergence as a warning with a "mark as legitimate variance" affordance.</td></tr>
+<tr><td>H6</td><td>high</td><td>Define Phase 7.6 abort semantics: if staged patch fails its rubric, the patch is dropped (not the release); /complete-dev logs to /retro and proceeds.</td></tr>
+<tr><td>H7</td><td>high</td><td>Add D12: taxonomy-extension trigger = ≥2 real repos that don't fit any of the 7 types AND a /retro pass with extension-rationale. Resolves Q1.</td></tr>
+<tr><td>H8</td><td>high</td><td>Promote Q5 to a hard prerequisite of Phase 4 /spec: A2/A4/A8 validation experiments must complete before /spec begins design. Resolves Q5.</td></tr>
+<tr><td>M1</td><td>med</td><td>Define "cleared" = ≥3 real-repo runs with zero rubric-failed patches AND /retro pass with neutral-or-positive disposition. Removes circularity.</td></tr>
+<tr><td>M2</td><td>med</td><td>R1 auto-fix becomes "create-or-update contents-table" with a structural-rewrite approval prompt when creating from scratch.</td></tr>
+<tr><td>M3</td><td>med</td><td><strong>Defer.</strong> Acknowledge as borrowed-rationale; revisit if simulated-reader signal looks weak post-A4 validation.</td></tr>
+<tr><td>M4</td><td>med</td><td>Mark Q3 as resolved-by-R3 (R3 already forces package-level omission); strike from open questions.</td></tr>
+<tr><td>F15</td><td>high</td><td>Add multi-manifest disambiguation to <code>empty-states-and-edge-cases</code>: precedence order = explicit user override → most-specific manifest first (Cargo workspace → pnpm-workspace → package.json#workspaces → pyproject.toml); on ambiguity, ask via AskUserQuestion.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="next-step">
+<h2 id="next-step">Recommended next step</h2>
+<p>Apply the 14 dispositions to <code>../01_requirements.html</code> in a loop-3 revision; regenerate <code>01_requirements.sections.json</code> if new IDs are introduced; then proceed to Phase 3a /creativity gate (default Skip, per orchestrator). M3 deferred — revisit during /spec design if convergence-drift evidence emerges.</p>
+</section>
+
+</main>
+</body>
+</html>

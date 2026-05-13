@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plan — /plan vertical-slice enforcement</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.42.0">
+  <script defer src="assets/viewer.js?v=2.42.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">Plan — /plan vertical-slice enforcement</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+    <a class="pmos-attribution pmos-attribution--toolbar" href="https://github.com/maneesh-dhabria/pmos-toolkit#readme" target="_blank" rel="noopener noreferrer" data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<p><strong>Tier:</strong> 2 · <strong>Type:</strong> enhancement · <strong>Feature:</strong> plan-vertical-slices · <strong>Spec ref:</strong> <code>02_spec.html</code> · <strong>Status:</strong> Draft · <strong>commit_cadence:</strong> per-task · <strong>execution_mode:</strong> inline</p>
+
+<h2 id="overview">Overview</h2>
+<p>Five edits to <code>plugins/pmos-toolkit/skills/plan/SKILL.md</code> that add a vertical-slice decomposition rule, pivot a horizontal worked example, add a Phase 4 review check, name horizontal layering as an Anti-Pattern, and seed tracer-bullet identification at Phase 2 deep-code-study time. Plan tasks themselves model the principle: T1 is a tracer bullet (rule + anti-pattern land together so the skill is internally consistent in one commit); subsequent tasks widen.</p>
+<p><strong>Done when:</strong> All four substantive edits land in <code>plan/SKILL.md</code> and <code>skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/plan</code> exits 0 with zero [D] failures, the [J] reviewer pass returns no fails against skill-patterns §A–§F, and the grep checks in TN return their expected counts (positive: ≥1 each for "vertical slice", "tracer bullet", "Slice shape"; negative: 0 occurrences of <code>## Phase 1: Schema and Migration</code> and <code>## Phase 2: API Layer</code> in SKILL.md).</p>
+<p><strong>Done-when walkthrough:</strong> A reader opens <code>plan/SKILL.md</code> at Phase 3 and finds the new "Vertical-Slice Decomposition" sub-section with the tracer-bullet T1 convention. They scroll to the <code>## Phase N</code> Groupings sub-section and find the example is now vertical-slice-shaped. They reach Phase 4 and find item 13 (vertical-slice shape check). They reach <code>## Anti-Patterns</code> and find the "Do NOT decompose by layer" bullet. They scroll back to Phase 2 and find a new step 7 ("Identify the tracer-bullet candidate") with the subsequent steps renumbered. Running <code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/plan</code> at the repo root exits 0.</p>
+
+<p><strong>Execution order:</strong></p>
+<pre>T1 (tracer bullet — rule + anti-pattern) → T2 (Phase 4 check) → T3 (example pivot) → T4 (Phase 2 tracer-bullet step) → TN (final verification)</pre>
+
+<h2 id="decision-log">Decision log</h2>
+<table>
+  <thead><tr><th>#</th><th>Decision</th><th>Options considered</th><th>Rationale</th></tr></thead>
+  <tbody>
+    <tr><td>D1</td><td>T1 lands BOTH the rule (Phase 3 sub-section) AND the Anti-Pattern in one commit.</td><td>(a) split: rule then anti-pattern; (b) bundle as one tracer-bullet task.</td><td>Option (b). The rule and its negative-space anti-pattern are conceptually one statement (\"here's the rule; here's what violating it looks like\"). Splitting them yields a half-second-class commit where the rule is stated but the anti-pattern list still doesn't reflect it — internally inconsistent. The tracer-bullet IS \"the rule lives in the skill\" — both surface areas must be touched for that to be true.</td></tr>
+    <tr><td>D2</td><td>Task code edits use <code>Edit</code> tool with <code>old_string</code>/<code>new_string</code> for every insertion (not <code>Write</code> rewrites).</td><td>(a) full-file rewrite via <code>Write</code>; (b) per-section <code>Edit</code>.</td><td>(b). 869-line file; rewrite churns the whole file and obscures diff review. Per-section Edits produce focused diffs.</td></tr>
+    <tr><td>D3</td><td>Verification of grep checks happens in TN, not per-task.</td><td>(a) per-task grep; (b) TN-only.</td><td>(b). Each per-task edit is small enough that visual confirmation in the diff is sufficient; centralized greps in TN catch any cross-task interactions (e.g., the example pivot accidentally removing a Slice-shape mention) in one pass.</td></tr>
+  </tbody>
+</table>
+
+<h2 id="code-study-notes">Code Study Notes</h2>
+<h3 id="patterns-to-follow">Patterns to follow</h3>
+<ul>
+  <li><code>plugins/pmos-toolkit/skills/plan/SKILL.md:852-869</code> — Anti-Patterns list prose style ("Do NOT …"). Match in T1's anti-pattern addition.</li>
+  <li><code>plugins/pmos-toolkit/skills/plan/SKILL.md:505-557</code> — Task Design Rules anchor; the new "Vertical-Slice Decomposition" sub-section attaches here.</li>
+  <li><code>plugins/pmos-toolkit/skills/plan/SKILL.md:666-679</code> — Phase 4 Structural Checklist numbered list; T2 appends item 13.</li>
+</ul>
+<h3 id="existing-code-to-reuse">Existing code to reuse</h3>
+<ul>
+  <li>None — this is a prose-only edit.</li>
+</ul>
+<h3 id="constraints-discovered">Constraints discovered</h3>
+<ul>
+  <li>The <code>## Phase N</code> example block (currently lines ~511-528) is referenced from <code>Anti-Patterns</code> line 868 ("Do NOT create <code>## Phase N</code> groupings of 1-2 tasks"). The pivot in T3 must not change the task count of the example such that it would itself violate the 5-10-per-phase rule.</li>
+  <li>The skill-patterns rubric's [J] checks against <code>SKILL.md</code> must still pass; in particular, no new H2/H3 may lack a kebab-case anchor in places the rubric checks (the new headings are H3 within Phase 3 — same as existing sub-section headings).</li>
+</ul>
+<h3 id="stack-signals">Stack signals</h3>
+<ul>
+  <li>Prose-only edit; no stack relevant. Verification tooling is the existing <code>skill-eval-check.sh</code> bash script in <code>plugins/pmos-toolkit/skills/feature-sdlc/tools/</code>.</li>
+</ul>
+<p><strong>Tracer-bullet candidate:</strong> T1 — landing the core rule sub-section plus the anti-pattern entry. This is the narrowest "the new rule lives in the skill" slice; everything after widens enforcement, examples, and discovery.</p>
+
+<h2 id="file-map">File map</h2>
+<table>
+  <thead><tr><th>Action</th><th>File</th><th>Responsibility</th><th>Task</th></tr></thead>
+  <tbody>
+    <tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/plan/SKILL.md</code></td><td>Add Vertical-Slice Decomposition sub-section + Anti-Pattern bullet (T1); add Phase 4 checklist item 13 (T2); pivot ## Phase N example (T3); add Phase 2 step 7 + renumber 7-11→8-12 (T4)</td><td>T1, T2, T3, T4</td></tr>
+  </tbody>
+</table>
+
+<h2 id="tasks">Tasks</h2>
+
+<h3 id="t1">T1 — Tracer bullet: land the rule + its anti-pattern</h3>
+<p><strong>Goal:</strong> A reader of <code>plan/SKILL.md</code> sees the vertical-slice rule defined in Phase 3 AND named as forbidden-otherwise in the Anti-Patterns list. Smallest "rule lives in the skill" slice.</p>
+<p><strong>Spec refs:</strong> FR-VS-01, FR-VS-04, FR-VS-06, FR-VS-07.</p>
+<p><strong>Depends on:</strong> none.</p>
+<p><strong>Idempotent:</strong> yes (Edit with unique <code>old_string</code> anchors).</p>
+<p><strong>Slice shape:</strong> vertical (rule + anti-pattern = end-to-end "the policy exists and is enforced by the skill's own self-statement").</p>
+<p><strong>TDD:</strong> no — prose-only edit; the skill-eval rerun in TN is the behavioral verification.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code>plugins/pmos-toolkit/skills/plan/SKILL.md</code></li></ul>
+<p><strong>Steps:</strong></p>
+<ol>
+  <li><strong>Insert "Vertical-Slice Decomposition" sub-section</strong> in Phase 3, immediately after the existing <code>### Task Design Rules</code> heading (line 505) and BEFORE <code>#### Optional: <code>## Phase N</code> Groupings (for large plans)</code> (line 507). Use <code>Edit</code> with <code>old_string</code> anchored on the unique sequence <code>### Task Design Rules\n\n#### Optional: \`## Phase N\` Groupings</code>. Insert content per FR-VS-01 (rule, tracer-bullet T1 convention, "many thin over few thick", done-when, exception path, <code>**Slice shape:**</code> field convention).</li>
+  <li><strong>Append the Anti-Pattern bullet</strong> to the existing <code>## Anti-Patterns (DO NOT)</code> list at the end of the file (after line 869). Use <code>Edit</code> with <code>old_string</code> anchored on the last existing bullet ("Do NOT skip the execution-mode selection question…") and append the new bullet per FR-VS-04 ("Do NOT decompose by layer…").</li>
+  <li><strong>Inline verification (visual):</strong> open the diff; confirm both insertions land at the expected positions, no overlapping anchors, no double-blank-lines introduced.</li>
+  <li><strong>Commit:</strong> <code>git add plugins/pmos-toolkit/skills/plan/SKILL.md && git commit -m "feat(plan): add vertical-slice decomposition rule + anti-pattern (tracer bullet)"</code></li>
+</ol>
+
+<h3 id="t2">T2 — Widen enforcement: Phase 4 structural-checklist item</h3>
+<p><strong>Goal:</strong> The rule has teeth. Phase 4 review now produces a finding when a task is a single-layer cut with no declared exception.</p>
+<p><strong>Spec refs:</strong> FR-VS-03, FR-VS-06.</p>
+<p><strong>Depends on:</strong> T1 (the rule must exist before Phase 4 cites it).</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>Slice shape:</strong> vertical (the rule is now both stated AND enforced by the skill's own review phase).</p>
+<p><strong>TDD:</strong> no — prose edit.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code>plugins/pmos-toolkit/skills/plan/SKILL.md</code></li></ul>
+<p><strong>Steps:</strong></p>
+<ol>
+  <li><strong>Insert item 13</strong> in the <code>**A. Structural Checklist**</code> numbered list of Phase 4. <code>Edit</code> with <code>old_string</code> anchored on the last existing item (the "Refactor-before-modify" bullet at item 12) and append item 13 per FR-VS-03.</li>
+  <li><strong>Inline verification:</strong> confirm numbering is sequential (12 → 13), no blank-line drift, item 13's body cites the new Phase 3 sub-section by name and the new Anti-Pattern by inference.</li>
+  <li><strong>Commit:</strong> <code>git commit -m "feat(plan): Phase 4 enforces vertical-slice shape"</code></li>
+</ol>
+
+<h3 id="t3">T3 — Widen example: pivot horizontal worked example to vertical</h3>
+<p><strong>Goal:</strong> The training example no longer undercuts the rule. The <code>## Phase N</code> Groupings sub-section shows vertical-slice phase names, not "Schema / API Layer / UI".</p>
+<p><strong>Spec refs:</strong> FR-VS-02, FR-VS-06.</p>
+<p><strong>Depends on:</strong> T1 (the rule must exist; the new example references it).</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>Slice shape:</strong> vertical (the example itself becomes a vertical slice; rule + example now agree).</p>
+<p><strong>TDD:</strong> no — prose edit. Negative-grep verification in TN.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code>plugins/pmos-toolkit/skills/plan/SKILL.md</code></li></ul>
+<p><strong>Steps:</strong></p>
+<ol>
+  <li><strong>Replace the example block</strong>. <code>Edit</code> with <code>old_string</code> spanning the markdown code block currently containing <code>## Phase 1: Schema and Migration</code> through <code>### T5: ...</code> (lines ~513-528). Replace with a vertical-slice example (per FR-VS-02): <code>## Phase 1: Tracer bullet — single record end-to-end</code> (T1-T3) / <code>## Phase 2: Widen to list + filters</code> (T4-T5). Update the per-phase rationale lines to describe deployable user-observable behavior.</li>
+  <li><strong>Append the one-line caveat</strong> to the "Rules" sub-bullet list immediately below the example block: "Phases group <strong>vertical slices</strong>, not layers — see §Vertical-Slice Decomposition above. Horizontal phase names ('all migrations', 'all endpoints', 'all UI') are an anti-pattern." <code>Edit</code> the last existing rule bullet ("Phase 1 always begins at T1.") and append the new line.</li>
+  <li><strong>Inline verification:</strong> confirm the example block parses as markdown (no broken code-fence), the new phase names mention end-to-end behavior, no leftover "Schema and Migration" / "API Layer" tokens.</li>
+  <li><strong>Commit:</strong> <code>git commit -m "feat(plan): pivot ## Phase N example from horizontal to vertical-slice"</code></li>
+</ol>
+
+<h3 id="t4">T4 — Widen discovery: Phase 2 tracer-bullet earmarking step</h3>
+<p><strong>Goal:</strong> The tracer-bullet candidate is identified at deep-code-study time, not as an afterthought during task writing. Phase 2 produces a one-line Code Study Note naming the candidate.</p>
+<p><strong>Spec refs:</strong> FR-VS-05, FR-VS-06.</p>
+<p><strong>Depends on:</strong> T1 (the term "tracer bullet" must be defined elsewhere in the skill before Phase 2 references it).</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>Slice shape:</strong> vertical (the rule is now also seeded at discovery time, not just at write time).</p>
+<p><strong>TDD:</strong> no — prose edit; correct renumbering is the verification.</p>
+<p><strong>Files:</strong></p>
+<ul><li>Modify: <code>plugins/pmos-toolkit/skills/plan/SKILL.md</code></li></ul>
+<p><strong>Steps:</strong></p>
+<ol>
+  <li><strong>Insert new step 7</strong> ("Identify the tracer-bullet candidate") between current step 6 (wireframes read, ends around line 202) and current step 7 (Detect stack signals, line 203). <code>Edit</code> with <code>old_string</code> anchored on the unique boundary between the two existing steps. Body per FR-VS-05.</li>
+  <li><strong>Renumber existing Phase 2 steps 7→8, 8→9, 9→10, 10→11, 11→12.</strong> Use four targeted <code>Edit</code> calls, each anchored on the unique step heading (e.g., <code>7. **Detect stack signals**</code> → <code>8. **Detect stack signals**</code>). Confirm no cross-references in OTHER phases point at "Phase 2 step N" by N-value (a quick <code>grep -nE "Phase 2 step ([7-9]|1[01])" plan/SKILL.md</code> — if any match, update them).</li>
+  <li><strong>Update the in-section cross-reference</strong> in the (now) step 12's text ("Summarize findings in a 'Code Study Notes' section") so it still reads correctly.</li>
+  <li><strong>Inline verification:</strong> sequential numbering 1-12, the new step 7 reads coherently in the flow (after wireframes, before stack signals), the tracer-bullet candidate field is recorded in Code Study Notes.</li>
+  <li><strong>Commit:</strong> <code>git commit -m "feat(plan): Phase 2 step 7 earmarks tracer-bullet candidate"</code></li>
+</ol>
+
+<h3 id="tn">TN — Final verification</h3>
+<p><strong>Goal:</strong> All four edits are present, internally consistent, and the skill-eval rubric still passes.</p>
+<p><strong>Spec refs:</strong> FR-VS-07; Done-when criteria from <code>02_spec.html#frs</code>.</p>
+<p><strong>Steps:</strong></p>
+<ul>
+  <li>[ ] <strong>Positive grep:</strong>
+    <pre>cd /Users/maneeshdhabria/Desktop/Projects/agent-skills-plan-vertical-slices
+grep -cE "vertical slice|Vertical-Slice|Vertical Slice" plugins/pmos-toolkit/skills/plan/SKILL.md
+# expected: ≥ 4 occurrences (Phase 3 heading + rule body + Phase 4 item 13 + Anti-Pattern + example caveat)
+grep -cE "tracer bullet|tracer-bullet|Tracer bullet" plugins/pmos-toolkit/skills/plan/SKILL.md
+# expected: ≥ 3 (Phase 2 step 7 + Phase 3 rule + ## Phase N example phase name + Anti-Pattern)
+grep -c "Slice shape:" plugins/pmos-toolkit/skills/plan/SKILL.md
+# expected: ≥ 2 (Phase 3 rule + Phase 4 item 13 referencing it)</pre>
+  </li>
+  <li>[ ] <strong>Negative grep:</strong>
+    <pre>grep -nE "^## Phase 1: Schema and Migration$|^## Phase 2: API Layer$" plugins/pmos-toolkit/skills/plan/SKILL.md
+# expected: 0 matches (the horizontal example must be gone)</pre>
+  </li>
+  <li>[ ] <strong>Renumbering consistency (Phase 2):</strong>
+    <pre>sed -n '/^## Phase 2: Deep Code Study/,/^---$/p' plugins/pmos-toolkit/skills/plan/SKILL.md | grep -E "^[0-9]+\." | awk '{print $1}'
+# expected: sequential 1. through 12. with no gaps or duplicates</pre>
+  </li>
+  <li>[ ] <strong>skill-eval rerun:</strong>
+    <pre>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/plan
+# expected: exit 0; TSV verdicts all PASS for [D] checks</pre>
+    On non-zero exit, treat as a Phase 6a iteration-1 failure (per /feature-sdlc Phase 6a contract) and proceed to remediation.
+  </li>
+  <li>[ ] <strong>Anchor integrity (heading ids):</strong>
+    <pre>grep -cE "^### Vertical-Slice Decomposition" plugins/pmos-toolkit/skills/plan/SKILL.md
+# expected: 1</pre>
+  </li>
+  <li>[ ] <strong>Done-when walkthrough (manual):</strong> open <code>plan/SKILL.md</code>, scroll Phase 2 → Phase 3 → Phase 4 → Anti-Patterns, confirm each surface area carries the change.</li>
+</ul>
+
+<h2 id="review-log">Review log</h2>
+<table>
+  <thead><tr><th>Loop</th><th>Findings</th><th>Changes made</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>(populated during Phase 4 review)</td><td>—</td></tr>
+  </tbody>
+</table>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_plan-vertical-slices/03_plan.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer" href="https://github.com/maneesh-dhabria/pmos-toolkit#readme" target="_blank" rel="noopener noreferrer" data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

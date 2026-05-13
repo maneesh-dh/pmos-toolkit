@@ -716,6 +716,32 @@ if [ "${#TOOLS_SKIPPED[@]}" -gt 0 ]; then
   tools_skipped_json=$(printf '%s\n' "${TOOLS_SKIPPED[@]}" | jq -R . | jq -s .)
 fi
 
+# ── Frontend declarative coverage (T12, FR-50/51/52) ─────────────────────────
+# Coverage = (TS/JS frontend files) / (TS/JS + Vue SFC files), 2-decimal.
+# Vue files run only L1 grep rules (declarative L2 via dep-cruiser doesn't
+# cover .vue's <script> blocks today — surfaced as the F3 gap). The field is
+# emitted only when the denominator is non-zero (i.e. a frontend tree); on
+# pure-Py or empty trees the field is omitted (null), keeping back-compat.
+# When coverage < 1.0, an F3 stderr note flags the gap to the operator.
+fde_json='null'
+fde_num=$(echo "$LOADER_JSON" | jq '.scanned.by_ext as $e
+  | (($e[".ts"]//0) + ($e[".tsx"]//0) + ($e[".js"]//0)
+     + ($e[".jsx"]//0) + ($e[".mjs"]//0) + ($e[".cjs"]//0))')
+fde_den=$(echo "$LOADER_JSON" | jq '.scanned.by_ext as $e
+  | (($e[".ts"]//0) + ($e[".tsx"]//0) + ($e[".js"]//0)
+     + ($e[".jsx"]//0) + ($e[".mjs"]//0) + ($e[".cjs"]//0)
+     + ($e[".vue"]//0))')
+if [ "$fde_den" -gt 0 ]; then
+  fde_json=$(jq -n --argjson n "$fde_num" --argjson d "$fde_den" \
+    '($n / $d * 100 | round / 100)')
+  # F3 stderr note: emit only when coverage is strictly below 1.0.
+  fde_lt_one=$(jq -n --argjson c "$fde_json" '$c < 1.0')
+  if [ "$fde_lt_one" = "true" ]; then
+    vue_count=$(echo "$LOADER_JSON" | jq '.scanned.by_ext[".vue"]//0')
+    echo "[F3] frontend_declarative_coverage=$fde_json — $vue_count .vue file(s) get L1-semantic treatment only (no L2 dep-cruiser pipeline)" 1>&2
+  fi
+fi
+
 END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
 jq -n \
@@ -723,6 +749,7 @@ jq -n \
   --argjson loader "$LOADER_JSON" \
   --argjson tools_skipped "$tools_skipped_json" \
   --argjson tools_errored "$TOOLS_ERRORED_JSON" \
+  --argjson fde "$fde_json" \
   --arg start "$START" \
   --arg end "$END" \
   --arg root "$SCAN_ROOT" \
@@ -744,6 +771,7 @@ jq -n \
     scanned: ($loader.scanned | del(.files_for_rules)),
     tools_skipped: $tools_skipped,
     tools_errored: $tools_errored,
+    frontend_declarative_coverage: $fde,
     findings: ($f
       | map(. + { severity: ($loader.effective_severity[.rule_id] // .severity) })
       | sort_by({block:0, warn:1, info:2}[.severity] // 9, .file, .line, .rule_id))

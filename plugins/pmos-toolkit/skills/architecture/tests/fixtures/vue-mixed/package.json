@@ -1,0 +1,6 @@
+{
+  "name": "vue-mixed-fixture",
+  "private": true,
+  "version": "0.0.0",
+  "description": "T12 fixture — 3 .vue + 7 .ts → frontend_declarative_coverage = 0.70."
+}

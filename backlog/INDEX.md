@@ -2,7 +2,7 @@
 
 Last regenerated: 2026-05-13
 
-8 open items. Capture more with `/backlog add <text>`; refine with `/backlog refine <id>`; promote with `/backlog promote <id>`.
+9 open items. Capture more with `/backlog add <text>`; refine with `/backlog refine <id>`; promote with `/backlog promote <id>`.
 
 ## should
 
@@ -10,6 +10,7 @@ Last regenerated: 2026-05-13
 |---|---|---|---|---|---|---|---|
 | 0001 | tech-debt | inbox | should | /feature-sdlc fails its own skill-eval-check.sh — e-scripts-dir (script at tools/ not scripts/) + c-portable-paths (heuristic flags prose example paths) | — | — | — |
 | 0004 | bug | inbox | should | skill-eval-check.sh --selftest aborts before reaching selftest dispatch (arg-validation order bug) | — | — | — |
+| 0009 | enhancement | inbox | should | /feature-sdlc has no mid-flight base-drift check — origin can advance during a long single-session run, surfacing only at /complete-dev Phase 9 stale-bump | — | — | — |
 
 ## could
 

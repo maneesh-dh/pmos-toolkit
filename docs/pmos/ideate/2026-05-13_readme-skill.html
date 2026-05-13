@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="pmos:ideate-phase" content="complete">
+  <meta name="pmos:ideate-slug" content="readme-skill">
+  <meta name="pmos:ideate-date" content="2026-05-13">
+  <title>README skill — Ideation</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.45.0">
+  <script defer src="assets/viewer.js?v=2.45.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">README skill — Ideation</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+    <a class="pmos-attribution pmos-attribution--toolbar"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="tldr">
+<h2 id="tldr">TL;DR</h2>
+<p>Ship <code>/readme</code> as a single pmos-toolkit skill with three modes — <strong>audit</strong> (default when README exists), <strong>scaffold</strong> (default when absent), and <strong>diff-update</strong> (v2, invoked from <code>/complete-dev</code>) — all sharing one <code>section-schema.yaml</code>, one binary rubric (~15 checks), and one simulated-reader verifier (3 personas at 60s / 5min / 30min time-budgets). Prose voice delegated to <code>/polish</code>. The opinionated default opening is the 5-block hero pattern repeated across every strong exemplar README (FastAPI / ripgrep / htmx / Stripe / Tailwind / Astro / shadcn): <em>user-verb tagline → proof row → show-don't-tell demo → install → why-this-exists</em>. <strong>Monorepos are first-class:</strong> the skill detects workspace manifests (pnpm-workspace / lerna / nx / turbo / cargo / go / pyproject / plugin marketplaces) and treats root vs. package READMEs as <em>different repo-types</em> with different opening shapes — root README's job is <em>map + identity</em> (contents-table replaces show-don't-tell demo), package README's job is the standard 5-block opening with link-up to the root for shared context.</p>
+<p><strong>Recommendation:</strong> Proceed to <code>/requirements readme-skill</code>, but gate the spec on validating three riskiest assumptions first — A2 (rubric distinguishes AI-slop), A4 (simulated-reader is real signal), and the new A8 (workspace-discovery heuristic detects ≥95% of real monorepos). All three are &lt;1 day each.</p>
+</section>
+
+<section id="hmw">
+<h2 id="hmw">How Might We</h2>
+<p>How might we generate README.md files that are <em>user-facing</em> — answering <em>what / who / why / how-to-start</em> in the first 200 words — rather than internal-structure dumps, for both greenfield repos and incrementally during <code>/complete-dev</code>?</p>
+</section>
+
+<section id="target-user-jtbd">
+<h2 id="target-user-jtbd">Target user &amp; job-to-be-done</h2>
+<p><strong>Who:</strong> Maintainers of pmos-toolkit-installed repos (initially: this repo's author; later: any user of the plugin). Three reader archetypes the README itself must serve: <em>evaluator</em> (60s — keep reading?), <em>adopter</em> (5min — get to first success), <em>contributor</em> (30min — extend / contribute).</p>
+<p><strong>When / where:</strong> Two trigger contexts — (a) the maintainer pauses mid-session and runs <code>/readme</code> against an existing repo whose README has rotted into a file-inventory; (b) <code>/complete-dev</code> Phase 7.6 reaches the README hook after a feature merges and asks whether to patch impacted sections.</p>
+<p><strong>JTBD:</strong> When I ship or update a repo, I want a README that lets a stranger decide in &lt;60s whether to adopt it and start using it in &lt;5min, so I don't lose adoption to a wall of "structure" prose.</p>
+</section>
+
+<section id="hypothesis">
+<h2 id="hypothesis">Hypothesis</h2>
+<p>We believe <strong>shipping <code>/readme</code> with a binary structural rubric (~15 checks) plus a simulated-reader verifier and the 5-block opening discipline</strong> will produce <strong>generated READMEs that pass the binary rubric ≥90% of checks on first emit, and a human-validated "would adopt" judgment from 3+ unrelated readers</strong> because <strong>every strong exemplar README converges on the same opening shape, and the failure mode of every existing tool (readme-md-generator, README-AI, Copilot's generator) is template-filling with no opinionated rubric — leaving a clear niche for a rubric-gated alternative that delegates prose to <code>/polish</code></strong>.</p>
+</section>
+
+<section id="idea-variants">
+<h2 id="idea-variants">Idea variants considered</h2>
+<p>Generated via <strong>Analogous Inspiration</strong> + <strong>First Principles</strong>, then researched via 4 parallel subagents covering structure conventions, exemplar opening shapes, multi-reader patterns, and operating-mode mechanics. Finalist (the chosen hybrid) flagged with ★.</p>
+<ol>
+  <li>Standard-readme conformant generator — strict spec adherence (used in finalist as the spine ★).</li>
+  <li>FastAPI quickstart-first — README reverse-engineered from a working 30-second quickstart.</li>
+  <li>Stripe task-recipes — opens with "I want to [X]" recipes.</li>
+  <li>awesome-readme synthesizer — distill a hybrid from 5–10 top exemplars (informed the finalist's defaults).</li>
+  <li>YC pitch-arc narrative — problem → why-now → solution → ta-da.</li>
+  <li>Diátaxis front-door — README as pointer hub to Tutorials/How-to/Reference/Explanation (used in finalist as the <em>linkout</em> discipline ★).</li>
+  <li>makeareadme.com + reviewer — fill canonical template, critique each section.</li>
+  <li>Three-reader layered doc — evaluator/adopter/contributor tiers (used in finalist as <em>implicit</em> ordering, not named-persona headings ★).</li>
+  <li>JTBD-extracted README — interview phase pulls "3 jobs for whom".</li>
+  <li>Use-case-first — opens with concrete <code>command → outcome</code> recipes (used in finalist as the 5-block opening ★).</li>
+  <li>Diff-mode regenerator (<code>/complete-dev</code> hook) — patches only sections impacted by merged commits (used in finalist as the <strong>v2</strong> mode ★).</li>
+  <li>Audit + refactor à la <code>/polish</code> — binary rubric on existing README, per-finding fixes (used in finalist as the <strong>--audit</strong> mode ★).</li>
+  <li>Two-mode skill: scaffold + maintain — shared rubric (used in finalist as the operating shape ★).</li>
+  <li>README-as-landing-page — hero / value-prop / social-proof / CTA; LLM-judge scoring like <code>/polish</code>.</li>
+  <li>Reader-simulation harness — 3 simulated reader subagents try to act on README (used in finalist as the <strong>verifier</strong> ★).</li>
+</ol>
+<p><strong>★ Hybrid finalist:</strong> one <code>/readme</code> skill, three modes (<code>--audit</code> / <code>--scaffold</code> / <code>--update</code>), shared <code>section-schema.yaml</code> + <code>rubric.yaml</code> + <code>simulated-reader.md</code>; standard-readme spine + Google's <em>Status/Maintainers</em> fields + Diátaxis linkouts + the 5-block opening as the opinionated default. Prose polish delegated to <code>/polish</code>.</p>
+</section>
+
+<section id="how-it-works">
+<h2 id="how-it-works">How it works (chosen finalist)</h2>
+<ul>
+  <li><strong>Three modes, one substrate.</strong> <code>--audit</code> (default when <code>README.md</code> exists), <code>--scaffold</code> (default when absent), <code>--update</code> (v2; invoked from <code>/complete-dev</code> Phase 7.6 as opt-in hook). All three read the same <code>section-schema.yaml</code> and the same <code>rubric.yaml</code>.</li>
+  <li><strong>Section schema (the spine).</strong> Standard-readme ordered backbone (Title → Short Description → TOC → Install → Usage → Contributing → License) augmented with: (a) <em>Status</em> + <em>Maintainers</em> fields per Google's open-source style; (b) a Diátaxis-style <em>Documentation</em> linkout section instead of inlining tutorials/reference. Per-repo-type variants for the seven supported types: <em>library</em> / <em>CLI tool</em> / <em>plugin</em> / <em>app</em> / <em>monorepo-root</em> / <em>monorepo-package</em> / <em>plugin-marketplace-root</em>.</li>
+  <li><strong>Opening shapes (per repo-type).</strong> <em>library / CLI / plugin / app / monorepo-package</em> → the standard 5-block opening: (1) hero line — user-verb + outcome, ≤15 words; (2) proof row — badges + one-line social proof; (3) show-don't-tell — 5–10 lines of working code/CLI demonstrating the most common use-case; (4) install + first run — 2–3 copy-pasteable commands; (5) why this exists — 2–3 sentences. <em>monorepo-root / plugin-marketplace-root</em> → a <strong>map+identity</strong> shape: (1) hero line — what the project family does; (2) proof row; (3) <strong>contents table</strong> (auto-generated from workspace manifests, replaces show-don't-tell) listing each package/plugin with its one-line purpose + link; (4) <em>most common entry point</em> quickstart — one canonical "start here" path; (5) why these pieces live in one repo. Anti-pattern enforced: root never duplicates package content; packages always link up to the root for shared install/contributing/license.</li>
+  <li><strong>Binary rubric (~15 checks).</strong> Examples: <code>hero-line-≤15-words</code>, <code>opens-with-user-verb-not-noun</code>, <code>has-working-quickstart</code>, <code>quickstart-is-copy-pasteable</code>, <code>no-directory-tree-as-prose</code>, <code>status-field-present</code>, <code>links-out-not-inlines-reference</code>, <code>no-banned-slop-phrases</code> ("🚀 Features", "blazing fast", "Welcome to"), <code>tldr-or-tagline-in-first-200-words</code>, <code>install-before-architecture</code>. Severity-tiered (blocker / friction / nit).</li>
+  <li><strong>Simulated-reader verifier.</strong> Three persona subagents — <em>evaluator</em> (60s skeptical reader with alternatives), <em>adopter</em> (5min trying to reach first success), <em>contributor</em> (30min trying to extend). Each reads top-to-bottom, must quote concrete passages where they got lost, and emits a friction list. Failures feed back as additional rubric findings.</li>
+  <li><strong>Audit mode flow.</strong> Score existing README → list findings ordered worst-first → auto-apply mechanical fixes → per-finding approval for structural rewrites → final simulated-reader pass → write <code>README.md</code> (atomic temp+rename) with diff preview before commit.</li>
+  <li><strong>Scaffold mode flow.</strong> Detect repo-type from file structure (fallback: ask). Mine repo for: project name, package manifest, primary entry point, example usage from tests/examples folder, license, contributors. Q&amp;A only for what can't be detected: hero line, why-this-exists, target user. Emit 5-block opening + standard-readme spine + Diátaxis linkouts. Run rubric + simulated-reader. Diff preview.</li>
+  <li><strong>Update mode (v2).</strong> <code>/complete-dev</code> Phase 7.6 hook (opt-in, default-off until v2 stabilizes). Classify merged commits via conventional-commit heuristics → map to impacted sections via <code>section-schema.yaml</code>'s commit-affinity table → patch only those sections → require human confirm on every section touched → never auto-commit. Cache "no README changes needed" verdict.</li>
+  <li><strong>Voice preservation.</strong> Audit/scaffold delegate prose-level polish to <code>/polish</code> (already solves voice with lock zones + per-finding approval + PRESERVE_VOICE_CONFLICT). <code>/readme</code> owns structure + content accuracy only; never sentence-level voice.</li>
+  <li><strong>Monorepo orchestration.</strong> When invoked at a repo root, the skill runs <em>workspace discovery</em>: parses <code>pnpm-workspace.yaml</code>, <code>package.json#workspaces</code>, <code>lerna.json</code>, <code>nx.json</code>, <code>turbo.json</code>, Cargo <code>[workspace]</code>, Go <code>go.work</code>, Python <code>pyproject.toml [tool.uv.workspace]</code>, and the pmos-toolkit <code>plugins/*/</code> convention. If any workspaces are detected → repo-type is <em>monorepo-root</em> (or <em>plugin-marketplace-root</em> when <code>.claude-plugin/marketplace.json</code> exists). The skill then surfaces a single <code>AskUserQuestion</code>: (a) audit-all READMEs in one batch (root + every package, per-file findings, single diff preview); (b) audit-one (pick from a list of discovered READMEs); (c) scaffold-missing (find workspaces lacking <code>README.md</code> and emit stubs); (d) root-only (default for a casual audit). Each file is processed against the rubric variant matching its detected sub-type. Cross-file checks: root must link to every package; packages must link up to root; no duplicate Install / Contributing / License sections between root and packages (these live at root, packages link up).</li>
+  <li><strong>Position vs. existing tools.</strong> No existing tool does structural README audit (gap). No existing tool does monorepo-aware README orchestration (second gap — readme-md-generator / README-AI all treat one repo as one README). Diff-mode is also a genuine gap (release-please does CHANGELOGs, not READMEs). Scaffold is the crowded space — differentiator is the rubric + simulated-reader + <code>/polish</code> delegation + monorepo awareness.</li>
+</ul>
+</section>
+
+<section id="alternatives-prior-art">
+<h2 id="alternatives-prior-art">Alternatives &amp; prior art</h2>
+<table>
+<tr><th>Source</th><th>What it does</th><th>Difference from this idea</th></tr>
+<tr><td>readme.so</td><td>Drag-drop section UI; pure template-filler.</td><td>No repo introspection, no rubric, no opinionation. We are code-aware and rubric-gated.</td></tr>
+<tr><td>readme-md-generator</td><td>Node CLI; ~15 prompts; scrapes <code>package.json</code>; emits templated output.</td><td>No code reading beyond manifests, badge-soup output. We have a structural rubric and delegate prose to <code>/polish</code>.</td></tr>
+<tr><td>README-AI (eli64s/readme-ai)</td><td>LLM-driven, multi-backend, tech-stack table, multiple "styles".</td><td>Whole-doc regenerate destroys hand edits; recognizable AI-slop voice; no audit mode; no diff-mode.</td></tr>
+<tr><td>GitHub Copilot "Generate README"</td><td>One-shot generation in GitHub UI.</td><td>One-shot, no rubric, no incremental update, no audit.</td></tr>
+<tr><td>standard-readme spec</td><td>Human spec for README structure (no tool enforcement).</td><td>We adopt the spec as the spine and ship the missing enforcement.</td></tr>
+<tr><td>vale.sh / alex.js / markdownlint</td><td>Prose / inclusive-language / syntax linters.</td><td>No structural README awareness. Complementary; we can compose with vale for prose linting.</td></tr>
+<tr><td>release-please / git-cliff</td><td>Commit classification → CHANGELOG generation.</td><td>Prior art for the commit-classifier mechanic; v2 borrows the heuristic but targets READMEs.</td></tr>
+<tr><td><code>/polish</code> (this toolkit)</td><td>Markdown/HTML prose critique + refactor with voice preservation.</td><td>We delegate prose polish to it; <code>/readme</code> owns structure + content only.</td></tr>
+</table>
+</section>
+
+<section id="premortem">
+<h2 id="premortem">Premortem: failure modes</h2>
+<table>
+<tr><th>#</th><th>Failure mode</th><th>Likelihood</th><th>Mitigation</th></tr>
+<tr><td>1</td><td>Generated READMEs still read as AI-slop despite the rubric — exemplar voice ≠ rubric compliance.</td><td>H</td><td>Banned-phrase list in rubric; simulated-reader flags slop tone as binary fail; delegate prose to <code>/polish</code>.</td></tr>
+<tr><td>2</td><td>The 5-block opening is wrong for monorepo-root / plugin-marketplace-root (e.g., agent-skills itself) — see assumptions A3 + A8.</td><td>H</td><td>Per-repo-type rubric variants; <em>map+identity</em> opening shape for root-type repos with contents-table replacing show-don't-tell; explicit opt-out flag for edge cases.</td></tr>
+<tr><td>2b</td><td>Workspace discovery misses the workspace manifest format the repo actually uses (e.g., yarn berry plug-n-play, Bazel BUILD files, Bun workspaces, Rush.js) → root repo wrongly classified as plain library → wrong opening shape applied.</td><td>M</td><td>Ship with the 8 most common manifests detected (covers ≥95% of public repos per ecosystem surveys); on unknown layout, fall back to interactive repo-type pick rather than guessing; surface "detected: X workspaces via Y" in diff preview so user can catch misclassification.</td></tr>
+<tr><td>2c</td><td>Monorepo audit-all run produces 50+ findings across 12 package READMEs → maintainer abandons the run.</td><td>M</td><td>Per-package severity tier filter; default audit-all to blockers-only on first run; offer "show friction+nit" expand on demand; per-package approval gates batched (one Y/n per package, not per finding) for non-blocker tiers.</td></tr>
+<tr><td>3</td><td>Audit finds 12+ issues on every README → user overwhelmed → never used.</td><td>M</td><td>Severity tiers; auto-apply mechanical only; per-finding approval ordered worst-first.</td></tr>
+<tr><td>4</td><td>Diff-mode commit-classifier wrong → patches sections that didn't change OR misses sections that did.</td><td>M</td><td>Ship v2 only after audit validates section taxonomy; require human confirm per section; never auto-commit.</td></tr>
+<tr><td>5</td><td><code>/complete-dev</code> integration intrusive → slows release → users disable.</td><td>M</td><td>Opt-in Phase 7.6 with one Y/n gate; cache "no changes needed" verdict.</td></tr>
+<tr><td>6</td><td>Simulated-reader is theater — personas all agree → no signal.</td><td>M</td><td>Failure-seeking persona prompts ("you are skeptical / pressed / have alternatives"); require concrete quote+location from reader trace.</td></tr>
+<tr><td>7</td><td>Skill exists but pmos-toolkit's own README never improves — rubric designed by the author whose taste produced the bad README.</td><td>L</td><td>Dogfood: audit pmos-toolkit's README day-1; <code>/retro</code> → <code>/feature-sdlc skill --from-feedback</code> loop.</td></tr>
+</table>
+</section>
+
+<section id="riskiest-assumptions">
+<h2 id="riskiest-assumptions">Riskiest assumptions</h2>
+<table>
+<tr><th>#</th><th>Assumption</th><th>Impact</th><th>Uncertainty</th><th>Cheapest test</th></tr>
+<tr><td>A1</td><td>Users want an opinionated 5-block opening, not just template-filling.</td><td>H</td><td>M</td><td>Run audit against 5 repos the user respects; check if ≥3 fail opening checks &amp; would benefit.</td></tr>
+<tr><td>A2</td><td>A ~15-check binary rubric can distinguish good vs. AI-slop READMEs.</td><td>H</td><td>H</td><td>Hand-label 20 READMEs (10 strong from awesome-readme, 10 AI-generated slop); run rubric; require ≥85% agreement with human label.</td></tr>
+<tr><td>A3</td><td>Repo-type detection from file structure is reliable across the 7 supported types.</td><td>H</td><td>M</td><td>Heuristic detector on 15 mixed repos including agent-skills, plugin repos, Vite app, CLI, Python lib, a pnpm monorepo, a Cargo workspace; require ≥90% correct or fall back to user-asks.</td></tr>
+<tr><td>A8</td><td>Workspace-manifest discovery catches ≥95% of real monorepos in the wild (across the 8 supported manifest formats).</td><td>H</td><td>M</td><td>Run the discovery heuristic against 20 well-known public monorepos (Babel, Next.js, Turborepo examples, Nx examples, React Native, Rust Cargo workspaces, kubernetes/kubernetes, this repo); require ≥19/20 correct workspace enumeration. Mismatches teach the next iteration of the detector.</td></tr>
+<tr><td>A9</td><td>Cross-file rules ("packages link up to root", "no duplicate Install between root and packages") are formalizable as binary checks, not subjective.</td><td>M</td><td>M</td><td>Hand-write the 4–6 candidate cross-file rules; dogfood against 5 public monorepos (does each rule produce a clear pass/fail with no human judgment required?); promote only the rules that pass this clarity test.</td></tr>
+<tr><td>A4</td><td>Simulated-reader personas surface real friction, not LLM hallucination.</td><td>H</td><td>H</td><td>A/B: run simulated-reader vs. a human cold-reader on the same README; require ≥50% friction-list overlap.</td></tr>
+<tr><td>A5</td><td>Voice preservation via <code>/polish</code> delegation works for structural rewrites.</td><td>M</td><td>M</td><td>Trial run: regenerate a README; diff voice metrics (sentence length, vocabulary) pre/post; require &lt;15% drift.</td></tr>
+<tr><td>A6</td><td>Diff-mode commit→section mapping is heuristic-tractable.</td><td>M</td><td>H</td><td>Defer — validated only at v2 entry; until then, unfalsified and that's fine.</td></tr>
+<tr><td>A7</td><td><code>/complete-dev</code> users want this in the release loop.</td><td>L</td><td>M</td><td>v2 hook behind a config flag default-off; turn on after ≥5 user requests.</td></tr>
+</table>
+<p><strong>Riskiest to test before building:</strong> A2 (rubric distinguishes slop), A4 (simulated-reader is real signal), A8 (workspace-discovery catches ≥95% of real monorepos). All three fit in Phase 0 of the spec, &lt;1 day of work each. A9 (cross-file rules are binary) is a design-time check, not a pre-build experiment — fold into <code>/spec</code>.</p>
+</section>
+
+<section id="success-signals">
+<h2 id="success-signals">Success signals</h2>
+<p><strong>Leading:</strong> (1) Generated READMEs pass ≥90% of binary rubric checks on first emit. (2) Simulated-reader friction list overlaps with human cold-reader ≥50%. (3) Audit on pmos-toolkit's current README surfaces ≥5 actionable findings the maintainer agrees with. (4) Diff between author's hand-edited README pre/post-skill shows &lt;15% voice drift. (5) Workspace-discovery enumerates ≥19/20 of the test-set monorepos correctly (A8 gate).</p>
+<p><strong>Lagging:</strong> (1) Skill is invoked &gt;3× per maintainer per quarter. (2) ≥3 unrelated users say they'd adopt a project after reading a skill-generated README cold. (3) <code>/complete-dev</code> v2 hook stays opted-in by &gt;50% of installs after first 4 releases. (4) Zero "skill regenerated my README and destroyed my voice" complaints in <code>/retro</code>. (5) On agent-skills' own monorepo, the audit-all run produces a maintainer-approved diff for root + ≥80% of plugins on first pass.</p>
+</section>
+
+<section id="next-steps">
+<h2 id="next-steps">Next steps</h2>
+<ol>
+  <li><strong>Pre-spec validation (Phase 0).</strong> Run the three cheap tests: A2 (rubric distinguishes slop), A4 (simulated-reader is real signal), A8 (workspace-discovery catches ≥19/20). ~1 day total. Failures redirect design before <code>/requirements</code>.</li>
+  <li><strong>Enter the pipeline.</strong> <code>/requirements readme-skill</code> with this artifact attached as the seed. Auto-tier suggests Tier 3 (new feature, non-trivial scope, multi-mode, monorepo-aware).</li>
+  <li><strong>Optional pressure-test pre-spec.</strong> <code>/grill</code> the requirements doc on A3 (repo-type detection) and A8 (workspace discovery) — the two most likely places for the design to fall over.</li>
+  <li><strong>Stage scope.</strong> v1 = <code>--audit</code> + <code>--scaffold</code> + shared substrate + simulated-reader + workspace discovery + monorepo-root / monorepo-package / plugin-marketplace-root repo-types. v2 = <code>--update</code> + <code>/complete-dev</code> hook, only after v1 has validated the section taxonomy on ≥3 real repos (must include at least one monorepo).</li>
+  <li><strong>Dogfood day-1.</strong> First action after v1 ships: <code>/readme --audit-all</code> on agent-skills' own monorepo (root + every plugin). Feed friction into <code>/retro</code>. This is the canonical eat-our-own-dogfood test — agent-skills <em>is</em> the plugin-marketplace-root + many plugin-package READMEs case.</li>
+</ol>
+<p><em>Suggested handoff commands (pick zero or more):</em></p>
+<ul>
+  <li><code>/pmos-toolkit:requirements readme-skill</code> — start the full pipeline.</li>
+  <li><code>/pmos-toolkit:grill docs/pmos/ideate/2026-05-13_readme-skill.html</code> — adversarial review of this brief before <code>/requirements</code>.</li>
+  <li><code>/pmos-toolkit:backlog add "validate rubric A2 + simulated-reader A4 before /readme spec"</code> — capture the pre-spec experiments.</li>
+  <li><code>/pmos-toolkit:ideate --refine --resume docs/pmos/ideate/2026-05-13_readme-skill.html</code> — polish this brief before sharing.</li>
+</ul>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">Open questions</h2>
+<ul>
+  <li>Should <code>/readme</code> be a pmos-toolkit skill or its own plugin? (Leaning pmos-toolkit — it composes with <code>/polish</code>, <code>/verify</code>, <code>/complete-dev</code>.)</li>
+  <li>Should the repo-type taxonomy (currently 7 types) be closed or extensible via user config at <code>~/.pmos/readme/types/</code>? (Closed for v1; revisit if A8 dogfood surfaces a common type the 7 don't cover.)</li>
+  <li>Does the v2 diff-mode patch the working tree README, or emit a suggested patch the user applies via <code>/complete-dev</code>? (Patch-suggestion is safer; touching working-tree during release is risky.)</li>
+  <li>Does the simulated-reader pass cap at 1 iteration or run-to-convergence? (Cap at 1 like other pmos skills — more iterations = LLM drift, not better readers.)</li>
+  <li>For monorepo audit-all, should findings be presented per-package (12 separate review streams) or rolled up by severity across all packages (one blocker list)? (Lean: roll-up by severity for the first pass, drill-down per-package on demand.)</li>
+  <li>What's the rubric-variant delta between <em>monorepo-package</em> and <em>library</em>? (Probably: monorepo-package has no Install / Contributing / License sections — those link up to root. Validate during <code>/spec</code>.)</li>
+</ul>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/ideate/2026-05-13_readme-skill.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

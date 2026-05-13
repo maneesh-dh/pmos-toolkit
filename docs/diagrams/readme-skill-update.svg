@@ -1,0 +1,212 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 1080" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="12">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f2937"/>
+    </marker>
+    <marker id="arrow-r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+    </marker>
+    <style>
+      .lifeline { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 4 4; }
+      .actor-box { fill: #f1f5f9; stroke: #334155; stroke-width: 1.2; }
+      .actor-label { font-weight: 600; fill: #0f172a; text-anchor: middle; }
+      .activation { fill: #e2e8f0; stroke: #475569; stroke-width: 0.8; }
+      .msg { stroke: #1f2937; stroke-width: 1.4; fill: none; }
+      .msg-ret { stroke: #475569; stroke-width: 1.2; fill: none; stroke-dasharray: 6 3; }
+      .msg-label { fill: #0f172a; }
+      .msg-label-ret { fill: #334155; font-style: italic; }
+      .note { fill: #fef9c3; stroke: #ca8a04; stroke-width: 1; }
+      .note-text { fill: #422006; font-size: 11px; }
+      .alt-frame { fill: none; stroke: #2563eb; stroke-width: 1.4; stroke-dasharray: 5 3; }
+      .alt-tag { fill: #2563eb; font-weight: 700; font-size: 11px; }
+      .alt-sep { stroke: #2563eb; stroke-width: 1; stroke-dasharray: 3 3; }
+      .alt-cond { fill: #1e3a8a; font-weight: 600; font-size: 11px; }
+      .title { font-weight: 700; font-size: 16px; fill: #0f172a; }
+      .subtitle { font-size: 11px; fill: #475569; }
+      .self-arc { fill: none; stroke: #1f2937; stroke-width: 1.4; }
+    </style>
+  </defs>
+
+  <!-- Title -->
+  <text x="40" y="32" class="title">/readme --update hook flow — /complete-dev Phase 7.6</text>
+  <text x="40" y="50" class="subtitle">Spec §6.3 · opt-in update hook · patch-fail-drop semantics (FR-UP-3) · no-commit contract (FR-UP-5)</text>
+
+  <!-- Participants: x-centers -->
+  <!-- /complete-dev: 120, /readme --update: 320, commit-classifier: 530, rubric.sh: 720, User: 900, /retro/update.log: 1080 -->
+
+  <!-- Actor boxes -->
+  <g>
+    <rect x="50"  y="72" width="140" height="44" rx="6" class="actor-box"/>
+    <text x="120" y="92"  class="actor-label">/complete-dev</text>
+    <text x="120" y="108" class="actor-label" font-size="10" font-weight="400" fill="#475569">Phase 7.6 hook</text>
+
+    <rect x="245" y="72" width="150" height="44" rx="6" class="actor-box"/>
+    <text x="320" y="92"  class="actor-label">/readme --update</text>
+    <text x="320" y="108" class="actor-label" font-size="10" font-weight="400" fill="#475569">skill (commit-range)</text>
+
+    <rect x="450" y="72" width="160" height="44" rx="6" class="actor-box"/>
+    <text x="530" y="92"  class="actor-label">commit-classifier</text>
+    <text x="530" y="108" class="actor-label" font-size="10" font-weight="400" fill="#475569">conventional-commit parser</text>
+
+    <rect x="650" y="72" width="140" height="44" rx="6" class="actor-box"/>
+    <text x="720" y="92"  class="actor-label">rubric.sh</text>
+    <text x="720" y="108" class="actor-label" font-size="10" font-weight="400" fill="#475569">15-check bash guard</text>
+
+    <rect x="840" y="72" width="120" height="44" rx="6" class="actor-box"/>
+    <text x="900" y="92"  class="actor-label">User</text>
+    <text x="900" y="108" class="actor-label" font-size="10" font-weight="400" fill="#475569">AskUserQuestion</text>
+
+    <rect x="1000" y="72" width="160" height="44" rx="6" class="actor-box"/>
+    <text x="1080" y="92"  class="actor-label">/retro · update.log</text>
+    <text x="1080" y="108" class="actor-label" font-size="10" font-weight="400" fill="#475569">failure-logging surface</text>
+  </g>
+
+  <!-- Lifelines -->
+  <line x1="120"  y1="116" x2="120"  y2="1040" class="lifeline"/>
+  <line x1="320"  y1="116" x2="320"  y2="1040" class="lifeline"/>
+  <line x1="530"  y1="116" x2="530"  y2="1040" class="lifeline"/>
+  <line x1="720"  y1="116" x2="720"  y2="1040" class="lifeline"/>
+  <line x1="900"  y1="116" x2="900"  y2="1040" class="lifeline"/>
+  <line x1="1080" y1="116" x2="1080" y2="1040" class="lifeline"/>
+
+  <!-- Bottom actor boxes (mirrors) -->
+  <g>
+    <rect x="50"   y="1040" width="140" height="28" rx="6" class="actor-box"/>
+    <text x="120"  y="1059" class="actor-label">/complete-dev</text>
+    <rect x="245"  y="1040" width="150" height="28" rx="6" class="actor-box"/>
+    <text x="320"  y="1059" class="actor-label">/readme --update</text>
+    <rect x="450"  y="1040" width="160" height="28" rx="6" class="actor-box"/>
+    <text x="530"  y="1059" class="actor-label">commit-classifier</text>
+    <rect x="650"  y="1040" width="140" height="28" rx="6" class="actor-box"/>
+    <text x="720"  y="1059" class="actor-label">rubric.sh</text>
+    <rect x="840"  y="1040" width="120" height="28" rx="6" class="actor-box"/>
+    <text x="900"  y="1059" class="actor-label">User</text>
+    <rect x="1000" y="1040" width="160" height="28" rx="6" class="actor-box"/>
+    <text x="1080" y="1059" class="actor-label">/retro · update.log</text>
+  </g>
+
+  <!-- ===================== Messages ===================== -->
+
+  <!-- 1. opt-in self-loop on /complete-dev -->
+  <g>
+    <path d="M120,150 C 175,150 175,180 120,180" class="self-arc" marker-end="url(#arrow)"/>
+    <text x="135" y="146" class="msg-label">1. opt-in check (config + lastrun)</text>
+    <!-- note -->
+    <rect x="200" y="138" width="280" height="44" class="note"/>
+    <polyline points="200,138 210,128 480,128 480,138" fill="#fef9c3" stroke="#ca8a04"/>
+    <text x="210" y="154" class="note-text">BOTH ~/.pmos/readme/config.yaml :: phase_7_6_hook_enabled</text>
+    <text x="210" y="168" class="note-text">AND .pmos/complete-dev.lastrun.yaml :: readme_update_hook</text>
+    <text x="210" y="178" class="note-text" font-style="italic">must be true · D14: hook lives in /complete-dev</text>
+  </g>
+
+  <!-- 2. invoke -->
+  <g>
+    <rect x="316" y="210" width="8" height="780" class="activation"/>
+    <line x1="120" y1="220" x2="316" y2="220" class="msg" marker-end="url(#arrow)"/>
+    <text x="130" y="215" class="msg-label">2. invoke(commit-range = &lt;merge-base&gt;..HEAD)</text>
+  </g>
+
+  <!-- 3. classify -->
+  <g>
+    <rect x="526" y="260" width="8" height="60" class="activation"/>
+    <line x1="324" y1="270" x2="526" y2="270" class="msg" marker-end="url(#arrow)"/>
+    <text x="335" y="265" class="msg-label">3. classify(range)</text>
+  </g>
+
+  <!-- 4. impacted_sections -->
+  <g>
+    <line x1="526" y1="310" x2="324" y2="310" class="msg-ret" marker-end="url(#arrow-r)"/>
+    <text x="335" y="305" class="msg-label-ret">4. impacted_sections[]</text>
+  </g>
+
+  <!-- 5. AskUserQuestion -->
+  <g>
+    <rect x="896" y="350" width="8" height="60" class="activation"/>
+    <line x1="324" y1="360" x2="896" y2="360" class="msg" marker-end="url(#arrow)"/>
+    <text x="335" y="355" class="msg-label">5. per-section AskUserQuestion (Apply / Modify / Skip / Defer)</text>
+  </g>
+
+  <!-- 6. dispositions -->
+  <g>
+    <line x1="896" y1="400" x2="324" y2="400" class="msg-ret" marker-end="url(#arrow-r)"/>
+    <text x="335" y="395" class="msg-label-ret">6. dispositions</text>
+  </g>
+
+  <!-- 7. draft patch self-loop -->
+  <g>
+    <path d="M324,440 C 380,440 380,470 324,470" class="self-arc" marker-end="url(#arrow)"/>
+    <text x="340" y="436" class="msg-label">7. draft patch</text>
+  </g>
+
+  <!-- 8. re-score -->
+  <g>
+    <rect x="716" y="500" width="8" height="60" class="activation"/>
+    <line x1="324" y1="510" x2="716" y2="510" class="msg" marker-end="url(#arrow)"/>
+    <text x="335" y="505" class="msg-label">8. re-score patched README</text>
+    <!-- note -->
+    <rect x="740" y="488" width="320" height="34" class="note"/>
+    <polyline points="740,488 750,478 1060,478 1060,488" fill="#fef9c3" stroke="#ca8a04"/>
+    <text x="750" y="503" class="note-text">FR-UP-3: patch-fail-drop-not-block</text>
+    <text x="750" y="517" class="note-text" font-style="italic">rubric verdict never blocks the release</text>
+  </g>
+
+  <!-- 9. verdict -->
+  <g>
+    <line x1="716" y1="550" x2="324" y2="550" class="msg-ret" marker-end="url(#arrow-r)"/>
+    <text x="335" y="545" class="msg-label-ret">9. verdict (pass / fail with failed_checks[])</text>
+  </g>
+
+  <!-- alt frame -->
+  <g>
+    <rect x="60" y="585" width="1100" height="340" rx="8" class="alt-frame"/>
+    <rect x="60" y="585" width="62" height="22" fill="#dbeafe" stroke="#2563eb" stroke-width="1.4"/>
+    <text x="68" y="601" class="alt-tag">alt</text>
+    <text x="128" y="601" class="alt-cond">[rubric verdict]</text>
+
+    <!-- FAIL section -->
+    <text x="74" y="624" class="alt-cond">[fail — FR-UP-3]</text>
+
+    <!-- 10a. log to /retro/update.log -->
+    <g>
+      <line x1="324" y1="650" x2="1076" y2="650" class="msg" marker-end="url(#arrow)"/>
+      <text x="335" y="645" class="msg-label">10a. log { event: "patch_dropped", failed_checks: [...] }</text>
+    </g>
+
+    <!-- 11a. no-op back to /complete-dev -->
+    <g>
+      <line x1="324" y1="700" x2="124" y2="700" class="msg-ret" marker-end="url(#arrow-r)"/>
+      <text x="135" y="695" class="msg-label-ret">11a. no-op (patch dropped, release proceeds unpatched)</text>
+    </g>
+
+    <!-- separator -->
+    <line x1="60" y1="740" x2="1160" y2="740" class="alt-sep"/>
+
+    <!-- PASS section -->
+    <text x="74" y="758" class="alt-cond">[pass]</text>
+
+    <!-- 10b. git add (no commit) — self-loop representing working tree -->
+    <g>
+      <path d="M324,785 C 400,785 400,820 324,820" class="self-arc" marker-end="url(#arrow)"/>
+      <text x="340" y="781" class="msg-label">10b. git add &lt;readme&gt; — stage, no commit (working tree)</text>
+      <!-- note -->
+      <rect x="430" y="775" width="280" height="34" class="note"/>
+      <polyline points="430,775 440,765 710,765 710,775" fill="#fef9c3" stroke="#ca8a04"/>
+      <text x="440" y="790" class="note-text">FR-UP-5: /readme never commits</text>
+      <text x="440" y="803" class="note-text" font-style="italic">/complete-dev owns the commit</text>
+    </g>
+
+    <!-- 11b. patch staged back to /complete-dev -->
+    <g>
+      <line x1="324" y1="870" x2="124" y2="870" class="msg-ret" marker-end="url(#arrow-r)"/>
+      <text x="135" y="865" class="msg-label-ret">11b. patch staged</text>
+    </g>
+  </g>
+
+  <!-- 12. release commit self-loop on /complete-dev -->
+  <g>
+    <path d="M120,960 C 60,960 60,995 120,995" class="self-arc" marker-end="url(#arrow)"/>
+    <text x="138" y="958" class="msg-label">12. commit flow includes staged patch (if any) in release commit</text>
+  </g>
+
+</svg>

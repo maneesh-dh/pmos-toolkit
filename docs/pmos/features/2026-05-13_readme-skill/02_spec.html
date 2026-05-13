@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="pmos:phase" content="spec">
+<meta name="pmos:tier" content="3">
+<meta name="pmos:slug" content="readme-skill">
+<meta name="pmos:type" content="feature">
+<title>/readme skill — Spec</title>
+<style>
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:920px;margin:2em auto;padding:0 1em;line-height:1.55;color:#222}
+h1{border-bottom:2px solid #333;padding-bottom:.3em}
+h2{margin-top:2em;border-bottom:1px solid #ddd;padding-bottom:.2em}
+h3{margin-top:1.5em}
+h4{margin-top:1.1em}
+table{border-collapse:collapse;width:100%;margin:.5em 0;font-size:.95em}
+th,td{border:1px solid #ccc;padding:.4em .6em;text-align:left;vertical-align:top}
+th{background:#f4f4f4}
+code{background:#f0f0f0;padding:.1em .3em;border-radius:3px;font-size:.95em}
+pre{background:#f6f6f6;border:1px solid #ddd;padding:.7em;overflow-x:auto;font-size:.9em}
+section{margin-bottom:1em}
+.meta{color:#555;font-size:.9em}
+.note{background:#fff8e1;border-left:4px solid #ffb300;padding:.5em .8em;margin:.7em 0;font-size:.95em}
+</style>
+</head>
+<body>
+<header>
+<h1>/readme skill — Spec</h1>
+<p class="meta"><strong>Tier:</strong> 3 — Feature · <strong>Type:</strong> feature · <strong>Feature:</strong> readme-skill · <strong>Date:</strong> 2026-05-13 · <strong>Status:</strong> Ready for Plan · <strong>Requirements:</strong> <a href="01_requirements.html">01_requirements.html</a></p>
+<p><strong>Standing acceptance criteria (FR-61):</strong> the produced skill MUST conform to <code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code> §A–§F. §A–§F are turned into FR-A1…FR-F3 below (§7) so the resulting /plan tasks are testable against them. §G drives the <a href="#release-prerequisites">Release prerequisites</a> section.</p>
+</header>
+<main>
+
+<section id="phase-0-validation">
+<h2 id="phase-0-validation">Phase 0 Validation — A2/A4/A8 prereqs (per Q5/H8)</h2>
+<p>Required before /spec design per requirements Q5/H8. Method: LLM-only proxies during /spec session (~30 min subagent work). Real validation is queued as a /verify residual + post-v1 dogfood task.</p>
+<table>
+<tr><th>Assumption</th><th>Method</th><th>Verdict</th><th>Gate</th><th>Caveats / Follow-up</th></tr>
+<tr><td>A2 — rubric distinguishes good vs AI-slop READMEs</td><td>5 strong exemplars (FastAPI, ripgrep, htmx, stripe-node, Tailwind) fetched via WebFetch; 5 synthesized slop counter-examples; 15-check rubric applied; ≥12 of 15 = strong, ≤8 = slop.</td><td><strong>advisory pass</strong> — 10/10 = 100% agreement</td><td>≥85%</td><td>Single-agent ran both rubric + labels (no independence); slop synthesized not collected; n=10 not 20. Real A2 validation is a /verify residual — independent labeler + real-world slop sample required before v1 ships.</td></tr>
+<tr><td>A4 — simulated-reader personas surface real friction</td><td>Deferred — requires ≥3 real human cold-readers (not LLM-proxiable).</td><td><strong>deferred</strong></td><td>≥70% top-3 in-pair (loop-3 metric)</td><td>Hard residual. Post-v1 dogfood pass invites 3 unrelated pmos-toolkit users to cold-read 5 READMEs; simulator runs in parallel; result feeds /retro. If A4 fails, simulated-reader demotes to opt-in.</td></tr>
+<tr><td>A8 — workspace-manifest discovery ≥19/20</td><td>20 named public monorepos (Babel, Next.js, Turborepo, Nx, React Native, kubernetes/kubernetes, tokio, rust-lang/rust, ruff, uv, lerna, storybook, vue/core, vite, grafana, expo, FluidFramework, this repo, golang/example, Rush) fetched via WebFetch; manifest detection + precedence + enumeration checked.</td><td><strong>pass 20/20</strong> (19/20 strict reading)</td><td>≥19/20</td><td>5 hard FR refinements surfaced — see FR-WS-* below. Real-world re-run before release recommended (manifest contents drift over time).</td></tr>
+</table>
+<p class="note"><strong>Verdict on the prereq gate:</strong> design proceeds. Two residuals (A2 real validation, A4 trial) are accepted-risk per /skill-eval Phase 6a semantics and re-checked by /verify. The /spec is NOT re-opening requirements.</p>
+</section>
+
+<section id="problem-statement">
+<h2 id="problem-statement">1. Problem Statement</h2>
+<p>READMEs in repos that pmos-toolkit users maintain drift into internal-structure dumps — file inventories, directory trees, "Features" sections, welcome boilerplate — and fail the basic adoption question (what / who / why / how-to-start in 60 seconds). Three reader personas (evaluator-60s, adopter-5min, contributor-30min) are all blocked by the same structure-dump anti-pattern. We ship a <code>/readme</code> skill that audits or scaffolds READMEs against a rubric + simulated-reader, with three operating modes (<code>--audit</code>, <code>--scaffold</code>, <code>--update</code>) sharing one substrate, voice work delegated to <code>/polish</code>, and monorepo-aware workspace discovery. <strong>Primary success metric:</strong> rubric pass-rate ≥90% on first emit across the 5-README dogfood set (this repo's plugins).</p>
+</section>
+
+<section id="goals">
+<h2 id="goals">2. Goals</h2>
+<table>
+<tr><th>#</th><th>Goal</th><th>Success metric</th></tr>
+<tr><td>G1</td><td>Rubric pass on emit</td><td>≥90% of binary rubric checks pass on first /readme write across 5 dogfood READMEs</td></tr>
+<tr><td>G2</td><td>Cold-reader signal (A4 follow-up)</td><td>Binary top-3-in-pair ≥70% across ≥3 human/simulator pairs; gate before A4 demotion</td></tr>
+<tr><td>G3</td><td>Maintainer-actionable findings</td><td>≥5 findings approved on first audit of pmos-toolkit's own README</td></tr>
+<tr><td>G4</td><td>Voice preserved on round-trip</td><td>Mean-sentence-length delta &lt;15% AND token Jaccard ≥0.7 (both gates; either failure flips)</td></tr>
+<tr><td>G5</td><td>Monorepo workspace coverage</td><td>≥19/20 on the A8 fixture set (Babel, Next.js, Turborepo, Nx, React Native, kubernetes/kubernetes, Cargo, ruff, uv, lerna, storybook, vue/core, vite, grafana, expo, FluidFramework, this repo, golang/example, Rush, tokio)</td></tr>
+</table>
+</section>
+
+<section id="non-goals">
+<h2 id="non-goals">3. Non-Goals</h2>
+<ul>
+<li><strong>NOT</strong> doing sentence-level prose polish — delegated to <code>/polish</code> per D2.</li>
+<li><strong>NOT</strong> generating CHANGELOGs — release-please / git-cliff / <code>/changelog</code> already cover that.</li>
+<li><strong>NOT</strong> auto-enabling the /complete-dev Phase 7.6 hook in v1 — opt-in / default-off until ≥3 real-repo runs + /retro pass per M1.</li>
+<li><strong>NOT</strong> auto-committing the new README — /complete-dev is the canonical release entry per D9.</li>
+<li><strong>NOT</strong> supporting more than 8 workspace-manifest formats in v1 — long-tail (Bazel, yarn berry PnP, Bun, Rush) falls back to interactive repo-type pick per H3.</li>
+<li><strong>NOT</strong> running more than one simulated-reader iteration per D6.</li>
+</ul>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log">4. Decision Log</h2>
+<p>D1–D12 carried forward from <a href="01_requirements.html#design-decisions">01_requirements §Design Decisions</a> verbatim. D13–D16 added in /spec multi-role interview (Architect / Designer / DevOps). MS01 added from A8 multi-stack finding.</p>
+<table>
+<tr><th>#</th><th>Decision</th><th>Options considered</th><th>Rationale</th></tr>
+<tr><td>D13</td><td>Simulated-reader subagents dispatched in PARALLEL (3 personas at once), 1-iter cap unchanged.</td><td>(a) sequential 3-pass; (b) parallel single-pass (Recommended); (c) single-subagent multi-persona</td><td>Parallel mirrors /verify's multi-agent code review pattern; no inter-persona contention (each reads top-to-bottom independently); cuts wall-clock 3×. Per-persona subagent returns <code>{persona, friction:[{quote,line,severity}]}</code>; parent grep-validates quotes against source (FR-50/51/52 pattern from /grill).</td></tr>
+<tr><td>D14</td><td>Phase 7.6 hook orchestration lives in /complete-dev; /readme just exposes <code>--update &lt;commit-range&gt;</code>.</td><td>(a) hook registered globally by /readme; (b) /complete-dev invokes /readme --update (Recommended); (c) /readme polls git pre-merge</td><td>/complete-dev is the canonical release skill (CLAUDE.md). Inverting control keeps /complete-dev's commit-classifier ownership clean; /readme stays a pre-release operation. The opt-in flag lives in /complete-dev's run-defaults memory (<code>.pmos/complete-dev.lastrun.yaml</code>) per the per-repo pattern, plus <code>~/.pmos/readme/config.yaml :: phase_7_6_hook_enabled</code> as the per-user default.</td></tr>
+<tr><td>D15</td><td>Diff-preview is a single unified diff with per-file headers + one final approval.</td><td>(a) per-file N gates; (b) single unified diff + one gate (Recommended); (c) hybrid (per-file gate for blockers, unified for friction)</td><td>Monorepo audit-all on agent-skills (~30 files) with N gates is reviewer overload (premortem). One pass with per-file section headers respects the maintainer's attention budget. Per-finding approval still happens UPSTREAM during the audit pass (per primary journey step 6); the diff preview is the final "ship this?" gate, not a re-litigation of each finding.</td></tr>
+<tr><td>D16</td><td>Mode composition: <code>--audit + --scaffold</code> may compose in one invocation; <code>--update</code> runs alone.</td><td>(a) all three compose freely; (b) --audit + --scaffold compose, --update alone (Recommended); (c) no composition (single mode per invocation)</td><td>Audit+scaffold compose naturally in monorepos with mixed-presence READMEs (some packages have READMEs, others don't) — the workspace-scope AskUserQuestion already has a "scaffold-missing" option. <code>--update</code> is driven by /complete-dev's commit-classifier, runs in a release-time window, and shouldn't bundle with structural rewrites — risk of conflating release-patch with broader refactor.</td></tr>
+<tr><td>MS01</td><td>Multi-stack workspace-discovery: emit BOTH stacks when ≥2 supported manifests have disjoint package sets.</td><td>(a) emit both (Recommended); (b) F15 primary only; (c) prompt user at workspace-scope</td><td>Grafana (package.json#workspaces + go.work), Next.js Rust crates inside JS monorepo, etc. are real. F15 precedence still applies for single-manifest tiebreaks (Cargo ≻ pnpm ≻ package.json#workspaces ≻ go.work ≻ uv); multi-stack ADDS to it. Workspace-scope prompt gains a "multi-stack detected: include all" affordance. Adds ~2 FRs + a fixture but matches A8 real-world signal.</td></tr>
+</table>
+</section>
+
+<section id="user-journeys">
+<h2 id="user-journeys">5. User Personas &amp; Journeys</h2>
+<p>Personas and journey-narrative carry forward verbatim from <a href="01_requirements.html#user-journeys">01_requirements §User Journeys</a>. This section specifies the technical sequence behind each journey; see §6 for the architecture diagrams.</p>
+
+<h3 id="primary-journey-audit">5.1 Primary Journey — Audit existing README (single repo)</h3>
+<ol>
+<li>User runs <code>/readme</code> in repo with <code>README.md</code> present.</li>
+<li>Mode-resolver detects file → defaults to <code>--audit</code>. Logs <code>mode: audit (existing README detected)</code>.</li>
+<li>Workspace-discovery runs (FR-WS-1 below); single-package result, repo-type confirmed via heuristic + AskUserQuestion fallback when confidence &lt; threshold.</li>
+<li>README loaded, rubric variant for detected type selected, 15 checks scored → findings list emitted worst-first (blockers, friction, nits).</li>
+<li>Auto-apply pass: mechanical findings (banned-phrase flagging, hero-line trimming) auto-applied; logged as one "auto-applied N mechanical findings" line.</li>
+<li>Structural findings: AskUserQuestion per finding, batched ≤4 per call. If &gt;20 findings, triage prompt first ("Filter to blockers+friction (Recommended)?").</li>
+<li>Simulated-reader pass: 3 personas dispatched in PARALLEL subagents (D13); friction findings returned with quote+line; parent substring-validates quotes (FR-SR-3).</li>
+<li>Unresolved simulated-reader friction surfaces as a final findings batch.</li>
+<li>Diff preview emitted (proposed vs current). User confirms via AskUserQuestion.</li>
+<li>Atomic write (temp+rename) → suggest <code>/polish</code> for prose touch-up → DOES NOT COMMIT.</li>
+</ol>
+
+<h3 id="primary-journey-scaffold">5.2 Primary Journey — Scaffold (greenfield)</h3>
+<ol>
+<li>User runs <code>/readme</code> in repo without <code>README.md</code>.</li>
+<li>Mode-resolver → <code>--scaffold</code>.</li>
+<li>Repo-mining subagent dispatched: package manifest name, entry point (main/bin/CLI shebang), example usage (tests/, examples/), license file, contributors via <code>git log --format="%an" | sort -u | head -10</code>.</li>
+<li>Workspace-discovery → classify repo-type.</li>
+<li>Q&amp;A only for what can't be mined. ≤4 questions per AskUserQuestion call; hard cap ≤6 across whole scaffold flow; beyond that → stub README with TODO markers.</li>
+<li>Draft emitted using per-type opening shape + section-schema spine + Diátaxis linkouts.</li>
+<li>Rubric pass + simulated-reader pass.</li>
+<li>Diff preview ("here is the README that would land") → user confirms → atomic write.</li>
+</ol>
+
+<h3 id="primary-journey-update">5.3 Primary Journey — Update (Phase 7.6 hook)</h3>
+<p class="meta">Default-OFF; opt-in via <code>~/.pmos/readme/config.yaml :: phase_7_6_hook_enabled: true</code> AND <code>.pmos/complete-dev.lastrun.yaml :: readme_update_hook: true</code> (both required). Cleared for default-on after ≥3 real-repo runs with zero rubric-failed patches + a /retro neutral-or-positive (M1).</p>
+<ol>
+<li>/complete-dev Phase 7.6 detects opt-in → invokes <code>/readme --update &lt;commit-range&gt;</code> where range is <code>&lt;merge-base&gt;..HEAD</code>.</li>
+<li>Commit-classifier (FR-UP-1) runs over the commit range: conventional-commit prefix mapped to impacted sections via <code>section-schema.yaml :: commit_affinity</code> (v0 table per requirements; see <a href="#fr-update">§7.6</a>).</li>
+<li>Per impacted section: AskUserQuestion (Apply / Modify / Skip / Defer), ≤4 per call.</li>
+<li>If user approves: patch is re-scored against rubric (FR-UP-3 patch-fail guard). If patched README fails ANY blocker check, patch is DROPPED (not the release); /complete-dev logs "/retro: patch failed self-rubric" finding; release proceeds with un-patched README.</li>
+<li>If patch passes rubric: staged in working tree (not committed). /complete-dev's commit flow picks it up as part of release commit.</li>
+<li>No impacted sections OR classifier confidence below threshold → no-op with warn line ("README update skipped — &lt;reason&gt;"). Never blocks /complete-dev.</li>
+</ol>
+
+<h3 id="alternate-journey-monorepo">5.4 Alternate Journey — Monorepo audit-all</h3>
+<ol>
+<li>User runs <code>/readme</code> at monorepo root.</li>
+<li>Workspace-discovery parses ALL supported manifests; emits <em>"detected N workspaces via &lt;primary-manifest&gt;"</em>; for multi-stack repos (MS01) appends <em>"+ &lt;secondary-manifest&gt; (M additional packages)"</em>.</li>
+<li>Workspace-scope AskUserQuestion (FR-WS-4): <em>audit-all / audit-one / scaffold-missing / root-only (Recommended) / multi-stack: include all (only shown when MS01 triggers)</em>.</li>
+<li>On <code>audit-all</code>: each file processed against the rubric variant for its sub-type (rubric-variant table FR-RUB-2).</li>
+<li>Cross-file rules R1–R4 fire (FR-CF-1 to FR-CF-4).</li>
+<li>Findings rolled up by severity across packages first pass; per-package drill-down on demand.</li>
+<li>Per-package approval gates batched (one Y/n per package, not per finding) for non-blocker tiers; per-finding for blockers.</li>
+<li>Single unified diff preview (D15) spanning all touched files with per-file section headers. One final approval → atomic-multi-write.</li>
+</ol>
+
+<h3 id="error-journeys">5.5 Error journeys (summary)</h3>
+<p>Carry forward from <a href="01_requirements.html#error-journeys">01_requirements §Error journeys</a>: unknown manifest, dirty tree, 50+ findings, simulated-reader returns no friction, ambiguous cross-file rule. Each handled inline per the FR table; no additional spec-level mechanics.</p>
+</section>
+
+<section id="system-design">
+<h2 id="system-design">6. System Design</h2>
+
+<h3 id="architecture-overview">6.1 Architecture Overview</h3>
+<pre>
+                       ┌──────────────────────┐
+   /readme &lt;args&gt; ───► │   mode-resolver      │
+                       │   (parses argv +     │
+                       │   detects README)    │
+                       └────────┬─────────────┘
+                                │ resolved-mode
+                                │ scope={audit:[],scaffold:[]}
+                                ▼
+                  ┌─────────────────────────────────┐
+                  │       workspace-discovery       │
+                  │  (FR-WS-1..6: 8 manifests +     │
+                  │  multi-stack MS01 + F15)        │
+                  └────────┬───────────────┬────────┘
+                           │ classified    │ repo-type
+                           ▼               │
+                  ┌───────────────────┐    │
+                  │  repo-miner       │    │
+                  │  (subagent —      │    │
+                  │  manifest, entry, │    │
+                  │  examples, lic)   │    │
+                  └────────┬──────────┘    │
+                           ▼               ▼
+              ┌──────────────────────────────────────┐
+              │           orchestrator               │
+              │  (per-package iteration; calls       │
+              │   rubric + simulated-reader)         │
+              └──┬──────────────────┬────────────────┘
+                 │                  │
+        ┌────────▼─────────┐   ┌────▼────────────────┐
+        │ rubric.sh        │   │ simulated-reader.md │
+        │ (15 binary       │   │ (3 personas in      │
+        │ checks; bundled  │   │ PARALLEL subagents) │
+        │ script,          │   │ FR-50/51/52         │
+        │ --selftest)      │   │ contract            │
+        └────────┬─────────┘   └────────┬────────────┘
+                 ▼                       ▼
+              ┌──────────────────────────────────────┐
+              │       findings aggregator            │
+              │  (severity sort; auto-apply pass;    │
+              │  AskUserQuestion batching ≤4)        │
+              └────────┬─────────────────────────────┘
+                       ▼
+              ┌──────────────────────────┐
+              │  diff-preview renderer   │
+              │  (unified diff, per-file │
+              │  headers, D15)           │
+              └────────┬─────────────────┘
+                       ▼  user confirm
+              ┌──────────────────────────┐
+              │  atomic writer           │
+              │  (temp + rename;         │
+              │  snapshot-commit if      │
+              │  dirty)                  │
+              └──────────────────────────┘
+                       ▼
+              suggest /polish (prose) — DOES NOT COMMIT
+</pre>
+
+<h3 id="sequence-diagram-audit">6.2 Sequence — Audit (single repo)</h3>
+<figure>
+<img src="../../../diagrams/readme-skill-audit.svg" alt="Sequence diagram — /readme audit flow: User → /readme → workspace-discovery → rubric.sh → 3 parallel simulated-reader personas → user dispositions → unified diff → atomic write; /readme never commits" style="max-width:100%;height:auto;border:1px solid #ddd">
+<figcaption>Authored via /diagram subagent (attempt 1). Source: <code>docs/diagrams/readme-skill-audit.svg</code>. 6 lifelines · 17 messages · parallel persona fan-out · FR-SR-3 quote-validation; release boundary callout.</figcaption>
+</figure>
+
+<h3 id="sequence-diagram-update">6.3 Sequence — Update (Phase 7.6 hook)</h3>
+<figure>
+<img src="../../../diagrams/readme-skill-update.svg" alt="Sequence diagram — /readme --update hook flow: /complete-dev opt-in check → invoke /readme --update → commit-classifier → per-section dispositions → rubric re-score with alt [verdict] branch (FAIL: log + no-op per FR-UP-3 / PASS: git add stage-only per FR-UP-5) → /complete-dev commit flow" style="max-width:100%;height:auto;border:1px solid #ddd">
+<figcaption>Authored via /diagram subagent (attempt 1). Source: <code>docs/diagrams/readme-skill-update.svg</code>. 6 lifelines · 12 messages + alt-frame branching · D14, FR-UP-3, FR-UP-5 annotations.</figcaption>
+</figure>
+</section>
+
+<section id="functional-requirements">
+<h2 id="functional-requirements">7. Functional Requirements</h2>
+
+<h3 id="fr-skill-patterns">7.1 Skill-patterns conformance (FR-61 — §A–§F mapped)</h3>
+<table>
+<tr><th>ID</th><th>Requirement (mapped to skill-patterns.md §)</th></tr>
+<tr><td>FR-A1</td><td>SKILL.md frontmatter has <code>name: readme</code> (lowercase, hyphen-separated; ≤64; matches dir) (§A).</td></tr>
+<tr><td>FR-A2</td><td><code>description</code> ≤1024 chars; third-person; states what + when; includes ≥5 user-spoken trigger phrases ("audit my README", "scaffold a README", "fix my README", "generate a README", "review my README structure", "/readme") (§A + §B).</td></tr>
+<tr><td>FR-B1</td><td>Description contains no embedded step-list / workflow body (§B "no embedded workflow").</td></tr>
+<tr><td>FR-B2</td><td>Description is assertively phrased ("Use this whenever the user…") not hedged (§B "be pushy").</td></tr>
+<tr><td>FR-C1</td><td>SKILL.md body ≤500 lines (501–800 pass-with-note); references one level deep; portable paths (<code>${CLAUDE_PLUGIN_ROOT}</code> not <code>/Users/…</code>) (§C).</td></tr>
+<tr><td>FR-C2</td><td>Bundle layout: <code>scripts/</code> (rubric.sh, voice-diff.sh, workspace-discovery.sh, etc.); <code>reference/</code> (section-schema.yaml, simulated-reader.md, opening-shapes.md, rubric-variants.md); <code>assets/</code> none in v1 (§C "bundle layout").</td></tr>
+<tr><td>FR-C3</td><td>Each reference file &gt;100 lines opens with a ToC in its first ~15 lines (§C "reference-file ToC").</td></tr>
+<tr><td>FR-D1</td><td>SKILL.md body uses imperative voice; explains the "why" for non-obvious instructions; no all-caps shouting outside genuine load-bearing constraints (§D).</td></tr>
+<tr><td>FR-D2</td><td>Body has a <code>## Platform Adaptation</code> section right after the announce line (§D).</td></tr>
+<tr><td>FR-D3</td><td>Body has a learnings-load line ("Read <code>~/.pmos/learnings.md</code>; note entries under <code>## /readme</code>"); body has a numbered <code>## Phase N: Capture Learnings</code> phase at the end (§D).</td></tr>
+<tr><td>FR-D4</td><td>Body has a <code>## Track Progress</code> instruction near the top (≥3 phases) (§D).</td></tr>
+<tr><td>FR-D5</td><td>Body covers in spirit: Overview → When to Use → Core Pattern → Implementation → Anti-patterns (§D "recommended body skeleton" — guidance, not rigid).</td></tr>
+<tr><td>FR-E1</td><td>Bundled scripts (rubric.sh, voice-diff.sh, workspace-discovery.sh) document dependencies in their header comments (bash ≥4, jq, node where applicable) (§E).</td></tr>
+<tr><td>FR-E2</td><td>Each bundled script ships a <code>--selftest</code> mode that exits 0 on a smoke check (§E "scripts get self-tests").</td></tr>
+<tr><td>FR-E3</td><td>Evidence of eval-driven development: rubric.sh has a fixture set under <code>tests/fixtures/rubric/</code> (the 5+5 A2 set extended) and a documented validate→fix→repeat loop in <code>reference/rubric-development.md</code> (§E).</td></tr>
+<tr><td>FR-F1</td><td>Frontmatter has <code>user-invocable: true</code> + an <code>argument-hint</code> enumerating <strong>every</strong> parsed flag/positional: <code>--audit</code>, <code>--scaffold</code>, <code>--update &lt;range&gt;</code>, <code>--audit-all</code>, <code>--audit-one &lt;pkg&gt;</code>, <code>--scaffold-missing</code>, <code>--root-only</code>, <code>--format md</code>, <code>--non-interactive</code>, <code>--interactive</code>, <code>--skip-simulated-reader</code> (§F).</td></tr>
+<tr><td>FR-F2</td><td>No codex sidecar required (target_platform = claude-code per /skill-tier-resolve).</td></tr>
+</table>
+
+<h3 id="fr-modes">7.2 Modes &amp; CLI surface</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-MODE-1</td><td>Default mode resolution: README present → <code>--audit</code>; README absent → <code>--scaffold</code>; explicit flag wins.</td></tr>
+<tr><td>FR-MODE-2</td><td><code>--update &lt;commit-range&gt;</code> never composes with other modes (D16); attempting it errors with <code>--update is mutually exclusive with --audit/--scaffold</code> (exit 64).</td></tr>
+<tr><td>FR-MODE-3</td><td><code>--audit + --scaffold</code> may compose; skill resolves <code>scope = {audit:[paths], scaffold:[paths]}</code> from workspace-discovery (per D16); both lists may be non-empty; diff preview unifies them.</td></tr>
+<tr><td>FR-MODE-4</td><td>Mode resolution prints to chat: <code>mode: &lt;resolved&gt; (source: cli|default-readme-present|default-readme-absent)</code>.</td></tr>
+</table>
+
+<h3 id="fr-rubric">7.3 Rubric (15 binary checks)</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-RUB-1</td><td>Rubric lives in <code>reference/rubric.yaml</code> as 15 binary checks; severity distribution targets ≈4 blockers / 7 friction / 4 nits (D3).</td></tr>
+<tr><td>FR-RUB-2</td><td>Rubric variants per repo-type (7 types): <em>library / CLI / plugin / app / monorepo-root / monorepo-package / plugin-marketplace-root</em>. Variants override base checks (e.g., monorepo-package omits Install/Contributing/License checks, adds the R2 "links up to root" check). Encoded in YAML as <code>variants:</code> map.</td></tr>
+<tr><td>FR-RUB-3</td><td>Auto-apply policy: blockers + mechanical-friction (banned-phrase removal, hero-line trimming) auto-apply with single rolled-up log line; structural-friction findings require per-finding AskUserQuestion; nits surface in report but do not gate diff preview (D3).</td></tr>
+<tr><td>FR-RUB-4</td><td>Banned-phrase list closed for v1 in <code>reference/rubric.yaml :: banned_phrases</code>; user-extension via <code>~/.pmos/readme/banned-phrases.yaml</code> (read at startup, unioned). Q7 resolved: closed-by-default + opt-in extension.</td></tr>
+<tr><td>FR-RUB-5</td><td><code>scripts/rubric.sh &lt;readme-path&gt; [--variant &lt;type&gt;]</code> emits TSV <code>check_id\tverdict\tsection\tline\tfix_note</code>; exit 0 (all pass) / 1 (any fail) / 2 (script error).</td></tr>
+<tr><td>FR-RUB-6</td><td><code>scripts/rubric.sh --selftest</code> runs against the fixture set in <code>tests/fixtures/rubric/{strong,slop}/</code> and asserts the 100% A2-proxy result holds (regression gate).</td></tr>
+</table>
+
+<h3 id="fr-section-schema">7.4 Section schema &amp; opening shapes</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-SS-1</td><td><code>reference/section-schema.yaml</code> defines the standard-readme spine: <em>Title → Short Description → TOC → Install → Usage → Contributing → License</em> + Google's <em>Status</em>/<em>Maintainers</em> + Diátaxis <em>Documentation</em> linkout.</td></tr>
+<tr><td>FR-SS-2</td><td>Per-repo-type opening shapes defined in <code>reference/opening-shapes.md</code>: (a) <em>5-block</em> (hero → proof → show-don't-tell → install → why) for library/CLI/plugin/app/monorepo-package; (b) <em>map+identity</em> (hero → proof → contents-table → canonical-entry quickstart → why-these-pieces) for monorepo-root / plugin-marketplace-root (D5).</td></tr>
+<tr><td>FR-SS-3</td><td>Schema includes <code>commit_affinity</code> map for /update mode: <code>feat → {Features, Usage, Quickstart}</code>; <code>fix → {Changelog, Troubleshooting (if present)}</code>; <code>docs → {Documentation, Usage}</code>; <code>feat!|fix!|BREAKING CHANGE → {Migration, Changelog}</code>; <code>refactor|perf|test|chore → ∅</code>. Per-repo-type variants override the base table.</td></tr>
+</table>
+
+<h3 id="fr-workspace">7.5 Workspace discovery</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-WS-1</td><td><code>scripts/workspace-discovery.sh &lt;repo-root&gt;</code> probes the 8 supported manifests in this order: <code>pnpm-workspace.yaml</code>, <code>package.json#workspaces</code>, <code>lerna.json</code>, <code>nx.json</code>, <code>turbo.json</code>, root <code>Cargo.toml [workspace]</code>, <code>go.work</code>, <code>pyproject.toml [tool.uv.workspace]</code>. Emits JSON <code>{primary: &lt;manifest&gt;, secondaries: [...], packages: [{name, path, manifest_source}], repo_type: &lt;detected&gt;}</code>.</td></tr>
+<tr><td>FR-WS-2</td><td>Glob semantics: enumerator MUST honor (a) glob negation (e.g., <code>!private/helloworld</code> in react-native), (b) <code>exclude</code> arrays (rust-lang/rust Cargo workspace), (c) object-form <code>package.json#workspaces</code> (<code>{"packages":[...],"nohoist":[...]}</code> in grafana), (d) pnpm filter — only the <code>packages:</code> key is enumerated; <code>catalog:</code>/<code>overrides:</code>/<code>patchedDependencies:</code> ignored.</td></tr>
+<tr><td>FR-WS-3</td><td>F15 precedence (single-stack tiebreak, highest first): user override in <code>.pmos/readme.config.yaml :: workspace_manifest</code> → Cargo → pnpm-workspace → package.json#workspaces → go.work → uv. <code>lerna.json</code> defers to <code>package.json#workspaces</code> (clarified vs requirements). <code>nx.json</code>/<code>turbo.json</code> are NOT enumeration sources — they configure tooling; package list still comes from a JS workspace manifest.</td></tr>
+<tr><td>FR-WS-4</td><td>Multi-stack discovery (MS01): when ≥2 supported manifests have DISJOINT package sets (e.g., grafana JS + Go), emit BOTH; each package labeled <code>manifest_source: &lt;name&gt;</code>. Workspace-scope AskUserQuestion gains an additional option <em>"Include all stacks (JS + Go + …) (Recommended for multi-stack)"</em> shown only when multi-stack triggers.</td></tr>
+<tr><td>FR-WS-5</td><td>Repo-type classification: presence of <code>plugins/*/</code> + <code>.claude-plugin/marketplace.json</code> → <em>plugin-marketplace-root</em>; ≥1 supported workspace manifest → <em>monorepo-root</em>; <code>bin</code> or executable manifest entry + no workspace manifest → <em>CLI</em>; manifest with <code>main</code>/<code>module</code>/<code>exports</code> + no <code>bin</code> → <em>library</em>; web framework signal (next.config, vite, app/page.tsx, etc.) → <em>app</em>; <code>plugins/&lt;p&gt;/.claude-plugin/plugin.json</code> path → <em>plugin</em>; child of a workspace → <em>monorepo-package</em>. Ambiguous → AskUserQuestion fallback persisted in <code>.pmos/readme.config.yaml</code>.</td></tr>
+<tr><td>FR-WS-6</td><td>Long-tail formats (Bazel <code>WORKSPACE</code>/<code>MODULE.bazel</code>, yarn berry PnP, Bun, Rush <code>rush.json</code>): fallback to interactive repo-type pick with <code>detected: unknown layout</code> warn line.</td></tr>
+</table>
+
+<h3 id="fr-update">7.6 Update mode (Phase 7.6 hook)</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-UP-1</td><td>Commit-classifier consumes <code>&lt;commit-range&gt;</code> argument; parses each commit's subject via conventional-commit regex <code>^(feat|fix|docs|refactor|perf|test|chore)(\([^)]+\))?(!)?:\s</code>; <code>BREAKING CHANGE:</code> body footer detected via <code>git show --format=%b</code>. Maps to impacted sections via <code>section-schema.yaml :: commit_affinity</code>; per-repo-type override applied if present.</td></tr>
+<tr><td>FR-UP-2</td><td>Classifier confidence: minimum quorum is ≥1 conventional-commit-formatted commit in range. Range with zero conv-commit subjects → no-op + warn line "README update skipped — commit signal ambiguous (no conventional-commit subjects in &lt;range&gt;)" (per requirements error journey).</td></tr>
+<tr><td>FR-UP-3</td><td>Patch-fail guard: after staging the draft patch, re-run <code>rubric.sh</code> against the patched README. If ANY blocker check fails, ABORT the patch (drop, do not block release); log JSON line <code>{event:"patch_dropped", reason:"rubric_blocker_fail", failed_checks:[...]}</code> to <code>.pmos/readme/update.log</code> + emit <code>/retro</code> finding "patch failed self-rubric — manual review" (H6).</td></tr>
+<tr><td>FR-UP-4</td><td>Opt-in gate: hook fires only when BOTH (a) <code>~/.pmos/readme/config.yaml :: phase_7_6_hook_enabled: true</code> AND (b) <code>.pmos/complete-dev.lastrun.yaml :: readme_update_hook: true</code> are set. Either absent or false → no-op (D14).</td></tr>
+<tr><td>FR-UP-5</td><td>Patched README is staged via <code>git add &lt;readme-path&gt;</code> only; no <code>git commit</code> by /readme. /complete-dev's commit flow picks it up in the release commit (D11).</td></tr>
+<tr><td>FR-UP-6</td><td>"Cleared for default-on" criterion (M1): ≥3 real-repo /complete-dev runs with zero <code>patch_dropped</code> events in <code>update.log</code> AND a /retro pass with neutral-or-positive disposition. Decision logged by skill author; flips the default in <code>~/.pmos/readme/config.yaml</code> shipped template.</td></tr>
+</table>
+
+<h3 id="fr-simulated-reader">7.7 Simulated-reader</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-SR-1</td><td><code>reference/simulated-reader.md</code> defines 3 persona prompts: <em>evaluator</em> (60s scan — "keep reading?"), <em>adopter</em> (5min — "get to first success"), <em>contributor</em> (30min — "extend / contribute"). Each persona reads top-to-bottom and emits <code>{persona, friction:[{quote:"≥40 chars verbatim", line:N, severity:"blocker|friction|nit"}]}</code>.</td></tr>
+<tr><td>FR-SR-2</td><td>Dispatched in PARALLEL via 3 concurrent Task subagent calls (D13). Per-persona timeout 120s; on timeout, persona is skipped with a chat warn line; remaining personas continue.</td></tr>
+<tr><td>FR-SR-3</td><td>Parent-side validation (FR-50/51/52 pattern from /grill): substring-grep every <code>quote</code> against the un-stripped README source; any miss → hard-fail with <code>simulated-reader returned quote not found in README: &lt;prefix-30&gt;…</code>; pause with failure dialog.</td></tr>
+<tr><td>FR-SR-4</td><td>1-iteration cap (D6); no convergence loop. Findings merged into the main rubric findings stream (severity-tagged); duplicates of rubric findings (same line ±2) deduped.</td></tr>
+<tr><td>FR-SR-5</td><td>Theater-check: if a persona returns zero friction AND the rubric returned ≥3 findings, re-prompt that persona ONCE with "you have alternatives and 90 seconds; what makes you bounce?" suffix injected (per requirements error-journey row). After re-prompt, accept the result (even if still empty).</td></tr>
+<tr><td>FR-SR-6</td><td><code>--skip-simulated-reader</code> CLI flag bypasses the entire persona pass; logged as <code>simulated-reader: skipped (--skip-simulated-reader)</code>. Useful for fast iteration; documented as not-recommended-for-final-runs.</td></tr>
+</table>
+
+<h3 id="fr-cross-file">7.8 Cross-file rules (monorepo)</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-CF-1</td><td>R1 — Root links to every package: each detected workspace package's <code>README.md</code> is referenced (by relative link) from the root README's contents-table. Auto-fix: <em>create-or-update</em> (when table exists, append missing entries inline; when no table exists, structural rewrite — surface explicit AskUserQuestion: "root README has no contents-table — add one? [show preview]" before write) (M2).</td></tr>
+<tr><td>FR-CF-2</td><td>R2 — Packages link up to root: every package README has a relative-link reference back to root README. Auto-fix: add the link-up line at end-of-readme (configurable section).</td></tr>
+<tr><td>FR-CF-3</td><td>R3 — Install/Contributing/License sections at root only (warn-with-override): package READMEs with these sections either (a) match root byte-for-byte → friction, auto-fix replaces with link-up; (b) diverge → <em>warn-with-override</em>, not blocker. Auto-fix offers "replace with link-up to root" OR "mark this package as legitimate variance" (persisted in <code>.pmos/readme.config.yaml :: package_variance: [&lt;path&gt;]</code>). Real monorepos (kubernetes/kubernetes, Babel) legitimately diverge (H5).</td></tr>
+<tr><td>FR-CF-4</td><td>R4 — No duplicate hero-line text between root and any package: surface as friction; require manual edit (hero lines voice-sensitive — delegated to maintainer).</td></tr>
+<tr><td>FR-CF-5</td><td>A9 clarity test applied at design-time: each rule above produces a binary pass/fail with no human judgment required. Rules failing A9 demote to friction-tier advisory. Test executed during skill development; results logged in <code>reference/cross-file-rules.md</code>.</td></tr>
+</table>
+
+<h3 id="fr-voice">7.9 Voice delegation</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-V-1</td><td>Structural-vs-prose boundary: <em>structural</em> = section order/presence/absence, hero-line shape, opening pattern, link-out direction, banned-phrase <strong>flagging</strong> only (token-level "line 14: 'blazing fast' — banned by rubric"). <em>Prose</em> = banned-phrase <strong>removal</strong>, sentence rewriting, paragraph-level voice, tone, register. /readme FLAGS, /polish REMOVES (H4).</td></tr>
+<tr><td>FR-V-2</td><td>When /readme structural rewrites would brush the prose line, output includes a suggested follow-up: <code>Suggest: /polish &lt;readme-path&gt; --target=sections=&lt;list&gt;</code> with the flagged ranges as targets.</td></tr>
+<tr><td>FR-V-3</td><td>Voice-drift gate (G4): <code>scripts/voice-diff.sh &lt;pre&gt; &lt;post&gt;</code> returns JSON <code>{sentence_len_delta_pct, jaccard_new_tokens}</code>. Gates: <code>sentence_len_delta_pct &lt; 15</code> AND <code>jaccard_new_tokens ≥ 0.7</code>. Either failure flips the gate; the diff-preview surfaces the failure as a blocker finding.</td></tr>
+<tr><td>FR-V-4</td><td>voice-diff.sh wraps /polish's voice-preservation substrate (specific path resolved at /execute time via <code>find plugins/pmos-toolkit/skills/polish/ -name 'voice*'</code>). On substrate absence → graceful warn ("voice-diff substrate not found; G4 gate skipped").</td></tr>
+</table>
+
+<h3 id="fr-output">7.10 Output / UX surface</h3>
+<table>
+<tr><th>ID</th><th>Requirement</th></tr>
+<tr><td>FR-OUT-1</td><td>Diff preview format: unified diff (<code>git diff --no-index --word-diff=plain</code>) for each touched file, prefixed with <code>=== package: &lt;name&gt; (audit|scaffold) ===</code> header (D15). Single confirm prompt at the end: <em>Apply all (Recommended) / Reject all / Cancel</em>.</td></tr>
+<tr><td>FR-OUT-2</td><td>AskUserQuestion batching: ≤4 questions per call across all phases. &gt;4 findings → multiple sequential calls; &gt;20 findings → triage prompt first ("Filter to blockers + friction (Recommended)? / Review all N") per requirements.</td></tr>
+<tr><td>FR-OUT-3</td><td>Scaffold-flow question cap: ≤6 questions total. Beyond cap, skill emits a stub README with explicit <code>&lt;!-- TODO(/readme): &lt;reason&gt; --&gt;</code> markers rather than continuing to interrogate.</td></tr>
+<tr><td>FR-OUT-4</td><td>Atomic write: temp file <code>&lt;readme-path&gt;.tmp.&lt;pid&gt;</code> + <code>rename(2)</code>. If <code>git status --porcelain &lt;readme-path&gt;</code> is non-empty pre-write, snapshot-commit first: <code>git add &lt;readme-path&gt; &amp;&amp; git commit -m "snapshot: pre-/readme-rewrite"</code>.</td></tr>
+<tr><td>FR-OUT-5</td><td>Never auto-commits the new README (D9). Output ends with <code>README written to &lt;path&gt;. Run /complete-dev to include it in the release commit.</code></td></tr>
+</table>
+
+<h3 id="fr-config">7.11 Configuration</h3>
+<p>Two config layers (per-user + per-repo). Settings-absent fallback: skill uses its built-in defaults with a one-line notice; never blocks (per requirements F6 row).</p>
+<table>
+<tr><th>Layer</th><th>Path</th><th>Schema</th></tr>
+<tr><td>Per-user</td><td><code>~/.pmos/readme/config.yaml</code></td><td><code>phase_7_6_hook_enabled: bool (default false)</code><br><code>banned_phrases_extend: [str] (default [])</code><br><code>default_format: "md" (only md supported in v1)</code></td></tr>
+<tr><td>Per-repo</td><td><code>.pmos/readme.config.yaml</code></td><td><code>workspace_manifest: &lt;name&gt; (override F15 precedence)</code><br><code>repo_type: &lt;type&gt; (persist ambiguous detection)</code><br><code>package_variance: [&lt;rel-path&gt;] (R3 override)</code><br><code>readme_path: &lt;rel-path&gt; (when README is not at root)</code></td></tr>
+</table>
+</section>
+
+<section id="non-functional-requirements">
+<h2 id="non-functional-requirements">8. Non-Functional Requirements</h2>
+<table>
+<tr><th>ID</th><th>Category</th><th>Requirement</th></tr>
+<tr><td>NFR-1</td><td>Performance</td><td>Single-repo audit completes in &lt;30s wall-clock excluding user interaction. Monorepo audit-all (N packages): linear in N at ≤5s/package; simulated-reader parallelism keeps it sub-linear in personas.</td></tr>
+<tr><td>NFR-2</td><td>Idempotency</td><td>Re-running /readme on a clean README (rubric all-pass) produces NO findings + NO diff. <code>--audit</code> on a /readme-emitted scaffold output is a no-op.</td></tr>
+<tr><td>NFR-3</td><td>Observability</td><td>One chat log line per major decision: <code>mode: …</code>, <code>workspace: detected … via …</code>, <code>rubric: N pass / M fail</code>, <code>simulated-reader: N personas (P parallel, K skipped)</code>, <code>auto-applied N mechanical findings</code>, <code>write: &lt;path&gt; (atomic)</code>.</td></tr>
+<tr><td>NFR-4</td><td>Failure isolation</td><td>Simulated-reader subagent crash does NOT block the rubric pass; logged as <code>simulated-reader: persona &lt;p&gt; failed (&lt;err&gt;); proceeding with N-1 personas</code>.</td></tr>
+<tr><td>NFR-5</td><td>Portability</td><td>Skill scripts use bash ≥4 + standard coreutils + jq + node (for JSON/YAML manifest parsing). All deps documented in <code>SKILL.md ## Platform Adaptation</code> and per-script header.</td></tr>
+<tr><td>NFR-6</td><td>Context economy (FR-C1)</td><td>SKILL.md body ≤500 lines; if 501–800, body justifies the length in a one-line pass-with-note. Reference files carry the depth.</td></tr>
+</table>
+</section>
+
+<section id="api-contracts">
+<h2 id="api-contracts">9. CLI &amp; Subagent Contracts</h2>
+<p>No HTTP API. The "API surface" is the CLI argument grammar + the subagent dispatch contracts.</p>
+
+<h3 id="cli-grammar">9.1 CLI grammar</h3>
+<pre>
+/readme [--audit|--scaffold|--update &lt;commit-range&gt;]
+        [--audit-all|--audit-one &lt;pkg&gt;|--scaffold-missing|--root-only]
+        [--format md]                          # only md in v1
+        [--skip-simulated-reader]
+        [--non-interactive|--interactive]
+        [&lt;repo-path&gt;]                          # defaults to cwd
+</pre>
+
+<h3 id="subagent-contracts">9.2 Subagent dispatch contracts</h3>
+<h4 id="subagent-simulated-reader">9.2.1 Simulated-reader persona subagent</h4>
+<p><strong>Dispatch:</strong> 3 concurrent Task calls, one per persona (evaluator / adopter / contributor). Prompt body inlines the persona definition from <code>reference/simulated-reader.md</code> + the un-stripped README markdown source. <strong>Per-call timeout:</strong> 120s. <strong>Return shape (validated parent-side):</strong></p>
+<pre>
+{
+  "persona": "evaluator" | "adopter" | "contributor",
+  "friction": [
+    { "quote": "&lt;≥40-char verbatim substring of README&gt;",
+      "line": &lt;1-indexed&gt;,
+      "severity": "blocker" | "friction" | "nit",
+      "message": "&lt;1-sentence concrete friction&gt;" }
+  ]
+}
+</pre>
+<p>Parent validation: substring-grep every <code>quote</code> against README source; any miss → hard-fail (FR-SR-3).</p>
+
+<h4 id="subagent-repo-miner">9.2.2 Repo-miner subagent (scaffold mode)</h4>
+<p><strong>Dispatch:</strong> single Task call. Prompt body inlines the supported-manifest list + the repo-root path. <strong>Return shape:</strong></p>
+<pre>
+{
+  "name": "&lt;project name from manifest&gt;",
+  "entry_point": "&lt;main|bin|cli-shebang path or null&gt;",
+  "example_usage": "&lt;code snippet from tests/ or examples/ or null&gt;",
+  "license": "&lt;SPDX id or filename or null&gt;",
+  "contributors": ["&lt;name&gt;", ...],   // top 10 by git-log frequency
+  "repo_type_hint": "&lt;type&gt; | null"
+}
+</pre>
+</section>
+
+<section id="persisted-state">
+<h2 id="persisted-state">10. Persisted State</h2>
+<p>No database. Two YAML files (per §7.11) + transient logs.</p>
+<table>
+<tr><th>File</th><th>Persistence</th><th>Lifetime</th></tr>
+<tr><td><code>~/.pmos/readme/config.yaml</code></td><td>Per-user defaults</td><td>Long-lived; user-edited</td></tr>
+<tr><td><code>.pmos/readme.config.yaml</code></td><td>Per-repo overrides</td><td>Committed to repo; survives across users</td></tr>
+<tr><td><code>~/.pmos/readme/banned-phrases.yaml</code></td><td>Optional per-user banned-phrase extension</td><td>Long-lived</td></tr>
+<tr><td><code>.pmos/readme/update.log</code></td><td>Update-mode patch-drop JSON log</td><td>Append-only; surfaced to /retro</td></tr>
+<tr><td><code>tests/fixtures/rubric/{strong,slop}/</code></td><td>Rubric self-test fixtures</td><td>Committed; A2 regression gate</td></tr>
+<tr><td><code>tests/fixtures/workspaces/</code></td><td>Workspace-discovery self-test fixtures</td><td>Committed; A8 regression gate</td></tr>
+</table>
+</section>
+
+<section id="edge-cases">
+<h2 id="edge-cases">11. Edge Cases</h2>
+<table>
+<tr><th>#</th><th>Scenario</th><th>Condition</th><th>Expected behavior</th></tr>
+<tr><td>E1</td><td>.pmos/settings.yaml absent</td><td>/readme invoked in repo never touched by pipeline</td><td>Use built-in defaults (md format, no workstream); one-line notice; never blocks (requirements F6).</td></tr>
+<tr><td>E2</td><td>Empty repo (manifest only)</td><td>No callable entry point resolves</td><td>Emit stub README with 5-block shape + <code>&lt;!-- TODO(/readme) --&gt;</code> markers; never invent commands.</td></tr>
+<tr><td>E3</td><td>Multi-plausible repo-type</td><td>e.g., CLI tool + library (npm package w/ bin + main)</td><td>AskUserQuestion → persist in <code>.pmos/readme.config.yaml :: repo_type</code>.</td></tr>
+<tr><td>E4</td><td>Workspace missing manifest</td><td>workspace dir exists, no manifest file</td><td>Skip workspace with warn; do not fail audit-all.</td></tr>
+<tr><td>E5</td><td>Multi-manifest precedence (F15)</td><td>≥2 supported manifests coexist</td><td>Apply FR-WS-3 precedence; for disjoint package sets, MS01 multi-stack emit (FR-WS-4).</td></tr>
+<tr><td>E6</td><td>README in non-standard location</td><td>repo has no root README but <code>docs/README.md</code> exists</td><td>Audit found file; warn about location; offer to move (or persist <code>readme_path:</code> in repo config).</td></tr>
+<tr><td>E7</td><td>Generated README &gt;200 lines</td><td>scaffold exceeds soft ceiling</td><td>Soft warning: suggest moving Tutorials / How-to / Reference / Explanation content into <code>docs/</code> linked from README (Diátaxis discipline).</td></tr>
+<tr><td>E8</td><td>Audit produces 50+ findings on monorepo</td><td>large monorepo, first-pass audit-all</td><td>Auto-filter to blockers-only first pass; offer "show friction+nit" expand on demand; cap interactive prompts at 4-per-batch.</td></tr>
+<tr><td>E9</td><td>Simulated-reader returns no friction</td><td>persona returns empty AND rubric returned ≥3 findings</td><td>Theater-check: re-prompt persona ONCE with failure-seeking suffix; accept result after re-prompt (FR-SR-5).</td></tr>
+<tr><td>E10</td><td>Cross-file rule produces ambiguous result</td><td>R1–R4 fail the A9 clarity test for a given case</td><td>Demote to friction-tier advisory; never blocker (FR-CF-5).</td></tr>
+<tr><td>E11</td><td>Dirty tree at write time</td><td><code>git status --porcelain &lt;readme&gt;</code> non-empty</td><td>Snapshot-commit first: <code>git commit -m "snapshot: pre-/readme-rewrite"</code> (FR-OUT-4).</td></tr>
+<tr><td>E12</td><td>Update-mode classifier confidence below threshold</td><td>commit range has zero conv-commit subjects</td><td>No-op + warn "README update skipped — commit signal ambiguous"; never blocks /complete-dev (FR-UP-2).</td></tr>
+<tr><td>E13</td><td>Update-mode patch fails own rubric</td><td>patched README fails any blocker check</td><td>Drop patch; release proceeds unpatched; log to <code>update.log</code> + /retro (FR-UP-3).</td></tr>
+<tr><td>E14</td><td>Simulated-reader persona timeout</td><td>120s per-persona limit hit</td><td>Skip that persona; warn line; continue with remaining personas (NFR-4).</td></tr>
+<tr><td>E15</td><td>Long-tail manifest (Bazel/Bun/Rush/yarn-berry)</td><td>No supported manifest detected</td><td>Fallback to interactive repo-type pick with "detected: unknown layout" warn (FR-WS-6).</td></tr>
+</table>
+</section>
+
+<section id="feature-flags">
+<h2 id="feature-flags">12. Configuration &amp; Feature Flags</h2>
+<table>
+<tr><th>Variable</th><th>Default</th><th>Purpose</th></tr>
+<tr><td><code>~/.pmos/readme/config.yaml :: phase_7_6_hook_enabled</code></td><td><code>false</code></td><td>Per-user default for /complete-dev Phase 7.6 hook; flips to <code>true</code> after M1 "cleared" criterion met</td></tr>
+<tr><td><code>.pmos/complete-dev.lastrun.yaml :: readme_update_hook</code></td><td><code>false</code></td><td>Per-repo per-developer opt-in; must be true alongside user default</td></tr>
+<tr><td><code>--skip-simulated-reader</code> CLI flag</td><td>off</td><td>Bypass persona dispatch for fast iteration; not recommended for final runs</td></tr>
+<tr><td><code>~/.pmos/readme/banned-phrases.yaml</code></td><td>absent</td><td>User-extension of the rubric's banned-phrase list (Q7)</td></tr>
+<tr><td><code>.pmos/readme.config.yaml :: workspace_manifest</code></td><td>absent</td><td>Override F15 precedence for multi-manifest repos</td></tr>
+<tr><td><code>.pmos/readme.config.yaml :: package_variance</code></td><td><code>[]</code></td><td>R3 override list — packages allowed legitimate Install/Contributing/License divergence from root</td></tr>
+</table>
+</section>
+
+<section id="testing-strategy">
+<h2 id="testing-strategy">13. Testing &amp; Verification Strategy</h2>
+
+<h3 id="unit-tests">13.1 Unit / script tests</h3>
+<table>
+<tr><th>Script</th><th>Self-test command</th><th>Assertion</th></tr>
+<tr><td><code>scripts/rubric.sh</code></td><td><code>scripts/rubric.sh --selftest</code></td><td>Runs 15 checks against <code>tests/fixtures/rubric/{strong,slop}/</code> (10 fixtures from A2 proxy, extended over time). Asserts ≥85% agreement (A2 gate); exit 1 on regression.</td></tr>
+<tr><td><code>scripts/workspace-discovery.sh</code></td><td><code>scripts/workspace-discovery.sh --selftest</code></td><td>Runs against <code>tests/fixtures/workspaces/{pnpm-monorepo,npm-workspaces,object-form,cargo-with-exclude,multi-stack,glob-negation,lerna-classic,go-work,uv-workspace,...}</code>. Asserts ≥19/20 pass (A8 gate).</td></tr>
+<tr><td><code>scripts/voice-diff.sh</code></td><td><code>scripts/voice-diff.sh --selftest</code></td><td>Compares hand-edited fixture pre/post against known-good output; asserts sentence-len delta + Jaccard within tolerance.</td></tr>
+<tr><td><code>scripts/commit-classifier.sh</code></td><td><code>scripts/commit-classifier.sh --selftest</code></td><td>Synthetic commit subjects → asserts section-affinity table maps correctly per FR-SS-3.</td></tr>
+</table>
+
+<h3 id="integration-tests">13.2 Integration tests</h3>
+<p>End-to-end fixture runs in <code>tests/integration/</code>:</p>
+<ul>
+<li><strong>scaffold_greenfield.sh</strong> — invoke /readme on an empty fixture repo; assert per-type opening shape emitted; assert ≤200 lines.</li>
+<li><strong>audit_clean.sh</strong> — invoke /readme on a /readme-emitted scaffold; assert NFR-2 idempotency (zero findings, zero diff).</li>
+<li><strong>audit_cluttered.sh</strong> — invoke /readme on a "good-but-cluttered" fixture; assert ≤20 lines of structural diff (per requirements satisfaction signal).</li>
+<li><strong>compose_audit_scaffold.sh</strong> — invoke /readme on a fixture monorepo with mixed-presence READMEs; assert unified diff covers both modes (D16 + FR-MODE-3).</li>
+<li><strong>multi_stack_grafana_style.sh</strong> — fixture with package.json#workspaces + go.work; assert MS01 emits BOTH stacks (FR-WS-4).</li>
+<li><strong>update_hook_dry_run.sh</strong> — synthetic commit history; assert patch-drop on blocker-fail (FR-UP-3); assert no-op when opt-in flags absent (FR-UP-4).</li>
+<li><strong>cross_file_rules.sh</strong> — monorepo fixture; assert R1–R4 fire correctly; R3 warn-with-override (not blocker) for divergent package.</li>
+</ul>
+
+<h3 id="reviewer-subagent-tests">13.3 Reviewer-subagent contract tests</h3>
+<p>Mock-LLM stub in <code>tests/mocks/simulated_reader_stub.sh</code> returns canned persona output; parent FR-SR-3 substring-validation tested with: (a) valid quotes → pass; (b) altered quotes (1-char casing slip mirroring grill F15 advisory) → hard-fail; (c) empty friction → re-prompt re-fire (FR-SR-5).</p>
+
+<h3 id="verification-commands">13.4 Verification commands (run by /verify)</h3>
+<pre>
+# Phase 6a + Phase 7 (binary skill-eval rubric)
+feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/
+
+# Script self-tests
+bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest
+bash plugins/pmos-toolkit/skills/readme/scripts/workspace-discovery.sh --selftest
+bash plugins/pmos-toolkit/skills/readme/scripts/voice-diff.sh --selftest
+bash plugins/pmos-toolkit/skills/readme/scripts/commit-classifier.sh --selftest
+
+# Integration suite
+for t in plugins/pmos-toolkit/skills/readme/tests/integration/*.sh; do bash "$t"; done
+
+# Dogfood (run by /verify Phase 7)
+/readme --audit  # on this repo's root README
+/readme --audit  # on each of the 5 dogfood plugins (G1 gate, ≥90% rubric pass)
+</pre>
+
+<h3 id="manual-spot-checks">13.5 Manual spot checks (deferred to /verify)</h3>
+<ul>
+<li>A2 real validation — independent labeler + 20-README real corpus (post-v1 dogfood).</li>
+<li>A4 trial — ≥3 human cold-readers vs simulated-reader; G2 gate before A4 demotion.</li>
+</ul>
+</section>
+
+<section id="rollout-strategy">
+<h2 id="rollout-strategy">14. Rollout Strategy</h2>
+<ol>
+<li><strong>v1 ship:</strong> all three modes (<code>--audit</code>, <code>--scaffold</code>, <code>--update</code>) land in one commit; update-mode opt-in/default-off via dual flag (FR-UP-4).</li>
+<li><strong>Day-1 dogfood:</strong> /readme runs against this repo's root README + the 5 dogfood plugin READMEs (pmos-toolkit, etc.); G1 (≥90% rubric pass) and G3 (≥5 findings approved on first audit) gate the release.</li>
+<li><strong>Cleared-for-default-on:</strong> after ≥3 real-repo /complete-dev runs with zero <code>patch_dropped</code> events + a /retro neutral-or-positive disposition, skill author flips the <code>phase_7_6_hook_enabled</code> default in the shipped <code>~/.pmos/readme/config.yaml</code> template (FR-UP-6). This is a follow-up release, not v1.</li>
+<li><strong>A4 trial:</strong> post-v1 dogfood pass invites 3 unrelated pmos-toolkit users to cold-read 5 READMEs; simulator runs in parallel; G2 gate. If A4 fails, simulated-reader demotes to opt-in via <code>--skip-simulated-reader</code> becoming the default + opt-in <code>--with-simulated-reader</code>.</li>
+<li><strong>D12 taxonomy extension trigger:</strong> after v1, extension to an 8th repo-type is gated by ≥2 real repos that don't fit + a /retro pass with a documented rationale.</li>
+<li><strong>Rollback:</strong> /readme is non-destructive (atomic write, snapshot-commit, never auto-commits). Rollback is <code>git checkout HEAD &lt;readme-path&gt;</code> or revert of the snapshot-commit. No deploy-time risk.</li>
+</ol>
+</section>
+
+<section id="release-prerequisites">
+<h2 id="release-prerequisites">15. Release prerequisites</h2>
+<p>Per skill-patterns.md §G — items in this section are <code>/complete-dev</code>'s scope (Phase 8), NOT <code>/plan</code>-wave tasks for <code>/execute</code>. /plan in skill modes MUST filter these out (FR-63 in feature-sdlc; FR-RUB-G in skill-eval).</p>
+<ul>
+<li><strong>README row</strong> — add a new row to <code>README.md</code> under <em>### Artifacts &amp; docs</em> (between <code>/polish</code> and <code>/changelog</code>): <code>| `/pmos-toolkit:readme` | Audit, scaffold, or update READMEs against a 15-check rubric + 3-persona simulated reader; monorepo-aware (8 manifests + multi-stack); voice work delegated to /polish; never auto-commits |</code></li>
+<li><strong>Both <code>plugin.json</code> manifests</strong> — minor version bump (2.46.0 → 2.47.0) in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> and <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code>, in ONE commit (pre-push hook enforces sync per CLAUDE.md).</li>
+<li><strong>Changelog</strong> — entry in <code>docs/pmos/changelog.md</code> (canonical changelog, lowercase per CLAUDE.md) describing the new <code>/readme</code> skill + the three modes + the opt-in Phase 7.6 hook.</li>
+<li><strong>Learnings header bootstrap</strong> — add <code>## /readme</code> section header to <code>~/.pmos/learnings.md</code> if absent (idempotent — only append if missing). Header only; no entries.</li>
+<li><strong>CLAUDE.md</strong> — no edits required (skill-authoring conventions section already canonical; <code>/readme</code>'s canonical path falls under existing rules).</li>
+</ul>
+<p class="note"><strong>Out of scope for /plan + /execute:</strong> the five items above. <strong>In scope for /plan + /execute:</strong> SKILL.md content, <code>reference/*</code>, <code>scripts/*</code>, <code>tests/*</code>.</p>
+</section>
+
+<section id="research-sources">
+<h2 id="research-sources">16. Research Sources</h2>
+<table>
+<tr><th>Source</th><th>Type</th><th>Key takeaway</th></tr>
+<tr><td><code>docs/pmos/features/2026-05-13_readme-skill/01_requirements.html</code></td><td>This feature's requirements doc</td><td>Three modes, rubric+simulated-reader+/polish-delegation, monorepo-aware, opt-in update hook. 27 stable IDs; 12 design decisions; D-count 12; Approved-for-/spec after 3 loops.</td></tr>
+<tr><td><code>docs/pmos/features/2026-05-13_readme-skill/grills/2026-05-13_01_requirements.html</code></td><td>This feature's /grill report</td><td>14 validated findings applied loop-3 (2 blockers, 8 high, 4 medium) + 1 advisory.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code> §A–§F</td><td>Standing acceptance criteria (FR-61)</td><td>16 FRs (FR-A1..FR-F2) in §7.1 are direct mappings; §G drives Release prerequisites.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-eval.md</code></td><td>Binary skill-eval rubric</td><td>Phase 6a will grade /readme implementation against this; /verify re-runs.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/polish/</code></td><td>Voice-preservation skill</td><td>FR-V-1..V-4 delegate sentence-level prose to /polish; voice-diff.sh reuses /polish substrate.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/grill/</code></td><td>Reviewer-subagent contract (FR-50/51/52)</td><td>FR-SR-3 mirrors /grill's parent-side substring-grep validation pattern for simulated-reader.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/complete-dev/</code></td><td>Phase 7.6 hook owner</td><td>D14 inverts control — /complete-dev invokes /readme --update; opt-in gate lives in complete-dev's lastrun.yaml.</td></tr>
+<tr><td>A2 proxy report (in-skill, this run)</td><td>Phase 0 validation — advisory pass 10/10</td><td>Rubric design plausible; banned-phrase + hero-shape + quickstart-presence are load-bearing; nit checks could shrink.</td></tr>
+<tr><td>A8 proxy report (in-skill, this run)</td><td>Phase 0 validation — pass 20/20</td><td>Surfaced 5 FR refinements: glob negation, exclude semantics, object-form workspaces, pnpm filter, multi-stack discovery (MS01).</td></tr>
+<tr><td>standard-readme + Diátaxis + awesome-readme</td><td>External standards / curated</td><td>Spine (standard-readme) + linkout discipline (Diátaxis) + convergent 5-block pattern (awesome-readme top-10 synth).</td></tr>
+<tr><td>readme-md-generator / README-AI / Copilot "Generate README" / readme.so</td><td>Prior art (template-fillers, AI-driven)</td><td>None ships a rubric + simulated-reader + voice delegation + monorepo awareness. The differentiation is uncontested.</td></tr>
+</table>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">16.5 Open Questions</h2>
+<p><strong>None.</strong> All carry-forward open questions from requirements are resolved in spec body:</p>
+<ul>
+<li><strong>Q1</strong> (resolved at requirements loop-3 by D12) — Taxonomy closed at 7 for v1; extension trigger documented.</li>
+<li><strong>Q2</strong> (resolved here) — Monorepo findings presentation: per <a href="#decision-log">D15</a> + journey 5.4 step 6, rolled up by severity across packages first pass; per-package drill-down on demand.</li>
+<li><strong>Q3</strong> (resolved at requirements loop-3 by R3) — monorepo-package rubric variant omits Install/Contributing/License + adds R2 link-up; encoded in FR-RUB-2.</li>
+<li><strong>Q4</strong> (resolved at requirements by D11) — Update-mode emits suggested patch; /complete-dev commits via FR-UP-5.</li>
+<li><strong>Q5</strong> (resolved here) — A2/A4/A8 hard prereq satisfied via <a href="#phase-0-validation">§Phase 0 Validation</a> proxies; A2 + A4 carried as accepted residuals to /verify.</li>
+<li><strong>Q6</strong> (resolved here) — /readme ships as a pmos-toolkit skill at <code>plugins/pmos-toolkit/skills/readme/</code> per /skill-tier-resolve (target_platform=claude-code, location resolved Phase 0d).</li>
+<li><strong>Q7</strong> (resolved here) — Banned-phrase list closed for v1 + opt-in user-extension via <code>~/.pmos/readme/banned-phrases.yaml</code> per FR-RUB-4.</li>
+</ul>
+</section>
+
+<section id="review-log">
+<h2 id="review-log">17. Review Log</h2>
+<table>
+<tr><th>Loop</th><th>Findings</th><th>Changes made</th></tr>
+<tr><td>1 (initial write)</td><td>Drafted from 01_requirements.html + skill-patterns.md §A–§F; 17 sections; 16 §A–§F FRs (FR-A1..FR-F2); 60+ FRs total; 4 new decisions (D13–D16) + MS01; Phase 0 validation A2 advisory-pass + A8 pass + A4 deferred.</td><td>—</td></tr>
+<tr><td>2 (self-critique)</td><td>3 findings — [Should-fix] §6.2/§6.3 sequence diagrams in ASCII not Mermaid; [Nit] no explicit Open Questions section; [Nit] additional gaps swept — clear.</td><td>§6.2 + §6.3 sequence diagrams replaced with SVGs rendered by /diagram subagent (paths: <code>docs/diagrams/readme-skill-{audit,update}.svg</code>); §16.5 Open Questions callout added confirming all Q1–Q7 resolved; review log updated.</td></tr>
+</table>
+</section>
+
+</main>
+</body>
+</html>

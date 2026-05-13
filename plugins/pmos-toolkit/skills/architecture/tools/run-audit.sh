@@ -258,24 +258,32 @@ PY
 
 START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
-# ── L1 evaluator (T6 — U001/U002/U003/U006 + U004 from T5) ───────────────────
+# ── L1 evaluator (T6 size/shape + T7 debug/hygiene) ──────────────────────────
 # Single python pass over scanned.files_for_rules. Severity is rewritten in the
 # final jq -n via effective_severity, so L3 demotes/promotes flow through.
-# Plan §T6 step 3 calls for bash/awk dispatchers; deviated to python because
-# U002 (brace-balanced function-body length) and U003 (paren-balanced arg list)
-# are stateful per-file and bash awk for both is illegible vs. a 60-LOC python
-# block. Result is identical and verifiable against plan §T6 inline-verify.
-findings_json="$(
+# T6 rules: U001 (file>500), U002 (TS fn>100), U003 (args>4), U006 (path depth).
+# T7 rules: U004 (console.log|print( in src/, excl tests/,scripts/),
+#           U005 (TODO/FIXME/XXX with git-blame committer-time > 90d),
+#           U007 (file lacks top-of-file purpose comment, info-severity),
+#           U008 (commented-out code blocks > 5 lines, code-like heuristic).
+# Bash 3.2 (default macOS) miscounts double quotes across a quoted heredoc
+# embedded inside "$(...)" — workaround: assign without the outer quotes.
+# The variable value is preserved verbatim; quote $findings_json at use site.
+findings_json=$(
   python3 - "$LOADER_JSON" "$SCAN_ROOT" <<'PY'
-import json, os, re, sys
+import json, os, re, subprocess, sys, time
 
 loader = json.loads(sys.argv[1])
 scan_root = sys.argv[2]
 files = loader["scanned"]["files_for_rules"]
 
-CONSOLE_LOG = re.compile(r'console\.log')
+CONSOLE_LOG_OR_PRINT = re.compile(r'console\.log|print\(')
 TS_FN_START = re.compile(r'^\s*(?:export\s+)?(?:async\s+)?function\s+\w+')
 TS_FN_OR_CTOR_SIG = re.compile(r'(?:function\s+\w+|constructor)\s*\(([^)]*)\)')
+TODO_RE = re.compile(r'\b(TODO|FIXME|XXX)\b')
+COMMENT_LINE_RE = re.compile(r'^\s*(//|#)')
+CODE_CHARS = set('(){};=')
+HEX = set('0123456789abcdef')
 
 def find_ts_function_spans(lines):
     """Return list of (start_line_1idx, end_line_1idx) for top-level functions."""
@@ -304,6 +312,48 @@ def find_ts_function_spans(lines):
             i += 1
     return spans
 
+def run_git_blame(rel):
+    """Return dict[line_no_1idx -> committer-time unix int], or None on failure
+    (FR-32 graceful-degrade: file untracked, no git, not a repo, timeout)."""
+    try:
+        r = subprocess.run(
+            ["git", "-C", scan_root, "blame", "--line-porcelain", rel],
+            capture_output=True, text=True, timeout=10,
+        )
+        if r.returncode != 0:
+            return None
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    line_to_time = {}
+    sha_to_time = {}
+    current_sha = None
+    current_final_line = None
+    for bl in r.stdout.splitlines():
+        if not bl:
+            continue
+        if bl.startswith('\t'):
+            if current_sha is not None and current_final_line is not None:
+                t = sha_to_time.get(current_sha)
+                if t is not None:
+                    line_to_time[current_final_line] = t
+            current_sha = None
+            current_final_line = None
+            continue
+        parts = bl.split(' ')
+        if parts and len(parts[0]) >= 7 and all(c in HEX for c in parts[0].lower()) and len(parts) >= 3:
+            current_sha = parts[0]
+            try:
+                current_final_line = int(parts[2])
+            except (ValueError, IndexError):
+                current_final_line = None
+        elif bl.startswith('committer-time ') and current_sha is not None:
+            try:
+                sha_to_time[current_sha] = int(bl.split(' ', 1)[1])
+            except ValueError:
+                pass
+    return line_to_time
+
+cutoff_unix = int(time.time()) - (90 * 86400)
 findings = []
 
 for rel in files:
@@ -315,6 +365,10 @@ for rel in files:
             lines = f.readlines()
     except OSError:
         continue
+
+    rel_segs = rel.replace("\\", "/").split("/")
+    in_excluded_path = any(seg in ("tests", "scripts") for seg in rel_segs)
+    is_ts = rel.endswith((".ts", ".tsx"))
 
     # U001 — file > 500 LOC (all supported exts)
     if len(lines) > 500:
@@ -329,34 +383,101 @@ for rel in files:
         })
 
     # U006 — path depth > 4 after src/
-    parts = rel.replace("\\", "/").split("/")
-    if parts and parts[0] == "src" and (len(parts) - 1) > 4:
+    if rel_segs and rel_segs[0] == "src" and (len(rel_segs) - 1) > 4:
         findings.append({
             "rule_id": "U006",
             "severity": "warn",
             "file": rel,
             "line": 1,
-            "message": f"path depth {len(parts) - 1} after src/ exceeds 4",
+            "message": f"path depth {len(rel_segs) - 1} after src/ exceeds 4",
             "source_citation": "principles.yaml#U006",
             "suppressed_by": None,
         })
 
-    is_ts = rel.endswith((".ts", ".tsx"))
-
-    if is_ts:
-        # U004 — console.log forbidden in src/
+    # U004 — console.log | print( (T7 formalised: applies to all exts under
+    # the rule pipeline; excludes paths under tests/ or scripts/ per
+    # principles.yaml#U004 `paths:src/;exclude:tests/,scripts/`).
+    if not in_excluded_path:
         for idx, line in enumerate(lines, 1):
-            if CONSOLE_LOG.search(line):
+            if CONSOLE_LOG_OR_PRINT.search(line):
                 findings.append({
                     "rule_id": "U004",
                     "severity": "warn",
                     "file": rel,
                     "line": idx,
-                    "message": "console.log forbidden in src/",
+                    "message": "console.log / print( forbidden outside scripts/, tests/",
                     "source_citation": "principles.yaml#U004",
                     "suppressed_by": None,
                 })
 
+    # U005 — TODO/FIXME/XXX with blame committer-time > 90 days old.
+    # Run blame only when the file has at least one matching line. Graceful
+    # degrade: if blame is unavailable (no git / untracked / timeout), skip.
+    todo_lines = [(idx, line) for idx, line in enumerate(lines, 1) if TODO_RE.search(line)]
+    if todo_lines:
+        blame = run_git_blame(rel)
+        if blame:
+            for idx, line in todo_lines:
+                t = blame.get(idx)
+                if t is not None and t < cutoff_unix:
+                    age_days = (int(time.time()) - t) // 86400
+                    findings.append({
+                        "rule_id": "U005",
+                        "severity": "warn",
+                        "file": rel,
+                        "line": idx,
+                        "message": f"TODO/FIXME/XXX is {age_days} days old; > 90 days threshold",
+                        "source_citation": "principles.yaml#U005",
+                        "suppressed_by": None,
+                    })
+
+    # U007 — first non-blank line should be a comment (info-severity).
+    first_content = next((l for l in lines if l.strip()), None)
+    if first_content is not None:
+        stripped = first_content.lstrip()
+        if not (stripped.startswith('//') or stripped.startswith('#') or stripped.startswith('/*')):
+            findings.append({
+                "rule_id": "U007",
+                "severity": "info",
+                "file": rel,
+                "line": 1,
+                "message": "file lacks a top-of-file purpose comment",
+                "source_citation": "principles.yaml#U007",
+                "suppressed_by": None,
+            })
+
+    # U008 — > 5 consecutive commented lines whose content looks like code.
+    run_start = None
+    run_len = 0
+    code_like = False
+    def maybe_emit_run(start, length, ok):
+        if start is not None and length > 5 and ok:
+            findings.append({
+                "rule_id": "U008",
+                "severity": "warn",
+                "file": rel,
+                "line": start,
+                "message": f"commented-out code block: {length} consecutive lines",
+                "source_citation": "principles.yaml#U008",
+                "suppressed_by": None,
+            })
+    for idx, line in enumerate(lines, 1):
+        if COMMENT_LINE_RE.match(line):
+            if run_start is None:
+                run_start = idx
+                run_len = 0
+                code_like = False
+            run_len += 1
+            if any(c in line for c in CODE_CHARS):
+                code_like = True
+        else:
+            maybe_emit_run(run_start, run_len, code_like)
+            run_start = None
+            run_len = 0
+            code_like = False
+    maybe_emit_run(run_start, run_len, code_like)
+
+    if is_ts:
         # U002 — TS function body > 100 LOC
         for start, end in find_ts_function_spans(lines):
             if (end - start + 1) > 100:
@@ -372,9 +493,6 @@ for rel in files:
 
         # U003 — function or constructor with > 4 args
         # Plan §goal: ">4 args" (≥5 args). 5 args = 4 commas, so commas > 3.
-        # (Plan step text "count commas; emit when > 4" was a one-off slip
-        # vs. the goal; the inline verification expects U003 to fire on the
-        # 5-arg constructor fixture. Following goal-text.)
         text = "".join(lines)
         for m in TS_FN_OR_CTOR_SIG.finditer(text):
             args = m.group(1).strip()
@@ -396,7 +514,7 @@ for rel in files:
 
 print(json.dumps(findings))
 PY
-)"
+)
 
 END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 

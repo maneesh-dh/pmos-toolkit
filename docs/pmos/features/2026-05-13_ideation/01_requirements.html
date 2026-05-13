@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>/ideation skill — Requirements</title>
+  <title>/ideate skill — Requirements</title>
   <link rel="stylesheet" href="assets/style.css?v=2.42.0">
   <script defer src="assets/viewer.js?v=2.42.0"></script>
 </head>
 <body>
   <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
-    <h1 class="pmos-artifact-title">/ideation skill — Requirements</h1>
+    <h1 class="pmos-artifact-title">/ideate skill — Requirements</h1>
     <div class="pmos-artifact-actions">
       <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
       <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
@@ -26,7 +26,7 @@
 <strong>Last updated:</strong> 2026-05-13<br>
 <strong>Status:</strong> Draft<br>
 <strong>Tier:</strong> 2 — New skill (medium-complexity, multi-phase workflow, structured artifact output)<br>
-<strong>Skill mode:</strong> skill-new (creates <code>plugins/pmos-toolkit/skills/ideation/</code>)<br>
+<strong>Skill mode:</strong> skill-new (creates <code>plugins/pmos-toolkit/skills/ideate/</code>)<br>
 <strong>Target platform:</strong> claude-code (with platform-adaptation block for codex / generic)</p>
 </section>
 
@@ -46,7 +46,7 @@
 
 <h3 id="goals">Goals</h3>
 <ul>
-<li><strong>Turn a fuzzy idea into a structured one-page artifact in ~10–15 minutes</strong> — measured by: a single end-to-end run produces a complete <code>{docs_path}/ideation/{YYYY-MM-DD}_&lt;idea-slug&gt;.html</code> with all 12 sections populated (or marked <em>Open</em>), no skill-internal retries.</li>
+<li><strong>Turn a fuzzy idea into a structured one-page artifact in ~10–15 minutes</strong> — measured by: a single end-to-end run produces a complete <code>{docs_path}/ideate/{YYYY-MM-DD}_&lt;idea-slug&gt;.html</code> with all 12 sections populated (or marked <em>Open</em>), no skill-internal retries.</li>
 <li><strong>Generate breadth before depth</strong> — measured by: the Expand phase produces ≥8 distinct idea variants before any convergence step; the user (not the skill) picks the 1–3 finalists.</li>
 <li><strong>Make pressure-testing the default, not an opt-in</strong> — measured by: every artifact contains a non-empty Premortem table and a ranked Riskiest-Assumptions list; running the skill without pressure-test is a deliberate <code>--no-stress-test</code> escape, not the happy path.</li>
 <li><strong>Stay simple and repeatable</strong> — measured by: the SKILL.md uses a 3-phase loop (Frame → Expand → Pressure-test) with one optional Refine pass; no internal sub-frameworks, no required references the user must read, no ceremonial "hats" / "roles".</li>
@@ -57,7 +57,7 @@
 <ul>
 <li><strong>NOT a workshop-shaped framework</strong> — no Six Thinking Hats, no Disney Method, no 6-3-5 Brainwriting, no Design Sprint week. Those assume multiple humans, multiple sessions, or facilitator setup. Because: the user explicitly asked for "simple and repeatable, not a complex framework-driven thing".</li>
 <li><strong>NOT a replacement for <code>/requirements</code></strong> — the artifact is intentionally pre-requirements (no acceptance criteria, no scope decomposition, no per-tier templates). Because: that's the seam the pipeline already covers, and conflating the two muddies both.</li>
-<li><strong>NOT a replacement for <code>/grill</code></strong> — the pressure-test phase is a <em>batch</em> structured battery (premortem + inversion + assumption-map) emitted in one pass, not a turn-by-turn decision-tree interview. Because: <code>/grill</code> targets committed plans; <code>/ideation</code> targets uncommitted ideas. Different input, different cadence, different output.</li>
+<li><strong>NOT a replacement for <code>/grill</code></strong> — the pressure-test phase is a <em>batch</em> structured battery (premortem + inversion + assumption-map) emitted in one pass, not a turn-by-turn decision-tree interview. Because: <code>/grill</code> targets committed plans; <code>/ideate</code> targets uncommitted ideas. Different input, different cadence, different output.</li>
 <li><strong>NOT folding <code>/creativity</code> in as a sub-phase</strong> — <code>/creativity</code> stays standalone (Tier-3-requirements enhancer per its own description). Because: tight coupling would erase its standalone surface, and the Expand phase has its own auto-picked techniques.</li>
 <li><strong>NOT loading workstream context</strong> — like <code>/diagram</code>, <code>/polish</code>, <code>/design-crit</code>, this skill is a standalone utility. Because: ideation is cross-repo by intent and workstream pollution would bias the variant generation.</li>
 <li><strong>NOT auto-promoting to backlog / requirements</strong> — the handoff is explicit (the artifact <em>suggests</em> next steps; the user invokes them). Because: auto-promotion floods <code>/backlog</code> with half-baked ideas; manual promotion preserves the bar.</li>
@@ -67,10 +67,10 @@
 <section id="solution-direction">
 <h2 id="solution-direction">Solution Direction</h2>
 
-<p>A single Claude Code skill at <code>plugins/pmos-toolkit/skills/ideation/SKILL.md</code>, invoked as <code>/ideation &lt;free-form idea text&gt;</code>. The skill runs a <strong>3-phase loop with one optional Refine pass</strong>:</p>
+<p>A single Claude Code skill at <code>plugins/pmos-toolkit/skills/ideate/SKILL.md</code>, invoked as <code>/ideate &lt;free-form idea text&gt;</code>. The skill runs a <strong>3-phase loop with one optional Refine pass</strong>:</p>
 
 <pre>
-  /ideation "what if we tracked decisions like commits?"
+  /ideate "what if we tracked decisions like commits?"
        │
        ▼
   ┌─────────────────────────────────────────────────────────┐
@@ -98,7 +98,7 @@
        │
        ▼ (optional Refine — clean rewrite of artifact)
        ▼
-  docs/pmos/ideation/2026-05-13_decision-commits.html
+  docs/pmos/ideate/2026-05-13_decision-commits.html
        + Next-steps handoffs: /requirements · /grill · /backlog add
 </pre>
 
@@ -140,14 +140,14 @@
 
 <h3 id="primary-journey">Primary journey — "I have a half-formed idea"</h3>
 <ol>
-<li>User types <code>/ideation what if we tracked decisions like commits?</code></li>
+<li>User types <code>/ideate what if we tracked decisions like commits?</code></li>
 <li>Skill reads <code>.pmos/settings.yaml</code> for <code>docs_path</code> + <code>output_format</code>; derives slug <code>decision-commits</code>; confirms slug via <code>AskUserQuestion</code> (Recommended: Use this slug).</li>
 <li>Skill emits Phase-1 Frame prompt — auto-fills HMW + target user + success signal from the seed if possible; asks the user (one consolidated <code>AskUserQuestion</code> with up to 4 sub-questions) to confirm/edit each.</li>
 <li>Skill classifies idea-type as <code>new</code>; announces <em>"Using First Principles + Crazy 8s — override?"</em>; user accepts (Recommended).</li>
 <li>Skill generates 10 variants (mix of "decision-as-commit", "decision graph", "decision review queue", inversions, analogues like git-blame-for-decisions); presents the list; asks user to pick 1–3 finalists (Recommended: strongest single).</li>
 <li>Skill runs Pressure-test batch — emits failure-modes table (5 rows), inversion bullets (4 lines), assumption map (6 ranked rows). No questions in this phase.</li>
-<li>Skill writes <code>docs/pmos/ideation/2026-05-13_decision-commits.html</code> (atomic, via <code>_shared/html-authoring/</code> substrate with <code>?v=&lt;version&gt;</code> cache-bust, kebab-case heading IDs, sections.json companion). Mixed-format sidecar (<code>.md</code>) when <code>output_format=both</code>.</li>
-<li>Skill prints chat summary with absolute file path and three suggested next-step commands (<code>/requirements decision-commits</code>, <code>/grill docs/pmos/ideation/2026-05-13_decision-commits.html</code>, <code>/backlog add</code>). User chooses whichever (or none).</li>
+<li>Skill writes <code>docs/pmos/ideate/2026-05-13_decision-commits.html</code> (atomic, via <code>_shared/html-authoring/</code> substrate with <code>?v=&lt;version&gt;</code> cache-bust, kebab-case heading IDs, sections.json companion). Mixed-format sidecar (<code>.md</code>) when <code>output_format=both</code>.</li>
+<li>Skill prints chat summary with absolute file path and three suggested next-step commands (<code>/requirements decision-commits</code>, <code>/grill docs/pmos/ideate/2026-05-13_decision-commits.html</code>, <code>/backlog add</code>). User chooses whichever (or none).</li>
 </ol>
 
 <h3 id="alternate-journey-rich-seed">Alternate journey — rich seed (no Frame questions needed)</h3>
@@ -157,13 +157,13 @@
 <p>Skill announces <em>"Using SCAMPER + Analogous — override?"</em>; user replies <em>"use First Principles instead"</em>. Skill replaces the second technique and proceeds. Override is one-shot — no further negotiation.</p>
 
 <h3 id="alternate-journey-no-stress-test">Alternate journey — <code>--no-stress-test</code></h3>
-<p>User passes <code>--no-stress-test</code> (e.g., for a deliberately throwaway brainstorm). Skill emits a one-line warning into the TL;DR ("⚠ Stress-test skipped — failure modes and assumptions are NOT validated"); writes the artifact without Phase 3 sections; Next Steps recommends running <code>/ideation --resume &lt;artifact&gt;</code> later to add the pressure-test pass.</p>
+<p>User passes <code>--no-stress-test</code> (e.g., for a deliberately throwaway brainstorm). Skill emits a one-line warning into the TL;DR ("⚠ Stress-test skipped — failure modes and assumptions are NOT validated"); writes the artifact without Phase 3 sections; Next Steps recommends running <code>/ideate --resume &lt;artifact&gt;</code> later to add the pressure-test pass.</p>
 
 <h3 id="error-empty-seed">Error journey — empty / one-word seed</h3>
-<p>User invokes <code>/ideation</code> with no arg or a single word ("dashboards"). Skill issues a single <code>AskUserQuestion</code> with three options: (a) Use as a HMW seed and ask Frame questions interactively, (b) Provide more context (free-form reply), (c) Cancel. Recommended: (b).</p>
+<p>User invokes <code>/ideate</code> with no arg or a single word ("dashboards"). Skill issues a single <code>AskUserQuestion</code> with three options: (a) Use as a HMW seed and ask Frame questions interactively, (b) Provide more context (free-form reply), (c) Cancel. Recommended: (b).</p>
 
 <h3 id="error-resume-interrupted">Error journey — interrupted run</h3>
-<p>If the user kills the run between Phase 2 and Phase 3, the partial artifact has been atomically written through Phase 2 (Frame + Expand sections present, Pressure-test section marked <em>Pending</em>). Re-invoking with <code>/ideation --resume &lt;artifact-path&gt;</code> picks up at Phase 3. Re-invoking without <code>--resume</code> warns about the existing artifact (overwrite / pick-new-slug / cancel).</p>
+<p>If the user kills the run between Phase 2 and Phase 3, the partial artifact has been atomically written through Phase 2 (Frame + Expand sections present, Pressure-test section marked <em>Pending</em>). Re-invoking with <code>/ideate --resume &lt;artifact-path&gt;</code> picks up at Phase 3. Re-invoking without <code>--resume</code> warns about the existing artifact (overwrite / pick-new-slug / cancel).</p>
 </section>
 
 <section id="design-decisions">
@@ -172,10 +172,10 @@
 <table>
 <tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr>
 <tr><td>D1</td><td>3-phase loop (Frame → Expand → Pressure-test)</td><td>(a) 3-phase, (b) 4-phase (add Refine as mandatory), (c) 2-phase (Generate → Critique)</td><td>3-phase is the shortest loop that still contains the differentiating value (pressure-test). 4-phase makes Refine mandatory — most ideas don't earn the polish cost. 2-phase folds Frame into Generate, losing the HMW discipline that prevents bad framing. Refine stays available as optional Phase 4.</td></tr>
-<tr><td>D2</td><td>Artifact path: <code>{docs_path}/ideation/{YYYY-MM-DD}_&lt;slug&gt;.html</code></td><td>(a) in-repo at <code>{docs_path}</code>, (b) global at <code>~/.pmos/ideation/</code>, (c) hybrid (in-repo default, <code>--global</code> escape)</td><td>In-repo matches the user's explicit ask and the <code>/artifact</code>/<code>/wireframes</code>/<code>/survey-design</code> pattern. Global would parallel <code>/backlog</code>/<code>/mytasks</code>, but ideation is intentionally project-shaped (the idea lives near the work). A future <code>--global</code> flag stays an option, not a requirement.</td></tr>
+<tr><td>D2</td><td>Artifact path: <code>{docs_path}/ideate/{YYYY-MM-DD}_&lt;slug&gt;.html</code></td><td>(a) in-repo at <code>{docs_path}</code>, (b) global at <code>~/.pmos/ideate/</code>, (c) hybrid (in-repo default, <code>--global</code> escape)</td><td>In-repo matches the user's explicit ask and the <code>/artifact</code>/<code>/wireframes</code>/<code>/survey-design</code> pattern. Global would parallel <code>/backlog</code>/<code>/mytasks</code>, but ideation is intentionally project-shaped (the idea lives near the work). A future <code>--global</code> flag stays an option, not a requirement.</td></tr>
 <tr><td>D3</td><td>Pressure-test is always-on (escape: <code>--no-stress-test</code>)</td><td>(a) always-on, (b) opt-in flag, (c) opt-out flag</td><td>Pressure-test is the differentiating value vs. <code>/superpowers:brainstorming</code> and <code>/creativity</code>. Making it opt-in means users skip the half that matters. Opt-out flag preserves the escape for deliberate cases (with a warning in the artifact).</td></tr>
 <tr><td>D4</td><td>Technique selection: auto-pick by idea-type + one-line override escape</td><td>(a) auto-pick, (b) always ask user, (c) always run all techniques</td><td>Auto-pick saves a turn and signals the skill has an opinion. The override escape preserves user control. "Always run all" is expensive, redundant for narrow ideas, and dilutes the strongest variants.</td></tr>
-<tr><td>D5</td><td>Seam vs. <code>/grill</code> and <code>/creativity</code>: <code>/ideation</code> stays standalone; suggests handoffs in Next Steps</td><td>(a) stay standalone, (b) fold <code>/creativity</code> in as Expand, (c) chain into <code>/grill</code> automatically</td><td>(a) preserves orthogonal surfaces — each skill has one job. Folding <code>/creativity</code> in erases its standalone surface and couples release cycles. Auto-chaining to <code>/grill</code> defeats <code>/grill</code>'s contract (it targets committed plans, not uncommitted ideas).</td></tr>
+<tr><td>D5</td><td>Seam vs. <code>/grill</code> and <code>/creativity</code>: <code>/ideate</code> stays standalone; suggests handoffs in Next Steps</td><td>(a) stay standalone, (b) fold <code>/creativity</code> in as Expand, (c) chain into <code>/grill</code> automatically</td><td>(a) preserves orthogonal surfaces — each skill has one job. Folding <code>/creativity</code> in erases its standalone surface and couples release cycles. Auto-chaining to <code>/grill</code> defeats <code>/grill</code>'s contract (it targets committed plans, not uncommitted ideas).</td></tr>
 <tr><td>D6</td><td>Standalone (no workstream load), no pipeline-mode dispatch</td><td>(a) standalone, (b) workstream-aware, (c) optional <code>--workstream</code></td><td>Matches the <code>/diagram</code>/<code>/polish</code>/<code>/design-crit</code>/<code>/survey-design</code> pattern. Workstream bias is exactly what we don't want at the ideation stage — variant breadth depends on letting in non-workstream framings.</td></tr>
 <tr><td>D7</td><td>HTML primary, MD sidecar via <code>output_format=both</code></td><td>(a) HTML primary, MD on opt-in, (b) MD primary, (c) HTML-only</td><td>Matches every other pmos-toolkit artifact-producing skill. <code>_shared/html-authoring/</code> substrate handles the heavy lifting (template, assets, sections.json, cache-bust, heading IDs).</td></tr>
 <tr><td>D8</td><td>Resumability: partial artifact written at each phase boundary; <code>--resume &lt;path&gt;</code> re-enters the cursor</td><td>(a) per-phase atomic writes + <code>--resume</code>, (b) single end-of-run write (no resume), (c) full <code>state.yaml</code> like pipeline skills</td><td>(a) gives the user a recoverable artifact without the pipeline-style state file overhead. The phase cursor lives <em>in the artifact</em> (an HTML data-attr / MD frontmatter field), not a sidecar.</td></tr>
@@ -188,8 +188,8 @@
 <table>
 <tr><th>#</th><th>Question</th></tr>
 <tr><td>OQ1</td><td>When the user picks <strong>multiple finalists</strong> (2 or 3) in Phase 2, does Pressure-test run once across all of them (cross-cutting failure modes) or once per finalist (separate batteries)? Default proposal: <strong>once per finalist, with a final cross-cutting "decision table" comparing them</strong>. To be confirmed in <code>/spec</code>.</td></tr>
-<tr><td>OQ2</td><td>Slug derivation for the artifact filename — does <code>/ideation</code> use the same slug-derivation rule as <code>/feature-sdlc</code> Phase 0a, or is there an ideation-specific shortening (e.g., max 4 words, lowercase-kebab from the HMW verb+object)? To be resolved in <code>/spec</code>.</td></tr>
-<tr><td>OQ3</td><td>Should the auto-picked technique pair be <strong>configurable per-user</strong> via <code>~/.pmos/ideation/config.yaml</code> (override the new/extend/fix → technique mapping)? Initial proposal: <strong>no</strong> — the mapping is a deliberate opinion. Revisit after user feedback.</td></tr>
+<tr><td>OQ2</td><td>Slug derivation for the artifact filename — does <code>/ideate</code> use the same slug-derivation rule as <code>/feature-sdlc</code> Phase 0a, or is there an ideation-specific shortening (e.g., max 4 words, lowercase-kebab from the HMW verb+object)? To be resolved in <code>/spec</code>.</td></tr>
+<tr><td>OQ3</td><td>Should the auto-picked technique pair be <strong>configurable per-user</strong> via <code>~/.pmos/ideate/config.yaml</code> (override the new/extend/fix → technique mapping)? Initial proposal: <strong>no</strong> — the mapping is a deliberate opinion. Revisit after user feedback.</td></tr>
 <tr><td>OQ4</td><td>Phase 6a <code>/skill-eval</code> will score the produced SKILL.md against <code>reference/skill-patterns.md §A–§F</code>. Are there any <strong>ideation-specific</strong> rubric checks worth adding (e.g., "the Pressure-test phase MUST produce non-empty failure-modes table") that should live in this skill's own <code>reference/</code>? To be resolved in <code>/plan</code>.</td></tr>
 </table>
 </section>
@@ -200,8 +200,8 @@
 <table>
 <tr><th>Source</th><th>Type</th><th>Key Takeaway</th></tr>
 <tr><td><code>~/.claude-personal/plugins/cache/claude-plugins-official/superpowers/5.1.0/skills/brainstorming/SKILL.md</code></td><td>Existing skill (reference)</td><td>One-question-at-a-time clarifying dialogue → propose 2–3 approaches → save design doc. Influences Frame phase shape.</td></tr>
-<tr><td><code>plugins/pmos-toolkit/skills/creativity/SKILL.md</code></td><td>Existing skill (sibling)</td><td>Techniques-driven idea generation; intentionally kept standalone to avoid coupling with <code>/ideation</code>.</td></tr>
-<tr><td><code>plugins/pmos-toolkit/skills/grill/SKILL.md</code></td><td>Existing skill (sibling)</td><td>Decision-tree adversarial interview against committed plans. Differentiates <code>/ideation</code>'s pressure-test (batch, uncommitted).</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/creativity/SKILL.md</code></td><td>Existing skill (sibling)</td><td>Techniques-driven idea generation; intentionally kept standalone to avoid coupling with <code>/ideate</code>.</td></tr>
+<tr><td><code>plugins/pmos-toolkit/skills/grill/SKILL.md</code></td><td>Existing skill (sibling)</td><td>Decision-tree adversarial interview against committed plans. Differentiates <code>/ideate</code>'s pressure-test (batch, uncommitted).</td></tr>
 <tr><td><code>plugins/pmos-toolkit/skills/polish/SKILL.md</code>, <code>plugins/pmos-toolkit/skills/diagram/SKILL.md</code>, <code>plugins/pmos-toolkit/skills/survey-design/SKILL.md</code></td><td>Existing skill (shape reference)</td><td>Single-doc utility skill pattern — HTML/MD output via <code>_shared/html-authoring/</code> substrate, no workstream load, no pipeline-mode dispatch.</td></tr>
 <tr><td>IMD SCAMPER guide; Workshopper ideation exercises</td><td>External</td><td>SCAMPER's 7 prompts map cleanly to LLM turns; best fit for "extend an existing thing".</td></tr>
 <tr><td>Google Design Sprint — Crazy 8s</td><td>External</td><td>"Generate 8 wildly different one-liners in 60 seconds" works verbatim as an LLM prompt; produces breadth fast.</td></tr>

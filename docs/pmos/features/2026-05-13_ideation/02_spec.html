@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>/ideation skill — Spec</title>
+  <title>/ideate skill — Spec</title>
   <link rel="stylesheet" href="assets/style.css?v=2.42.0">
   <script defer src="assets/viewer.js?v=2.42.0"></script>
 </head>
 <body>
   <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
-    <h1 class="pmos-artifact-title">/ideation skill — Spec</h1>
+    <h1 class="pmos-artifact-title">/ideate skill — Spec</h1>
     <div class="pmos-artifact-actions">
       <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
       <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
@@ -28,10 +28,10 @@
 
 <section id="architecture">
 <h2 id="architecture">Architecture</h2>
-<p>A single Claude Code skill under <code>plugins/pmos-toolkit/skills/ideation/</code>, structured per the pmos-toolkit standalone-utility shape (model: <code>/polish</code>, <code>/diagram</code>, <code>/survey-design</code>):</p>
+<p>A single Claude Code skill under <code>plugins/pmos-toolkit/skills/ideate/</code>, structured per the pmos-toolkit standalone-utility shape (model: <code>/polish</code>, <code>/diagram</code>, <code>/survey-design</code>):</p>
 
 <pre>
-plugins/pmos-toolkit/skills/ideation/
+plugins/pmos-toolkit/skills/ideate/
 ├── SKILL.md                       # Entry point — phases, control flow (target ~400 lines)
 ├── reference/
 │   ├── techniques.md              # The 6 supported techniques + prompt templates
@@ -46,7 +46,7 @@ plugins/pmos-toolkit/skills/ideation/
 
 <p><strong>Substrate dependency:</strong> the skill writes HTML/MD artifacts via the existing <code>_shared/html-authoring/</code> substrate (template, assets, sections.json, cache-bust, heading IDs). The skill does NOT re-implement HTML emission — it consumes the substrate exactly like <code>/polish</code>, <code>/wireframes</code>, <code>/spec</code>, <code>/plan</code> do.</p>
 
-<p><strong>Codex sidecar:</strong> at <code>plugins/pmos-toolkit/skills/ideation/agents/openai.yaml</code> — required for <code>--target codex</code> parity (decision F-codex-sidecar of skill-eval). Matches the existing per-skill sidecar pattern.</p>
+<p><strong>Codex sidecar:</strong> at <code>plugins/pmos-toolkit/skills/ideate/agents/openai.yaml</code> — required for <code>--target codex</code> parity (decision F-codex-sidecar of skill-eval). Matches the existing per-skill sidecar pattern.</p>
 </section>
 
 <section id="functional-requirements">
@@ -54,7 +54,7 @@ plugins/pmos-toolkit/skills/ideation/
 
 <h3 id="fr-invocation">FR-INVOCATION — argument parsing</h3>
 <ul>
-<li><strong>FR-01:</strong> Skill is invoked as <code>/ideation &lt;seed-text&gt;</code> where <code>&lt;seed-text&gt;</code> is free-form (a sentence to several paragraphs). Empty seed → error journey (single <code>AskUserQuestion</code> per requirements §user-journeys).</li>
+<li><strong>FR-01:</strong> Skill is invoked as <code>/ideate &lt;seed-text&gt;</code> where <code>&lt;seed-text&gt;</code> is free-form (a sentence to several paragraphs). Empty seed → error journey (single <code>AskUserQuestion</code> per requirements §user-journeys).</li>
 <li><strong>FR-02:</strong> Supported flags (enumerated in <code>argument-hint</code>): <code>--format &lt;html|md|both&gt;</code> (overrides <code>.pmos/settings.yaml :: output_format</code>), <code>--no-stress-test</code> (skips Phase 3), <code>--refine</code> (forces Phase 4), <code>--slug &lt;custom&gt;</code> (overrides derived slug), <code>--resume &lt;artifact-path&gt;</code> (re-enters at the partial-write phase cursor), <code>--non-interactive</code> / <code>--interactive</code> (mode override per <code>_shared/non-interactive.md</code> contract).</li>
 <li><strong>FR-03:</strong> Last flag wins on conflict. Unknown flag → stderr warn + exit 64. <code>--non-interactive</code> on a skill without a Recommended default for any required AskUserQuestion → DEFER per the canonical non-interactive block.</li>
 </ul>
@@ -93,7 +93,7 @@ plugins/pmos-toolkit/skills/ideation/
 
 <h3 id="fr-artifact">FR-ARTIFACT — output</h3>
 <ul>
-<li><strong>FR-50:</strong> Artifact path: <code>{docs_path}/ideation/{YYYY-MM-DD}_&lt;idea-slug&gt;.html</code>. Mixed-format sidecar (<code>.md</code>) when <code>output_format=both</code>. <code>{docs_path}</code> from <code>.pmos/settings.yaml</code>.</li>
+<li><strong>FR-50:</strong> Artifact path: <code>{docs_path}/ideate/{YYYY-MM-DD}_&lt;idea-slug&gt;.html</code>. Mixed-format sidecar (<code>.md</code>) when <code>output_format=both</code>. <code>{docs_path}</code> from <code>.pmos/settings.yaml</code>.</li>
 <li><strong>FR-51:</strong> Slug derivation per <code>reference/slug-derivation.md</code> — kebab-case, max 4 words, lowercase, drop stopwords. Collision: append <code>-2</code>, <code>-3</code>, … (idempotent on re-run with the same seed).</li>
 <li><strong>FR-52:</strong> Atomic write: temp-then-rename for both <code>.html</code> and the <code>sections.json</code> companion. Cache-bust <code>?v=&lt;plugin-version&gt;</code> on all asset URLs. Heading IDs kebab-case per <code>_shared/html-authoring/conventions.md §3</code>. Top-level artifact: asset prefix <code>../assets/</code> (the <code>ideation/</code> dir is one level under <code>docs_path</code>, so its <code>assets/</code> resolves to <code>{docs_path}/assets/</code> shared across all ideation outputs).</li>
 <li><strong>FR-53:</strong> Artifact contains the 12 sections from requirements §artifact-section-list, in order. Each section is a <code>&lt;section id="..."&gt;</code> with kebab-case heading IDs.</li>
@@ -102,7 +102,7 @@ plugins/pmos-toolkit/skills/ideation/
 
 <h3 id="fr-handoff">FR-HANDOFF — Next Steps</h3>
 <ul>
-<li><strong>FR-60:</strong> The artifact's Next Steps section names 1–3 candidate follow-up commands. Selection rules: idea-type=<code>new</code> → suggest <code>/requirements &lt;slug&gt;</code> + <code>/backlog add</code>; idea-type=<code>extend</code> → suggest <code>/requirements &lt;slug&gt;</code> + <code>/grill &lt;artifact-path&gt;</code>; idea-type=<code>fix</code> → suggest <code>/grill &lt;artifact-path&gt;</code> + <code>/backlog add</code>. All cases include <code>/ideation --refine --resume</code> if Phase 4 was skipped.</li>
+<li><strong>FR-60:</strong> The artifact's Next Steps section names 1–3 candidate follow-up commands. Selection rules: idea-type=<code>new</code> → suggest <code>/requirements &lt;slug&gt;</code> + <code>/backlog add</code>; idea-type=<code>extend</code> → suggest <code>/requirements &lt;slug&gt;</code> + <code>/grill &lt;artifact-path&gt;</code>; idea-type=<code>fix</code> → suggest <code>/grill &lt;artifact-path&gt;</code> + <code>/backlog add</code>. All cases include <code>/ideate --refine --resume</code> if Phase 4 was skipped.</li>
 </ul>
 
 <h3 id="fr-platform">FR-PLATFORM — multi-platform</h3>
@@ -114,8 +114,8 @@ plugins/pmos-toolkit/skills/ideation/
 
 <h3 id="fr-skill-patterns">FR-SKILL-PATTERNS — §A–§F conformance (Phase 6a gate)</h3>
 <ul>
-<li><strong>FR-80 (§A):</strong> frontmatter — <code>name: ideation</code> (matches dir), <code>description</code> ≤1024 chars stating <em>when</em> + <em>what</em> + ≥5 user-spoken trigger phrases + assertive, <code>user-invocable: true</code>, <code>argument-hint</code>.</li>
-<li><strong>FR-81 (§B):</strong> description is third-person, contains "Use when…", no embedded numbered workflow, ≥5 trigger phrases inline. Trigger phrases to include: "help me brainstorm this idea", "stress-test this idea", "I have a half-formed idea", "ideate on X", "what should we build to solve Y", "pressure-test this concept", "/ideation".</li>
+<li><strong>FR-80 (§A):</strong> frontmatter — <code>name: ideate</code> (matches dir), <code>description</code> ≤1024 chars stating <em>when</em> + <em>what</em> + ≥5 user-spoken trigger phrases + assertive, <code>user-invocable: true</code>, <code>argument-hint</code>.</li>
+<li><strong>FR-81 (§B):</strong> description is third-person, contains "Use when…", no embedded numbered workflow, ≥5 trigger phrases inline. Trigger phrases to include: "help me brainstorm this idea", "stress-test this idea", "I have a half-formed idea", "ideate on X", "what should we build to solve Y", "pressure-test this concept", "/ideate".</li>
 <li><strong>FR-82 (§C):</strong> SKILL.md body ≤500 lines (target: ~400). Reference files in <code>reference/</code>, depth ≤1, each &gt;100-line ref has a ToC in first ~15 lines. No hard-coded absolute paths; portable tokens only.</li>
 <li><strong>FR-83 (§D):</strong> <code>## Platform Adaptation</code> present, <code>## Track Progress</code> present, learnings-load line + numbered <code>## Phase N: Capture Learnings</code> phase. Imperative voice. Rationale given for non-obvious instructions.</li>
 <li><strong>FR-84 (§E):</strong> no bundled scripts — group skips. <code>e-eval-driven</code> satisfied by the per-skill SDLC run producing this artifact stack.</li>
@@ -137,12 +137,12 @@ plugins/pmos-toolkit/skills/ideation/
 <section id="acceptance-criteria">
 <h2 id="acceptance-criteria">Acceptance Criteria</h2>
 <ol>
-<li><code>tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/ideation/</code> returns exit 0 (all 20 [D] checks pass; group 10.E skipped because no scripts).</li>
+<li><code>tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/ideate/</code> returns exit 0 (all 20 [D] checks pass; group 10.E skipped because no scripts).</li>
 <li>A reviewer subagent running the 19 [J] checks returns 0 fails (or ≤2 fails with substrings of skill source quoted, captured as <code>accepted_residuals</code> per Phase 6a's cap).</li>
-<li>An end-to-end manual run with seed "what if we tracked decisions like commits?" produces <code>docs/pmos/ideation/2026-05-13_decision-commits.html</code> with all 12 sections non-empty, the Pressure-test battery populated, and Next Steps naming concrete slash commands.</li>
+<li>An end-to-end manual run with seed "what if we tracked decisions like commits?" produces <code>docs/pmos/ideate/2026-05-13_decision-commits.html</code> with all 12 sections non-empty, the Pressure-test battery populated, and Next Steps naming concrete slash commands.</li>
 <li>The same run with <code>--no-stress-test</code> produces an artifact with a TL;DR warning and Pressure-test sections marked <em>Skipped</em>.</li>
 <li>The same run interrupted between Phase 2 and Phase 3, then resumed via <code>--resume</code>, completes successfully and produces an identical Phase-3 onwards.</li>
-<li>README has a <code>/ideation</code> row under "Utilities"; both <code>plugin.json</code> manifests bump 2.42.0 → 2.43.0 in sync; changelog has a 2.43.0 entry.</li>
+<li>README has a <code>/ideate</code> row under "Utilities"; both <code>plugin.json</code> manifests bump 2.42.0 → 2.43.0 in sync; changelog has a 2.43.0 entry.</li>
 </ol>
 </section>
 

@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="pmos:ideate-phase" content="{{phase_cursor}}">
+  <meta name="pmos:ideate-slug" content="{{slug}}">
+  <meta name="pmos:ideate-date" content="{{date}}">
+  <title>{{title}} — Ideation</title>
+  <link rel="stylesheet" href="assets/style.css?v={{plugin_version}}">
+  <script defer src="assets/viewer.js?v={{plugin_version}}"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">{{title}}</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+    <a class="pmos-attribution pmos-attribution--toolbar"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="tldr">
+<h2 id="tldr">TL;DR</h2>
+<p>{{tldr_sentence}}</p>
+<p><strong>Recommendation:</strong> {{go_no_go}}</p>
+{{stress_test_warning_block}}
+</section>
+
+<section id="hmw">
+<h2 id="hmw">How Might We</h2>
+<p>{{hmw_statement}}</p>
+</section>
+
+<section id="target-user-jtbd">
+<h2 id="target-user-jtbd">Target user &amp; job-to-be-done</h2>
+<p><strong>Who:</strong> {{user_persona}}</p>
+<p><strong>When / where:</strong> {{user_context}}</p>
+<p><strong>JTBD:</strong> {{jtbd}}</p>
+</section>
+
+<section id="hypothesis">
+<h2 id="hypothesis">Hypothesis</h2>
+<p>We believe {{hypothesis_action}} will produce {{hypothesis_outcome}} because {{hypothesis_reasoning}}.</p>
+</section>
+
+<section id="idea-variants">
+<h2 id="idea-variants">Idea variants considered</h2>
+<p>Generated via {{technique_1}} + {{technique_2}}. Finalist(s) flagged with ★.</p>
+<ol>
+{{variants_list}}
+</ol>
+</section>
+
+<section id="how-it-works">
+<h2 id="how-it-works">How it works (chosen finalist)</h2>
+<ul>
+{{how_it_works_bullets}}
+</ul>
+</section>
+
+<section id="alternatives-prior-art">
+<h2 id="alternatives-prior-art">Alternatives &amp; prior art</h2>
+<table>
+<tr><th>Source</th><th>What it does</th><th>Difference from this idea</th></tr>
+{{prior_art_rows}}
+</table>
+</section>
+
+<section id="premortem">
+<h2 id="premortem">Premortem: failure modes</h2>
+{{premortem_table_or_skipped}}
+</section>
+
+<section id="riskiest-assumptions">
+<h2 id="riskiest-assumptions">Riskiest assumptions</h2>
+{{assumption_table_or_skipped}}
+</section>
+
+<section id="success-signals">
+<h2 id="success-signals">Success signals</h2>
+<p><strong>Leading:</strong> {{leading_signals}}</p>
+<p><strong>Lagging:</strong> {{lagging_signals}}</p>
+</section>
+
+<section id="next-steps">
+<h2 id="next-steps">Next steps</h2>
+<ol>
+{{next_steps_bullets}}
+</ol>
+<p><em>Suggested handoff commands (pick zero or more):</em></p>
+<ul>
+{{handoff_commands}}
+</ul>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">Open questions</h2>
+<ul>
+{{open_questions_list}}
+</ul>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: {{source_path}}</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

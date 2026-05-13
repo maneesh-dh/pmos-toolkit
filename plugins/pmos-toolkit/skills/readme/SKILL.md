@@ -186,6 +186,28 @@ This subsection documents the protocol /readme follows after `rubric.sh` returns
 
 > See [reference/simulated-reader.md](reference/simulated-reader.md) for the full persona prompts and return-shape JSON schema (per §C "references one level deep" of skill-patterns.md).
 
+### §3: Theater-check + skip flag
+
+**FR-SR-5 — Theater-check.** After §2's parallel dispatch + substring validation completes, examine the returns per persona:
+
+- If persona `P` returned `friction[]` is **empty** AND the rubric.sh pass (§1) scored **≥3 findings**, treat this as suspected theater (the persona may have rubber-stamped the README to avoid friction). **Re-dispatch persona P ONCE** with the same body as §2 but appending this bounce-suffix to the prompt:
+  > "You have alternatives and 90 seconds. What makes you bounce?"
+- Re-dispatch is **single-shot**: even if the second-pass still returns empty, accept it as a genuine pass (a persona that bounces on nothing twice has earned the empty return).
+- Re-dispatch validation: still subject to FR-SR-3 substring-grep + persona-label match. Hard-fail on miss, same dialog as §2.
+- Log to chat: `simulated-reader: theater-check re-dispatched persona <P> (rubric≥3, empty first-pass)`.
+
+**FR-SR-6 — Skip flag.** The CLI flag `--skip-simulated-reader` short-circuits §2 + §3 entirely:
+
+- When present, skip the 3 Task dispatches; emit chat log `simulated-reader: skipped (--skip-simulated-reader)`; the aggregator pass receives ONLY rubric.sh findings.
+- The flag is parsed by §1's argv loop alongside `--variant`, `--auto-apply`, etc. (mutex with `--selftest`).
+- Intended use: speed up CI runs against pre-vetted READMEs; not the default user path.
+
+**Contract-test escape (P9).** The `READMER_PERSONA_STUB` environment variable, if set to a path, REPLACES the Task-tool dispatch with a shell invocation of that path:
+- The script receives `--persona=<name>` and the README path as args.
+- Stdout = the per-persona JSON return (same shape as a real Task return).
+- Used exclusively by `tests/mocks/simulated_reader_stub.sh` for the FR-SR-3 contract test (verifies the parent substring-grep correctly hard-fails on a deliberately altered quote).
+- DO NOT use in production — the env var is unset in the default skill prompt.
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

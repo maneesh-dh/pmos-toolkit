@@ -9,20 +9,46 @@
 
 set -euo pipefail
 
-# Arg parsing (T14, FR-67). --no-adr suppresses ADR writes entirely;
-# findings still emit. Positional arg is the scan root (default ".").
+# Arg parsing (T14, FR-67; selector + --non-interactive added in /verify pass).
+# FR-01: first positional MUST be the `audit` selector; absence/unknown selector → exit 64.
+# --no-adr suppresses ADR writes; --non-interactive defaults the ADR-promotion prompt
+# to "promote within cap" (no-op at the shell level — run-audit.sh always emits JSON
+# without prompting; the flag is parsed for forward-compat with FR-04 + SKILL.md L48).
 NO_ADR=0
+NONINTERACTIVE=0
 SCAN_ROOT="."
+POSITIONALS=()
 for arg in "$@"; do
   case "$arg" in
     --no-adr) NO_ADR=1 ;;
+    --non-interactive) NONINTERACTIVE=1 ;;
     -*)
       echo "ERROR: unknown flag: $arg" >&2
+      echo "usage: /architecture audit [path] [--no-adr] [--non-interactive]" >&2
       exit 64
       ;;
-    *) SCAN_ROOT="$arg" ;;
+    *) POSITIONALS+=("$arg") ;;
   esac
 done
+# FR-01: require the `audit` selector as the first positional.
+if [[ ${#POSITIONALS[@]} -eq 0 || "${POSITIONALS[0]}" != "audit" ]]; then
+  echo "ERROR: /architecture requires the 'audit' selector as the first argument." >&2
+  echo "usage: /architecture audit [path] [--no-adr] [--non-interactive]" >&2
+  exit 64
+fi
+if [[ ${#POSITIONALS[@]} -ge 2 ]]; then
+  SCAN_ROOT="${POSITIONALS[1]}"
+fi
+if [[ ${#POSITIONALS[@]} -gt 2 ]]; then
+  echo "ERROR: too many positional arguments (got ${#POSITIONALS[@]}, max 2)." >&2
+  echo "usage: /architecture audit [path] [--no-adr] [--non-interactive]" >&2
+  exit 64
+fi
+# NFR-06 observability: log non-interactive mode to stderr (also keeps shellcheck
+# from flagging NONINTERACTIVE as unused — it IS read here, not just written).
+if [[ "$NONINTERACTIVE" -eq 1 ]]; then
+  echo "[mode] non-interactive: ADR-promotion prompt defaulted to 'promote within cap' (FR-04)." >&2
+fi
 
 command -v jq >/dev/null 2>&1 || {
   echo "ERROR: /architecture requires jq. Install via brew/apt/dnf, then re-run." >&2
@@ -297,6 +323,7 @@ PY
 )"
 
 START="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+START_EPOCH="$(date -u +%s)"
 
 # ── L1 evaluator (T6 size/shape + T7 debug/hygiene) ──────────────────────────
 # Single python pass over scanned.files_for_rules. Severity is rewritten in the
@@ -1078,6 +1105,8 @@ if [ "$fde_den" -gt 0 ]; then
 fi
 
 END="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+END_EPOCH="$(date -u +%s)"
+DURATION_S=$((END_EPOCH - START_EPOCH))
 
 # Build the final report JSON. Sort findings per FR-73: severity desc (block
 # < warn < info via 0/1/2 numeric key), then rule_id asc, file asc, line asc.
@@ -1092,10 +1121,11 @@ REPORT_JSON=$(jq -n \
   --argjson exemptions_summary "$exemptions_summary_json" \
   --arg start "$START" \
   --arg end "$END" \
+  --argjson duration_s "$DURATION_S" \
   --arg root "$SCAN_ROOT" \
   '{
     schema_version: 1,
-    run: { started_at: $start, finished_at: $end, duration_s: 0.0 },
+    run: { started_at: $start, finished_at: $end, duration_s: $duration_s },
     scan_root: $root,
     rules_loaded: {
       tier_1: $loader.tier_1,

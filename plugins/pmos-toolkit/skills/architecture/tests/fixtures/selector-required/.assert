@@ -1,0 +1,29 @@
+# selector-required — FR-01: invoking run-audit.sh without the `audit` selector
+# must exit 64 with a usage line on stderr. Regression test added in /verify pass
+# after the reviewer caught the missing selector enforcement.
+set -euo pipefail
+RUN_AUDIT="$SKILL_DIR/tools/run-audit.sh"
+
+# Case 1: no args at all → exit 64.
+if bash "$RUN_AUDIT" >/dev/null 2>&1; then
+  echo "FR-01 broken: run-audit.sh with no args exited 0 (expected 64)"; exit 1
+fi
+rc=0; bash "$RUN_AUDIT" >/dev/null 2>&1 || rc=$?
+[ "$rc" = "64" ] || { echo "FR-01: no-args exit was $rc (expected 64)"; exit 1; }
+
+# Case 2: positional path without selector → exit 64.
+rc=0; bash "$RUN_AUDIT" . >/dev/null 2>&1 || rc=$?
+[ "$rc" = "64" ] || { echo "FR-01: path-only exit was $rc (expected 64)"; exit 1; }
+
+# Case 3: `audit .` works → exit 0.
+bash "$RUN_AUDIT" audit . --no-adr >/dev/null 2>&1 \
+  || { echo "FR-01: 'audit .' should succeed but failed"; exit 1; }
+
+# Case 4: `--non-interactive` accepted (FR-04) → exit 0 + stderr log line.
+err=$(bash "$RUN_AUDIT" audit . --no-adr --non-interactive 2>&1 >/dev/null)
+echo "$err" | grep -q "non-interactive" \
+  || { echo "FR-04: --non-interactive did not log mode line to stderr"; exit 1; }
+
+# Case 5: too many positionals → exit 64.
+rc=0; bash "$RUN_AUDIT" audit . extra-arg >/dev/null 2>&1 || rc=$?
+[ "$rc" = "64" ] || { echo "FR-01: too-many-positionals exit was $rc (expected 64)"; exit 1; }

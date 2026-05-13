@@ -84,9 +84,9 @@ Vue SFC coverage gap: dependency-cruiser does not parse `<script setup>` blocks.
 
 L3 may carry `exemptions:` rows that whitelist a `(rule, file)` pair, optionally with an `adr:` pointer and an `expires:` date.
 
-1. **Matching exemptions** (an exemption row that matches an active finding): the finding is dropped from `findings[]` and surfaced under `exemptions_applied[]`.
-2. **Orphan exemptions** (an exemption row that matches no active finding): surfaced under `exemptions_orphaned[]` (info-only — exemption can be retired).
-3. **Expired exemptions** (`expires` date in the past): demoted — the finding re-emits and the row is logged under `exemptions_expired[]`.
+1. **Matching exemptions** (an exemption row that matches an active finding): the finding is dropped from `findings[]` and surfaced under `exemptions.applied[]`.
+2. **Orphan exemptions** (an exemption row that matches no active finding): surfaced under `exemptions.orphan[]` (info-only — exemption can be retired).
+3. **Expired exemptions** (`expires` date in the past): demoted — the finding re-emits and the row is logged under `exemptions.expired[]`.
 
 ADR promotion (FR-60/61/62/63):
 
@@ -103,20 +103,27 @@ Stdout is the canonical artifact: a single JSON object with the shape locked in 
 
 ```
 {
-  "run": { "id, scan_root, started_at, finished_at, duration_ms" },
+  "schema_version": 1,
+  "run": { "started_at, finished_at, duration_s" },
+  "scan_root": "<resolved path>",
+  "rules_loaded": { "tier_1, tier_2, tier_3, total" },
+  "declarative_delegated_pct": 0.444,
+  "l3_present": false,
+  "stacks_detected": ["typescript", "python"],
   "config": { "adr_path, scan_root, extra_ignore" },
-  "rules": { "loaded, effective_severity, l3_overrides" },
+  "rule_overrides": [...],
+  "exemptions": { "applied": [...], "orphan": [...], "expired": [...], "informational": [...], "rows": [...] },
   "scanned": { "total, by_ext, excluded_by_gitignore, excluded_by_fallback" },
-  "findings": [ { "rule, severity, file, line?, message" } ],
-  "exemptions_applied": [...],
-  "exemptions_orphaned": [...],
-  "exemptions_expired": [...],
-  "adrs_written": [ { "rule, file, adr_path" } ],
+  "tools_skipped": [...],
+  "tools_errored": [...],
+  "frontend_declarative_coverage": 1.0,
+  "adrs_written": [ { "rule_id, file, adr_path" } ],
   "adrs_truncated": [...],
-  "coverage_gaps": [...],
-  "tools_errored": [...]
+  "findings": [ { "rule_id, severity, file, line?, message, why?" } ]
 }
 ```
+
+Sort: `findings[]` are severity-first (block, warn, info), then `rule_id` asc, `file` asc, `line` asc. (FR-73 — implemented via a `{block:0, warn:1, info:2}` lookup so `sort_by(rank)` ascending == block-first.)
 
 Stderr carries a human summary: counts by severity, files scanned, ADRs written, tools errored. Findings are sorted (FR-73); the JSON is byte-identical across runs when source state is unchanged — see `tools/check-determinism.sh`.
 

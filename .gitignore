@@ -25,3 +25,8 @@ plugins/pmos-toolkit/skills/*/package-lock.json
 
 # Architecture skill — fixture ADRs are write-side-effects of regression runs; never committed.
 plugins/pmos-toolkit/skills/architecture/tests/fixtures/*/docs/
+# adr-reconcile fixtures keep tracked baseline ADRs 0001-0006 under */docs/adr/;
+# regression runs append ADR-0007+ which must not be committed.
+plugins/pmos-toolkit/skills/architecture/tests/fixtures/adr-reconcile/*/docs/adr/ADR-00[01][7-9]*-*.md
+plugins/pmos-toolkit/skills/architecture/tests/fixtures/adr-reconcile/*/docs/adr/ADR-001[0-9]-*.md
+plugins/pmos-toolkit/skills/architecture/tests/fixtures/adr-reconcile/*/docs/adr/ADR-00[2-9][0-9]-*.md

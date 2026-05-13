@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "artifact": "grills/2026-05-13_01_requirements.html",
+  "ids": ["meta", "resolved", "open-deferred", "gaps", "next-step"],
+  "sections": [
+    {"id": "meta", "level": 2, "title": "Meta", "parent_id": null},
+    {"id": "resolved", "level": 2, "title": "Resolved", "parent_id": null},
+    {"id": "open-deferred", "level": 2, "title": "Open / Deferred", "parent_id": null},
+    {"id": "gaps", "level": 2, "title": "Gaps surfaced", "parent_id": null},
+    {"id": "next-step", "level": 2, "title": "Recommended next step", "parent_id": null}
+  ]
+}

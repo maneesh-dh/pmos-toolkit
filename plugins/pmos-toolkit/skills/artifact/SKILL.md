@@ -18,6 +18,10 @@ These instructions use Claude Code tool names. In other environments:
 - **No subagents:** Run the refinement reviewer inline as the same agent. Same eval.md; same output format.
 - **Task tracking:** Use whatever task tool exists (TaskCreate / update_plan / verbal phase announcements).
 
+## Track Progress
+
+This skill has multiple phases per flow. For the Create flow, create one task per phase using your agent's task-tracking tool (`TaskCreate` in Claude Code, equivalents elsewhere): Phase 0 Load Context, Phase 1 Subcommand Routing, Phase 2 Create (with 2.0–2.7 sub-phases), Phase 3 Self-Refinement Loop, Phase 4 Save & Confirm, Phase 5 Workstream Enrichment, Phase 6 Capture Learnings. Refine Flow and Update Flow have their own phase tasks (see flow sections below). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+
 ## Phase 0 — Load Context
 
 1. Follow `../_shared/pipeline-setup.md` Section 0 (canonical inline block) to read `.pmos/settings.yaml`, resolve `{docs_path}`, and load workstream context. If settings.yaml is missing, run first-run setup per Section A.
@@ -223,9 +227,24 @@ Generate the artifact section-by-section using:
 
 Write the draft to `{feature_folder}/{slug}.html` (e.g., `prd.html`, `experiment-design.html`) per the substrate at `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/`. The template store at `~/.pmos/artifacts/templates/<slug>/template.md` retains its MD shape and is rendered via the substrate at write time (per runbook edge case row 4).
 
-**Atomic write (FR-10.2):** write `{slug}.html` and the companion `{slug}.sections.json` via temp-then-rename — never serve a half-written file.
+**Authoring path (FR-1):** author the HTML body directly using `template.md` for section ordering and per-section guidance comments. Wrap each `## §N` section as `<section id="...">` containing `<h2 id="...">` per `_shared/html-authoring/conventions.md` §3 (kebab-case ids; level-3 subsections become `<h3 id="...">` inside the same `<section>`). **No MD→HTML conversion step happens at write time** — the LLM emits substantive HTML directly, identical to how `/spec` and `/plan` author HTML from outline. The MD template is the *structural* guide, not the rendered source.
 
-**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
+**Pre-rename assertion (FR-2):** before the `rename(2)` step of the atomic write, run inline checks on `{slug}.html.tmp`:
+
+```bash
+# Every <h2>/<h3> carries an id="..." attr
+grep -oE '<h[23][^>]*>' {slug}.html.tmp | grep -v 'id="' && \
+  { echo "[/artifact] FR-2 violation: <h2>/<h3> without id in {slug}.html.tmp"; exit 1; }
+# Every <section> wrapper carries an id="..." attr
+grep -oE '<section[^>]*>' {slug}.html.tmp | grep -v 'id="' && \
+  { echo "[/artifact] FR-2 violation: <section> without id in {slug}.html.tmp"; exit 1; }
+```
+
+On either fail: hard-fail the Phase 2.7 write; surface the soft-phase failure dialog (Retry / Pause / Abort). The Retry path re-invokes the LLM with an explicit reminder of conventions.md §3.
+
+**Atomic write (FR-10.2):** write `{slug}.html` and the companion `{slug}.sections.json` via temp-then-rename — never serve a half-written file. The `sections.json` companion is built by running `node {feature_folder}/assets/build_sections_json.js {slug}.html.tmp > {slug}.sections.json.tmp` and renamed alongside.
+
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, `build_sections_json.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` skips identical files.
 
 **Asset prefix (FR-10.1):** `assets/` for top-level feature-folder writes.
 
@@ -237,20 +256,22 @@ Write the draft to `{feature_folder}/{slug}.html` (e.g., `prd.html`, `experiment
 
 **Mixed-format sidecar (FR-12.1):** when `output_format` resolves to `both`, also emit `{slug}.md` by piping the freshly-written HTML through `bash node {feature_folder}/assets/html-to-md.js {slug}.html > {slug}.md`. The MD sidecar is read-only (FR-33).
 
-Include a frontmatter block in the artifact (HTML primary uses a leading `<script type="application/json" id="pmos-frontmatter">` block carrying the same fields):
+Include a frontmatter block at the top of the HTML `<main>` body as a `<script type="application/json" id="pmos-frontmatter">` element carrying the artifact's metadata (FR-3):
 
-```yaml
----
-type: prd
-tier: full
-preset: narrative
-generated_at: 2026-05-02
-template_version: pmos-toolkit@2.10.0
-sources:
-  - 01_requirements_v3.md
-  - workstream:product-x
----
+```html
+<script type="application/json" id="pmos-frontmatter">
+{
+  "type": "prd",
+  "tier": "full",
+  "preset": "narrative",
+  "generated_at": "2026-05-02",
+  "template_version": "pmos-toolkit@2.41.0",
+  "sources": ["01_requirements.html", "workstream:product-x"]
+}
+</script>
 ```
+
+(Legacy MD-only mode: a YAML triple-dash frontmatter block at the top of the .md file with the same fields.)
 
 Then proceed to Phase 3.
 
@@ -260,16 +281,38 @@ Mirrors `/wireframes` Phase 4 pattern.
 
 ### Loop iteration
 
+0. **Pre-dispatch input prep (FR-4).** When primary is HTML, chrome-strip the draft before dispatch so the reviewer receives only the substantive body (no toolbar, no footer, no `<head>` chrome):
+   ```bash
+   node {feature_folder}/assets/chrome-strip.js {slug}.html > /tmp/artifact-reviewer-input.html
+   ```
+   Pass the stripped HTML inline as the reviewer's draft body. When primary is legacy MD (`output_format=md`), skip this step and pass the raw `.md` file contents instead.
+
 1. **Dispatch reviewer subagent.**
    - Subagent type: `general-purpose`.
-   - Inputs: `reviewer-prompt.md` (system instructions), the full `eval.md` for this template, and the current draft.
+   - Inputs: `reviewer-prompt.md` (system instructions), the full `eval.md` for this template, the companion `{slug}.sections.json`, and the chrome-stripped draft (or raw MD for legacy mode).
    - Background: false (this is a foreground call; we need findings before proceeding).
-   - Subagent returns JSON of the shape defined in `reviewer-prompt.md`.
+   - Subagent returns JSON of the shape defined in `reviewer-prompt.md` — each finding has `section, criterion_id, severity, finding, suggested_fix, quote`.
 
-2. **Parse findings.** Each finding has `section`, `criterion_id`, `severity`, `finding`, `suggested_fix`.
+1a. **Validate reviewer return (FR-5, FR-50/51/52 parity).** Before applying any fix:
+   1. Load `{slug}.sections.json`; collect ids into `known_ids`.
+   2. For every finding, assert `finding.section` ∈ `known_ids` (kebab-case match; tolerate trivial §N-stem derivation). On miss: hard-fail `[/artifact] FR-5 violation: reviewer returned section "{section}" not in sections.json: missing=[…]`.
+   3. For every finding, substring-grep `finding.quote` against the raw `{slug}.html` (un-stripped) source — `quote` must be ≥40 chars and a verbatim substring. On miss: hard-fail `[/artifact] FR-5 violation: reviewer quote not found in {slug}.html: {quote-prefix-30char}…`.
 
-3. **Auto-apply** all `high` and `medium` findings via `Edit` against the draft file. Apply the `suggested_fix` literally — the reviewer prompt requires fixes specific enough to apply directly.
+   On any FR-5 hard-fail: surface the soft-phase failure dialog (Retry / Pause / Abort). Retry re-dispatches the reviewer with the same prompt (idempotent — the reviewer-prompt.md contract is stable).
+
+2. **Parse findings.** Each finding has `section, criterion_id, severity, finding, suggested_fix, quote` (post-validation).
+
+3. **Auto-apply** all `high` and `medium` findings via `Edit` against the draft file. Apply the `suggested_fix` literally — the reviewer prompt requires fixes specific enough to apply directly. (Use the `quote` field as the `old_string` anchor for the Edit when applicable.)
 4. **Log** all `low` findings to a `_residuals` accumulator (in-memory).
+
+5. **Post-loop companion re-emit (FR-6).** After all fixes for this iteration have been applied (and again after all iterations conclude — once is sufficient), re-emit the companions from the live (post-edit) HTML:
+   ```bash
+   node {feature_folder}/assets/build_sections_json.js {slug}.html > {slug}.sections.json.tmp
+   mv {slug}.sections.json.tmp {slug}.sections.json
+   # When output_format=both:
+   node {feature_folder}/assets/html-to-md.js {slug}.html > {slug}.md.tmp && mv {slug}.md.tmp {slug}.md
+   ```
+   Atomic via temp-then-rename. Failures fall through to the soft-phase failure dialog. (Legacy `output_format=md` path skips both re-emits — sections.json is HTML-specific; MD primary has no sidecar.)
 
 ### Loop continuation
 
@@ -321,7 +364,7 @@ If a workstream was loaded in Phase 0:
 
 If no workstream is active, skip this phase.
 
-## Phase 6 — Capture Learnings
+## Phase 6: Capture Learnings
 
 Read `../learnings/learnings-capture.md` (relative to this skill dir) and follow it. This phase is a **terminal gate** — the skill is not complete until learnings have been processed.
 
@@ -333,8 +376,8 @@ Re-run the eval-loop judge on an existing artifact. **Internal QA only — does 
 1. Read the artifact at `<path>`. Parse its frontmatter to determine `type`. If frontmatter is missing or `type` cannot be inferred, ask the user via `AskUserQuestion`.
 2. Resolve the template (same 2.1 logic) and load `eval.md`.
 <!-- defer-only: destructive -->
-3. Ask the user: "Overwrite `<path>` or write to `<path>.refined.md`?" via `AskUserQuestion`. Default = `.refined.md` (safer).
-4. Run Phase 3 refinement loop against the artifact (or its `.refined.md` copy).
+3. **Detect primary extension (FR-7):** `EXT=$(basename "$path" | awk -F. '{print $NF}')` — `html` or `md`. Ask the user via `AskUserQuestion`: "Overwrite `<path>` or write to `<path>.refined.<EXT>`?" Default = `.refined.<EXT>` (safer; mirrors primary format). The refined sibling carries the same shape contract as the primary — `prd.refined.html` gets its own `prd.refined.sections.json` companion and (when `output_format=both`) a `prd.refined.md` sidecar; `prd.refined.md` is the legacy path.
+4. Run Phase 3 refinement loop against the artifact (or its `.refined.<EXT>` copy).
 5. Run Phase 4 save & confirm — point at the chosen output path.
 6. Skip Phase 5 (no new workstream signals from a re-run).
 7. Run Phase 6 learnings capture (terminal gate).
@@ -375,9 +418,28 @@ Per parsed item, batch ≤4 per `AskUserQuestion`. Options: **Apply as proposed*
 
 ### Phase U.4 — Append Comment Resolution Log
 
-At the bottom of the artifact, append (or extend) a `## Comment Resolution Log` section with one row per resolved item:
+At the bottom of the artifact (inside `<main>`, before any existing `<section id="deferred-improvements">`), append or extend a `<section id="comment-resolution-log">` with one row per resolved item (FR-8 — HTML primary path):
+
+```html
+<section id="comment-resolution-log">
+  <h2 id="comment-resolution-log">Comment Resolution Log</h2>
+  <table>
+    <thead><tr><th>Date</th><th>Reviewer</th><th>Section</th><th>Feedback</th><th>Resolution</th></tr></thead>
+    <tbody>
+      <tr><td>2026-05-02</td><td>(paste)</td><td>problem</td><td>Add competitor benchmark</td><td>Applied</td></tr>
+      <tr><td>2026-05-02</td><td>sarah@</td><td>guardrails</td><td>Tighten guardrails</td><td>Modified</td></tr>
+    </tbody>
+  </table>
+</section>
+```
+
+Apply via `Edit` against the HTML file; the post-edit re-emit step (Phase 3 step 5) regenerates `sections.json` to include the new id.
+
+When primary is legacy MD (`output_format=md`), fall back to the markdown table emission:
 
 ```markdown
+## Comment Resolution Log
+
 | Date | Reviewer | Section | Feedback | Resolution |
 |---|---|---|---|---|
 | 2026-05-02 | (paste) | §2 | Add competitor benchmark | Applied |

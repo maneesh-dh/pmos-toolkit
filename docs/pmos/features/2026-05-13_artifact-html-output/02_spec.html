@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>/artifact — HTML output parity — Spec</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.40.0">
+  <script defer src="assets/viewer.js?v=2.40.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">/artifact — HTML output parity — Spec</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+<script type="application/json" id="pmos-frontmatter">
+{"date":"2026-05-13","tier":3,"feature":"artifact-html-output","requires":"01_requirements.html","status":"Draft","skill_target":"plugins/pmos-toolkit/skills/artifact/"}
+</script>
+
+<section id="overview">
+<h2 id="overview">Overview</h2>
+<p>Close eight HTML-parity gaps in <code>/artifact</code> by editing <code>plugins/pmos-toolkit/skills/artifact/SKILL.md</code> + <code>reviewer-prompt.md</code>, adding one new substrate helper (<code>build_sections_json.js</code>), and fanning out the substrate manifest mention across the 7 sibling SKILL.md files that enumerate it. The resulting <code>/artifact</code>-generated HTML artifact is visually + structurally indistinguishable from a sibling <code>02_spec.html</code>; the reviewer subagent receives chrome-stripped HTML with quote-validation; the refine/update flows mirror the primary format; <code>sections.json</code> + MD sidecar stay byte-aligned to the live HTML.</p>
+</section>
+
+<section id="functional-requirements">
+<h2 id="functional-requirements">Functional Requirements</h2>
+
+<h3 id="fr-1">FR-1 — Phase 2.7 MD→HTML authoring contract (D1)</h3>
+<p>Add a paragraph to <code>plugins/pmos-toolkit/skills/artifact/SKILL.md</code> Phase 2.7 immediately above the "Atomic write" bullet: "Author the HTML body directly using <code>template.md</code> for section ordering and per-section guidance comments. Wrap each <code>## §N</code> as <code>&lt;section id="..."&gt;&lt;h2 id="..."&gt;</code> per <code>_shared/html-authoring/conventions.md</code> §3. No MD→HTML conversion happens at write time — the LLM emits substantive HTML directly, identical to how <code>/spec</code> and <code>/plan</code> author HTML from outline."</p>
+
+<h3 id="fr-2">FR-2 — Inline heading-id + section-wrapper assertion before rename (D1 hardening from grill)</h3>
+<p>Add a "Pre-rename assertion" bullet to Phase 2.7 immediately above "Atomic write":</p>
+<pre><code># Before rename(2):
+grep -oE '&lt;h[23][^&gt;]*&gt;' {slug}.html.tmp | grep -v 'id="' &amp;&amp; \
+  { echo "[/artifact] FR-2 violation: &lt;h2&gt;/&lt;h3&gt; without id in {slug}.html.tmp"; exit 1; }
+# AND every &lt;section&gt; carries an id="..." attr:
+grep -oE '&lt;section[^&gt;]*&gt;' {slug}.html.tmp | grep -v 'id="' &amp;&amp; \
+  { echo "[/artifact] FR-2 violation: &lt;section&gt; without id in {slug}.html.tmp"; exit 1; }</code></pre>
+<p>On either fail: hard-fail the Phase 2.7 write; surface soft-phase failure dialog (Retry / Pause / Abort). The Retry path re-invokes the LLM with an explicit reminder of conventions.md §3.</p>
+
+<h3 id="fr-3">FR-3 — JSON frontmatter example, not YAML (D5)</h3>
+<p>Replace the YAML frontmatter example in SKILL.md Phase 2.7 (current lines ~240–250, the <code>```yaml ... ---</code> block) with:</p>
+<pre><code>&lt;script type="application/json" id="pmos-frontmatter"&gt;
+{
+  "type": "prd",
+  "tier": "full",
+  "preset": "narrative",
+  "generated_at": "2026-05-02",
+  "template_version": "pmos-toolkit@2.41.0",
+  "sources": ["01_requirements.html", "workstream:product-x"]
+}
+&lt;/script&gt;</code></pre>
+
+<h3 id="fr-4">FR-4 — Phase 3 chrome-strip preamble (D2)</h3>
+<p>Insert a numbered step 0 ("Pre-dispatch input prep") in SKILL.md Phase 3 immediately above "Dispatch reviewer subagent":</p>
+<blockquote>
+<p><strong>0. Chrome-strip the draft.</strong> Run <code>node {feature_folder}/assets/chrome-strip.js {slug}.html &gt; /tmp/artifact-reviewer-input.html</code>. Pass the stripped HTML inline (verbatim file contents) to the reviewer subagent prompt as the canonical "draft" body. The subagent receives <code>&lt;h1&gt;…&lt;/h1&gt;\n&lt;main&gt;…&lt;/main&gt;</code> only — no toolbar, footer, or chrome.</p>
+</blockquote>
+
+<h3 id="fr-5">FR-5 — Reviewer return validation (D2 hardening from grill)</h3>
+<p>Add a numbered step 1a ("Validate reviewer return") in SKILL.md Phase 3 immediately after "Dispatch reviewer subagent":</p>
+<blockquote>
+<p><strong>1a. Validate reviewer return (FR-50/51/52 parity).</strong> The reviewer must return findings as <code>{section, criterion_id, severity, finding, suggested_fix, quote}</code> — note new required <code>quote</code> field. Before applying any fix:</p>
+<ol>
+  <li>Load <code>{slug}.sections.json</code>; collect ids into <code>known_ids</code>.</li>
+  <li>For every finding, assert <code>finding.section</code>'s leading kebab token is a member of <code>known_ids</code> (or matches a <code>§N</code>-stem to id derivation per conventions.md §3). On miss: hard-fail <code>[/artifact] FR-5 violation: reviewer returned section "{section}" not in sections.json: missing=[…]</code>.</li>
+  <li>For every finding, substring-grep <code>finding.quote</code> against the raw <code>{slug}.html</code> source. <code>quote</code> must be ≥40 chars and a verbatim substring. On miss: hard-fail <code>[/artifact] FR-5 violation: reviewer quote not found in {slug}.html: {quote-prefix-30char}…</code>.</li>
+</ol>
+<p>On any FR-5 hard-fail: surface the soft-phase failure dialog (Retry/Pause/Abort). Retry re-dispatches the reviewer with the same prompt (idempotent).</p>
+</blockquote>
+
+<h3 id="fr-6">FR-6 — Post-edit sections.json + sidecar re-emit (D4, D6 revised)</h3>
+<p>Add a numbered step 5 ("Post-loop companion re-emit") in SKILL.md Phase 3 immediately after the residual presentation step:</p>
+<blockquote>
+<p><strong>5. Re-emit companions.</strong> After any Phase 3 <code>Edit</code> applies a fix (and after all iterations conclude):</p>
+<ol>
+  <li>Run <code>node {feature_folder}/assets/build_sections_json.js {slug}.html &gt; {slug}.sections.json.tmp &amp;&amp; mv {slug}.sections.json.tmp {slug}.sections.json</code>. The script parses <code>&lt;h2&gt;/&lt;h3&gt;</code> ids (and parent <code>&lt;section&gt;</code> wrappers when present) using a minimal regex-DOM walker — zero npm install footprint.</li>
+  <li>When <code>output_format=both</code>: re-run <code>bash node {feature_folder}/assets/html-to-md.js {slug}.html &gt; {slug}.md</code>.</li>
+</ol>
+<p>The re-emit is atomic via temp-then-rename; failures fall through to soft-phase failure dialog.</p>
+</blockquote>
+
+<h3 id="fr-7">FR-7 — Refine flow extension mirrors primary (D3)</h3>
+<p>Replace SKILL.md line 336 — currently <code>Ask the user: "Overwrite &lt;path&gt; or write to &lt;path&gt;.refined.md?" via AskUserQuestion. Default = .refined.md (safer).</code> — with:</p>
+<blockquote>
+<p>Detect primary extension: <code>EXT=$(basename "$path" | awk -F. '{print $NF}')</code>. If <code>EXT=html</code>, offer <code>.refined.html</code>; if <code>EXT=md</code> (legacy), offer <code>.refined.md</code>. Ask the user via <code>AskUserQuestion</code>: "Overwrite <code>&lt;path&gt;</code> or write to <code>&lt;path&gt;.refined.&lt;ext&gt;</code>?" Default = <code>.refined.&lt;ext&gt;</code> (safer; mirrors primary format).</p>
+</blockquote>
+
+<h3 id="fr-8">FR-8 — Update flow Comment Resolution Log HTML emission (D7)</h3>
+<p>Replace SKILL.md Phase U.4 markdown table emission with HTML:</p>
+<blockquote>
+<p>At the bottom of the artifact (inside <code>&lt;main&gt;</code>, before any existing <code>&lt;section id="deferred-improvements"&gt;</code>), append (or extend) a <code>&lt;section id="comment-resolution-log"&gt;&lt;h2 id="comment-resolution-log"&gt;Comment Resolution Log&lt;/h2&gt;&lt;table&gt;</code> block with thead <code>Date | Reviewer | Section | Feedback | Resolution</code>. Each resolved item adds a <code>&lt;tr&gt;</code>. Apply via <code>Edit</code> against the HTML file. When primary is legacy MD, fall back to the existing markdown table emission.</p>
+</blockquote>
+
+<h3 id="fr-9">FR-9 — reviewer-prompt.md update</h3>
+<p>Edit <code>plugins/pmos-toolkit/skills/artifact/reviewer-prompt.md</code>:</p>
+<ol>
+  <li>Change paragraph 1 — "you receive ... 1. The full draft of an artifact (a markdown document)." — to: "1. A chrome-stripped HTML slice of the artifact draft (<code>&lt;h1&gt;</code> + <code>&lt;main&gt;</code> only) when primary is HTML; the raw markdown document when primary is MD-only legacy. The skill chrome-strips before dispatching you."</li>
+  <li>Update the JSON output example to include the new required <code>quote</code> field: <code>"quote": "Specific, testable criterion 1"</code> (a ≥40-char verbatim substring of the source).</li>
+  <li>Add to Rules: <strong>9.</strong> Every finding MUST include <code>quote</code>, a ≥40-char verbatim substring of the input draft proving the finding's location. The skill validates substring presence and hard-fails on miss. <strong>10.</strong> Every finding's <code>section</code> field must be a kebab-case id present in the companion <code>sections.json</code> (or a <code>§N</code> stem trivially derivable from it).</li>
+</ol>
+
+<h3 id="fr-10">FR-10 — New substrate helper: build_sections_json.js (D4 + D6 revised)</h3>
+<p>Add <code>plugins/pmos-toolkit/skills/_shared/html-authoring/assets/build_sections_json.js</code>. Minimal Node script using regex (no jsdom, no parse5 — keeps zero install footprint matching <code>chrome-strip.js</code>'s pattern). Reads an HTML file from argv[2] (or stdin), parses <code>&lt;h2 id="...">…&lt;/h2&gt;</code> + <code>&lt;h3 id="...">…&lt;/h3&gt;</code> + their enclosing <code>&lt;section id="...">…&lt;/section&gt;</code> if present, emits the conventions.md §10 JSON shape <code>[{id, level, title, parent_id}]</code> to stdout. Implementation pattern: mirror <code>chrome-strip.js</code>'s balanced-tag tracker — read input as a string, walk <code>&lt;section&gt;</code>/<code>&lt;h2&gt;</code>/<code>&lt;h3&gt;</code> with a stack to compute parent_id, extract title from text content via a tag-stripping regex. ≤80 LOC, zero external deps.</p>
+
+<h3 id="fr-11">FR-11 — Substrate-manifest fanout</h3>
+<p>The current substrate file list — <code>style.css, viewer.js, serve.js, html-to-md.js, turndown.umd.js, turndown-plugin-gfm.umd.js, LICENSE.turndown.txt</code> — is enumerated verbatim across 8 SKILL.md files (per substrate manifest in <code>_shared/html-authoring/README.md</code>). Append <code>build_sections_json.js</code> to the enumeration in the same commit across:</p>
+<ol>
+  <li><code>plugins/pmos-toolkit/skills/_shared/html-authoring/README.md</code> (the substrate manifest)</li>
+  <li><code>plugins/pmos-toolkit/skills/requirements/SKILL.md</code></li>
+  <li><code>plugins/pmos-toolkit/skills/spec/SKILL.md</code></li>
+  <li><code>plugins/pmos-toolkit/skills/plan/SKILL.md</code></li>
+  <li><code>plugins/pmos-toolkit/skills/wireframes/SKILL.md</code></li>
+  <li><code>plugins/pmos-toolkit/skills/prototype/SKILL.md</code></li>
+  <li><code>plugins/pmos-toolkit/skills/grill/SKILL.md</code></li>
+  <li><code>plugins/pmos-toolkit/skills/feature-sdlc/SKILL.md</code></li>
+  <li><code>plugins/pmos-toolkit/skills/artifact/SKILL.md</code></li>
+</ol>
+<p>Find via <code>grep -lr "turndown-plugin-gfm.umd.js" plugins/pmos-toolkit/skills/</code> to enumerate currently-mentioning files; apply uniform append.</p>
+
+<h3 id="fr-12">FR-12 — skill-patterns conformance</h3>
+<p>The edited <code>plugins/pmos-toolkit/skills/artifact/SKILL.md</code> must conform to <code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md §A–§F</code>: §A frontmatter (description ≥5 user-spoken triggers — already present; do not break), §B description triggering (no break), §C structure (the edits add steps; do not split into sub-files), §D body (concrete, scannable; the FR edits are concrete), §E scripts (the one new script is named clearly + sits in substrate), §F platform-conditional frontmatter (no change required).</p>
+
+<h3 id="fr-13">FR-13 — Release prereqs</h3>
+<p>Per <code>agent-skills/CLAUDE.md ## Plugin manifest version sync</code>: bump both <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> and <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code> to <strong>2.41.0</strong> (minor bump from 2.40.0) in the same commit. Add a changelog entry under <code>plugins/pmos-toolkit/CHANGELOG.md</code> (or README's changelog table per repo convention) describing the /artifact HTML-parity fix. Update README.md if /artifact has a row in the Pipeline table that mentions output_format.</p>
+</section>
+
+<section id="non-functional-requirements">
+<h2 id="non-functional-requirements">Non-Functional Requirements</h2>
+<ul>
+  <li><strong>NFR-1 (Compatibility):</strong> Legacy MD-only mode (<code>output_format=md</code>) continues to work — FR-2/4/5/6 short-circuit (chrome-strip + quote validation only run for HTML).</li>
+  <li><strong>NFR-2 (Zero install):</strong> <code>build_sections_json.js</code> ships with zero npm dependencies — node built-ins only. Mirrors <code>chrome-strip.js</code>.</li>
+  <li><strong>NFR-3 (Idempotence):</strong> Re-running /artifact create on an existing folder regenerates sections.json + sidecar from the live HTML; no stale companions.</li>
+  <li><strong>NFR-4 (Atomic writes):</strong> All companion files (<code>sections.json</code>, <code>.md</code> sidecar) use temp-then-rename per substrate contract.</li>
+</ul>
+</section>
+
+<section id="api-data-contracts">
+<h2 id="api-data-contracts">API / Data contracts</h2>
+
+<h3 id="sections-json-schema">sections.json schema</h3>
+<p>Unchanged — per <code>conventions.md §10</code>: <code>[{id, level: 2|3, title, parent_id: id|null}]</code>. Build-script emits this shape; reviewer + /verify consume it.</p>
+
+<h3 id="reviewer-return-shape">Reviewer return shape (revised)</h3>
+<pre><code>{
+  "section": "problem",                       // kebab-case id from sections.json
+  "criterion_id": "evidence-cited",
+  "severity": "high",                         // high | medium | low
+  "finding": "No customer quote present in §2.",
+  "suggested_fix": "Add a 1-sentence evidence citation...",
+  "quote": "Problem section with no evidence cited"  // NEW; ≥40-char verbatim substring of source HTML
+}</code></pre>
+</section>
+
+<section id="testing">
+<h2 id="testing">Testing strategy</h2>
+<ul>
+  <li><strong>Unit (synthetic):</strong> Author a synthetic <code>prd.html</code> with planted defects (h2 without id, section without wrapper, reviewer-quote not in source). Run each FR's check; expect canonical hard-fail messages.</li>
+  <li><strong>Integration (end-to-end):</strong> Run <code>/artifact prd full</code> on a real feature folder; open the rendered HTML in browser; compare <code>&lt;header&gt;</code> + <code>&lt;footer&gt;</code> chrome byte-by-byte to a sibling <code>02_spec.html</code>.</li>
+  <li><strong>Refine-flow test:</strong> Create a <code>prd.html</code>, invoke <code>/artifact refine</code>; confirm <code>.refined.html</code> is offered and works. Repeat with a <code>prd.md</code> legacy primary; confirm <code>.refined.md</code> fallback.</li>
+  <li><strong>Update-flow test:</strong> Invoke <code>/artifact update</code> with synthetic feedback; confirm the <code>&lt;section id="comment-resolution-log"&gt;</code> appears with a valid <code>&lt;table&gt;</code>.</li>
+  <li><strong>Skill-eval rubric:</strong> The Phase 6a skill-eval rubric (<code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-eval.md</code>) runs the deterministic + LLM-judge gate as final acceptance.</li>
+</ul>
+</section>
+
+<section id="verification">
+<h2 id="verification">Verification plan</h2>
+<ol>
+  <li>All FRs implemented per task list in /plan.</li>
+  <li>Plugin manifests synced (both .claude-plugin and .codex-plugin at 2.41.0).</li>
+  <li>Pre-push hook passes (manifest sync enforced).</li>
+  <li>Phase 6a skill-eval rubric scores 100% [D] + [J] pass on iter ≤2.</li>
+  <li>Phase 7 /verify runs the full suite (re-run skill-eval, host-repo prereq grades).</li>
+</ol>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">Open Questions</h2>
+<table>
+  <thead><tr><th>#</th><th>Question</th><th>Disposition</th></tr></thead>
+  <tbody>
+    <tr><td>OQ1</td><td>Add jsdom or use regex-DOM walker?</td><td><strong>Decided: regex-DOM walker</strong> (NFR-2). Pivot from grill Q3's jsdom answer captured here.</td></tr>
+    <tr><td>OQ2</td><td>Output_format=md path skips chrome-strip + quote validation?</td><td><strong>Decided: yes.</strong> NFR-1.</td></tr>
+  </tbody>
+</table>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_artifact-html-output/02_spec.html</span>
+  </footer>
+</body>
+</html>

@@ -301,7 +301,7 @@ Save to `{feature_folder}/01_requirements.html` per the substrate at `${CLAUDE_P
 
 **Atomic write (FR-10.2):** write `01_requirements.html` and the companion `01_requirements.sections.json` via temp-then-rename — never serve a half-written file.
 
-**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` (no-clobber) or `rsync --update` skips identical files.
+**Asset substrate (FR-10):** copy `assets/*` from `${CLAUDE_PLUGIN_ROOT}/skills/_shared/html-authoring/assets/` to `{feature_folder}/assets/` if not already present. The substrate currently includes `style.css`, `viewer.js`, `serve.js`, `html-to-md.js`, `turndown.umd.js`, `turndown-plugin-gfm.umd.js`, `build_sections_json.js`, and `LICENSE.turndown.txt`; new substrate files added in future releases ride along automatically. Idempotent — `cp -n` (no-clobber) or `rsync --update` skips identical files.
 
 **Asset prefix (FR-10.1):** for top-level feature-folder artifacts the prefix is `assets/`. Compute per-file relative prefixes for any nested-folder artifacts.
 

@@ -1,0 +1,10 @@
+# ts-circular — TS001 (no-circular) fires via dependency-cruiser delegation.
+set -euo pipefail
+out=$($AUDIT) || { echo "audit exited non-zero"; exit 1; }
+# If dep-cruiser is unavailable, the rule auto-skips and the test is informational only.
+if echo "$out" | jq -e '[.tools_errored[]? | select(.tool == "dependency-cruiser")] | length > 0' >/dev/null 2>&1; then
+  echo "dependency-cruiser not on PATH; rule auto-skipped (FR-32 graceful degrade) — pass."
+  exit 0
+fi
+echo "$out" | jq -e '[.findings[] | select(.rule_id == "TS001")] | length >= 1' >/dev/null \
+  || { echo "expected ≥1 TS001 circular-import finding"; echo "$out" | jq '.findings | map(.rule_id)'; exit 1; }

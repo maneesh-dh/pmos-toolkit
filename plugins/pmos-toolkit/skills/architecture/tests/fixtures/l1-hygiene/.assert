@@ -1,0 +1,6 @@
+# l1-hygiene — U004/U005/U007/U008 debug/hygiene rules fire.
+set -euo pipefail
+out=$($AUDIT) || { echo "audit exited non-zero"; exit 1; }
+rules=$(echo "$out" | jq -r '.findings | map(.rule_id) | unique | join(",")')
+echo "$out" | jq -e '[.findings[].rule_id] | (contains(["U004"]) or contains(["U005"]) or contains(["U007"]) or contains(["U008"]))' >/dev/null \
+  || { echo "expected ≥1 of U004/U005/U007/U008; got [$rules]"; exit 1; }

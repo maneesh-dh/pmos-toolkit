@@ -1,0 +1,9 @@
+# gitignore-deny — scanner honors .gitignore + hardcoded deny-list (FR-40/41/42/43, D15).
+set -euo pipefail
+out=$($AUDIT) || { echo "audit exited non-zero"; exit 1; }
+# The fixture stuffs files into deny-listed and gitignored paths. The scanner
+# must exclude them — verify by inspecting scanned counts (excluded > 0 OR
+# files_for_rules does not include node_modules / .git etc.).
+total=$(echo "$out" | jq -e '.scanned.total // 0')
+echo "$out" | jq -e '(.scanned.files_for_rules // []) | map(select(test("node_modules|\\.git/|dist/|build/|\\.venv/|__pycache__/"))) | length == 0' >/dev/null \
+  || { echo "scanner allowed a deny-listed path through"; exit 1; }

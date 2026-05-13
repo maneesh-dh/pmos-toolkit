@@ -1,0 +1,6 @@
+# l1-size — U001/U002/U003/U006 size/shape rules fire.
+set -euo pipefail
+out=$($AUDIT) || { echo "audit exited non-zero"; exit 1; }
+rules=$(echo "$out" | jq -r '.findings | map(.rule_id) | unique | join(",")')
+echo "$out" | jq -e '[.findings[].rule_id] | (contains(["U001"]) or contains(["U002"]) or contains(["U003"]) or contains(["U006"]))' >/dev/null \
+  || { echo "expected ≥1 of U001/U002/U003/U006; got [$rules]"; exit 1; }

@@ -1,0 +1,7 @@
+# principles-16-rules — rule loader honors the L1 cap (≤15 per FR-21).
+set -euo pipefail
+out=$($AUDIT) || { echo "audit exited non-zero"; exit 1; }
+total=$(echo "$out" | jq -r '.rules_loaded.total // 0')
+[ "$total" -ge 1 ] || { echo "rule loader returned no rules"; exit 1; }
+l1=$(echo "$out" | jq -r '.rules_loaded.tier_1 // 0')
+[ "$l1" -le 15 ] || { echo "L1 rule cap breached: tier_1=$l1 > 15 (FR-21)"; exit 1; }

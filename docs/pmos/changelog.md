@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.39.0: /execute parallel subagent-driven execution mode
+
+`/execute` can now run a plan by fanning independent tasks out across subagents in parallel, instead of (or in addition to) the single-agent task-by-task loop. The behavior is selected by a flag, the user is asked which mode to use right after `/plan`, and all of the subagent-driven logic lives inside `/execute` itself — nothing outside `plugins/pmos-toolkit/skills/execute/` is required.
+
+### What's new
+
+- **`/execute --subagent-driven` — parallel, subagent-driven execution.** A fresh implementer subagent per task; a deterministic wave planner groups tasks into "waves" (a task is in wave *k* once all its `Depends on:` / `Requires state from:` are in earlier waves **and** it shares no `Files:` path with its wave-mates), and each wave's implementers are dispatched concurrently. Implementer subagents implement + test but never `git commit` — the controller commits each task's file-set serially after the wave, preserving the `T<N>` commit subjects the resume resolver depends on (and honoring the plan's `commit_cadence`). Every completed task then goes through a two-stage review — spec-compliance reviewer subagent first, then (only on ✅) a code-quality reviewer subagent — looping to clean, and one whole-implementation reviewer runs after the last wave. Implementer status (`DONE` / `DONE_WITH_CONCERNS` / `NEEDS_CONTEXT` / `BLOCKED` / stall) is handled per the subagent-driven contract. Inspired by `superpowers:subagent-driven-development`, but with no dependency on it — degenerate plans (dependency cycle, unknown task id, legacy plan with no v2 task fields) fall back to fully-sequential singleton waves.
+- **`plugins/pmos-toolkit/skills/execute/subagent-driven.md` — self-contained prompt templates.** Implementer / spec-compliance-reviewer / code-quality-reviewer / final-reviewer templates plus model-selection guidance (cheap model for mechanical 1–2-file tasks, standard for integration, most-capable for design/review). No `../_shared/*` or `superpowers:*` reference is load-bearing.
+- **`/plan` asks the execution mode at close.** Before the closing offer, `/plan` asks **Inline execution** (Recommended — one agent, task-by-task, lowest token cost) vs **Subagent-driven execution** (fresh subagent per task, parallel waves, two-stage review — faster on wide plans), records the choice as `execution_mode:` in the plan's frontmatter, and reflects it in the `/execute …` invocation it offers.
+- **`/feature-sdlc` honors it.** Phase 6 reads `execution_mode` from the plan and passes `--subagent-driven` accordingly; an absent value (legacy plan) means inline, with no re-prompt.
+
+### Changed
+
+- `/execute` `argument-hint` gains `[--subagent-driven | --inline]` (mutually exclusive, last wins, absent ⇒ inline). On platforms with no subagent tool, `--subagent-driven` degrades to a warning + inline execution — never an error. `/execute` also gains a `## Track Progress` section. The pre-existing "Subagent Execution (when Agent tool is available)" note is now framed as a lightweight *sequential* sub-option of inline mode; the new section is the parallel variant.
+- Both `plugin.json` manifests bumped to 2.39.0 (in sync).
+
+### References
+
+- Requirements: `docs/pmos/features/2026-05-13_execute-subagent-mode/01_requirements.md`
+- Spec: `docs/pmos/features/2026-05-13_execute-subagent-mode/02_spec.md`
+- Plan: `docs/pmos/features/2026-05-13_execute-subagent-mode/03_plan.md`
+- Verification report: `docs/pmos/features/2026-05-13_execute-subagent-mode/04_verify.md`
+
 ## 2026-05-12 — pmos-toolkit 2.38.0: skill development via /feature-sdlc (skill modes, skill-eval rubric, /skill-sdlc alias)
 
 Folds skill authoring into the same SDLC spine everything else uses. `/create-skill` and `/update-skills` are retired — building or revising a skill now runs the full worktree-isolated, resumable, gated `/feature-sdlc` pipeline (requirements → spec → plan → execute → eval → verify → complete-dev), and every skill is scored against a binary rubric before it can merge.

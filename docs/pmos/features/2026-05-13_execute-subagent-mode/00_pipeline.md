@@ -15,9 +15,9 @@
 | 3a /creativity | skipped (recommended) | — |
 | 4 /spec | done | `02_spec.md` |
 | 5 /plan | done | `03_plan.md` |
-| 6 /execute | in_progress | (skill changes) |
-| 6a /skill-eval | pending | — |
-| 7 /verify | pending | — |
-| 8 /complete-dev | pending | — |
-| 8a /retro | pending | — |
+| 6 /execute | done | execute/SKILL.md + subagent-driven.md; /plan + /feature-sdlc edits |
+| 6a /skill-eval | done (PASS) | all [D] green for /execute; [J] reviewer PASS; iter-1 remediation applied |
+| 7 /verify | done (PASS) | 04_verify.md |
+| 8 /complete-dev | in_progress | v2.39.0, changelog, merge+tag+push |
+| 8a /retro | pending (gate) | — |
 | 9 final-summary | pending | — |

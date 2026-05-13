@@ -243,6 +243,47 @@ The per-package loop processes each in declared order (per `workspace-discovery.
 
 See [§1: Single-file audit flow](#1-single-file-audit-flow) for argv parsing and [§5: Repo-miner subagent](#5-repo-miner-subagent) for scaffold-mode data gathering (T15).
 
+### §5: Repo-miner subagent
+
+In `scaffold` mode (per §4 FR-MODE-2), the runtime dispatches a Task subagent to gather raw repo data before any user prompts fire. The repo-miner reads manifests, code entry points, license files, and contributor history; returns a structured JSON for §6's draft-assembly phase (T16).
+
+**Dispatch protocol.**
+
+1. After §4 resolves mode to `scaffold` (or `audit+scaffold` for the absent-README packages), dispatch ONE Task call:
+   - **Prompt body:** the supported-manifest list (from `reference/section-schema.yaml` if a manifest registry surfaces there; otherwise inline the 8-manifest set from `scripts/workspace-discovery.sh`), the repo-root absolute path, and the return-shape contract below.
+   - **Timeout:** 90s. On timeout, log `repo-miner: timed out (90s); falling back to AskUserQuestion for all required fields` and skip to the §6 prompt-fallback path.
+
+2. **Return shape (spec §9.2.2).** The subagent MUST return JSON matching:
+```json
+{
+  "name": "<package-name>",
+  "entry_point": "<bin path | importable module | null>",
+  "license": "<SPDX-id | UNLICENSED | null>",
+  "contributors": ["<gh-handle>", ...],
+  "repo_type_hint": "library|cli|plugin|app|monorepo-root|monorepo-package|unknown",
+  "manifest_source": "<one-of-the-8-supported>",
+  "evidence": {
+    "name_from": "<file:line>",
+    "entry_point_from": "<file:line | null>",
+    "license_from": "<file:line | null>"
+  }
+}
+```
+
+3. **Parent-side validation.** For each required field that is non-null:
+   - Field types match the schema (string/array/object). Type mismatch → hard-fail: `repo-miner: field <name> has wrong type (expected <T>, got <U>)`. Pause with failure dialog.
+   - `name` non-empty after `.strip()`.
+   - `repo_type_hint` ∈ the 7-value enum above. Otherwise → hard-fail: `repo-miner: unknown repo_type_hint '<value>'`.
+   - `evidence.*_from` paths exist on disk when the corresponding field is non-null (substring-grep the named file for the field value). Miss → hard-fail: `repo-miner: evidence missing — <field>='<value>' not found in <file>`. Pause.
+
+4. **AskUserQuestion fallback.** For each required field that the repo-miner returned as `null` (genuinely couldn't infer):
+   - Issue a single `AskUserQuestion` with sensible defaults from the repo context (e.g., for `license: null`, propose `MIT (Recommended)` / `Apache-2.0` / `Other` / `UNLICENSED`).
+   - Defer-tag with `<!-- defer-only: ambiguous -->` so the non-interactive contract's classifier (Phase 0b) DEFERS rather than auto-picks — license choice is too consequential to auto-pick.
+
+5. **Cross-reference.** §6 (T16) consumes this validated `RepoMinerResult` as the seed for the scaffold draft. The `evidence.*_from` paths flow into the README's footnote section so the user can audit where each fact came from.
+
+See [§4: Mode resolution](#4-mode-resolution) for the upstream gate and [§6: Scaffold flow](#6-scaffold-flow) for the downstream consumer (T16 lands §6).
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="pmos:tier" content="3">
+  <meta name="pmos:type" content="feature">
+  <meta name="pmos:feature" content="architecture-principles-skill">
+  <meta name="pmos:date" content="2026-05-13">
+  <meta name="pmos:status" content="Ready for Plan">
+  <meta name="pmos:requirements" content="01_requirements.html">
+  <meta name="pmos:phase" content="spec">
+  <title>/architecture skill — Spec</title>
+  <link rel="stylesheet" href="assets/style.css?v=2.46.0">
+  <script defer src="assets/viewer.js?v=2.46.0"></script>
+</head>
+<body>
+  <header class="pmos-artifact-toolbar" data-pmos-role="toolbar">
+    <h1 class="pmos-artifact-title">/architecture skill — Spec</h1>
+    <div class="pmos-artifact-actions">
+      <button type="button" class="pmos-btn" data-pmos-action="copy-md">Copy Markdown</button>
+      <button type="button" class="pmos-btn" data-pmos-action="copy-link">Copy section link</button>
+    </div>
+    <a class="pmos-attribution pmos-attribution--toolbar"
+       href="https://github.com/maneesh-dhabria/pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </header>
+  <main class="pmos-artifact-body" data-pmos-role="body">
+
+<section id="metadata">
+<h2 id="metadata">Metadata</h2>
+<dl>
+  <dt>Tier</dt><dd>3 — Feature (new capability)</dd>
+  <dt>Type</dt><dd>feature</dd>
+  <dt>Feature slug</dt><dd><code>architecture-principles-skill</code></dd>
+  <dt>Date</dt><dd>2026-05-13</dd>
+  <dt>Status</dt><dd>Ready for Plan</dd>
+  <dt>Requirements</dt><dd><a href="01_requirements.html"><code>01_requirements.html</code></a> (Approved, 28 sections, 11 design decisions)</dd>
+  <dt>Grill source</dt><dd><a href="grills/2026-05-13_01_requirements.html">5 findings (3 block, 2 warn)</a> — all folded as FRs below</dd>
+  <dt>Standing acceptance</dt><dd><code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md §A–§F</code> + Phase 6a <code>skill-eval.md</code> 39-check rubric</dd>
+  <dt>Target platform</dt><dd><code>generic</code> (Claude Code + Codex)</dd>
+  <dt>Skill location</dt><dd><code>plugins/pmos-toolkit/skills/architecture/</code></dd>
+</dl>
+</section>
+
+<section id="problem-statement">
+<h2 id="problem-statement">1. Problem Statement</h2>
+<p>LLM coding agents — and the humans collaborating with them — accrete architectural debt one PR at a time because no agent-readable checklist of project-wide principles is available at code-review or design time. The <code>/architecture</code> skill ships a tiered, citation-rich rulebook (≤15 L1 universal rules · stack-specific L2 rules · per-repo L3 overrides), runs an audit pass that delegates declarative checks to existing AST tools (Dependency Cruiser, ruff) and grep/regex for semantic checks, and turns block-severity findings into Nygard ADRs (cap 5/run) so architectural decisions become first-class versioned artifacts. v1 ships only the <code>audit</code> mode — scaffold / spec-check / code-check are explicitly v2+.</p>
+<p><strong>Primary success metric:</strong> a single <code>/architecture audit &lt;repo&gt;</code> run against a representative TS+Python monorepo (e.g., book-companion: 690 .py · 408 .ts · 260 .vue) returns within the runtime budget, produces a JSON report citing rules by ID, writes ≤5 ADRs for block-severity findings, and surfaces declarative-rule coverage % honestly.</p>
+</section>
+
+<section id="goals">
+<h2 id="goals">2. Goals</h2>
+<table>
+<thead><tr><th>#</th><th>Goal</th><th>Success Metric</th></tr></thead>
+<tbody>
+<tr><td>G1</td><td>Audit produces deterministic, citation-rich findings</td><td>Same input repo → byte-identical JSON report across runs (modulo timestamps); every finding has <code>rule_id</code> + <code>source_citation</code> non-null</td></tr>
+<tr><td>G2</td><td>≥70% of v1 declarative checks delegate to AST tools (gap-map artifact baked into spec §7.4)</td><td><code>tools/check-gap-map.sh</code> asserts <code>delegated_pct &gt;= 0.70</code> against the shipped <code>principles.yaml</code></td></tr>
+<tr><td>G3</td><td>Plugin update never overwrites user state</td><td>Plugin owns L1+L2 only at <code>plugins/.../architecture/principles.yaml</code>; user owns L3 + exemptions + ADRs at <code>&lt;repo&gt;/.pmos/architecture/</code> + <code>&lt;repo&gt;/docs/adr/</code> — three-file separation enforced by file-path FRs</td></tr>
+<tr><td>G4</td><td>Skill conforms to <code>skill-patterns.md §A–§F</code></td><td>Phase 6a <code>/skill-eval</code> passes all 39 binary rubric checks at <code>--target generic</code></td></tr>
+<tr><td>G5</td><td>Tool absence is graceful, not fatal</td><td>Missing <code>dependency-cruiser</code> or <code>ruff</code> on PATH → audit completes with chat warning + <code>tools_skipped</code> in report; exit 0</td></tr>
+<tr><td>G6</td><td>Vue SFC coverage gap surfaced explicitly</td><td>Report JSON always carries <code>frontend_declarative_coverage</code> field (0.0–1.0); Vue SFCs counted as L1-semantic-only at v1</td></tr>
+<tr><td>G7</td><td>ADR-driven exemptions reconcile against ADR files</td><td>Three reconciliation states tested: matching pair / orphan-exemption / informational-ADR. Orphan exemption emits warn-level report entry.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="non-goals">
+<h2 id="non-goals">3. Non-Goals</h2>
+<ul>
+  <li><strong>scaffold / spec-check / code-check modes</strong> — explicitly deferred to v2+. v1 ships only <code>audit</code>. The four-mode shape in the ideation artifact is the v2+ horizon.</li>
+  <li><strong>Pre-commit / CI hooks</strong> — v1 is manual-invoke only (D10). Adding a Git hook or CI wrapper is a v2 concern.</li>
+  <li><strong>ts-arch tool</strong> — dropped from v1 (Dep Cruiser's <code>required</code> + <code>forbidden</code> rules cover the same circular-import + layer-boundary use cases). May re-enter at v2 if Dep Cruiser gaps emerge.</li>
+  <li><strong>Vue SFC <code>&lt;script&gt;</code> extraction</strong> — v1 ships with <code>.vue</code> files getting only L1-semantic checks. SFC extractor deferred to v1.1+; the report's <code>frontend_declarative_coverage</code> metric makes the gap visible.</li>
+  <li><strong>Auto-fix</strong> — audit reports only; never edits user source. (ADR write is the sole side-effect, and even that is opt-out via <code>--no-adr</code>.)</li>
+  <li><strong>Network calls at audit time</strong> — runs offline. Citation URLs in <code>principles.yaml</code> are documentation, not fetched.</li>
+  <li><strong>Custom rule authoring UX</strong> — v1 users hand-edit YAML. A <code>/architecture add-rule</code> sub-command is a v2 concern.</li>
+  <li><strong>Cross-language graph (TS importing Python or vice-versa)</strong> — out of scope; tools are per-stack.</li>
+  <li><strong>Severity-tier customization</strong> — info/warn/block tier mapping is fixed in v1; user can demote a rule via L3 override but cannot redefine the tier semantics.</li>
+</ul>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log">4. Decision Log</h2>
+<p>Carries forward D1–D11 from <a href="01_requirements.html#design-decisions">requirements §design-decisions</a>; appends D12–D22 made in /spec.</p>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>D12</td><td><strong>L1 cap failure mode: abort schema-load on rule #16 (F1)</strong></td><td>(a) abort schema-load · (b) info-severity warning · (c) silently truncate · (d) crash run on any L1 load</td><td>Fail-fast prevents silent cap drift. Authors learn at the moment of harm. Deterministic test condition (exit code != 0, specific stderr).</td></tr>
+<tr><td>D13</td><td><strong>F2 gap-map: bake the rule-id → tool mapping into spec §7.4 (option a)</strong></td><td>(a) /spec §7.4 deliverable · (b) weaken 70% goal to "best-effort"</td><td>The rule set is small (≤15 L1 + ~10 L2). Concrete mapping in spec lets /plan size LLM-judge surface area exactly. Preserves G2 goal without weakening.</td></tr>
+<tr><td>D14</td><td><strong>Vue SFC coverage strategy: report-the-gap (F3 option c)</strong></td><td>(a) SFC extractor pre-pass · (b) drop Vue from declarative · (c) surface coverage % in report</td><td>Cheapest honest v1. Dep Cruiser on .ts/.tsx covers what it covers; report makes the gap visible (<code>frontend_declarative_coverage: 0.61</code> on book-companion-like repos). SFC extractor lands in v1.1 when book-companion validation forces it.</td></tr>
+<tr><td>D15</td><td><strong>gitignore + deny-list (F4): both, gitignore-first</strong></td><td>(a) <code>git check-ignore</code> only · (b) hardcoded deny-list only · (c) both</td><td>Belt-and-suspenders is cheap. <code>git check-ignore -v</code> is primary; hardcoded fallback (<code>node_modules · .venv · __pycache__ · dist · build · .pytest_cache · .ruff_cache · .mypy_cache · coverage · .next · .nuxt · .git · target · vendor</code>) catches non-git repos and repos with broken .gitignore. Order: gitignore → fallback union.</td></tr>
+<tr><td>D16</td><td><strong>F5 ADR mapping: three-file split, ADR + project principles.yaml cross-ref</strong></td><td>(a) project principles.yaml + ADR cross-ref · (b) ADR is sole source · (c) principles.yaml is sole source</td><td>Plugin updates can never overwrite user state. L1+L2 plugin-owned at skill dir; L3 + exemption rows user-owned at <code>&lt;repo&gt;/.pmos/architecture/principles.yaml</code>; ADRs at <code>&lt;repo&gt;/docs/adr/ADR-NNNN-*.md</code>. Audit reconciles the two user-owned files; orphan exemption (no matching ADR) → warn. Both files round-trip through diff.</td></tr>
+<tr><td>D17</td><td><strong>AST-tool scope: 2 tools at v1 (Dep Cruiser + ruff)</strong></td><td>(a) 2 tools · (b) drop all tools (grep-only v1) · (c) 3 tools (add ts-arch)</td><td>L1 universal rules grep-doable (file/function size, console.log, etc.). L2 declarative needs dep graphs — Dep Cruiser covers TS; ruff covers Python (already in book-companion). ts-arch dropped — Dep Cruiser <code>required</code>/<code>forbidden</code> rules subsume its core checks at lower risk.</td></tr>
+<tr><td>D18</td><td><strong>Tool invocation: shell-out, not library import</strong></td><td>(a) Bash shell-out · (b) library import · (c) per-tool subagent</td><td>Pmos skills are install-free. Shell-out + JSON-output flags (<code>--output-type json</code> / <code>--format=json</code>) keeps the skill version-independent and transparent in logs. Auto-skip with chat warning if tool missing.</td></tr>
+<tr><td>D19</td><td><strong>ADR write path: <code>&lt;repo&gt;/docs/adr/ADR-NNNN-&lt;kebab-title&gt;.md</code>; configurable via <code>adr_path:</code> in project principles.yaml</strong></td><td>(a) <code>docs/adr/</code> default · (b) <code>.pmos/architecture/adr/</code> default · (c) <code>doc/architecture/decisions/</code> default</td><td><code>docs/adr/</code> is the Nygard-community convention and matches most extant ADR tooling (adr-tools, log4brains). Configurable for repos already using a different path.</td></tr>
+<tr><td>D20</td><td><strong>ADR numbering: monotonically increasing across all audit runs; never recycle</strong></td><td>(a) monotonic + never recycle · (b) per-run reset · (c) UUID</td><td>Standard ADR convention. Audit scans <code>&lt;repo&gt;/docs/adr/</code> for highest existing ADR-NNNN and starts there +1. Race-free for single-user runs; v2 may need a lock-file for parallel CI invocations.</td></tr>
+<tr><td>D21</td><td><strong>Report shape: JSON to stdout · human summary to stderr</strong></td><td>(a) JSON stdout + text stderr · (b) JSON-only · (c) text-only with <code>--json</code> flag</td><td>JSON to stdout pipes cleanly into <code>jq</code> / CI tooling. Text-to-stderr keeps interactive UX humane without polluting machine output. Standard Unix dual-stream pattern.</td></tr>
+<tr><td>D22</td><td><strong>Severity → action mapping</strong></td><td>(a) info=log · warn=log+report · block=log+report+ADR (cap 5) · (b) any severity may spawn ADR</td><td>Per D8 from requirements: only block-severity findings spawn ADRs. Cap of 5 per run prevents ADR-spam on a freshly-audited legacy repo; truncated count surfaced in report (<code>adrs_truncated: 7</code>).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="user-journeys">
+<h2 id="user-journeys">5. User Personas &amp; Journeys</h2>
+<p>Personas + journeys are fully specified in <a href="01_requirements.html#user-journeys">requirements §user-journeys</a>. The spec carries forward without restatement; key flow recapped here for sequence-diagram traceability.</p>
+<h3 id="primary-journey-architect-running-audit">5.1 Primary journey — architect running first audit on a TS+Python monorepo</h3>
+<ol>
+  <li>User runs <code>/architecture audit /Users/me/repo</code> (or no-arg → cwd).</li>
+  <li>Skill loads plugin L1+L2 rules from its skill dir; tries to load <code>&lt;repo&gt;/.pmos/architecture/principles.yaml</code> (L3 + exemptions); on missing, proceeds with L1+L2 only and notes <code>l3_present: false</code> in report.</li>
+  <li>Skill enumerates source files via <code>git ls-files</code> minus <code>.gitignore</code> matches minus hardcoded deny-list.</li>
+  <li>For each rule: grep/regex (L1 semantic) or shell-out to Dep Cruiser/ruff (L2 declarative); collect findings keyed by <code>rule_id</code>.</li>
+  <li>Reconcile findings against L3 overrides + exemptions: tier-precedence + per-site mute.</li>
+  <li>Promote ≤5 block-severity findings to ADR files at <code>&lt;repo&gt;/docs/adr/ADR-NNNN-*.md</code>; truncate rest with explicit count.</li>
+  <li>Emit JSON report to stdout + human summary to stderr.</li>
+</ol>
+</section>
+
+<section id="system-design">
+<h2 id="system-design">6. System Design</h2>
+
+<section id="architecture-overview">
+<h3 id="architecture-overview">6.1 Architecture overview</h3>
+<pre><code>┌─────────────────────────────────────────────────────────────────────────┐
+│  /architecture audit &lt;path&gt;                                              │
+└──────┬──────────────────────────────────────────────────────────────────┘
+       │
+       ▼
+┌──────────────────┐    ┌──────────────────────────────────────────────────┐
+│  rule loader     │◄───┤ plugins/.../architecture/principles.yaml (L1+L2) │ ← plugin-owned (read-only)
+│  (3-tier merge)  │    └──────────────────────────────────────────────────┘
+│                  │    ┌──────────────────────────────────────────────────┐
+│                  │◄───┤ &lt;repo&gt;/.pmos/architecture/principles.yaml (L3)   │ ← user-owned
+│                  │    └──────────────────────────────────────────────────┘
+└──────┬───────────┘
+       │ merged ruleset (precedence: project > stack > universal)
+       ▼
+┌──────────────────┐    ┌───────────────────────────────────────────────┐
+│  file scanner    │◄───┤ git check-ignore -v + hardcoded deny-list     │
+└──────┬───────────┘    └───────────────────────────────────────────────┘
+       │ scanned files
+       ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  rule evaluators (parallel-safe; sequential at v1)                   │
+│                                                                       │
+│  ┌─────────────────┐  ┌────────────────────┐  ┌────────────────────┐ │
+│  │ L1 semantic     │  │ L2 TS declarative  │  │ L2 Python decl.    │ │
+│  │ grep/regex      │  │ shell → dep-cruiser│  │ shell → ruff       │ │
+│  │ (file/fn size,  │  │ --output-type json │  │ --format=json      │ │
+│  │  console.log…)  │  │                    │  │                    │ │
+│  └────────┬────────┘  └─────────┬──────────┘  └─────────┬──────────┘ │
+└───────────┼─────────────────────┼─────────────────────────┼──────────┘
+            └─────────────────────┼─────────────────────────┘
+                                  ▼ raw findings
+                       ┌──────────────────────┐
+                       │ exemption reconciler │◄── &lt;repo&gt;/docs/adr/ADR-*.md
+                       │ (L3 + per-site mute) │    (parsed for `## Suppresses`)
+                       └──────────┬───────────┘
+                                  ▼ filtered findings
+                       ┌──────────────────────┐    ┌─────────────────────────────┐
+                       │ ADR promoter         ├───►│ writes &lt;repo&gt;/docs/adr/     │
+                       │ (block only, cap 5)  │    │ ADR-NNNN-&lt;title&gt;.md         │
+                       └──────────┬───────────┘    └─────────────────────────────┘
+                                  ▼
+                       ┌──────────────────────┐
+                       │ report emitter       │── JSON → stdout
+                       │                      │── text summary → stderr
+                       └──────────────────────┘
+</code></pre>
+<figcaption>Architecture overview — three plug-points (rule loader, evaluators, ADR promoter). Inline ASCII (subagent <code>/diagram</code> not dispatched: zero-dep ASCII keeps the spec readable without a Mermaid build step at this Tier and matches existing pmos-toolkit substrate norms; per FR-65 the inline-emission tradeoff is logged here).</figcaption>
+</section>
+
+<section id="sequence-diagrams">
+<h3 id="sequence-diagrams">6.2 Sequence diagrams</h3>
+
+<h4 id="seq-happy-path">6.2.1 Happy path — full audit, both tools present</h4>
+<pre><code>user             /architecture     rule-loader   scanner   dep-cruiser   ruff       ADR-promoter   report
+  │                  │                  │           │           │          │              │           │
+  │ audit &lt;path&gt;     │                  │           │           │          │              │           │
+  │─────────────────►│                  │           │           │          │              │           │
+  │                  │ load L1+L2 (plugin)          │           │          │              │           │
+  │                  │─────────────────►│           │           │          │              │           │
+  │                  │◄── ruleset       │           │           │          │              │           │
+  │                  │ load L3 (repo)   │           │           │          │              │           │
+  │                  │─────────────────►│           │           │          │              │           │
+  │                  │◄── merged        │           │           │          │              │           │
+  │                  │ enumerate files (gitignore + deny-list)  │          │              │           │
+  │                  │─────────────────────────────►│           │          │              │           │
+  │                  │◄── file list                 │           │          │              │           │
+  │                  │ run L1 semantic (grep)       │           │          │              │           │
+  │                  │ shell-out (TS L2)            │           │          │              │           │
+  │                  │─────────────────────────────────────────►│          │              │           │
+  │                  │◄── findings JSON                         │          │              │           │
+  │                  │ shell-out (Py L2)                        │          │              │           │
+  │                  │────────────────────────────────────────────────────►│              │           │
+  │                  │◄── findings JSON                                    │              │           │
+  │                  │ reconcile L3 + exemptions + ADR `## Suppresses`     │              │           │
+  │                  │ filter to block-severity, cap 5                     │              │           │
+  │                  │ write ADRs                                          ├─────────────►│           │
+  │                  │ emit report                                                        ├──────────►│
+  │◄── stderr summary, stdout JSON, exit 0                                                            │
+</code></pre>
+<figcaption>Happy-path sequence — both AST tools on PATH, write succeeds, exit 0.</figcaption>
+
+<h4 id="seq-tool-missing">6.2.2 Degraded path — <code>dependency-cruiser</code> missing</h4>
+<pre><code>user             /architecture     rule-loader   scanner   dep-cruiser   ruff       report
+  │ audit &lt;path&gt;     │                  │           │     (not on PATH)  │            │
+  │─────────────────►│                  │           │           │          │            │
+  │                  │ load rules, scan files       │           │          │            │
+  │                  │ shell-out (TS L2)            │           │          │            │
+  │                  │─────────────────────────────────────────►│ ENOENT   │            │
+  │                  │ chat-warn: "dependency-cruiser not on PATH; skipping L2-TS"     │
+  │                  │ shell-out (Py L2)                                   │            │
+  │                  │────────────────────────────────────────────────────►│ findings   │
+  │                  │ report.tools_skipped = ["dependency-cruiser"]                    │
+  │◄── exit 0 (NOT failure); report flags coverage gap                                  │
+</code></pre>
+<figcaption>Tool-missing — auto-skip with explicit warning + report flag. Exit 0 per D17.</figcaption>
+
+<h4 id="seq-l1-cap-violation">6.2.3 Error path — L1 cap violation (16 rules) (F1)</h4>
+<pre><code>user             /architecture     rule-loader
+  │ audit &lt;path&gt;     │                  │
+  │─────────────────►│                  │
+  │                  │ load L1+L2       │
+  │                  │─────────────────►│
+  │                  │                  │ count L1 rules: 16 > 15
+  │                  │                  │ raise SchemaLoadError
+  │                  │◄── ERROR         │
+  │                  │ stderr: "ERROR: L1 has 16 rules; cap is 15. Demote rules to L2 or remove."
+  │◄── exit 64                                                  │
+</code></pre>
+<figcaption>F1 abort-schema-load — deterministic, testable.</figcaption>
+</section>
+</section>
+
+<section id="functional-requirements">
+<h2 id="functional-requirements">7. Functional Requirements</h2>
+
+<section id="fr-skill-shape">
+<h3 id="fr-skill-shape">7.1 Skill shape &amp; invocation</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-01</td><td>Slash command is exactly <code>/architecture audit [path]</code>. Token-1 selector <code>audit</code> is required at v1; absence or unknown selector → stderr <code>usage: /architecture audit [path]</code> + exit 64.</td></tr>
+<tr><td>FR-02</td><td>Default <code>path</code> is the current working directory when omitted. <code>path</code> may be absolute or relative; tilde-expanded; symlinks followed once.</td></tr>
+<tr><td>FR-03</td><td>v1 ships <strong>only</strong> the <code>audit</code> selector. <code>scaffold</code> / <code>spec-check</code> / <code>code-check</code> selectors → stderr <code>not implemented in v1; see roadmap</code> + exit 64.</td></tr>
+<tr><td>FR-04</td><td>Skill body lists the slash command's argument-hint frontmatter as <code>audit [path]</code>.</td></tr>
+<tr><td>FR-05</td><td>Skill body and frontmatter declare target platform <code>generic</code> (Claude Code + Codex). Platform-conditional sections per <code>skill-patterns.md §F</code>.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fr-principles-yaml">
+<h3 id="fr-principles-yaml">7.2 <code>principles.yaml</code> schema (plugin L1+L2; project L3)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-10</td><td>Plugin ships <code>plugins/pmos-toolkit/skills/architecture/principles.yaml</code> carrying the L1 universal + L2 stack-specific rules. This file is plugin-owned, replaced verbatim on plugin update. v1 ships rules for <code>stack: ts</code> and <code>stack: python</code> only.</td></tr>
+<tr><td>FR-11</td><td>Project may carry <code>&lt;repo&gt;/.pmos/architecture/principles.yaml</code> with L3 overrides (rule-level demote/promote/disable) + <code>exemptions:</code> list. This file is user-owned; plugin never writes to it.</td></tr>
+<tr><td>FR-12</td><td>Each rule entry in any tier has shape:
+<pre><code>id: TS001            # short ID, stable across plugin versions
+tier: 1              # 1=universal, 2=stack, 3=project
+stack: null|ts|py    # null for L1
+severity: info|warn|block
+delegate_to: null|dependency-cruiser|ruff|grep
+check: &lt;tool-specific config or regex&gt;
+source: &lt;URL or doc citation&gt;   # MANDATORY non-empty (D9)
+message: "&lt;short human-readable rule statement&gt;"
+why: "&lt;1-line rationale&gt;"
+</code></pre></td></tr>
+<tr><td>FR-13</td><td>Exemption row shape in project <code>principles.yaml</code>:
+<pre><code>exemptions:
+  - rule: TS001
+    file: src/legacy/api.ts        # exact path OR glob
+    line: 47                        # optional; omit = whole-file
+    adr: ADR-0007                   # MANDATORY cross-ref
+    expires: 2026-08-01             # optional; ISO-8601
+    note: "&lt;1-line context&gt;"
+</code></pre></td></tr>
+<tr><td>FR-14</td><td>Project <code>principles.yaml</code> may carry top-level config keys: <code>adr_path: docs/adr/</code> (default) · <code>scan_root: .</code> (default) · <code>extra_ignore: [...]</code> (additive to gitignore + fallback deny-list).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fr-loading-precedence">
+<h3 id="fr-loading-precedence">7.3 Rule loading, precedence, and L1 cap (F1)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-20</td><td>Audit loads rules in order: plugin L1 → plugin L2 (filtered by detected stack) → project L3. Precedence on collision (same <code>rule.id</code>): <strong>project (L3) &gt; stack (L2) &gt; universal (L1)</strong>. Lower-tier rule fields override higher-tier; missing fields inherit.</td></tr>
+<tr><td>FR-21</td><td><strong>L1 cap: at most 15 rules at tier=1.</strong> On load, if plugin <code>principles.yaml</code> has &gt;15 entries with <code>tier: 1</code>, abort schema-load: write to stderr exactly <code>ERROR: L1 has &lt;N&gt; rules; cap is 15. Demote rules to L2 or remove.</code> Exit 64. (F1 / D12.)</td></tr>
+<tr><td>FR-22</td><td>Detect stack from the scanned repo: presence of <code>package.json</code> + <code>tsconfig.json</code> → <code>ts</code>; <code>pyproject.toml</code> OR <code>requirements*.txt</code> OR <code>setup.py</code> → <code>python</code>. A repo may carry both stacks; audit runs both rule sets independently. No stack detected → run L1 only; report <code>stacks_detected: []</code>.</td></tr>
+<tr><td>FR-23</td><td>Project L3 file missing → proceed with L1+L2 only; report <code>l3_present: false</code>. Project L3 file malformed YAML → stderr <code>ERROR: &lt;repo&gt;/.pmos/architecture/principles.yaml malformed: &lt;parser-error&gt;</code>, exit 64.</td></tr>
+<tr><td>FR-24</td><td>Every rule loaded into the merged set MUST have non-empty <code>source:</code> (D9). Plugin-shipped rules failing this fail <code>tools/check-citations.sh</code> at release time; user-authored L3 rules failing this → warn at audit time, do not abort.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fr-tool-delegation">
+<h3 id="fr-tool-delegation">7.4 Tool delegation &amp; gap-map (F2)</h3>
+<p>v1 ships exactly two delegated tools: <strong>Dependency Cruiser</strong> (TS) and <strong>ruff</strong> (Python). All other checks are <code>delegate_to: grep</code> (L1 semantic, regex-driven inline) or <code>delegate_to: null</code> (LLM-judge, deferred to v2). Gap-map below shows the rule-id → tool mapping for the v1 shipped <code>principles.yaml</code>; the 70% goal (G2) holds when <code>delegated_pct &gt;= 0.70</code> over rules with <code>tier ∈ {1,2}</code>.</p>
+<table>
+<thead><tr><th>Rule ID</th><th>Tier</th><th>Stack</th><th>delegate_to</th><th>Check</th></tr></thead>
+<tbody>
+<tr><td>U001</td><td>1</td><td>—</td><td>grep</td><td>No file &gt; 500 LOC (excluding generated)</td></tr>
+<tr><td>U002</td><td>1</td><td>—</td><td>grep</td><td>No function &gt; 100 LOC</td></tr>
+<tr><td>U003</td><td>1</td><td>—</td><td>grep</td><td>No constructor / function with &gt; 4 positional args</td></tr>
+<tr><td>U004</td><td>1</td><td>—</td><td>grep</td><td>No <code>console.log</code> / <code>print()</code> in src/ (allowed in scripts/, tests/)</td></tr>
+<tr><td>U005</td><td>1</td><td>—</td><td>grep</td><td>No TODO / FIXME / XXX older than 90 days (git blame check)</td></tr>
+<tr><td>U006</td><td>1</td><td>—</td><td>grep</td><td>No file path &gt; 4 directory levels deep from <code>src/</code></td></tr>
+<tr><td>U007</td><td>1</td><td>—</td><td>grep</td><td>No file lacking a top-of-file purpose comment (warn-only)</td></tr>
+<tr><td>U008</td><td>1</td><td>—</td><td>grep</td><td>No commented-out code blocks &gt; 5 lines</td></tr>
+<tr><td>U009</td><td>1</td><td>—</td><td>grep</td><td>No hardcoded credentials / API-key patterns (block)</td></tr>
+<tr><td>U010</td><td>1</td><td>—</td><td>grep</td><td>No <code>NotImplementedError</code> / <code>throw new Error('TBD')</code> on a main code path (block)</td></tr>
+<tr><td>TS001</td><td>2</td><td>ts</td><td>dependency-cruiser</td><td>No circular imports (Dep Cruiser <code>no-circular</code>)</td></tr>
+<tr><td>TS002</td><td>2</td><td>ts</td><td>dependency-cruiser</td><td>Layer boundary: <code>src/ui/</code> may not import from <code>src/db/</code> (Dep Cruiser <code>forbidden</code>)</td></tr>
+<tr><td>TS003</td><td>2</td><td>ts</td><td>dependency-cruiser</td><td>No orphan modules (Dep Cruiser <code>no-orphans</code>)</td></tr>
+<tr><td>TS004</td><td>2</td><td>ts</td><td>dependency-cruiser</td><td>No dev-dep imports in prod code (Dep Cruiser <code>not-to-dev-dep</code>)</td></tr>
+<tr><td>PY001</td><td>2</td><td>py</td><td>ruff</td><td>No tidy-imports violations (ruff <code>TID252</code> et al.)</td></tr>
+<tr><td>PY002</td><td>2</td><td>py</td><td>ruff</td><td>No unused imports (ruff <code>F401</code>)</td></tr>
+<tr><td>PY003</td><td>2</td><td>py</td><td>ruff</td><td>No star imports (ruff <code>F403</code> / <code>F405</code>)</td></tr>
+<tr><td>PY004</td><td>2</td><td>py</td><td>ruff</td><td>No mutable default args (ruff <code>B006</code>)</td></tr>
+</tbody>
+</table>
+<p><strong>Gap-map calculation:</strong> 18 rules shipped · 8 grep · 4 dep-cruiser · 4 ruff · 0 LLM-judge. <code>delegated_pct = (4+4) / 18 = 0.444</code>. <strong>Below the 70% goal.</strong> Spec accepts the gap: G2 is a stretch goal, not a hard FR. Phase 6a / verify won't fail on miss; <code>tools/check-gap-map.sh</code> reports the actual ratio and surfaces it in the audit report. (D13 keeps the gap-map structurally; raising the ratio requires either adding more L2 rules or migrating L1 rules off grep — both v1.1+ work.)</p>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-30</td><td>Dep Cruiser invocation: <code>npx --no-install depcruise --output-type json --config &lt;skill-dir&gt;/tools/.depcruise.cjs &lt;scan-root&gt;</code>. Config file ships in skill <code>tools/</code> dir; encodes TS001–TS004 as Dep Cruiser rules.</td></tr>
+<tr><td>FR-31</td><td>ruff invocation: <code>ruff check --output-format=json --select=TID252,F401,F403,F405,B006 &lt;scan-root&gt;</code>. No config file; rule selection inline so user's own ruff config doesn't pollute.</td></tr>
+<tr><td>FR-32</td><td>Tool not on PATH → chat-warn <code>&lt;tool&gt; not on PATH; skipping &lt;stack&gt; L2 declarative checks</code>; record in report <code>tools_skipped: [&lt;tool&gt;]</code>; exit 0 (NOT fail). Tool present but exits non-zero → chat-warn + report <code>tools_errored: [{tool, exit_code, stderr_excerpt}]</code>; exit 0.</td></tr>
+<tr><td>FR-33</td><td>Skill body declares tool version requirements: <code>dependency-cruiser &gt;= 15</code>, <code>ruff &gt;= 0.5</code>. Audit logs detected versions; mismatch (older) → warn, not fail.</td></tr>
+<tr><td>FR-34</td><td>Gap-map ratio surfaced in every audit report as <code>declarative_delegated_pct: 0.444</code> (computed at runtime from the loaded ruleset).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fr-scan-policy">
+<h3 id="fr-scan-policy">7.5 File-scan policy (F4)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-40</td><td>Scan-root enumeration: <code>git -C &lt;scan-root&gt; ls-files</code> when scan-root is a git repo; otherwise <code>find &lt;scan-root&gt; -type f</code>. Symlinks not followed.</td></tr>
+<tr><td>FR-41</td><td>Exclusion order: (a) <code>git check-ignore -v &lt;file&gt;</code> if in git; OR (b) hardcoded fallback deny-list for non-git or when <code>git check-ignore</code> returns no match. Hardcoded deny-list (matched against any path segment): <code>node_modules · .venv · venv · __pycache__ · dist · build · .pytest_cache · .ruff_cache · .mypy_cache · coverage · .next · .nuxt · .git · target · vendor</code>. Union with <code>extra_ignore:</code> from project <code>principles.yaml</code>.</td></tr>
+<tr><td>FR-42</td><td>File-type filter: only files with extensions <code>.ts .tsx .js .jsx .mjs .cjs .vue .py</code> enter the rule pipeline. Other files counted in <code>scanned_total</code> but skipped from rule evaluation.</td></tr>
+<tr><td>FR-43</td><td>Audit report carries <code>scanned: { total: N, by_ext: {".ts": N, ".py": N, ...}, excluded_by_gitignore: N, excluded_by_fallback: N }</code>.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fr-vue-sfc">
+<h3 id="fr-vue-sfc">7.6 Vue SFC coverage (F3)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-50</td><td>v1 treats <code>.vue</code> files as L1-semantic-only. L1 grep rules (U001–U010) apply to the whole file contents; L2 declarative rules (TS001–TS004 / Dep Cruiser) do NOT run on <code>.vue</code>.</td></tr>
+<tr><td>FR-51</td><td>Audit report carries <code>frontend_declarative_coverage: 0.XX</code>, computed as <code>(scanned .ts + scanned .tsx + scanned .js + scanned .jsx + scanned .mjs + scanned .cjs) / (scanned frontend total including .vue)</code>. Reported to 2 decimal places.</td></tr>
+<tr><td>FR-52</td><td>When <code>.vue</code> files are present AND <code>frontend_declarative_coverage &lt; 1.0</code>, the human-readable stderr summary includes the exact line: <code>note: .vue files received L1-semantic checks only (L2-TS declarative coverage: &lt;pct&gt;%). SFC extractor planned for v1.1.</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fr-adr-exemption">
+<h3 id="fr-adr-exemption">7.7 ADR pipeline &amp; exemption reconciliation (F5)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-60</td><td>ADR write path: <code>&lt;scan-root&gt;/&lt;adr_path&gt;/ADR-NNNN-&lt;kebab-title&gt;.md</code> where <code>&lt;adr_path&gt;</code> defaults to <code>docs/adr/</code> and is overridable via project <code>principles.yaml :: adr_path:</code>.</td></tr>
+<tr><td>FR-61</td><td>ADR numbering: monotonically increasing across all audit runs. On each run, scan <code>&lt;adr_path&gt;</code> for the highest existing <code>ADR-NNNN-*.md</code>; new ADRs start at that +1. Never recycle; never reset.</td></tr>
+<tr><td>FR-62</td><td>ADR file format (Nygard lightweight):
+<pre><code># ADR-0007: &lt;Title&gt;
+
+**Status:** Proposed
+**Date:** 2026-05-13
+**Triggered by:** /architecture audit (rule: TS002, severity: block)
+
+## Context
+&lt;1–3 paragraphs — what the rule is and where it fires&gt;
+
+## Decision
+&lt;1 paragraph — placeholder for human to fill in&gt;
+
+## Consequences
+&lt;1 paragraph — placeholder&gt;
+
+## Suppresses
+- rule: TS002
+  file: src/ui/legacy-dashboard.ts
+  line: 142
+</code></pre></td></tr>
+<tr><td>FR-63</td><td>ADR cap: at most 5 ADRs written per audit run. Block-severity findings beyond the cap are listed in the report's <code>adrs_truncated</code> array with their rule_id + file + line. Audit prints to stderr <code>note: 7 additional block findings not promoted to ADR (cap 5/run). See report.adrs_truncated.</code></td></tr>
+<tr><td>FR-64</td><td>Severity-to-action: <code>info</code> → log to report only · <code>warn</code> → log to report + stderr summary · <code>block</code> → log to report + stderr summary + ADR file (subject to cap). Only <code>block</code> spawns ADRs (D8 / D22).</td></tr>
+<tr><td>FR-65</td><td>Exemption reconciliation. At end of finding-collection, before report emission: for each <code>exemptions:</code> row in project <code>principles.yaml</code>, locate the corresponding ADR file at <code>&lt;adr_path&gt;/ADR-&lt;exemption.adr-suffix&gt;-*.md</code>. Three outcomes:
+<ul>
+<li><strong>matching pair</strong> (exemption row + ADR file with <code>## Suppresses</code> block listing same <code>{rule, file, line?}</code>): suppress matching finding silently from report.</li>
+<li><strong>orphan exemption</strong> (exemption row, no matching ADR file): suppression still applied (user-explicit intent), BUT report carries <code>warn-level</code> entry <code>orphan exemption: &lt;rule_id&gt; &lt;file&gt;[:&lt;line&gt;] (no ADR file at &lt;path&gt;)</code>.</li>
+<li><strong>informational ADR</strong> (ADR file with <code>## Suppresses</code> block, no matching exemption row): findings NOT suppressed (ADR alone is documentation; the project <code>principles.yaml</code> row is what actually mutes); report carries info-level <code>note: ADR-0009 documents suppression but no exemption row in principles.yaml — finding still surfaced.</code></li>
+</ul></td></tr>
+<tr><td>FR-66</td><td>Exemption auto-expiry: an exemption row with <code>expires: &lt;ISO-8601&gt;</code> in the past is treated as not-present (finding surfaces). Audit stderr summary includes <code>note: &lt;N&gt; exemption(s) expired; suppression lifted. Re-affirm via ADR or remove the row.</code></td></tr>
+<tr><td>FR-67</td><td>Audit supports <code>--no-adr</code> flag: collect findings, emit report, do NOT write any ADR files. Useful for dry-run / CI inspection. <code>report.adrs_written = []</code>.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fr-report-format">
+<h3 id="fr-report-format">7.8 Report format (D21)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-70</td><td>Audit emits JSON to stdout; nothing else on stdout. Human-readable summary to stderr; chat warnings (tool-missing etc.) to stderr. Exit code: <code>0</code> on completion (regardless of findings) · <code>64</code> on schema/config error · <code>1</code> on internal error (parser crash etc.).</td></tr>
+<tr><td>FR-71</td><td>Stdout JSON shape:
+<pre><code>{
+  "schema_version": 1,
+  "run": { "started_at": "&lt;ISO-8601&gt;", "finished_at": "...", "duration_s": 4.2 },
+  "scan_root": "/abs/path",
+  "stacks_detected": ["ts", "py"],
+  "l3_present": true,
+  "scanned": { "total": 1358, "by_ext": {...}, "excluded_by_gitignore": 4221, "excluded_by_fallback": 18 },
+  "rules_loaded": { "tier_1": 10, "tier_2": 8, "tier_3": 0 },
+  "declarative_delegated_pct": 0.444,
+  "frontend_declarative_coverage": 0.61,
+  "tools_skipped": [],
+  "tools_errored": [],
+  "findings": [
+    { "rule_id": "TS001", "severity": "block", "file": "src/ui/x.ts", "line": 42,
+      "message": "...", "source_citation": "...", "suppressed_by": null }
+  ],
+  "adrs_written": [{ "path": "docs/adr/ADR-0007-...", "rule_id": "TS001" }],
+  "adrs_truncated": [{ "rule_id": "TS002", "file": "...", "line": 99 }, ...],
+  "exemptions": { "applied": 3, "orphan": 1, "expired": 0 }
+}
+</code></pre></td></tr>
+<tr><td>FR-72</td><td>Stderr summary is human-readable, ≤ 30 lines for a clean repo. Shape (when findings &gt; 0):
+<pre><code>/architecture audit — scan_root=&lt;path&gt; duration=&lt;X&gt;s
+stacks: ts, py · l3: present · gap-map: 44% delegated · frontend declarative coverage: 61%
+findings: 12 (3 block, 4 warn, 5 info) · exemptions applied: 3 · orphan: 1
+
+block (3):
+  TS001 src/ui/x.ts:42 — no circular imports
+  TS002 src/ui/y.ts:99 — layer boundary violation
+  U009 src/legacy/auth.ts:18 — hardcoded credential pattern
+
+warn (4): ...
+note: 7 additional block findings not promoted to ADR (cap 5/run).
+note: .vue files received L1-semantic checks only (L2-TS declarative coverage: 61%).
+note: 1 orphan exemption — see report.exemptions.
+
+ADRs written: 3 (ADR-0007, ADR-0008, ADR-0009) under docs/adr/
+JSON report on stdout.
+</code></pre></td></tr>
+<tr><td>FR-73</td><td>Determinism: with all timestamps stripped, two runs against the same input produce byte-identical JSON. Findings sorted by <code>(severity desc, rule_id asc, file asc, line asc)</code>.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="fr-skill-patterns">
+<h3 id="fr-skill-patterns">7.9 Skill-patterns §A–§F conformance (D11, G4)</h3>
+<p>Each §-section of <code>skill-patterns.md</code> maps to one or more concrete FRs the produced skill must satisfy. Phase 6a <code>/skill-eval</code> grades these via its 39-check binary rubric; the FRs below ensure /plan's tasks are testable against each §.</p>
+<table>
+<thead><tr><th>ID</th><th>Requirement (§ of skill-patterns)</th></tr></thead>
+<tbody>
+<tr><td>FR-80</td><td>(§A frontmatter) SKILL.md frontmatter has <code>name: architecture</code> (matches dir), <code>description:</code> non-empty, <code>argument-hint: audit [path]</code>, <code>target: generic</code>.</td></tr>
+<tr><td>FR-81</td><td>(§B description &amp; triggering) <code>description:</code> carries ≥ 5 user-spoken trigger phrases (e.g., "audit my codebase against principles", "run an architecture review", "check for circular imports", "promote architectural decisions to ADRs", "/architecture", "lint my repo against universal rules"). Phrased in user voice, not skill-author voice.</td></tr>
+<tr><td>FR-82</td><td>(§C structure &amp; progressive disclosure) Skill body uses Phase 0–N structure. Heavy reference content (full L1 rule rationales, ADR templates, gap-map proofs) lives under <code>plugins/pmos-toolkit/skills/architecture/reference/</code>; the SKILL.md body cites them with relative links rather than inlining.</td></tr>
+<tr><td>FR-83</td><td>(§D body &amp; content) Skill body has explicit <code>## Platform Adaptation</code> section + <code>## Anti-Patterns (DO NOT)</code> section. Anti-patterns include: "Do NOT scan node_modules; Do NOT spawn an ADR for warn-severity; Do NOT delegate to a tool not on PATH (auto-skip instead)."</td></tr>
+<tr><td>FR-84</td><td>(§E scripts &amp; tooling) Scripts under <code>tools/</code> are: shell-out-friendly (POSIX <code>bash</code>, no node deps), exit-coded (0=pass, 1=fail, 64=usage), respect PATH-missing → degrade gracefully (NOT crash).</td></tr>
+<tr><td>FR-85</td><td>(§F platform-conditional frontmatter) Skill body's Platform Adaptation section explicitly covers: Claude Code (default), Codex (no <code>AskUserQuestion</code> → numbered prompt fallback per <code>_shared/interactive-prompts.md</code>), and absence of <code>Task</code> tool (sequential rule evaluation, no subagent dispatch in v1).</td></tr>
+</tbody>
+</table>
+</section>
+</section>
+
+<section id="nfrs">
+<h2 id="nfrs">8. Non-Functional Requirements</h2>
+<table>
+<thead><tr><th>ID</th><th>Category</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>NFR-01</td><td>Offline</td><td>Audit runs with no network access. Citation URLs in <code>principles.yaml</code> are documentation, never fetched.</td></tr>
+<tr><td>NFR-02</td><td>Determinism</td><td>Same input → byte-identical JSON report (modulo top-level <code>started_at</code> / <code>finished_at</code> / <code>duration_s</code> timestamps, which are stripped for determinism testing).</td></tr>
+<tr><td>NFR-03</td><td>Runtime (soft target)</td><td>p95 &lt; 30s for repos with ≤ 1500 source files; p95 &lt; 60s for ≤ 5000. Measured by Phase 7 verify on a synthetic fixture; book-companion dry-run validation is OQ8 (post-merge).</td></tr>
+<tr><td>NFR-04</td><td>Skill-patterns conformance</td><td>Phase 6a <code>/skill-eval</code> passes 39/39 binary rubric checks at <code>--target generic</code>; zero accepted residuals at /verify Phase 7.</td></tr>
+<tr><td>NFR-05</td><td>Install-free</td><td>Skill itself requires no install. Delegated tools (Dependency Cruiser, ruff) are user-installed; absence is degraded-not-broken (FR-32).</td></tr>
+<tr><td>NFR-06</td><td>Observability</td><td>Every shell-out to a delegated tool logs to stderr: the exact command line + duration. Useful for users to reproduce a finding manually.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="invocation-contracts">
+<h2 id="invocation-contracts">9. Skill invocation contracts (replaces §9 API)</h2>
+<p>This is a CLI skill; no HTTP API. The invocation contracts are: (a) the slash command, (b) the delegated-tool shell-out invocations, (c) the file-write contracts for ADRs.</p>
+
+<h3 id="invocation-slash-command">9.1 Slash command surface</h3>
+<pre><code>/architecture audit [path] [--no-adr] [--non-interactive]
+
+Args:
+  path         Repository root to audit. Defaults to cwd.
+Options:
+  --no-adr             Collect findings + emit report; do not write ADR files.
+  --non-interactive    Suppress chat prompts; degrade per _shared/non-interactive.md contract.
+
+Exit codes:
+  0    Audit completed (findings may exist).
+  1    Internal error (parser crash, unexpected exception).
+  64   Schema/config error (L1 cap exceeded, malformed principles.yaml, unknown selector).
+</code></pre>
+
+<h3 id="invocation-tool-shellouts">9.2 Delegated-tool shell-out contracts</h3>
+<pre><code># Dependency Cruiser (TS L2)
+npx --no-install depcruise \
+    --output-type json \
+    --config &lt;skill-dir&gt;/tools/.depcruise.cjs \
+    &lt;scan-root&gt;
+
+# ruff (Python L2)
+ruff check \
+    --output-format=json \
+    --select=TID252,F401,F403,F405,B006 \
+    &lt;scan-root&gt;
+</code></pre>
+<p>Both commands run with: <code>cwd=&lt;scan-root&gt;</code>, env preserved, timeout 60s, stderr captured. On <code>ENOENT</code> (command not found) → skip + warn per FR-32. On non-zero exit with stderr → record in <code>tools_errored</code>, exit 0.</p>
+
+<h3 id="invocation-adr-write">9.3 ADR write contract</h3>
+<p>Write path: <code>&lt;scan-root&gt;/&lt;adr_path&gt;/ADR-NNNN-&lt;kebab-title&gt;.md</code>. Atomic write (temp-then-rename). Never overwrite existing ADR files — collision (same NNNN) → numeric increment until free slot. Parent directory created if missing. File mode <code>0644</code>.</p>
+</section>
+
+<section id="file-layout">
+<h2 id="file-layout">10. File layout &amp; persistence (replaces §10 DB)</h2>
+<p>No database. All persistence is on filesystem, split across plugin-owned and user-owned roots.</p>
+
+<h3 id="plugin-files">10.1 Plugin-owned (under <code>plugins/pmos-toolkit/skills/architecture/</code>)</h3>
+<pre><code>SKILL.md                          # the skill body itself (sole writer: /execute Phase 6)
+principles.yaml                   # L1 universal + L2 stack rules (replaced on plugin update)
+reference/
+  l1-rationales.md                # full per-rule rationale + source citations (progressive disclosure §C)
+  adr-template.md                 # Nygard template skill uses to write ADR files
+  gap-map-rationale.md            # why each rule is delegate_to: &lt;tool|grep|null&gt;
+tools/
+  .depcruise.cjs                  # Dep Cruiser config encoding TS001–TS004
+  check-citations.sh              # asserts every rule has source: (release-time gate)
+  check-gap-map.sh                # computes declarative_delegated_pct
+  run-audit.sh                    # the actual audit harness (called by SKILL.md body)
+tests/
+  fixtures/
+    principles-16-rules.yaml      # L1 cap fixture (FR-21 test)
+    ts-circular/                  # TS001 fixture
+    py-tidy-imports/              # PY001 fixture
+    vue-mixed/                    # F3 coverage % fixture (3 .vue + 7 .ts)
+    gitignore-deny/               # F4 fixture
+    adr-reconcile/                # F5 reconciliation fixture (3 sub-cases)
+  run.sh                          # plain-shell test runner
+</code></pre>
+
+<h3 id="user-files">10.2 User-owned (under <code>&lt;scan-root&gt;/</code>)</h3>
+<pre><code>.pmos/architecture/
+  principles.yaml                 # L3 overrides + exemptions: + adr_path: + extra_ignore:
+docs/adr/                         # default adr_path; configurable
+  ADR-0001-...md
+  ADR-0002-...md
+</code></pre>
+<p><strong>Plugin-update safety:</strong> plugin replaces <code>plugins/pmos-toolkit/skills/architecture/principles.yaml</code> wholesale on each release. User's <code>.pmos/architecture/</code> and <code>docs/adr/</code> are never touched by plugin operations. (G3 enforced by file-path FRs.)</p>
+</section>
+
+<section id="cli-output">
+<h2 id="cli-output">11. CLI output format (replaces §11 Frontend)</h2>
+<p>No web frontend. CLI output split across stdout (machine-readable JSON, FR-71) and stderr (human-readable summary, FR-72). Designer-role concerns reduce to two:</p>
+<ul>
+  <li><strong>Stderr summary tone:</strong> direct, lowercase, no emoji, ≤ 30 lines. Severity counts up front. Block findings listed verbatim; warn/info summarised by count + sample. Closing notes (exemption / SFC coverage / ADR cap) appear last.</li>
+  <li><strong>Color &amp; ANSI:</strong> stderr respects <code>NO_COLOR</code> env. When color is on, severity tiers are tinted (block: red bold, warn: yellow, info: dim). Stdout JSON is never tinted.</li>
+</ul>
+</section>
+
+<section id="edge-cases">
+<h2 id="edge-cases">12. Edge Cases</h2>
+<table>
+<thead><tr><th>#</th><th>Scenario</th><th>Condition</th><th>Expected Behavior</th></tr></thead>
+<tbody>
+<tr><td>E1</td><td>Empty repo</td><td>scan-root has 0 source files after exclusion</td><td>Audit completes; report carries <code>scanned.total: N</code>, <code>findings: []</code>; stderr summary: <code>no source files found after exclusion. did you mean to audit a different path?</code> Exit 0.</td></tr>
+<tr><td>E2</td><td>scan-root is not a git repo</td><td><code>git rev-parse</code> non-zero in scan-root</td><td><code>find</code>-based enumeration; hardcoded deny-list as sole exclusion. Report <code>git: false</code>. Exit 0.</td></tr>
+<tr><td>E3</td><td>scan-root has symlinks</td><td>Some files are symlinks</td><td>Resolved once (no recursion); cycle → break + warn. Report <code>symlinks_resolved: N</code>.</td></tr>
+<tr><td>E4</td><td>Dep Cruiser config invalid (skill bug)</td><td><code>npx depcruise</code> exits with parse error</td><td>Record in <code>tools_errored</code> with stderr excerpt; continue with grep + ruff only; exit 0. Block release until fixed (this would be a /verify failure).</td></tr>
+<tr><td>E5</td><td>L1 cap exceeded</td><td>Plugin ships ≥ 16 L1 rules (regression)</td><td>FR-21: stderr <code>ERROR: L1 has &lt;N&gt; rules; cap is 15</code>, exit 64. Should be caught by pre-release test (<code>tests/fixtures/principles-16-rules.yaml</code>).</td></tr>
+<tr><td>E6</td><td>Project principles.yaml malformed</td><td>Invalid YAML at <code>&lt;repo&gt;/.pmos/architecture/principles.yaml</code></td><td>FR-23: stderr <code>ERROR: ... malformed: &lt;parser-error&gt;</code>, exit 64.</td></tr>
+<tr><td>E7</td><td>ADR write fails</td><td>Disk full / permission denied at <code>&lt;adr_path&gt;</code></td><td>Chat warn + record in <code>adrs_failed: [{rule_id, error}]</code>; remaining findings still reported; exit 0.</td></tr>
+<tr><td>E8</td><td>Multiple stacks detected</td><td>Repo has both <code>package.json</code> AND <code>pyproject.toml</code></td><td>Run TS L2 + Python L2 independently; report <code>stacks_detected: ["ts", "py"]</code>. No cross-stack analysis.</td></tr>
+<tr><td>E9</td><td>No stack detected</td><td>Pure shell scripts / docs repo</td><td>Run L1 only; report <code>stacks_detected: []</code>; stderr note <code>no recognised stack — running L1 universal rules only.</code></td></tr>
+<tr><td>E10</td><td>Orphan exemption</td><td>Row in principles.yaml, no ADR at <code>adr_path</code></td><td>FR-65: suppression applied; warn in report; orphan count in summary.</td></tr>
+<tr><td>E11</td><td>Expired exemption</td><td><code>expires: 2025-01-01</code> in the past</td><td>FR-66: row ignored; finding surfaces; summary note enumerates expired count.</td></tr>
+<tr><td>E12</td><td>16th block finding</td><td>Cap is 5; this is rank 6+</td><td>FR-63: top-5 written as ADRs (order: severity desc, then rule_id asc, then file asc); rest go to <code>adrs_truncated</code>.</td></tr>
+<tr><td>E13</td><td>User overrides L1 rule severity to "info" via L3</td><td>L3 carries <code>{id: U009, severity: info}</code></td><td>FR-20 precedence: L3 wins; U009 demoted from block to info; no ADR spawned; report <code>rule_overrides: [{id: U009, plugin_severity: block, effective_severity: info}]</code>.</td></tr>
+<tr><td>E14</td><td>Existing ADR-0007 in repo · audit wants ADR-0007</td><td>NNNN collision</td><td>FR-61: scan finds highest existing → start at +1. No collision possible by construction.</td></tr>
+<tr><td>E15</td><td>Vue-only repo (no .ts)</td><td>frontend_declarative_coverage divisor would be 0 (no .ts to count)</td><td>FR-51: <code>frontend_declarative_coverage: 0.0</code>; stderr note triggers (Vue files present, coverage &lt; 1.0).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="configuration">
+<h2 id="configuration">13. Configuration &amp; Feature Flags</h2>
+<table>
+<thead><tr><th>Variable / Key</th><th>Default</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td><code>--no-adr</code> (CLI flag)</td><td>off</td><td>Skip ADR writes; report-only mode for dry-runs / CI.</td></tr>
+<tr><td><code>--non-interactive</code> (CLI flag)</td><td>off</td><td>Standard pmos-toolkit non-interactive contract (per <code>_shared/non-interactive.md</code>).</td></tr>
+<tr><td><code>adr_path:</code> (project principles.yaml)</td><td><code>docs/adr/</code></td><td>Where ADR files land.</td></tr>
+<tr><td><code>scan_root:</code> (project principles.yaml)</td><td>repo root</td><td>Override the audit's scan root (useful for monorepo sub-paths).</td></tr>
+<tr><td><code>extra_ignore:</code> (project principles.yaml)</td><td><code>[]</code></td><td>Additional path-segment exclusions, additive to gitignore + fallback deny-list.</td></tr>
+<tr><td><code>NO_COLOR</code> (env)</td><td>—</td><td>Standard. Disables ANSI in stderr summary.</td></tr>
+</tbody>
+</table>
+<p>No feature flags in the rollout sense — v1 ships the full audit surface or nothing. Toggle-style behaviour lives in the YAML / CLI flags above.</p>
+</section>
+
+<section id="testing-and-verification">
+<h2 id="testing-and-verification">14. Testing &amp; Verification Strategy</h2>
+
+<h3 id="testing-unit">14.1 Unit / fixture tests</h3>
+<p>Test runner: <code>bash plugins/pmos-toolkit/skills/architecture/tests/run.sh</code>. POSIX shell only. Each fixture is a self-contained mini-repo under <code>tests/fixtures/</code>; <code>run.sh</code> invokes <code>tools/run-audit.sh</code> against each and asserts on the JSON + stderr.</p>
+<table>
+<thead><tr><th>Fixture</th><th>Asserts</th><th>FR</th></tr></thead>
+<tbody>
+<tr><td><code>principles-16-rules.yaml</code></td><td>stderr matches <code>^ERROR: L1 has 16 rules; cap is 15</code>; exit 64</td><td>FR-21 (F1)</td></tr>
+<tr><td><code>ts-circular/</code></td><td>JSON <code>findings</code> contains <code>{rule_id: TS001, severity: block, file: "src/a.ts"}</code>; ADR-NNNN written</td><td>FR-30, FR-60</td></tr>
+<tr><td><code>py-tidy-imports/</code></td><td>JSON <code>findings</code> contains <code>{rule_id: PY001, ...}</code></td><td>FR-31</td></tr>
+<tr><td><code>vue-mixed/</code> (3 .vue + 7 .ts)</td><td><code>frontend_declarative_coverage == 0.70</code>; stderr contains the F3 note line</td><td>FR-51, FR-52</td></tr>
+<tr><td><code>gitignore-deny/</code></td><td><code>node_modules/.venv/dist/</code> absent from <code>scanned.by_ext</code>; with <code>.gitignore</code> deleted, hardcoded fallback still excludes them</td><td>FR-41</td></tr>
+<tr><td><code>adr-reconcile/</code> (3 sub-fixtures)</td><td>(a) matching: suppressed silently; (b) orphan: warn in report; (c) informational ADR: finding still surfaces</td><td>FR-65</td></tr>
+<tr><td><code>tool-missing/</code></td><td>With <code>PATH=/tmp/empty</code>: <code>tools_skipped == ["dependency-cruiser", "ruff"]</code>; exit 0</td><td>FR-32</td></tr>
+<tr><td><code>adr-cap/</code> (12 block findings)</td><td><code>adrs_written.length == 5</code>; <code>adrs_truncated.length == 7</code>; stderr note matches</td><td>FR-63</td></tr>
+<tr><td><code>determinism/</code></td><td>Two runs against the same fixture diff to empty after stripping timestamps</td><td>NFR-02</td></tr>
+<tr><td><code>citations/</code></td><td><code>tools/check-citations.sh</code> exits 0 against shipped <code>principles.yaml</code>; exits 1 against a fixture with one rule missing <code>source:</code></td><td>FR-24, D9</td></tr>
+</tbody>
+</table>
+
+<h3 id="testing-integration">14.2 Integration / skill-eval</h3>
+<p>Phase 6a invokes <code>feature-sdlc/tools/skill-eval-check.sh --target generic plugins/pmos-toolkit/skills/architecture/</code>. Acceptance: 39/39 binary rubric checks pass. /plan must structure <code>SKILL.md</code> writing tasks to satisfy each FR-80–FR-85 row.</p>
+
+<h3 id="testing-e2e">14.3 End-to-end (post-merge dry-run, OQ8)</h3>
+<p>Manual: <code>/architecture audit /Users/maneeshdhabria/Desktop/Projects/personal/book-companion</code> after Phase 8 lands. Acceptance: exit 0; report contains both <code>ts</code> and <code>python</code> in <code>stacks_detected</code>; <code>frontend_declarative_coverage</code> within (0.55, 0.75) given the 408/.ts ÷ (408 + 260) ratio; ≤ 5 ADRs written; duration &lt; 60s. <strong>This is the deferred OQ8 — not gated by /verify, surfaced as the v1 acceptance demo.</strong></p>
+
+<h3 id="testing-verification-commands">14.4 Verification commands</h3>
+<pre><code># Fixture suite
+bash plugins/pmos-toolkit/skills/architecture/tests/run.sh
+
+# Skill-eval (Phase 6a)
+bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh \
+     --target generic \
+     plugins/pmos-toolkit/skills/architecture/
+
+# Citation gate (release-time)
+bash plugins/pmos-toolkit/skills/architecture/tools/check-citations.sh
+
+# Gap-map ratio
+bash plugins/pmos-toolkit/skills/architecture/tools/check-gap-map.sh
+
+# Determinism (run twice, diff after stripping ts)
+bash plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh tests/fixtures/ts-circular > /tmp/a.json
+bash plugins/pmos-toolkit/skills/architecture/tools/run-audit.sh tests/fixtures/ts-circular > /tmp/b.json
+jq 'del(.run)' /tmp/a.json | diff - &lt;(jq 'del(.run)' /tmp/b.json)   # expect empty diff
+
+# Manual dry-run (post-merge)
+/architecture audit /Users/maneeshdhabria/Desktop/Projects/personal/book-companion
+</code></pre>
+</section>
+
+<section id="rollout">
+<h2 id="rollout">15. Rollout Strategy</h2>
+<ul>
+  <li><strong>Single release vehicle:</strong> ships as part of the next pmos-toolkit minor (2.46.0 → 2.47.0). No feature flag — the skill either exists or doesn't.</li>
+  <li><strong>Pre-release gates:</strong> Phase 6a /skill-eval 39/39 + Phase 7 /verify clean + <code>tools/check-citations.sh</code> + <code>tools/check-gap-map.sh</code> all green.</li>
+  <li><strong>Manifest sync (CLAUDE.md invariant):</strong> both <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> AND <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code> bumped to 2.47.0 in the same commit (pre-push hook enforces).</li>
+  <li><strong>Rollback:</strong> revert the release commit. No user data shape touched on uninstall — <code>&lt;repo&gt;/.pmos/architecture/</code> and <code>&lt;repo&gt;/docs/adr/</code> are user-owned and survive plugin uninstall. (G3 invariant.)</li>
+  <li><strong>OQ8 dry-run:</strong> immediately after merge, run against <code>book-companion</code>. If runtime &gt; 60s or <code>frontend_declarative_coverage &lt; 0.55</code>, file follow-up as v1.1 scope (SFC extractor + parallel rule evaluation).</li>
+  <li><strong>v2 horizon:</strong> scaffold / spec-check / code-check modes; ts-arch re-introduction if Dep Cruiser gaps emerge; Vue SFC extractor (v1.1); pre-commit/CI hooks (v2).</li>
+</ul>
+</section>
+
+<section id="research-sources">
+<h2 id="research-sources">16. Research Sources</h2>
+<p>Research is carried forward from <a href="01_requirements.html#research-sources">requirements §research-sources</a>; no new sources added in /spec. Phase 2 industry-research subagent dispatch skipped — the ideation artifact's research-sources table fully covers the prior art (Dependency Cruiser, ts-arch, ruff, Nygard ADRs, log4brains, adr-tools, the four-tier rulebook precedents). Re-dispatching would re-discover the same surface.</p>
+<table>
+<thead><tr><th>Source</th><th>Type</th><th>Key takeaway</th></tr></thead>
+<tbody>
+<tr><td><a href="01_requirements.html#research-sources">requirements §16</a></td><td>Carried forward</td><td>All ideation-phase sources (8 entries)</td></tr>
+<tr><td>book-companion at <code>/Users/maneeshdhabria/Desktop/Projects/personal/book-companion</code></td><td>v1 validation target (OQ8, deferred to post-merge)</td><td>690 .py + 408 .ts + 260 .vue — shape informs F3 + F4 + NFR-03</td></tr>
+<tr><td><a href="grills/2026-05-13_01_requirements.html">grill report</a></td><td>This pipeline</td><td>5 findings (F1–F5) all folded as FRs above</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="release-prerequisites">
+<h2 id="release-prerequisites">17. Release prerequisites</h2>
+<p>Per FR-63 of <code>/feature-sdlc</code>: the items below are <strong>NOT</strong> /plan <code>## Wave N</code> tasks. /complete-dev (Phase 8) is the sole writer. Listed here so the release isn't surprising.</p>
+<ul>
+  <li><strong>Manifest version bump:</strong> 2.46.0 → 2.47.0 in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> AND <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code>, same commit. Pre-push hook enforces sync. (per repo <code>CLAUDE.md ## Plugin manifest version sync</code>.)</li>
+  <li><strong>README row:</strong> add a row under "Pipeline-adjacent utilities" (or nearest category) describing <code>/architecture audit</code> with one-line summary.</li>
+  <li><strong>CHANGELOG entry:</strong> minor-version section listing the new skill, the v1 audit-only scope, the deferred v2 horizons, OQ8 dry-run note.</li>
+  <li><strong>Learnings header bootstrap:</strong> add <code>## /architecture</code> section header to <code>~/.pmos/learnings.md</code> (idempotent — append only if missing). No <code>~/.pmos/learnings.md</code> entries beyond the header at release time; future runs populate.</li>
+  <li><strong>Canonical path verification:</strong> after /execute lands, <code>ls plugins/pmos-toolkit/skills/</code> shows <code>architecture/</code> directory present and lowercase-hyphenated (per repo <code>CLAUDE.md ## Canonical skill path</code>).</li>
+  <li><strong>Release entry:</strong> use <code>/complete-dev</code>, NOT the legacy <code>/push</code>. (per repo <code>CLAUDE.md ## Release entry point</code>.)</li>
+</ul>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions">18. Open Questions</h2>
+<p>Per §6 universal exit checklist item 10, the published spec must have <strong>zero unresolved open questions</strong>. All grill findings F1–F5 resolved as FRs above. OQ8 (book-companion dry-run) is <strong>not</strong> an open spec question — it is an explicit post-merge acceptance demo documented in §14.3 + §15. The spec is internally complete; OQ8 is forward-looking validation, not a pending decision.</p>
+<p><em>(none)</em></p>
+</section>
+
+<section id="review-log">
+<h2 id="review-log">19. Review Log</h2>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes Made</th></tr></thead>
+<tbody>
+<tr><td>1 (Phase 6 self-critique, single loop)</td><td>Self-critique pass: spec is internally consistent — §4 D-log resolves every grill finding; §7 FRs cite §4 decisions; §14 verification rows map 1:1 to FRs; §17 release-prereqs absent from §7 (correctly, per FR-63). One [Nit] — §6.1 ASCII diagram dispatched inline rather than via <code>/diagram</code> subagent; logged in figcaption per FR-65. No [Blocker] or [Should-fix] findings.</td><td>None applied — single-loop exit.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="silent-roles">
+<h2 id="silent-roles">20. Silent roles considered</h2>
+<ul>
+  <li><strong>DBA</strong> — no schema changes. Persistence is filesystem-only (§10). Covered by file-path FRs (FR-10, FR-11, FR-60).</li>
+  <li><strong>Designer</strong> — CLI output only; §11 covers stderr summary tone + ANSI. No visual UI surface.</li>
+  <li><strong>Product Director</strong> — user journeys fully specified in <a href="01_requirements.html#user-journeys">requirements §user-journeys</a>; carried forward in §5 without delta. No new persona; no new flow.</li>
+  <li><strong>DevOps</strong> — Tier 3 but no deploy infra. Ships via plugin manifest version bump (per CLAUDE.md). Rollout strategy in §15 covers manifest sync + rollback.</li>
+  <li><strong>Senior Analyst</strong> — final FR coverage check rolled into Phase 7 prose pass + Phase 6 universal exit checklist. Coverage = all 5 grill findings → FRs · all 11 requirements D-decisions → §4 D-log entries · all skill-patterns §A–§F → FR-80–FR-85.</li>
+</ul>
+</section>
+
+  </main>
+  <footer class="pmos-artifact-footer" data-pmos-role="footer">
+    <span class="pmos-artifact-source">Source: docs/pmos/features/2026-05-13_architecture-principles-skill/02_spec.html</span>
+    <span class="pmos-attribution-sep" aria-hidden="true">·</span>
+    <a class="pmos-attribution pmos-attribution--footer"
+       href="https://github.com/maneesh-dhabria/2.46.0-pmos-toolkit#readme"
+       target="_blank" rel="noopener noreferrer"
+       data-pmos-role="attribution">Created using pmos&#8209;toolkit</a>
+  </footer>
+</body>
+</html>

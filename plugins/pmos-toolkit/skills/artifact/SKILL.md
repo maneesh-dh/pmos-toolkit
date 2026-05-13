@@ -18,6 +18,10 @@ These instructions use Claude Code tool names. In other environments:
 - **No subagents:** Run the refinement reviewer inline as the same agent. Same eval.md; same output format.
 - **Task tracking:** Use whatever task tool exists (TaskCreate / update_plan / verbal phase announcements).
 
+## Track Progress
+
+This skill has multiple phases per flow. For the Create flow, create one task per phase using your agent's task-tracking tool (`TaskCreate` in Claude Code, equivalents elsewhere): Phase 0 Load Context, Phase 1 Subcommand Routing, Phase 2 Create (with 2.0–2.7 sub-phases), Phase 3 Self-Refinement Loop, Phase 4 Save & Confirm, Phase 5 Workstream Enrichment, Phase 6 Capture Learnings. Refine Flow and Update Flow have their own phase tasks (see flow sections below). Mark each task in-progress when you start it and completed as soon as it finishes — do not batch completions.
+
 ## Phase 0 — Load Context
 
 1. Follow `../_shared/pipeline-setup.md` Section 0 (canonical inline block) to read `.pmos/settings.yaml`, resolve `{docs_path}`, and load workstream context. If settings.yaml is missing, run first-run setup per Section A.
@@ -360,7 +364,7 @@ If a workstream was loaded in Phase 0:
 
 If no workstream is active, skip this phase.
 
-## Phase 6 — Capture Learnings
+## Phase 6: Capture Learnings
 
 Read `../learnings/learnings-capture.md` (relative to this skill dir) and follow it. This phase is a **terminal gate** — the skill is not complete until learnings have been processed.
 

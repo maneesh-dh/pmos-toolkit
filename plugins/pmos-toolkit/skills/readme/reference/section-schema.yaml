@@ -1,0 +1,42 @@
+# section-schema.yaml — standard-readme spine consumed by /readme.
+# Spine = the canonical ordered section sequence.
+# augmentations = optional add-ons (Google's "Status"/"Maintainers"; Diátaxis "Documentation" linkout).
+# commit_affinity = which README sections a given Conventional-Commit type touches (drives /update mode targeting).
+# variants = per-repo-type overrides applied on top of spine.
+
+version: 1
+
+spine:
+  - Title
+  - Short Description
+  - TOC                       # optional under 100 lines
+  - Install
+  - Usage
+  - Contributing
+  - License
+
+augmentations:
+  - Status                    # google.dev/style/readmes
+  - Maintainers               # google.dev/style/readmes
+  - Documentation             # Diátaxis linkout
+
+commit_affinity:
+  feat:           [Features, Usage, Quickstart]
+  fix:            [Changelog, Troubleshooting]
+  docs:           [Documentation, Usage]
+  feat!:          [Migration, Changelog]
+  fix!:           [Migration, Changelog]
+  BREAKING CHANGE: [Migration, Changelog]
+  refactor:       []
+  perf:           []
+  test:           []
+  chore:          []
+
+variants:
+  monorepo-root:
+    append: [Packages]
+  plugin-marketplace-root:
+    append: [Plugins]
+  monorepo-package:
+    drop:   [Install, Contributing, License]
+    append: [Link Up]

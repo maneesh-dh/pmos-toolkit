@@ -2,7 +2,7 @@
 
 Last regenerated: 2026-05-13
 
-7 open items. Capture more with `/backlog add <text>`; refine with `/backlog refine <id>`; promote with `/backlog promote <id>`.
+8 open items. Capture more with `/backlog add <text>`; refine with `/backlog refine <id>`; promote with `/backlog promote <id>`.
 
 ## should
 
@@ -20,3 +20,4 @@ Last regenerated: 2026-05-13
 | 0005 | tech-debt | inbox | could | skill-eval-check.sh HAS_SCRIPTS detection uses `find … \| grep -q .` — same SIGPIPE/pipefail pattern as the body-check race | — | — | — |
 | 0006 | feature | inbox | could | /polish — optionally honor HTML for URL / Notion inputs (currently always normalized to markdown) | — | — | — |
 | 0007 | feature | inbox | could | /polish — symmetric "expansion" mode (grow a doc that's too thin) | — | — | — |
+| 0008 | tech-debt | inbox | could | skill-eval-check.sh --selftest failure surfacing — bijection break (e.g., §[A-F] vs §G) exits 1 with no stdout; stderr alone is easy to lose | — | — | — |

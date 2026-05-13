@@ -205,5 +205,5 @@ Every `[J]` check call (copied from the `polish/reference/rubric.md` shape):
 Every check above names exactly one `skill-patterns.md` §-rule in its `§` column, and
 every §-rule there lists ≥1 `check_id` here in its closing `Checks:` line. The
 bijection is asserted by `skill-eval-check.sh --selftest` (every `[D]` check ↔ a code
-branch, and every check names a `§[A-F]` rule) plus a `/verify` structural check
+branch, and every check names a `§[A-Z]` rule) plus a `/verify` structural check
 (FR-72). Change a rule there and the matching check here in the same commit.

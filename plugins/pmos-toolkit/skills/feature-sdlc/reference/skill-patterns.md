@@ -313,7 +313,7 @@ Checks: g-release-prereqs-scope, g-plan-grep-clean.
 `check_id` in its closing `Checks:` line, and every check in `skill-eval.md` names
 exactly one §-rule here. `skill-eval-check.sh --selftest` asserts the
 deterministic-check half of that bijection (every `[D]` check ↔ a code branch in the
-script, and every check names a `§[A-F]` rule); a `/verify` structural check covers
+script, and every check names a `§[A-Z]` rule); a `/verify` structural check covers
 the rest (FR-72). When you change a rule here, change the matching check there in the
 same commit — the two files drifting apart is the one failure this pair is built to
 prevent.

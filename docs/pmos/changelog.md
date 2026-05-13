@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-05-13 — pmos-toolkit 2.46.0: /feature-sdlc base-drift pre-flight + release-prereq scope discipline
+
+Two follow-up fixes for `/feature-sdlc` from the 2026-05-13 retro on the `/survey-analyse` run, applied to its skill modes. (2.44.0 was taken by `/plan vertical-slice`; 2.45.0 by `/ideate` — both shipped concurrently.)
+
+### What's new
+
+- **`/feature-sdlc` Phase 0a — base-drift pre-flight.** Before `git worktree add`, `/feature-sdlc` now fetches the base branch's upstream and computes `behind`. When local is behind remote, it surfaces a dialog: pull-then-branch (Recommended) / branch-anyway (record drift) / abort. The branch-anyway path writes `state.base_drift = {behind, fetched_at, remote, base, remote_sha, local_sha}` so `/complete-dev` Phase 8 can surface the gap at merge time. Phase 0b on resume re-runs the fetch+diff to flag origin advancing after worktree creation. Network failures degrade gracefully (log + proceed). Closes the silent-friction class where a worktree branched from stale local main only fails at Phase 8 merge with version-collision conflicts on `plugin.json` and changelog files.
+- **`reference/state-schema.md` — three new optional top-level fields** (`base`, `remote`, `base_drift`) on the run-state document. Additive; no migration needed for older states (v4 schema unchanged).
+- **`reference/skill-patterns.md` §G — Release-prerequisites scope.** New section codifies the scope split: `SKILL.md` body, `reference/`, `scripts/`, `tests/` are `/execute`'s scope; README rows, manifest version bumps, changelog entries, and `~/.pmos/learnings.md` header bootstraps are `/complete-dev`'s scope and belong in the spec's `## Release prerequisites` section. The pmos-specific file list is delegated to the host repo's `CLAUDE.md ## Skill-authoring conventions`.
+- **`reference/skill-eval.md` 10.G — two new rubric checks.** `g-release-prereqs-scope` `[J]` (reviewer) verifies a plan's wave sections list only skill-content tasks; `g-plan-grep-clean` `[D]` (script) greps `03_plan.{html,md}` wave blocks for `version bump|bump.*plugin\.json|CHANGELOG\.md|docs/.*changelog|README row` markers. Group skipped when no plan artifact is present. Totals: 41 checks (21 `[D]` + 20 `[J]`).
+- **`tools/skill-eval-check.sh` — implements `g-plan-grep-clean`.** New `--plan <path>` flag enables the check; awk wave-block extractor scopes the grep to `## Wave N` sections (preamble and `## Release prerequisites` are excluded); HTML chrome stripped before grep so `.html` and `.md` plans are graded uniformly. Selftest bijection regex extended from `§[A-F]` to `§[A-Z]` so future §-additions don't break it. Verified via selftest + good/bad smoke fixtures. Companion prose `§[A-F]` → `§[A-Z]` cleanup in skill-patterns.md + skill-eval.md cross-reference sections.
+- **`/feature-sdlc` Phase 5 dispatch — directive line in skill modes.** The `/plan` invocation now prepends a directive forbidding version-bump / CHANGELOG / README-row / manifest-sync / learnings-bootstrap tasks in any wave block — they MUST live in the spec's `## Release prerequisites` section as `/complete-dev` deliverables. Backed by the 10.G rubric.
+
+### Why this matters
+
+The 2026-05-13 `/survey-analyse` SDLC run branched off stale local main and the resulting `03_plan` included version bumps + changelog edits as `/execute` tasks. `/execute` committed them against the stale base; `/complete-dev` then had to merge-conflict-resolve `plugin.json`, revert the legacy `CHANGELOG.md` writes, and re-prepend the entry to the canonical `docs/pmos/changelog.md`. Phase 0a Step 2.5 surfaces the divergence before the worktree exists; §G + 10.G prevents `/execute` from ever owning release artifacts.
+
+This very release encountered the same stale-bump dynamic in `/complete-dev` (2.45.0 was taken by /ideate while this branch was being prepared at 2.45.0) — the Phase 9 stale-bump recovery prompt fired correctly, rebased onto main, and re-bumped to 2.46.0. That path is operating as designed.
+
+### Breaking changes
+
+None. The Phase 0a Step 2.5 pre-flight degrades gracefully when no upstream is configured (skipped). The 10.G checks are group-skipped when no plan artifact is given to `skill-eval-check.sh`. The state-schema additions are optional fields — older state files keep working.
+
+### Migration
+
+None. Additive.
+
+---
+
 ## 2026-05-13 — pmos-toolkit 2.43.0: /survey-analyse skill
 
 Sister to `/survey-design`: turns a raw survey response export (CSV / TSV / XLSX / XLS / PDF) into a defensible HTML report.

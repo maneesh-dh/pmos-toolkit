@@ -286,6 +286,7 @@ date: YYYY-MM-DD
 status: Draft
 commit_cadence: per-task
 contract_version: 1
+execution_mode: inline | subagent-driven   # set in the closing phase (default: inline). /execute and /feature-sdlc Phase 6 read this.
 ---
 
 # <Feature Name> — Implementation Plan
@@ -792,13 +793,27 @@ git commit -m "docs: add implementation plan for <feature>"
 
 **/backlog write-back:** if the plan was generated with `--backlog <id>`, set the backlog item's status to `planned` and write `plan: <feature_folder>/03_plan.{html,md}` (whichever was the primary write) per `backlog/pipeline-bridge.md` (the bridge contract owns the write-back, /plan invokes it).
 
-**Closing offer (platform-aware via `_shared/platform-strings.md`):** read `execute_invocation` for the active platform and emit the offer with that string substituted. e.g.,
+**Execution-mode selection.** Before the closing offer, ask the user how `/execute` should run, with a one-line description of each option:
+
+`AskUserQuestion`:
+```
+question: "How should /execute run this plan?"
+options:
+  - Inline execution (Recommended)
+    description: One agent works the plan task-by-task in this session — simplest, lowest token cost.
+  - Subagent-driven execution
+    description: A fresh subagent per task; independent tasks run in parallel waves; each task gets a spec + code-quality review — faster on wide plans, higher token cost.
+```
+
+Record the choice in the plan doc's frontmatter `execution_mode:` (`inline` or `subagent-driven`; default `inline`) and re-commit the plan if it changed. `/execute` reads this (it also accepts an explicit `--subagent-driven | --inline` override), and `/feature-sdlc` Phase 6 reads it to decide whether to pass `--subagent-driven`. In `--non-interactive` mode the Recommended option (`inline`) is auto-picked per the non-interactive classifier.
+
+**Closing offer (platform-aware via `_shared/platform-strings.md`):** read `execute_invocation` for the active platform and emit the offer with that string substituted; **append ` --subagent-driven` to the invocation when `execution_mode == subagent-driven`**. e.g. (with `execution_mode: inline`):
 
 > claude-code: `Plan complete and saved. Run /pmos-toolkit:execute to implement it, or review the plan first?`
 > gemini: `Plan complete and saved. Activate the execute skill to implement it, or review the plan first?`
 > codex: `Plan complete and saved. Run the execute skill to implement it, or review the plan first?`
 
-The offer wording is otherwise identical across platforms (FR-72).
+With `execution_mode: subagent-driven`, the claude-code form reads `Run /pmos-toolkit:execute --subagent-driven to implement it, or review the plan first?` (and analogously for the other platforms). The offer wording is otherwise identical across platforms (FR-72).
 
 ---
 
@@ -851,3 +866,4 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT instruct tasks to copy the wireframe's visual style verbatim. Wireframes are reference for IA / copy / states / journeys; visual style follows the host app's design system. Tasks should say "follow host-app pattern X" rather than "match wireframe pixel-for-pixel."
 - Do NOT let TN's frontend smoke test stop at "renders correctly" — it must include hard-reload, an error-path probe, the UX polish checklist, and (if wireframes exist) a wireframe diff. Polish belongs in the plan, not as a verify afterthought.
 - Do NOT create `## Phase N` groupings of 1–2 tasks — each phase boundary triggers full /verify (multi-agent code review + interactive QA), which dwarfs the implementation cost of a tiny phase. Target 5–10 tasks per phase, or skip phases entirely for small plans.
+- Do NOT skip the execution-mode selection question (Inline vs Subagent-driven) at close — the recorded `execution_mode:` frontmatter value is what `/execute` and `/feature-sdlc` Phase 6 read; omitting it silently forces inline everywhere.

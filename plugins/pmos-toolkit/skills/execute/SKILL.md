@@ -2,7 +2,7 @@
 name: execute
 description: Execute an implementation plan end-to-end — task-by-task TDD implementation with deploy verification, frontend testing, and manual spot checks. Supports git worktree isolation. Use when the user says "implement the plan", "start building", "execute this", "code this up", or has a plan doc ready for implementation.
 user-invocable: true
-argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>] [--resume | --restart | --from T<N>] [--no-halt] [--non-interactive | --interactive]"
+argument-hint: "<path-to-plan-doc> [--feature <slug>] [--backlog <id>] [--resume | --restart | --from T<N>] [--no-halt] [--subagent-driven | --inline] [--non-interactive | --interactive]"
 ---
 
 # Plan Executor
@@ -17,9 +17,15 @@ Follow the inline instructions below — they are self-contained.
 
 These instructions use Claude Code tool names. In other environments:
 - **No interactive prompt tool:** State your assumption, document it in the output, and proceed. The user reviews after completion.
-- **No subagents:** Perform research and analysis sequentially as a single agent.
+- **No subagents:** Perform research and analysis sequentially as a single agent. If `--subagent-driven` was passed on a platform with no subagent tool, emit `WARNING: --subagent-driven requested but no subagent tool available; running inline.` and proceed with inline execution — never error out.
 - **No Playwright MCP:** Note browser-based verification as a manual step for the user.
 - **Task tracking:** Use your available task tracking tool (e.g., `TaskCreate`/`TaskUpdate` in Claude Code, `update_plan` in Codex, or equivalent). If none is available, track progress via commit messages and report status verbally.
+
+---
+
+## Track Progress
+
+This skill runs many phases over a potentially long execution. Track progress with your agent's task-tracking tool: in Phase 1, create one tracked task per **plan task** (the live progress view the user watches); update each to in-progress when you start it and completed as soon as it's done — do not batch completions. For multi-session runs, the per-task `{feature_folder}/execute/task-NN.md` logs and per-phase `phase-N.md` logs are the canonical, durable progress record (the resume resolver reads them). If no task-tracking tool is available, track via the `T<N>`-bearing commit subjects and the per-task logs, and report status verbally.
 
 ---
 
@@ -139,6 +145,16 @@ END { emit_pending() }
 8. **End-of-skill summary.** Print to stderr at exit: `pmos-toolkit: /<skill> finished — outcome=<clean|deferred|error>, open_questions=<N>` (NFR-07).
 <!-- non-interactive-block:end -->
 
+### Phase 0 addendum: execution-strategy resolution
+
+Resolve `execution_strategy ∈ {inline, subagent-driven}` once, at Phase 0 entry:
+
+- `--subagent-driven` and `--inline` are parsed from this skill's argument string. They are mutually exclusive; **last flag wins** on conflict; **neither present ⇒ `inline`** (today's behavior — zero regression).
+- If `subagent-driven` resolved but the platform has **no subagent/Agent tool** (Codex, Gemini, or any harness without it): emit `WARNING: --subagent-driven requested but no subagent tool available; running inline.` to stderr and set `execution_strategy = inline`. Never error.
+- Print to stderr exactly once: `execution_strategy: <inline|subagent-driven> (source: cli|default)`.
+
+`execution_strategy` selects the Phase 2 path (see "Phase 2 — Execution Strategy" below). It does **not** change any other phase: Phase 0/0.4/0.5 setup + resume, Phase 1 setup, Phase 2.5 phase-boundary handling, the runtime-evidence gate, the per-task / per-phase logs, and Phases 3–7 all run identically in both strategies.
+
 ## Phase 0.4: Feature Disambiguation
 
 <!-- defer-only: destructive -->
@@ -206,6 +222,15 @@ Follow `../_shared/execute-resume.md` Phase 0.5 to:
 ---
 
 ## Phase 2: Execute Tasks
+
+### Phase 2 — Execution Strategy
+
+Branch on `execution_strategy` (resolved in Phase 0):
+
+- **`inline`** (default) — run the **per-task loop** below as a single agent, in plan order. Optionally, when an Agent/subagent tool is available, you may use the lightweight per-task subagent variant under "Inline mode: optional per-task subagents" — but that is *not* the parallel mode.
+- **`subagent-driven`** (`--subagent-driven`) — skip the single-agent per-task loop and run the **"Parallel Subagent-Driven Execution"** section below instead. It dispatches a fresh implementer subagent per task, runs independent tasks in parallel waves, and puts every completed task through a two-stage review. Inspired by `superpowers:subagent-driven-development`, but **fully self-contained** — all wave logic, prompt templates, and review loops live in this skill (`SKILL.md` + the sibling `subagent-driven.md`); nothing outside `plugins/pmos-toolkit/skills/execute/` is required.
+
+Everything that is **not** the per-task implementation loop is shared by both strategies and runs identically: Phase 0/0.4/0.5 (setup + resume), Phase 1 (worktree, dependency install, **verification-tooling hard gate**, task list), the per-task fields contract and defect handoff (below), **Phase 2.5 phase-boundary `/verify` + `--no-halt`/`continue_through_phases`**, the per-task `task-NN.md` and per-phase `phase-N.md` logs, the runtime-evidence gate, and Phases 3–7. The subagent-driven path **must** keep producing the same `T<N>`-bearing commit subjects the Phase 0.5 resume resolver greps for — see its commit step below.
 
 ### Per-task fields consumed by /execute v2 (T35 — /plan v2 contract)
 
@@ -338,9 +363,9 @@ if still failing after 3 attempts:
 - Re-run the full task verification, not just the failing subset. A fix in one place can break another.
 - The bound (3 attempts) prevents thrashing. If you can't fix it in 3 tries, a human needs to look.
 
-### Subagent Execution (when Agent tool is available)
+### Inline mode: optional per-task subagents (lightweight, sequential)
 
-Dispatch a fresh subagent per task. Fresh context prevents confusion from accumulated state. After each task, run a **two-stage review**:
+This is part of **`inline`** mode — not the parallel mode. When an Agent/subagent tool is available you may dispatch a fresh subagent per task, **one at a time**: fresh context prevents confusion from accumulated state. After each task, run a **two-stage review**:
 
 1. **Spec compliance review** — dispatch a reviewer subagent with the task's spec requirements and the implementer's diff. Question: does the code match the spec? Flag missing requirements or scope creep.
 2. **Code quality review** — dispatch a second reviewer with the diff and project conventions (CLAUDE.md). Question: is the code well-built? Flag bugs, inconsistencies, convention violations.
@@ -352,9 +377,52 @@ If either reviewer finds issues, the implementer fixes them and the reviewer re-
 - **Needs context** — provide the missing information and re-dispatch.
 - **Blocked** — assess: provide more context, use a more capable model, break the task smaller, or escalate to the user. Never retry without changing something.
 
+> For the **parallel** variant — fan independent tasks out across subagents in waves, with the same two-stage review — run `/execute --subagent-driven` and follow "Parallel Subagent-Driven Execution" below instead.
+
 ### Sequential Execution (no subagents)
 
 Execute tasks in order. After each task, self-review against the spec before proceeding.
+
+### Parallel Subagent-Driven Execution (`--subagent-driven`)
+
+Selected when `execution_strategy == subagent-driven` (see Phase 0). This **replaces** the per-task single-agent loop above; all the *shared* machinery from "Phase 2 — Execution Strategy" still applies. Self-contained: the four subagent prompt templates live in `subagent-driven.md` (sibling to this file) — read it before dispatching. No external skill is required; `superpowers:subagent-driven-development` is the inspiration, not a dependency.
+
+You (the controller) coordinate; subagents do the work. Implementer subagents **never inherit your context** — you hand them exactly the task text + scene-setting context they need. Implementer subagents **implement and test but never `git commit`** — the controller commits, serially, after the wave (this avoids `.git/index` races between concurrent subagents and keeps the `T<N>` commit subjects the resume resolver depends on).
+
+#### Step A — Wave planning (deterministic)
+
+1. **Collect tasks.** Reuse the Phase 0.5 parse: every `T<N>[<suffix>]` task with its `**Goal:**`, `**Files:**`, `**Depends on:**`, `**Requires state from:**`, and `## Phase N` grouping. **Exclude** tasks the resume resolver already classified `done` / `done-sealed`. If nothing remains → report "nothing to execute" and stop.
+2. **Dependency edges.** For each task `T`, add edge `D → T` for every task id `D` listed in `T`'s `**Depends on:**` *or* `**Requires state from:**`. (Absent fields ⇒ no edges from this rule — but see step 5.)
+3. **File-conflict relation.** Two tasks `A`, `B` *conflict* if their `**Files:**` path sets intersect (normalize paths; `Create` / `Modify` / `Test` entries all count). Conflicting tasks **must not** share a wave even when no dependency edge connects them — concurrent edits to the same file collide.
+4. **Layer into waves.** Kahn's algorithm over the dependency edges gives topological layers. Within each layer, greedily pack tasks into sub-waves (in task-index order) such that no sub-wave contains a conflicting pair — overflow tasks spill to the next sub-wave. The result is an ordered list of waves; every task in wave *k* has all its dependencies in waves `< k` and is pairwise file-disjoint from its wave-mates.
+5. **Degenerate-case fallback.** If there is a dependency cycle, a reference to an unknown task id, or the plan's tasks lack the v2 per-task fields entirely (legacy plan) ⇒ fall back to **all-singleton waves** (= fully sequential) and log: `[/execute] subagent-driven: wave planning fell back to sequential (<reason>).` Do not halt.
+6. **Print the wave plan** to chat before starting, e.g.: `Wave 1: T1, T3, T4 | Wave 2: T2 | Wave 3: T5, T6`.
+
+#### Step B — Per-wave loop
+
+For each wave, in order:
+
+1. **Dispatch implementer subagents in parallel.** One Agent call per task in the wave, **all in a single assistant message** (the dispatching-parallel-agents pattern). Each call uses the *implementer* template from `subagent-driven.md`, populated with: the task's full text from the plan (paste it — do **not** make the subagent read the plan file), scene-setting context (where the task fits, what upstream tasks produced, relevant conventions), the worktree path, and the explicit instruction: **"implement and test (TDD per the task's `**TDD:**` value), but do NOT `git commit` — leave your changes in the working tree and report the exact files you changed and your test results."** Pick the model per the model-selection guidance in `subagent-driven.md` (cheap for mechanical 1–2-file tasks; standard for integration; most-capable for design/judgement).
+   - Per the known stall pattern: if a task is "one component → desktop AND mobile"-shaped (multiple large outputs), dispatch it as two narrower subagents from the start rather than one.
+2. **Collect results.** For each returned implementer status:
+   - **DONE** / **DONE_WITH_CONCERNS** — proceed (read concerns first; if a concern is about correctness or scope, resolve it before review; if it's an observation, note and proceed).
+   - **NEEDS_CONTEXT** — provide the missing context, re-dispatch that one subagent.
+   - **BLOCKED** — assess the blocker: more context → re-dispatch same model; needs more reasoning → re-dispatch a more capable model; too large → split into smaller tasks; plan is wrong → write the defect file (see "Defect handoff" above) and escalate. **Never** re-dispatch the same model with nothing changed. A blocked task stalls only its dependents — already-done tasks stay done.
+   - **Stall** (no return / timeout) — re-dispatch that single task focused (focused single-file re-dispatches recover fast).
+3. **Per task, in task-index order — the CONTROLLER (not subagents):**
+   1. **Commit / stage.** `git add` the task's reported file-set, then — honoring the plan's `commit_cadence` — `commit_cadence: per-task` (default) ⇒ `git commit` now with a `T<N>`-bearing subject (`feat(T<N>): …` / `T<N>: …`); `per-phase` ⇒ leave it staged and commit the whole phase at the phase boundary; `manual` ⇒ leave it staged for the user. The `T<N>` subject (when a commit is made) is mandatory — the Phase 0.5 resolver greps `\bT[0-9]+\b` from `git log`. The diff handed to the reviewers in step 3 is the per-task commit (`git show <sha>`) when one exists, otherwise the task's staged/working-tree change for its file-set (`git diff --staged -- <files>` / `git diff -- <files>`).
+   2. **Write the per-task log** `{feature_folder}/execute/task-NN.md` per the schema above (`status: done`, `files_touched`, body = decisions / deviations / runtime evidence / verification outcome). Honor the runtime-evidence gate: an API/UI task with no runtime evidence is **not done** — re-dispatch the implementer to produce it.
+   3. **Two-stage review (this order, no skipping):**
+      - **(i) Spec-compliance reviewer subagent** — dispatch with the *spec-reviewer* template from `subagent-driven.md`: the task requirements + the implementer's claims + the diff (`git show <sha>` / base→head SHAs). It verifies by reading code, not by trusting the report. On `❌` → re-dispatch the **same implementer subagent** with the reviewer's findings to fix → controller commits (or, under `per-phase`/`manual` cadence, re-stages) the fix as `fix(T<N>): address spec-review gap` → re-review. Loop until `✅`.
+      - **(ii) Code-quality reviewer subagent** — only after spec `✅`: dispatch with the *code-quality-reviewer* template from `subagent-driven.md`: the diff + project conventions (`CLAUDE.md`). On Critical/Important findings → implementer fixes → controller commits / re-stages `fix(T<N>): …` → re-review → loop until approved. Minor findings: note and proceed.
+      - Reviewer subagents are read-only; you may dispatch the spec-reviewers for several wave tasks concurrently, but the spec→quality **order per task** is mandatory, and code-quality review never starts before that task's spec review is `✅`.
+   4. **Mark the task complete** in your task tracker.
+4. **Phase 2.5 phase-boundary check.** If the wave's last task completes a `## Phase N` group, run **Phase 2.5** exactly as in inline mode (`/verify --scope phase`, `phase-N.md` log, `HALT_FOR_COMPACT` unless `--no-halt` / the session-sticky continuation flag). Unchanged.
+5. **Next wave.**
+
+#### Step C — Final review
+
+After the last wave: dispatch one **whole-implementation reviewer subagent** (the *final-reviewer* template in `subagent-driven.md`) with the full diff range (base SHA → HEAD) and the spec — this is the subagent form of Phase 4's compliance pass. Address any gaps it finds (implementer subagent fixes; controller commits). Then run **Phase 3** (Deploy & Verify) and **Phase 5** (Commit & Report) exactly as in inline mode — Phase 5 still ends by invoking `/pmos-toolkit:verify`.
 
 ### Execution Rules
 
@@ -486,3 +554,8 @@ This phase is mandatory whenever Phase 0 loaded a workstream — do not skip it 
 - Do NOT stop at the first passing test run — re-read the spec for completeness
 - Do NOT silently re-do tasks marked `done` in `task-NN.md` without checking the `task_goal_hash` against the current plan — drift detection exists for a reason; surface `done-but-drifted` to the user instead of either skipping or quietly redoing
 - Do NOT skip the Phase 2.5 Phase Boundary Check when the plan has `## Phase N` headings — full /verify at boundaries is the design's purpose; suppressing it defeats the cross-session compact handshake
+- (subagent-driven) Do NOT put two tasks in the same parallel wave if they share a `**Files:**` entry or one `**Depends on:**`/`**Requires state from:**` the other — file races and wrong execution order. When in doubt, fall back to a singleton wave.
+- (subagent-driven) Do NOT let implementer subagents `git commit` — the controller commits, serially, after the wave, with `T<N>` subjects. Concurrent commits race on `.git/index` and break the resume resolver's `T<N>` grep.
+- (subagent-driven) Do NOT start the code-quality review before the spec-compliance review is `✅` — and never skip either review, or move to the next wave with a task's review still open.
+- (subagent-driven) Do NOT make a subagent read the plan file or inherit your context — paste the task's full text plus the scene-setting context it needs; that's the point of fresh-context subagents.
+- (subagent-driven) Do NOT treat `--subagent-driven` as a hard requirement — on a platform with no subagent tool it degrades to a warning + inline execution, not an error.

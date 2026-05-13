@@ -407,6 +407,19 @@ This contract makes `/readme --update` a **patch generator**, not a commit autho
 
 See [§7: Update-mode flow](#7-update-mode-flow) for the upstream flow gated by this section, and [§4: Mode resolution](#4-mode-resolution) for `--update`'s mutex with `--audit`/`--scaffold`.
 
+### §9: Cross-file rules (monorepo)
+
+When composition is `monorepo` (per §5 repo-miner output), the audit pass runs four cross-file rules **after** per-file rubric scoring and **before** synthesis. Each rule emits a finding into the same rubric stream (`severity`, `rule_id`, `path`, `auto_fix_path`) so §1 audit and §6 scaffold both consume it uniformly. Full detection contracts, edge cases, and fixture mappings live in [reference/cross-file-rules.md](reference/cross-file-rules.md) (forward-cite — dangling until T20 merges).
+
+| Rule | Scope | Detection | Auto-fix path |
+|---|---|---|---|
+| **R1** — root contents-table refs every workspace pkg ([#r1-link-existence](reference/cross-file-rules.md#r1-link-existence)) | root README only | Resolve workspace pkgs via `scripts/workspace-discovery.sh`; scan root README for a contents/packages table; assert each pkg path is referenced. | If table exists → append missing entries inline. If absent → AskUserQuestion "root README has no contents-table — add one? [show preview]" `<!-- defer-only: ambiguous -->` (structural rewrite, user must confirm). |
+| **R2** — each pkg README links back to root ([#r2-link-up-presence](reference/cross-file-rules.md#r2-link-up-presence)) | every workspace pkg README | Scan pkg README for a relative link resolving to root README (`../README.md`, `../../README.md`, etc., per pkg depth). | Append a link-up line at end-of-readme under the configurable section (default: appended bare; section name overridable via `.pmos/readme.config.yaml :: link_up_section`). |
+| **R3** — Install/Contributing/License root-only ([#r3-install-contributing-license-root-only](reference/cross-file-rules.md#r3-install-contributing-license-root-only)) | every workspace pkg README | Scan pkg README headings for `Install`, `Contributing`, `License` (case-insensitive, H2/H3). Emit WARN per hit. | Offer two options: (a) replace section body with a link-up to the root README's corresponding section; (b) mark as legitimate variance → persist in `.pmos/readme.config.yaml :: package_variance` keyed by `<pkg_path>:<section>`. Variance prompt is `<!-- defer-only: free-form -->` (override reason is user-typed). Subsequent runs skip the WARN when a matching variance entry exists. |
+| **R4** — no duplicate hero text ([#r4-no-duplicate-hero-text](reference/cross-file-rules.md#r4-no-duplicate-hero-text)) | root vs each pkg README | Extract hero line = first non-empty, non-heading line after H1. Cross-compare root hero against each pkg hero; flag exact or near-duplicate (normalized whitespace + case). | **No auto-fix** — voice-sensitive. Surface as friction-only finding; user resolves via /polish or manual edit. |
+
+The cross-file pass slots in as a single post-per-file phase: §1 audit invokes it after rubric scoring and includes its findings in the rubric-stream summary; §6 scaffold invokes it after writing the per-pkg READMEs so the generated tree is internally consistent on first emit. Both flows respect the `package_variance` ledger from R3, so confirmed variances persist across runs without re-prompting.
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

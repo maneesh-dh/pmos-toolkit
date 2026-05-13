@@ -420,6 +420,40 @@ When composition is `monorepo` (per §5 repo-miner output), the audit pass runs 
 
 The cross-file pass slots in as a single post-per-file phase: §1 audit invokes it after rubric scoring and includes its findings in the rubric-stream summary; §6 scaffold invokes it after writing the per-pkg READMEs so the generated tree is internally consistent on first emit. Both flows respect the `package_variance` ledger from R3, so confirmed variances persist across runs without re-prompting.
 
+### §10: Monorepo audit-all flow
+
+When `scripts/workspace-discovery.sh` reports composition=`monorepo`, §10 orchestrates the workspace-scope flow that wraps §1 audit, §6 scaffold, and §7 update into a single cross-package run with one unified diff (FR-OUT-1) and one final approval. This section closes the monorepo integration contract — it is invoked from §1/§6/§7 once workspace composition is confirmed, and supersedes their per-file flows for the duration of the run.
+
+**argv parsing.** The non-interactive surface is `--scope <audit-all|audit-one|scaffold-missing|root-only>` (FR-MODE-3). When `--scope` is present, §10 bypasses the workspace-scope AskUserQuestion below and dispatches directly. `--scope audit-one` requires a positional pkg path (`--scope audit-one packages/web`); missing path → hard error, no prompt fallback. Absent `--scope`, the interactive prompt fires. `--scope` is mutex with the per-file `--path` flag (validated at §4 mode resolution).
+
+**Workspace-scope prompt** (interactive surface, fires once after workspace-discovery returns). `<!-- defer-only: ambiguous -->` — choice surface, no destructive write yet.
+
+| Option | When shown | Behavior |
+|---|---|---|
+| `audit-all` (Recommended for non-empty workspaces) | always | Run rubric + cross-file pass against every discovered pkg + root. |
+| `audit-one <pick>` | always | Follow-up AskUserQuestion lists discovered pkg paths; run rubric on that pkg only (cross-file pass skipped — single-pkg scope). |
+| `scaffold-missing` | only when ≥1 pkg has no README | Run §6 scaffold against pkgs missing README; existing READMEs untouched. |
+| `root-only` | always | Audit root README only; skip pkg iteration. Cross-file R1 still fires (root contents-table check). |
+| `Include all stacks (JS + Go + …)` | only when repo-miner emits MS01 (multi-stack workspace) | Forces per-pkg rubric variant to follow each pkg's detected `repo_type` rather than the workspace-default; otherwise pkgs inherit root `repo_type`. |
+
+**Per-package iteration.** For `audit-all` and `Include all stacks`, iterate pkgs in discovery order. Per pkg: load rubric variant per its `repo_type` (from repo-miner per-pkg output — see §5), run the 15-check rubric (§2), run the §9 cross-file rule pass scoped to that pkg, append findings to a shared rubric stream keyed by `<pkg_path>`. Root README is iterated as a synthetic pkg with `path=.` so R1/R4 land in the same stream.
+
+**Findings roll-up.** First-pass output groups by severity across the whole workspace (blockers first, then friction, then nits), then within each severity a per-package one-liner: `<pkg_path>: N blockers, M friction, K nits` (zero-counts omitted from the line, omitted entirely if all-zero). After the roll-up, fire a follow-up `AskUserQuestion` — `Show findings for <pkg>` / `Proceed to diff` / `Cancel` — drill-down lists every finding for that pkg with `rule_id`, `path`, `severity`, `auto_fix_path` (matches §1 audit format). User can drill multiple pkgs before proceeding. `<!-- defer-only: ambiguous -->` (read-only navigation).
+
+**Unified diff (D15 / FR-OUT-1).** A single diff body covers every patched file across every pkg + root. Per-file headers use the form `=== package: <pkg_path> (audit|scaffold) ===` immediately before the standard unified-diff `--- a/<path>` / `+++ b/<path>` header. `audit` = update-mode patch against an existing README; `scaffold` = new-file create against `/dev/null`. Diff body is emitted in pkg-discovery order; root last so reviewers land on the highest-level file at end-of-scroll.
+
+**Atomic multi-write contract.** On `Apply all`, every patched file is written via `temp+rename` per §6's atomic-write contract. If any rename fails mid-batch, every successfully-renamed file is reverted to its pre-write content (captured to per-file `.bak` paths before any rename); failure surfaces to chat as `monorepo write rolled back: <failed-path> — <N> files reverted, no partial state on disk`. The contract is all-or-nothing — workspace consistency wins over partial progress.
+
+**Final approval** (single AskUserQuestion, fires after diff render). `<!-- defer-only: destructive -->` — writes to disk.
+
+| Option | Behavior |
+|---|---|
+| `Apply all` (Recommended) | Atomic multi-write per above; stages all paths via `git add` (§8 contract); does NOT commit. |
+| `Reject all` | Discard diff; exit with `monorepo audit complete — no files written`. |
+| `Cancel` | Same as Reject all (alias for muscle-memory). |
+
+**Composition wiring.** §10 is the entry point for §1 audit / §6 scaffold / §7 update whenever composition=`monorepo`: §1 delegates the iteration + roll-up + diff phases here and consumes the unified diff as its audit output; §6 delegates the missing-pkg detection + scaffold-emit phases here and reuses the same approval gate; §7 update applies §10's diff-and-stage contract per-pkg so workspace-scope update lands as one staged batch for /complete-dev to commit. Per-file flows in §1/§6/§7 remain the contract for `composition=single` repos — §10 is the monorepo overlay, not a replacement.
+
 ## Anti-Patterns
 
 - **Do NOT auto-commit.** /readme writes to the working tree (or stdout for audit); /complete-dev owns the release commit. Auto-committing breaks the user's ability to review the patch before it lands.

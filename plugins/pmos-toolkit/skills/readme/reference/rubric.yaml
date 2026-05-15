@@ -8,6 +8,7 @@ checks:
   # Blockers (4)
   - id: hero-line-presence
     severity: blocker
+    type: "[D]"
     description: "The first non-blank line after H1 is a one-sentence prose tagline (not a list/heading)."
     pass_when: "First non-blank, non-list, non-heading line after H1 exists and is ≥30 chars."
     fix_note_template: "Insert a hero line: '<Project> is a <one-sentence what + who + why>.' below the H1."
@@ -15,6 +16,7 @@ checks:
 
   - id: install-or-quickstart-presence
     severity: blocker
+    type: "[D]"
     description: "README has an Install or Quickstart section a reader can copy-paste."
     pass_when: "Heading matching /^##\\s+(Install|Quickstart|Getting Started)/ exists and is followed by a fenced code block within 10 lines."
     fix_note_template: "Add an ## Install section with a 1-3 line copy-paste-ready command."
@@ -22,6 +24,7 @@ checks:
 
   - id: what-it-does-in-60s
     severity: blocker
+    type: "[D]"
     description: "A first-time reader can answer 'what is this?' from the first 60 seconds (hero + 2-3 paragraphs)."
     pass_when: "First 25 lines after frontmatter contain ≥1 hero line + ≥1 use-case clause."
     fix_note_template: "Rewrite the opening so a reader who skims the first 25 lines learns what + for-whom + why-now."
@@ -29,6 +32,7 @@ checks:
 
   - id: no-banned-phrases
     severity: blocker
+    type: "[D]"
     description: "README contains zero phrases from the banned-phrase list (marketing slop)."
     pass_when: "grep -iE banned_phrases against README returns no match."
     fix_note_template: "Replace banned phrase '${match}' with concrete, specific wording."
@@ -37,6 +41,7 @@ checks:
   # Friction (7)
   - id: tldr-fits-screen
     severity: friction
+    type: "[D]"
     description: "The opening fits on one screen (≤25 lines)."
     pass_when: "Line count from H1 to first ## section ≤ 25."
     fix_note_template: "Trim the opening; move details past the first ## section."
@@ -44,6 +49,7 @@ checks:
 
   - id: code-example-runnable-as-shown
     severity: friction
+    type: "[D]"
     description: "Code blocks in Install/Quickstart are runnable as-shown (no placeholders, no '...')."
     pass_when: "First code block in Install/Quickstart has no '...' or '<TODO>' or '<placeholder>' tokens."
     fix_note_template: "Replace placeholders with a runnable example or move to a separate 'Advanced' section."
@@ -51,6 +57,7 @@ checks:
 
   - id: links-resolve
     severity: friction
+    type: "[D]"
     description: "Markdown links to relative paths resolve to existing files."
     pass_when: "Each [text](path) where path is relative resolves to a file in the repo."
     fix_note_template: "Fix broken link '${path}' or remove it."
@@ -58,6 +65,7 @@ checks:
 
   - id: no-marketing-hyperbole
     severity: friction
+    type: "[D]"
     description: "Adjective density (subjective superlatives) is low."
     pass_when: "Count of words matching /^(amazing|awesome|incredible|stunning|revolutionary)$/i ≤ 2 in the whole file."
     fix_note_template: "Replace marketing language with concrete claims."
@@ -65,6 +73,7 @@ checks:
 
   - id: sections-in-recommended-order
     severity: friction
+    type: "[D]"
     description: "Top-level ## sections follow the standard-readme spine ordering (per reference/section-schema.yaml)."
     pass_when: "## headings appear in an order that is a subsequence of the spine declared in section-schema.yaml."
     fix_note_template: "Reorder sections to match the canonical spine."
@@ -72,6 +81,7 @@ checks:
 
   - id: contributing-link-or-section
     severity: friction
+    type: "[D]"
     description: "README has a Contributing section OR links to CONTRIBUTING.md."
     pass_when: "Heading /^##\\s+Contributing/ OR link to CONTRIBUTING.md exists."
     fix_note_template: "Add a ## Contributing section or link to CONTRIBUTING.md."
@@ -79,6 +89,7 @@ checks:
 
   - id: license-present
     severity: friction
+    type: "[D]"
     description: "README has a License section or LICENSE link."
     pass_when: "Heading /^##\\s+License/ OR link to LICENSE exists."
     fix_note_template: "Add a ## License section naming the SPDX identifier."
@@ -87,6 +98,7 @@ checks:
   # Nits (4)
   - id: badges-not-stale
     severity: nit
+    type: "[D]"
     description: "Badge images in the header reference active services (no obviously dead badge providers)."
     pass_when: "No img/badge URL matches /shields\\.io.*\\?cacheSeconds=-1/ or known-dead patterns."
     fix_note_template: "Remove or update the stale badge for '${service}'."
@@ -94,6 +106,7 @@ checks:
 
   - id: anchor-links-resolve
     severity: nit
+    type: "[D]"
     description: "In-document anchor links (#section-name) resolve to existing heading slugs."
     pass_when: "Each [text](#anchor) has a matching heading whose slug is 'anchor'."
     fix_note_template: "Fix or remove broken anchor link '#${anchor}'."
@@ -101,6 +114,7 @@ checks:
 
   - id: image-alt-text
     severity: nit
+    type: "[D]"
     description: "Inline images carry alt text."
     pass_when: "Each ![alt](path) has alt.length > 0."
     fix_note_template: "Add alt text to '${path}': '${suggested-alt}'."
@@ -108,10 +122,20 @@ checks:
 
   - id: line-length-soft-cap
     severity: nit
+    type: "[D]"
     description: "≥95% of non-code lines are ≤120 characters."
     pass_when: "Count of non-code lines >120 chars / total non-code lines ≤ 0.05."
     fix_note_template: "Wrap long lines (>120 chars) at word boundaries."
     auto_apply: true  # reflow
+
+  # Cross-cutting capability surfacing (FR-08).
+  - id: cross-cutting-capabilities-surfaced
+    severity: friction
+    type: "[D]"
+    description: "≥1 of {HTML, MD, worktree, auto-tier, self-eval, monorepo, subagent, manifest} (case-insensitive substring) appears in any text after the first ## heading."
+    pass_when: "Substring match of any keyword (case-insensitive) in README body after the first ## heading."
+    fix_note_template: "Surface at least one cross-cutting platform capability (HTML/MD, worktrees, auto-tiering, self-eval, monorepo support, subagent dispatch, manifest sync) in a non-hero section."
+    auto_apply: false
 
 banned_phrases:
   # FR-RUB-4 / Q7 closed list. Extend only via ~/.pmos/readme/banned-phrases.yaml.

@@ -304,6 +304,28 @@ check_line_length_soft_cap() {
   return 1
 }
 
+check_cross_cutting_capabilities_surfaced() {
+  local path="$1"
+  # FR-08: ≥1 of {HTML, MD, worktree, auto-tier, self-eval, monorepo, subagent,
+  # manifest} appears (case-insensitive substring) in any text after the first
+  # ## heading.
+  local body line_no
+  line_no=$(awk '/^## / {print NR; exit}' "$path")
+  if [ -z "$line_no" ]; then
+    # No ## heading — vacuously fail (cross-cutting surface should appear in a
+    # non-hero section, which requires at least one ## heading).
+    printf 'cross-cutting-capabilities-surfaced\tFAIL\tHEAD\t1\tno ## heading; cross-cutting capability would have no home\n'
+    return 1
+  fi
+  body=$(awk -v start="$line_no" 'NR>=start' "$path")
+  if printf '%s' "$body" | grep -qiE '(HTML|\bMD\b|worktree|auto-tier|self-eval|monorepo|subagent|manifest)'; then
+    printf 'cross-cutting-capabilities-surfaced\tPASS\tHEAD\t1\t\n'
+    return 0
+  fi
+  printf 'cross-cutting-capabilities-surfaced\tFAIL\tHEAD\t1\tNo cross-cutting capability keyword (HTML/MD/worktree/auto-tier/self-eval/monorepo/subagent/manifest) after first ## heading\n'
+  return 1
+}
+
 # ---------------------------------------------------------------------------
 # Active check set resolution (base + variant overrides).
 # Emits one check-id per line on stdout.
@@ -324,7 +346,8 @@ license-present
 badges-not-stale
 anchor-links-resolve
 image-alt-text
-line-length-soft-cap"
+line-length-soft-cap
+cross-cutting-capabilities-surfaced"
 
 resolve_active_checks() {
   local variant="$1"
@@ -380,6 +403,7 @@ dispatch_check() {
     anchor-links-resolve)             check_anchor_links_resolve "$path" ;;
     image-alt-text)                   check_image_alt_text "$path" ;;
     line-length-soft-cap)             check_line_length_soft_cap "$path" ;;
+    cross-cutting-capabilities-surfaced) check_cross_cutting_capabilities_surfaced "$path" ;;
     *)
       printf '%s\tFAIL\tHEAD\t1\tunknown check id\n' "$id"
       return 1
@@ -502,6 +526,8 @@ selftest() {
   local strong_dir="$HERE/../tests/fixtures/rubric/strong"
   local slop_dir="$HERE/../tests/fixtures/rubric/slop"
   local agreement=0 total=0 f counts pass
+  local total_checks
+  total_checks=$(printf '%s\n' "$ALL_CHECKS" | grep -c .)
 
   for f in "$strong_dir"/*.md; do
     [ -f "$f" ] || continue
@@ -510,9 +536,9 @@ selftest() {
     pass=$(printf '%s\n' "$counts" | awk '{print $1}')
     if [ "$pass" -ge 12 ]; then
       agreement=$((agreement+1))
-      readme::log "selftest: strong $(basename "$f") PASS=$pass/15 [AGREE]"
+      readme::log "selftest: strong $(basename "$f") PASS=$pass/$total_checks [AGREE]"
     else
-      readme::log "selftest: strong $(basename "$f") PASS=$pass/15 [MISS — expected ≥12]"
+      readme::log "selftest: strong $(basename "$f") PASS=$pass/$total_checks [MISS — expected ≥12]"
     fi
   done
 
@@ -523,9 +549,9 @@ selftest() {
     pass=$(printf '%s\n' "$counts" | awk '{print $1}')
     if [ "$pass" -le 8 ]; then
       agreement=$((agreement+1))
-      readme::log "selftest: slop $(basename "$f") PASS=$pass/15 [AGREE]"
+      readme::log "selftest: slop $(basename "$f") PASS=$pass/$total_checks [AGREE]"
     else
-      readme::log "selftest: slop $(basename "$f") PASS=$pass/15 [MISS — expected ≤8]"
+      readme::log "selftest: slop $(basename "$f") PASS=$pass/$total_checks [MISS — expected ≤8]"
     fi
   done
 
@@ -550,9 +576,37 @@ selftest() {
 # main()
 # ---------------------------------------------------------------------------
 
+_validate_yaml() {
+  # FR-04: validate rubric.yaml schema. Every checks[*] row must carry
+  # {id, severity, type, description, pass_when}; type ∈ {[D], [J]}.
+  python3 - "$RUBRIC_YAML" <<'PYEOF'
+import sys, yaml
+path = sys.argv[1]
+with open(path) as f:
+    d = yaml.safe_load(f)
+required = {"id", "severity", "type", "description", "pass_when"}
+allowed_types = {"[D]", "[J]"}
+exit_code = 0
+for row in d.get("checks", []) or []:
+    rid = row.get("id", "<unknown>")
+    missing = required - row.keys()
+    for k in missing:
+        sys.stderr.write(f"[validate] FAIL: {rid} missing {k}\n")
+        exit_code = 1
+    if "type" in row and row["type"] not in allowed_types:
+        sys.stderr.write(f"[validate] FAIL: {rid} invalid type: {row['type']!r} (expected [D] or [J])\n")
+        exit_code = 1
+sys.exit(exit_code)
+PYEOF
+}
+
 main() {
   if [ "${1:-}" = "--selftest" ]; then
     selftest
+  fi
+  if [ "${1:-}" = "--validate-yaml" ]; then
+    _validate_yaml
+    exit $?
   fi
 
   local readme="" variant="" autoapply=0
@@ -561,8 +615,9 @@ main() {
       --variant) variant="$2"; shift 2 ;;
       --auto-apply) autoapply=1; shift ;;
       --selftest) selftest ;;
+      --validate-yaml) _validate_yaml; exit $? ;;
       -h|--help)
-        echo "usage: rubric.sh <readme-path> [--variant <type>] [--auto-apply] | --selftest"
+        echo "usage: rubric.sh <readme-path> [--variant <type>] [--auto-apply] | --selftest | --validate-yaml"
         exit 0 ;;
       *) readme="$1"; shift ;;
     esac

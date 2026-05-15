@@ -137,6 +137,24 @@ checks:
     fix_note_template: "Surface at least one cross-cutting platform capability (HTML/MD, worktrees, auto-tiering, self-eval, monorepo support, subagent dispatch, manifest sync) in a non-hero section."
     auto_apply: false
 
+  # IA-fit checks (FR-03 / FR-11). Scored by the reviewer subagent (LLM-judge);
+  # see reference/reviewer.md for prompt + return-shape contract.
+  - id: hero-scope-matches-surface
+    severity: friction
+    type: "[J]"
+    description: "Hero line's claimed scope is ⊇ the surface area implied by the Skills/Commands table."
+    pass_when: "Reviewer's verdict for check_id 'hero-scope-matches-surface' is 'pass' (LLM-judge)."
+    fix_note_template: "Tighten hero-line scope to match the actual Skills surface, OR widen the hero to cover all listed surfaces."
+    auto_apply: false
+
+  - id: primary-index-by-jtbd
+    severity: friction
+    type: "[J]"
+    description: "Top-level ## headings index by job-to-be-done, not by maintainer category."
+    pass_when: "Reviewer's verdict for check_id 'primary-index-by-jtbd' is 'pass' (LLM-judge)."
+    fix_note_template: "Reorganize top-level sections by user job-to-be-done (e.g., 'How to install', 'How to deploy') rather than internal taxonomy ('Skills', 'Commands', 'Architecture')."
+    auto_apply: false
+
 banned_phrases:
   # FR-RUB-4 / Q7 closed list. Extend only via ~/.pmos/readme/banned-phrases.yaml.
   - "blazing fast"

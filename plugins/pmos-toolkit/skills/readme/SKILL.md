@@ -214,10 +214,16 @@ This subsection documents the protocol /readme follows after `rubric.sh` returns
 - The flag is parsed by §1's argv loop alongside `--variant`, `--auto-apply`, etc. (mutex with `--selftest`).
 - Intended use: speed up CI runs against pre-vetted READMEs; not the default user path.
 
-**Contract-test escape (P9).** The `READMER_PERSONA_STUB` environment variable, if set to a path, REPLACES the Task-tool dispatch with a shell invocation of that path:
+**Contract-test escape (P9).** The `READMER_PERSONA_STUB` environment variable, if set to a path, REPLACES the persona Task-tool dispatch with a shell invocation of that path:
 - The script receives `--persona=<name>` and the README path as args.
 - Stdout = the per-persona JSON return (same shape as a real Task return).
 - Used exclusively by `tests/mocks/simulated_reader_stub.sh` for the FR-SR-3 contract test (verifies the parent substring-grep correctly hard-fails on a deliberately altered quote).
+- DO NOT use in production — the env var is unset in the default skill prompt.
+
+**Reviewer-subagent contract-test escape (FR-11).** The `READMER_REVIEWER_STUB` environment variable, if set to a path, REPLACES the reviewer Task-tool dispatch (§2 step 1, the 5th concurrent Task call) with a shell invocation of that path:
+- The script receives the README path as a single arg.
+- Stdout = the reviewer JSON array (same shape as a real Task return, per `reference/reviewer.md §2`).
+- Used by `tests/mocks/reviewer_stub.sh` for the FR-11/FR-12 reviewer contract tests (parent-side validation of `check_id` set-equality + `quote≥40` substring-grep).
 - DO NOT use in production — the env var is unset in the default skill prompt.
 
 ### §4: Mode resolution

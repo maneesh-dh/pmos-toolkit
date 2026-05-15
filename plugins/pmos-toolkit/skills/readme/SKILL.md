@@ -155,7 +155,9 @@ Capture stdout (TSV: `check-id\tverdict\tcommit\tline\tmessage` per row) and exi
 
 **3. Aggregate findings.** Tally `PASS` / `FAIL` rows from the TSV. Emit one summary line to chat: `rubric: <P> pass / <F> fail`. (FR-OUT-1.) Empty `FAIL` set ⇒ no diff preview, no AskUserQuestion: close with `README clean against rubric. Nothing to fix.` (FR-OUT-5 — no findings, no diff path.)
 
-**4. Batched AskUserQuestion for findings.** If `<F> > 0`, group failing findings into batches of ≤4 per `AskUserQuestion` call (FR-OUT-2). Each finding presents one question with options **Apply suggested fix (Recommended)** / **Modify** / **Skip — leave as-is** / **Defer**. Question shape: `[<check-id>] <message>. Suggested fix: <one-line>.` Pass canonical (Recommended) labelling per the non-interactive contract.
+**4. Findings presentation — mode-branch (FR-OUT-2, FR-15/FR-16/FR-17).**
+   - **Audit mode** (read-only contract): if `<F> > 0`, emit a single Markdown table to chat with columns `Source | Severity | Check/Persona | Line | Message | Suggested fix`, sorted severity-desc then source. Source ∈ {`rubric`, `reviewer`, `persona`}. **Do NOT fire `AskUserQuestion`** — audit is a read-only audit pass; the user runs `/readme` again with `--scaffold` or edits the README directly to apply.
+   - **Scaffold / update mode**: group failing findings into batches of ≤4 per `AskUserQuestion` call (existing batched-ask behavior). Each finding's question shape: `[<check-id>] <message>. Suggested fix: <one-line>.` Options: **Apply suggested fix (Recommended)** / **Modify** / **Skip — leave as-is** / **Defer**. Canonical (Recommended) labelling per the non-interactive contract.
 
 **5. Atomic write.** For every Apply-or-Modify disposition, compute the proposed README content in memory, then write via temp + rename:
 ```
@@ -165,7 +167,10 @@ mv -- "${tmp}" "${target}"
 ```
 Never write to `${target}` directly. (FR-OUT-4.) On any write error, refuse with `Atomic write failed: ${err}. Original README preserved at ${target}.` and exit 1 without modifying the file. The integration test at `tests/integration/tracer_audit.sh` exercises this contract end-to-end.
 
-**6. Close-out.** Emit final line to chat: `README written to ${target}. Run /complete-dev to include it in the release commit.` (FR-OUT-4 — never auto-commit.)
+**6. Close-out — mode-branch (FR-V-2, FR-OUT-4).**
+   - **Audit mode** (no write happened): emit `rubric: <P> pass / <F> fail` + optional bracketed sub-counts `[+ <R> reviewer findings + <N> persona friction]` (omit a bracket when its bucket is zero).
+   - **Scaffold / update mode** (write happened): emit `README written to ${target}. Run /complete-dev to include it in the release commit.` (never auto-commit.)
+   - **Both modes additionally emit on a separate final line:** `Suggest: /polish <readme-path> — tighten prose without changing meaning.` (FR-V-2 — unconditional on successful run.)
 
 All script paths use `${CLAUDE_PLUGIN_ROOT}/skills/readme/scripts/…` — no absolute paths. (FR-C1.)
 

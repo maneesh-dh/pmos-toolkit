@@ -82,6 +82,38 @@ line, bounce.
 - License is unspecified or only a badge with no `LICENSE` file linked.
 - Issue/PR conventions (commit format, branch naming) are buried below the fold or absent.
 
+### 1.4 returning-user-navigator (intent → skill mapping, 2-min orient)
+
+**Task framing.** You already know this plugin/repo exists. You opened the
+README because you have a job to do **right now** and need to map your intent
+to the right skill/command/file. You have 2 minutes before you give up and
+re-read the source or ask in chat.
+
+**Anti-script (persona-specific, in addition to the common anti-script).**
+You are **NOT a first-contact reader.** You skip the hero / value-prop block.
+You scan top-level `##` headings for jobs-to-be-done ("How to install",
+"Deploy X", "Configure Y", "Audit Z"). You bounce if top-level sections
+index by **maintainer category** ("Skills", "Commands", "Architecture",
+"Internals") instead of jobs — because then you have to read the section body
+to figure out which one covers your job.
+
+**Bounce-trigger examples:**
+
+- Top-level `##` headings are predominantly taxonomy buckets
+  ("Skills", "Commands", "Architecture", "Internals", "Modules") — ≥50%
+  of headings are taxonomy-shaped.
+- No imperative-verb or "How to X" heading appears in the first screen of
+  `##` sections.
+- The thing you need (e.g. "How to audit a README") is mentioned only in a
+  table or a bullet list nested under a taxonomy heading — you have to scan
+  the body to find it.
+- The hero says one thing the project does, but the actual surface (Skills
+  table, Commands list) does much more — you can't tell whether your job is
+  in scope without reading the whole file.
+
+**Return-shape contract:** §2 verbatim — same JSON schema as personas 1.1–1.3.
+No new fields. The `persona` field MUST be `"returning-user-navigator"`.
+
 ---
 
 ## §2 Return shape & FR-SR-3 quote contract
@@ -90,7 +122,7 @@ Each persona subagent MUST return exactly this JSON shape (spec §9.2.1):
 
 ```json
 {
-  "persona": "evaluator" | "adopter" | "contributor",
+  "persona": "evaluator" | "adopter" | "contributor" | "returning-user-navigator",
   "friction": [
     { "quote":    "<≥40-char verbatim substring of README>",
       "line":     <1-indexed>,
@@ -101,7 +133,8 @@ Each persona subagent MUST return exactly this JSON shape (spec §9.2.1):
 ```
 
 **FR-SR-1 — persona name.** MUST equal the dispatched persona string exactly
-(`evaluator`, `adopter`, or `contributor`). Any mismatch → parent hard-fail.
+(`evaluator`, `adopter`, `contributor`, or `returning-user-navigator`). Any
+mismatch → parent hard-fail.
 
 **FR-SR-3 — quote contract.** Every `quote` MUST be a **≥40-character verbatim
 substring** of the un-stripped README markdown source the parent passed into the
@@ -136,6 +169,12 @@ persona ONCE with the following suffix appended to the prompt body:
 still empty. There is no second retry (D6: 1-iteration cap; no convergence loop).
 
 The parent SHOULD log: `simulated-reader: <persona> re-dispatched (theater-check); <N> findings on retry`.
+
+**Symmetry across personas.** The theater-check rule applies identically to
+all four personas (evaluator / adopter / contributor / returning-user-navigator).
+There is no persona-specific carve-out — the same `friction[]` empty AND
+rubric ≥3 trigger, the same single re-dispatch, the same bounce-suffix.
+Per /grill D6.
 
 ---
 

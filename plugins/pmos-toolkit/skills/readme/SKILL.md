@@ -181,11 +181,18 @@ All script paths use `${CLAUDE_PLUGIN_ROOT}/skills/readme/scripts/…` — no ab
 
 This subsection documents the protocol /readme follows after `rubric.sh` returns its findings (§1 step 3) and before the AskUserQuestion batching (§1 step 4). It implements FR-SR-1 / FR-SR-2 / FR-SR-3 and decision-log entries D13 + P3. Skip entirely when `--skip-simulated-reader` is set (advisory log: `simulated-reader: skipped via --skip-simulated-reader`).
 
-**1. Parallel Task dispatch (FR-SR-1, P3 — 3 concurrent calls).** Issue **3 `Task` tool calls in ONE assistant response** — one per persona: `evaluator`, `adopter`, `contributor`. Sequential dispatch is forbidden (P3); the parallel-scheduling requirement is what makes the 120s-per-call wall budget tractable. Each `Task` prompt body inlines, in order:
-   - The persona-specific prompt block from `reference/simulated-reader.md §1` (load the file and paste the matching persona section verbatim — do not re-author).
-   - The full **un-stripped** README markdown source (the user-supplied input file, byte-for-byte — required for FR-SR-3 substring grep to be sound).
-   - The return-shape contract from `reference/simulated-reader.md §2` (JSON schema: `persona`, `friction[]` with `quote`/`line`/`section`/`severity`/`rationale`).
-   - A per-call timeout of **120s**. On timeout, emit to chat: `simulated-reader: persona <name> timed out (120s); skipping` (NFR-4) and proceed with whichever of the other 2 personas returned in time.
+**1. Parallel Task dispatch (FR-SR-1, FR-09/FR-10/FR-13 — 5 concurrent calls).** Issue **5 `Task` tool calls in ONE assistant response** — 4 personas + 1 reviewer:
+   - Persona Task calls (4): `evaluator`, `adopter`, `contributor`, `returning-user-navigator`. Each body inlines, in order:
+     - The persona-specific prompt block from `reference/simulated-reader.md §1` (load the file and paste the matching `### 1.x` section verbatim — do not re-author).
+     - The full **un-stripped** README markdown source (the user-supplied input file, byte-for-byte — required for FR-SR-3 substring grep to be sound).
+     - The return-shape contract from `reference/simulated-reader.md §2` (JSON schema: `persona`, `friction[]` with `quote`/`line`/`severity`/`message`).
+   - Reviewer Task call (1): IA-fit reviewer scoring the 2 [J] checks. Body inlines, in order:
+     - The reviewer prompt block from `reference/reviewer.md §1` verbatim.
+     - The full **un-stripped** README markdown source (same byte-for-byte source as the personas).
+     - The return-shape contract from `reference/reviewer.md §2` (JSON array, one object per declared [J] `check_id`).
+   - Sequential dispatch is forbidden (P3); the parallel-scheduling requirement is what makes the 120s-per-call wall budget tractable.
+   - A per-call timeout of **120s**. On persona timeout, emit `simulated-reader: persona <name> timed out (120s); skipping` (NFR-4) and proceed with whichever of the other personas returned in time. On reviewer timeout, emit `reviewer: timed out (120s); dropping [J] findings (soft-failure E4)` and proceed without [J] entries.
+   - **Stub escape (P9).** When `READMER_PERSONA_STUB` is set, the persona Task calls are replaced by `bash "$READMER_PERSONA_STUB" --persona=<name> <readme-path>` (per §3). When `READMER_REVIEWER_STUB` is set, the reviewer Task call is replaced by `bash "$READMER_REVIEWER_STUB" <readme-path>` (per §3). Both env vars are unset in the default skill prompt — test-only.
 
 **2. Substring validation on return (FR-SR-3 personas; FR-11/FR-12 reviewer).** For each returned JSON payload, parse `friction[]` (personas) OR the JSON array (reviewer) and validate every entry against the un-stripped README source:
    - **Persona quote length:** if `len(quote) < 40` → hard-fail with `simulated-reader returned quote shorter than 40 chars: <quote>` and pause with the failure dialog.

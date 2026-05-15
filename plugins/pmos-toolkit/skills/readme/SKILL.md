@@ -187,10 +187,14 @@ This subsection documents the protocol /readme follows after `rubric.sh` returns
    - The return-shape contract from `reference/simulated-reader.md §2` (JSON schema: `persona`, `friction[]` with `quote`/`line`/`section`/`severity`/`rationale`).
    - A per-call timeout of **120s**. On timeout, emit to chat: `simulated-reader: persona <name> timed out (120s); skipping` (NFR-4) and proceed with whichever of the other 2 personas returned in time.
 
-**2. Substring validation on return (FR-SR-3).** For each returned JSON payload, parse `friction[]` and validate every entry against the un-stripped README source:
-   - **Quote length:** if `len(quote) < 40` → hard-fail with `simulated-reader returned quote shorter than 40 chars: <quote>` and pause with the failure dialog.
-   - **Substring grep:** if `quote NOT IN readme_source_text` (exact substring, byte-for-byte) → hard-fail with `simulated-reader returned quote not found in README: <prefix-30>…` and pause with the failure dialog.
-   - **Persona label match:** the returned `persona` field MUST exactly equal the dispatched persona label (one of `evaluator|adopter|contributor`). Mismatch → hard-fail with `simulated-reader persona label mismatch: dispatched=<X>, returned=<Y>`.
+**2. Substring validation on return (FR-SR-3 personas; FR-11/FR-12 reviewer).** For each returned JSON payload, parse `friction[]` (personas) OR the JSON array (reviewer) and validate every entry against the un-stripped README source:
+   - **Persona quote length:** if `len(quote) < 40` → hard-fail with `simulated-reader returned quote shorter than 40 chars: <quote>` and pause with the failure dialog.
+   - **Persona substring grep:** if `quote NOT IN readme_source_text` (exact substring, byte-for-byte) → hard-fail with `simulated-reader returned quote not found in README: <prefix-30>…` and pause with the failure dialog.
+   - **Persona label match:** the returned `persona` field MUST exactly equal the dispatched persona label (one of `evaluator|adopter|contributor|returning-user-navigator`). Mismatch → hard-fail with `simulated-reader persona label mismatch: dispatched=<X>, returned=<Y>`.
+   - **Reviewer validation (FR-11/FR-12 — symmetric).** Delegate to `scripts/_reviewer_validate.sh::readme::reviewer_validate <json> <readme-path>` which enforces:
+     - **`check_id` set-equality** vs the declared [J] set (read from `rubric.yaml` rows where `type: "[J]"`). On miss/extra → hard-fail with `reviewer returned check_ids that do not match rubric.yaml: missing=[…], extra=[…]` and pause.
+     - **Reviewer quote length:** if `len(quote) < 40` → hard-fail with `reviewer returned quote shorter than 40 chars: <quote>` and pause.
+     - **Reviewer substring grep:** if `quote NOT IN readme_source_text` → hard-fail with `reviewer returned quote not found in README: <prefix-30>…` and pause.
 
 **3. Merge into rubric stream.** Every entry from a persona that passes all FR-SR-3 checks merges into the rubric findings as a severity-tagged item — using the `severity` field from the persona return (default `friction` when omitted). Annotate each merged entry with `source: simulated-reader/<persona>` so the §1 step-3 aggregator and the §1 step-4 AskUserQuestion batcher can distinguish persona findings from `rubric.sh` checks.
 

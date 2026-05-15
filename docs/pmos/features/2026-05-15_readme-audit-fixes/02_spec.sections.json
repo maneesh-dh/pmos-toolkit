@@ -1,0 +1,140 @@
+[
+  {
+    "id": "problem-statement-heading",
+    "level": 2,
+    "title": "1. Problem Statement",
+    "parent_id": null
+  },
+  {
+    "id": "goals-heading",
+    "level": 2,
+    "title": "2. Goals",
+    "parent_id": null
+  },
+  {
+    "id": "non-goals-heading",
+    "level": 2,
+    "title": "3. Non-Goals",
+    "parent_id": null
+  },
+  {
+    "id": "decision-log-heading",
+    "level": 2,
+    "title": "4. Decision Log",
+    "parent_id": null
+  },
+  {
+    "id": "user-journeys-heading",
+    "level": 2,
+    "title": "5. User Journeys",
+    "parent_id": null
+  },
+  {
+    "id": "primary-journey-audit-mode",
+    "level": 3,
+    "title": "5.1 Primary Journey — macOS audit on a maintainer-backward README",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "error-edge-cases",
+    "level": 3,
+    "title": "5.2 Error / Edge Cases",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "functional-requirements-heading",
+    "level": 2,
+    "title": "6. Functional Requirements",
+    "parent_id": null
+  },
+  {
+    "id": "fr-rubric",
+    "level": 3,
+    "title": "6.1 Rubric (rubric.yaml + scripts/rubric.sh)",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-simulated-reader-reviewer",
+    "level": 3,
+    "title": "6.2 Simulated reader + reviewer (SKILL.md §2 + reference/*.md)",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-close-out-flow-branching",
+    "level": 3,
+    "title": "6.3 Close-out, FR-V-2, mode branching (SKILL.md §1 + §11)",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "fr-acceptance-against-skill-patterns",
+    "level": 3,
+    "title": "6.4 Acceptance against skill-patterns.md §A–§F (FR-AC-*)",
+    "parent_id": "functional-requirements"
+  },
+  {
+    "id": "api-changes-heading",
+    "level": 2,
+    "title": "7. API Changes",
+    "parent_id": null
+  },
+  {
+    "id": "frontend-design-heading",
+    "level": 2,
+    "title": "8. Frontend Design",
+    "parent_id": null
+  },
+  {
+    "id": "edge-cases-table-heading",
+    "level": 2,
+    "title": "9. Edge Cases",
+    "parent_id": null
+  },
+  {
+    "id": "testing-strategy-heading",
+    "level": 2,
+    "title": "10. Testing & Verification Strategy",
+    "parent_id": null
+  },
+  {
+    "id": "ts-unit-validate",
+    "level": 3,
+    "title": "10.1 Unit / structural validation",
+    "parent_id": "testing-strategy"
+  },
+  {
+    "id": "ts-integration",
+    "level": 3,
+    "title": "10.2 Integration tests (tests/integration/)",
+    "parent_id": "testing-strategy"
+  },
+  {
+    "id": "ts-fixtures",
+    "level": 3,
+    "title": "10.3 New fixtures",
+    "parent_id": "testing-strategy"
+  },
+  {
+    "id": "ts-skill-eval",
+    "level": 3,
+    "title": "10.4 skill-eval re-run (under /verify Phase 7)",
+    "parent_id": "testing-strategy"
+  },
+  {
+    "id": "ts-verification-commands",
+    "level": 3,
+    "title": "10.5 Exact verification commands",
+    "parent_id": "testing-strategy"
+  },
+  {
+    "id": "release-prerequisites-heading",
+    "level": 2,
+    "title": "11. Release Prerequisites (not in plan waves)",
+    "parent_id": null
+  },
+  {
+    "id": "review-log-heading",
+    "level": 2,
+    "title": "12. Review Log",
+    "parent_id": null
+  }
+]

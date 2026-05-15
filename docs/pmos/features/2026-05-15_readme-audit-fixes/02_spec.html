@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Spec — /readme audit fixes</title>
+<link rel="stylesheet" href="assets/style.css?v=2.48.0">
+</head>
+<body>
+<main>
+<header>
+<h1>/readme audit fixes — Spec</h1>
+<p><strong>tier:</strong> 2 · <strong>type:</strong> enhancement · <strong>feature:</strong> readme-audit-fixes · <strong>date:</strong> 2026-05-15 · <strong>status:</strong> Ready for Plan · <strong>requirements:</strong> <code>docs/pmos/features/2026-05-15_readme-audit-fixes/01_requirements.html</code></p>
+</header>
+
+<section id="problem-statement">
+<h2 id="problem-statement-heading">1. Problem Statement</h2>
+<p>The <code>/readme</code> skill's 15-check rubric + 3-persona simulated-reader pass is structurally complete but blind to value-prop accuracy and information-architecture fit, false-fails on BSD-awk macOS, never emits the documented <code>Suggest: /polish</code> follow-up on the audit edge, conflates audit (read-only) with scaffold/update (writes) in the findings UX, and has silently relaxed the FR-SR-3 sub-40 quote contract. Five surgical fixes against the existing skill, preserving 3-mode substrate, monorepo-aware discovery, voice→/polish delegation, and never-auto-commit invariants. Primary success metric: re-running <code>/readme --audit</code> against the pmos-toolkit README pre-rewrite surfaces the retro's specific IA finding via the new <code>[J]</code> reviewer subagent.</p>
+</section>
+
+<section id="goals">
+<h2 id="goals-heading">2. Goals</h2>
+<table>
+<thead><tr><th>#</th><th>Goal</th><th>Success Metric</th></tr></thead>
+<tbody>
+<tr><td>G1</td><td>Surface IA-fit + value-prop issues on maintainer-backward READMEs</td><td>Reviewer subagent returns <code>verdict: fail</code> for both <code>hero-scope-matches-surface</code> and <code>primary-index-by-jtbd</code> on the pmos-toolkit pre-rewrite README fixture</td></tr>
+<tr><td>G2</td><td>Two-sided fixture: the new [J] checks PASS a JTBD-organized README</td><td>Reviewer returns <code>verdict: pass</code> on <code>tests/fixtures/jtbd-organized-readme.md</code> for both [J] checks</td></tr>
+<tr><td>G3</td><td><code>install-or-quickstart-presence</code> passes under BSD awk</td><td><code>tests/integration/audit_clean.sh</code> green under <code>/usr/bin/awk</code> (macOS default)</td></tr>
+<tr><td>G4</td><td>Every successful audit emits the <code>Suggest: /polish</code> line</td><td><code>tests/integration/tracer_audit_polish_suggest.sh</code> asserts regex match exactly once on audit-mode exit</td></tr>
+<tr><td>G5</td><td>Pure-audit mode emits NO <code>AskUserQuestion</code></td><td><code>tests/integration/audit_clean.sh</code> grep on transcript hard-fails if AskUserQuestion fires</td></tr>
+<tr><td>G6</td><td>Sub-40 quote return hard-fails with the documented message + pauses</td><td><code>tests/integration/simulated_reader_sub40_quote.sh</code> asserts exit non-zero + exact stderr</td></tr>
+<tr><td>G7</td><td>Future <code>\b</code> reintroduction in awk blocks is caught structurally</td><td><code>scripts/rubric.sh --selftest</code> with a planted-<code>\b</code> fixture exits 1 + stderr <code>[lint] FAIL: \b at scripts/rubric.sh:&lt;line&gt;</code></td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="non-goals">
+<h2 id="non-goals-heading">3. Non-Goals</h2>
+<ul>
+<li>NOT rewriting the existing 3 personas (<code>evaluator</code>/<code>adopter</code>/<code>contributor</code>) — because the retro proposes <em>adding</em> a 4th lens; existing personas optimise first-contact bounces correctly for their role.</li>
+<li>NOT changing BSD <code>grep -qE \b</code> usages on lines 213/223 of <code>rubric.sh</code> — because BSD grep ERE supports <code>\b</code>; only BSD awk is broken.</li>
+<li>NOT introducing voice/prose rewriting into <code>/readme</code> — because §11 explicitly delegates to <code>/polish</code>.</li>
+<li>NOT re-architecting <code>rubric.yaml</code> schema beyond adding a <code>type: [D]|[J]</code> field per check row.</li>
+<li>NOT preserving 15/15 pass on existing READMEs — net rubric: 15 → 16 <code>[D]</code> + 2 <code>[J]</code> is a deliberate widening; new checks surface as advisory findings, not blockers.</li>
+<li>NOT planning version-bump, CHANGELOG, README-row, manifest version-sync, or learnings-header tasks in any plan wave — per <code>/feature-sdlc</code> FR-63 these are release prerequisites only; <code>/complete-dev</code> is the sole writer.</li>
+</ul>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log-heading">4. Decision Log</h2>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>D1</td><td>[J] reviewer-subagent return shape: <code>{check_id, verdict, fix_note, quote≥40}</code></td><td>(a) /skill-eval shape; (b) extend simulated-reader.md §2; (c) custom hybrid; (d) defer</td><td>(a) Matches the /skill-eval precedent cited in /grill Q1. Parent-side validation reuses skill-eval's set-equality + quote-grep logic verbatim — no new validation code path.</td></tr>
+<tr><td>D2</td><td>Close-out unified table columns: <code>[Source | Severity | Check/Persona | Line | Message | Suggested fix]</code></td><td>(a) single table with Source col; (b) 3 separate sub-tables; (c) severity-bucket grouping w/o Source</td><td>(a) Preserves the existing FR-OUT-1 single-table mental model. Source column gives provenance at a glance. Sort: severity desc, then source. Aligns with the audit-mode read-only contract — no AskUserQuestion regardless of source.</td></tr>
+<tr><td>D3</td><td>Parent-side reviewer validation: two-check (set-equality + quote≥40 substring-grep)</td><td>(a) two-check (/skill-eval); (b) three-check (/grill w/ sections_found); (c) two-check + no-empty-findings guard</td><td>(a) READMEs have no sections.json equivalent, so the /grill three-check shape adds complexity without value. The reviewer is constrained to return one object per declared [J] check_id; the set-equality assertion already prevents the "silently dropped check" failure mode.</td></tr>
+<tr><td>D4</td><td>Reviewer prompt + return-shape contract extracted to <code>reference/reviewer.md</code></td><td>(a) sibling to simulated-reader.md; (b) inline in SKILL.md §2 step 1; (c) embed in rubric.yaml <code>reviewer:</code> block</td><td>(a) Mirrors simulated-reader.md pattern; keeps SKILL.md under any future eval line cap; evolves the reviewer prompt independently of the dispatch loop.</td></tr>
+<tr><td>D5</td><td>Cross-cutting keyword set (8): <code>HTML, MD, worktree, auto-tier, self-eval, monorepo, subagent, manifest</code></td><td>(a) tight 8-keyword set; (b) loose 15+ set; (c) configurable via rubric.yaml; (d) defer</td><td>(a) Curated to pmos-toolkit's actually-distinctive capabilities. Case-insensitive substring match against README body (outside H1 hero block). Loose set trivially passes; defer kicks the can. Configurable is YAGNI for a single-monorepo use case.</td></tr>
+<tr><td>D6</td><td>Negative fixture: <code>tests/fixtures/jtbd-organized-readme.md</code>, synthetic ~40-line README</td><td>(a) standalone sibling to rubric/strong/+rubric/slop/; (b) under rubric/strong/; (c) pinned real-world README; (d) skip fixture</td><td>(a) Synthetic so it's stable + license-clean. Reused by the reviewer-subagent integration test, not the existing --selftest [D]-only path (option (b) is wrong — selftest can't grade [J]). ~40 lines: small to maintain, big enough for ≥3 JTBD imperative-verb headings + a scoped hero line.</td></tr>
+<tr><td>D7</td><td><code>--selftest</code> lint folds into existing exit code (lint fail → exit 1; runs always alongside fixture-agreement)</td><td>(a) folded exit 1; (b) separate exit 2 for lint; (c) lint + fixtures always-run, OR exit code</td><td>(a) = (c) functionally with the additional "always run both" requirement. No existing CI consumes selftest exit-code granularity; YAGNI. Lint output to stderr with <code>[lint] FAIL: \b at scripts/rubric.sh:&lt;line&gt;</code> for grep-friendly debugging.</td></tr>
+<tr><td>D8</td><td>SKILL.md §2 step 1 dispatches 5 concurrent Task calls (4 personas + 1 reviewer)</td><td>(a) sequential; (b) 5-parallel; (c) fold reviewer into 5th "rubric-judge" persona</td><td>(b) Reuses the existing P3 concurrent-dispatch contract. Latency ≈ max(personas, reviewer) — effectively free since personas dominate. (c) conflates rubric evaluation with reader simulation; rejected in /grill.</td></tr>
+<tr><td>D9</td><td>Reviewer-subagent stub escape via <code>READMER_REVIEWER_STUB</code> env var (mirrors <code>READMER_PERSONA_STUB</code>)</td><td>(a) new env var; (b) extend PERSONA_STUB; (c) no stub; rely on live subagent</td><td>(a) Parallel naming convention with the existing persona-stub escape. Integration tests need a deterministic reviewer return; live-subagent tests are flaky + costly. Pattern is established at SKILL.md L217–221.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="user-journeys">
+<h2 id="user-journeys-heading">5. User Journeys</h2>
+
+<h3 id="primary-journey-audit-mode">5.1 Primary Journey — macOS audit on a maintainer-backward README</h3>
+<ol>
+<li>User runs <code>/readme --audit README.md</code> on the pmos-toolkit README pre-rewrite.</li>
+<li>Mode resolver (SKILL.md §1 step 1) sets mode=audit. <code>scripts/rubric.sh</code> shells out, runs 16 <code>[D]</code> checks. <code>install-or-quickstart-presence</code> PASSES under BSD awk (fixed). <code>cross-cutting-capabilities-surfaced</code> evaluates against the 8-keyword set — borderline/FAIL on pre-rewrite README.</li>
+<li>SKILL.md §2 step 1 fires 5 concurrent Task calls: 4 personas (<code>evaluator</code>, <code>adopter</code>, <code>contributor</code>, <code>returning-user-navigator</code>) + 1 reviewer-subagent scoring the 2 <code>[J]</code> IA-fit checks. Per-call 120s budget unchanged.</li>
+<li>Persona returns + reviewer return → parent-side validation (quote≥40 substring-grep; for reviewer: also check_id set-equality vs the [J] check set in rubric.yaml). Any sub-40 quote OR missing check_id hard-fails with the existing FR-SR-3 message (extended to reviewer findings).</li>
+<li>FR-SR-5 theater-check fires symmetrically on all 4 personas (per /grill D6).</li>
+<li>Findings merged into one close-out table (D2 column shape). Audit mode: NO <code>AskUserQuestion</code> (FR-OUT-2 mode-branch).</li>
+<li>Close-out lines: <code>rubric: 15 pass / 1 [D] fail + 2 [J] reviewer findings + N persona friction</code> followed by <code>Suggest: /polish README.md — tighten prose without changing meaning.</code> (FR-V-2 unconditional on success).</li>
+</ol>
+
+<h3 id="error-edge-cases">5.2 Error / Edge Cases</h3>
+<ul>
+<li><strong>Persona OR reviewer returns sub-40 quote</strong> — parent hard-fails with <code>simulated-reader returned quote shorter than 40 chars: &lt;quote&gt;</code> (existing) OR <code>reviewer returned quote shorter than 40 chars: &lt;quote&gt;</code> (new symmetric message). Skill pauses via /feature-sdlc failure dialog. Regression fixtures exercise both.</li>
+<li><strong>Reviewer returns missing check_id</strong> — parent hard-fails with <code>reviewer returned check_ids that do not match rubric.yaml: missing=[...], extra=[...]</code>. Mirrors /skill-eval FR-44 validation.</li>
+<li><strong>BSD vs GNU awk</strong> — <code>scripts/rubric.sh --selftest</code> exercises portable boundary class works under both. Drift-guard lint catches any new <code>\b</code> introduced.</li>
+<li><strong>README has no Skills table</strong> — reviewer's <code>hero-scope-matches-surface</code> [J] check returns <code>verdict: pass</code> with rationale "no surface table to compare against" (LLM-judge handles vacuous-true).</li>
+<li><strong>Scaffold/update mode</strong> — §1 step 4 still fires AskUserQuestion batched 4-option ask; reviewer subagent + 4th persona dispatch unchanged across modes.</li>
+<li><strong>Reviewer subagent timeout</strong> — exceeds 120s per-call budget; parent treats as soft-failure, drops the 2 [J] check results from the close-out table, emits <code>[J] reviewer timed out — IA-fit checks not scored</code> warning. Audit completes; rubric [D] + 4 personas still report.</li>
+</ul>
+</section>
+
+<section id="functional-requirements">
+<h2 id="functional-requirements-heading">6. Functional Requirements</h2>
+
+<h3 id="fr-rubric">6.1 Rubric (rubric.yaml + scripts/rubric.sh)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-01</td><td>Every check row in <code>reference/rubric.yaml</code> carries a <code>type:</code> field with value <code>[D]</code> (deterministic, scored by <code>scripts/rubric.sh</code>) or <code>[J]</code> (LLM-judge, scored by the reviewer subagent). Existing 15 rows default to <code>type: [D]</code> on migration (additive change; no schema break).</td></tr>
+<tr><td>FR-02</td><td>Add row <code>cross-cutting-capabilities-surfaced</code> with <code>type: [D]</code>, <code>severity: friction</code>, <code>pass_when: "≥1 of {HTML, MD, worktree, auto-tier, self-eval, monorepo, subagent, manifest} (case-insensitive substring) appears in any text AFTER the first <code>##</code> heading (i.e., outside the implicit hero block, which is everything between H1 and the first <code>##</code>)."</code></td></tr>
+<tr><td>FR-03</td><td>Add rows <code>hero-scope-matches-surface</code> and <code>primary-index-by-jtbd</code>, both <code>type: [J]</code>, <code>severity: friction</code>. Their <code>pass_when</code> text states the rule for the reviewer subagent to enforce; their <code>fix_note_template</code> is what the reviewer cites on fail.</td></tr>
+<tr><td>FR-04</td><td><code>scripts/rubric.sh</code> reads rubric.yaml, filters to <code>type: [D]</code> rows only, runs them. Rows with <code>type: [J]</code> are skipped by the shell script (scored separately by the reviewer subagent).</td></tr>
+<tr><td>FR-05</td><td><code>scripts/rubric.sh:40</code> awk block: replace <code>\b</code> with portable boundary class <code>($|[^A-Za-z])</code>. Mirror the workaround at L60 (existing comment).</td></tr>
+<tr><td>FR-06</td><td><code>scripts/rubric.sh:119</code> awk block: same <code>\b</code> → <code>($|[^A-Za-z])</code> replacement.</td></tr>
+<tr><td>FR-07</td><td><code>scripts/rubric.sh --selftest</code> adds a lint pass: grep every <code>awk '...'</code> block body in <code>rubric.sh</code> for word-boundary atoms <code>\b</code>, <code>\&lt;</code>, <code>\&gt;</code>. On any match: emit <code>[lint] FAIL: \b at scripts/rubric.sh:&lt;line&gt;</code> to stderr and set lint_failed=1. Both the lint pass AND the fixture-agreement pass run unconditionally; final exit code = OR of (lint_failed, fixture_failed). Exit 1 on either (D7).</td></tr>
+<tr><td>FR-08</td><td>Add CLI flag <code>scripts/rubric.sh --validate-yaml</code>: parse rubric.yaml, assert every row has <code>id</code>, <code>severity</code>, <code>type ∈ {[D],[J]}</code>, <code>description</code>, <code>pass_when</code>; exit 0 on clean, 1 on any violation with stderr <code>[validate] FAIL: &lt;row-id&gt; missing &lt;field&gt;</code>.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-simulated-reader-reviewer">6.2 Simulated reader + reviewer (SKILL.md §2 + reference/*.md)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-09</td><td><code>reference/simulated-reader.md §1</code> gains a §1.4 <code>returning-user-navigator</code> persona prompt: "I know this plugin exists — can I find the skill for my current job?" Return-shape contract from §2 is reused verbatim — no new JSON schema for the persona half.</td></tr>
+<tr><td>FR-10</td><td><code>SKILL.md §2 step 1</code> (L184–188) updates to "Issue <strong>5 Task tool calls in ONE assistant response</strong>": 4 personas (<code>evaluator</code>, <code>adopter</code>, <code>contributor</code>, <code>returning-user-navigator</code>) + 1 reviewer (loaded from new <code>reference/reviewer.md</code>). Sequential dispatch still forbidden (P3).</td></tr>
+<tr><td>FR-11</td><td>New <code>reference/reviewer.md</code> file containing: (a) the reviewer prompt — "You are evaluating a README against 2 IA-fit checks defined in rubric.yaml; for each declared [J] check_id, return one finding object."; (b) the JSON return-shape contract: <code>{check_id: string, verdict: "pass"|"fail", fix_note: string (required on fail), quote: string (≥40-char verbatim substring of README; required)}</code>; (c) the parent-side validation rules (D3). Mirrors the structure of simulated-reader.md §1–§3.</td></tr>
+<tr><td>FR-12</td><td><code>SKILL.md §2 step 2</code> (L190–193) tightening: a sub-40 quote from a persona OR reviewer return MUST hard-fail with the exact existing message <code>simulated-reader returned quote shorter than 40 chars: &lt;quote&gt;</code> (persona) OR <code>reviewer returned quote shorter than 40 chars: &lt;quote&gt;</code> (reviewer); skill MUST pause via the failure-dialog contract — no silent drop or graceful degradation. Symmetric for substring-grep miss and (reviewer-only) check_id set-equality miss.</td></tr>
+<tr><td>FR-13</td><td>FR-SR-5 theater-check (simulated-reader.md §3) extends to the new 4th persona <code>returning-user-navigator</code> using the existing rule unchanged: rubric ≥3 findings + empty <code>friction[]</code> → single re-dispatch. /grill D6.</td></tr>
+<tr><td>FR-14</td><td>Reviewer-subagent stub escape via env var <code>READMER_REVIEWER_STUB</code> pointing at a script that emits the reviewer JSON on stdout. SKILL.md §2 step 1 checks the env var alongside the existing <code>READMER_PERSONA_STUB</code> check; when set, replaces the reviewer Task dispatch with a shell invocation.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-close-out-flow-branching">6.3 Close-out, FR-V-2, mode branching (SKILL.md §1 + §11)</h3>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-15</td><td><code>SKILL.md §1 step 4</code> (L158) splits into mode-branched contracts: <strong>audit mode</strong> — emit findings table ONLY (D2 column shape); do NOT fire <code>AskUserQuestion</code>. <strong>scaffold/update mode</strong> — preserve existing batched 4-option <code>AskUserQuestion</code> (Apply/Modify/Skip/Defer); behavior unchanged.</td></tr>
+<tr><td>FR-16</td><td><code>SKILL.md §1 step 6</code> (L168) audit close-out: emit the existing <code>README written to ...</code> line ONLY when the mode is scaffold/update (i.e., a write actually happened); in audit mode emit instead <code>rubric: &lt;P&gt; pass / &lt;F&gt; fail [+ &lt;R&gt; reviewer findings + &lt;N&gt; persona friction]</code>. <strong>Both</strong> modes additionally emit on a separate final line: <code>Suggest: /polish &lt;path-to-README.md&gt; — tighten prose without changing meaning.</code> (FR-V-2, unconditional on successful audit-or-scaffold-or-update; /grill D3).</td></tr>
+<tr><td>FR-17</td><td>Close-out table renders ONE row per finding with columns <code>Source | Severity | Check/Persona | Line | Message | Suggested fix</code>. <code>Source ∈ {rubric, reviewer, persona}</code>. Sort: severity desc (blocker > friction > nit) then source (rubric > reviewer > persona). (D2.)</td></tr>
+<tr><td>FR-18</td><td><code>tests/run-all.sh</code> registers the 4 new integration tests in alphabetical order under the existing fixture list: <code>reviewer_subagent_contract.sh</code>, <code>reviewer_subagent_jtbd_fixture.sh</code>, <code>simulated_reader_sub40_quote.sh</code>, <code>tracer_audit_polish_suggest.sh</code>. No new CI wiring; the runner already exits non-zero on any single-fixture failure.</td></tr>
+</tbody>
+</table>
+
+<h3 id="fr-acceptance-against-skill-patterns">6.4 Acceptance against skill-patterns.md §A–§F (FR-AC-*)</h3>
+<p>Per /feature-sdlc FR-61 skill-mode contract: the revised /readme must conform to <code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md §A–§F</code>. Mapped FRs (testable by /verify Phase 7's re-run of <code>skill-eval-check.sh</code> + reviewer pass):</p>
+<table>
+<thead><tr><th>ID</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td>FR-AC-A</td><td><strong>§A frontmatter:</strong> SKILL.md frontmatter preserves <code>name</code>, <code>description</code>, <code>user-invocable: true</code>, <code>argument-hint</code>. No new required keys.</td></tr>
+<tr><td>FR-AC-B</td><td><strong>§B description+triggering:</strong> existing 5+ trigger phrases preserved verbatim ("audit my README", "scaffold a README", "fix my README", "generate a README", "review my README structure"). No bug-fix delta requires new phrases.</td></tr>
+<tr><td>FR-AC-C</td><td><strong>§C structure / progressive disclosure:</strong> changes confined to §1 step 4 / step 6, §2 step 1 / step 2, §11 wiring, and <code>reference/*</code> files (new <code>reference/reviewer.md</code>). No new top-level <code>##</code> sections in SKILL.md. SKILL.md line count stays within the existing footprint plus the line cost of the mode-branch split (estimated +15–25 lines).</td></tr>
+<tr><td>FR-AC-D</td><td><strong>§D body content:</strong> wording is structural/contract prose; no marketing language; no implementation details bleed in (no shell commands in SKILL.md body beyond the existing <code>scripts/rubric.sh</code> dispatch line; reviewer prompt content lives in <code>reference/reviewer.md</code>).</td></tr>
+<tr><td>FR-AC-E</td><td><strong>§E scripts:</strong> <code>scripts/rubric.sh</code> changes use existing patterns — <code>printf</code> TSV row, named function, <code>--selftest</code> via <code>_lib.sh</code>, <code>readme::log</code> stderr emission. New <code>--validate-yaml</code> CLI flag follows the same dispatcher shape as <code>--selftest</code> (L483/L492).</td></tr>
+<tr><td>FR-AC-F</td><td><strong>§F platform-conditional:</strong> no platform-conditional frontmatter changes warranted; the reviewer-subagent Task dispatch is the same primitive used by persona dispatch and degrades the same way on Task-tool-absent platforms (env-var stub paths active in both).</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="api-changes">
+<h2 id="api-changes-heading">7. API Changes</h2>
+<p><strong>N/A</strong> — this is a markdown / YAML / shell-only enhancement. No HTTP, no client-server interface. The <strong>reviewer-subagent return contract</strong> is documented in <code>reference/reviewer.md</code> (per FR-11) as a JSON shape; treat that as the spec's nearest analogue to an API contract.</p>
+</section>
+
+<section id="frontend-design">
+<h2 id="frontend-design-heading">8. Frontend Design</h2>
+<p><strong>N/A</strong> — no UI. The closest analogue is the close-out chat-output table (D2 / FR-17 column shape): rendered as a Markdown table in chat by SKILL.md's close-out step. No HTML, no CSS, no component hierarchy.</p>
+</section>
+
+<section id="edge-cases-table">
+<h2 id="edge-cases-table-heading">9. Edge Cases</h2>
+<table>
+<thead><tr><th>#</th><th>Scenario</th><th>Condition</th><th>Expected Behavior</th></tr></thead>
+<tbody>
+<tr><td>E1</td><td>Persona returns sub-40 quote</td><td>any persona's <code>friction[].quote</code> &lt; 40 chars</td><td>Hard-fail with existing FR-SR-3 message; skill pauses via failure-dialog (FR-12).</td></tr>
+<tr><td>E2</td><td>Reviewer returns sub-40 quote</td><td>any reviewer finding's <code>quote</code> &lt; 40 chars</td><td>Hard-fail with symmetric message <code>reviewer returned quote shorter than 40 chars: &lt;quote&gt;</code>; skill pauses (FR-12).</td></tr>
+<tr><td>E3</td><td>Reviewer returns wrong check_id set</td><td>reviewer's <code>check_id</code> set ≠ declared [J] set in rubric.yaml</td><td>Hard-fail <code>reviewer returned check_ids that do not match rubric.yaml: missing=[...], extra=[...]</code>; skill pauses (FR-12, D3).</td></tr>
+<tr><td>E4</td><td>Reviewer subagent timeout</td><td>reviewer call exceeds 120s</td><td>Soft-failure: drop [J] check results from close-out table; emit warning <code>[J] reviewer timed out — IA-fit checks not scored</code>; rubric [D] + 4 personas still report; audit completes.</td></tr>
+<tr><td>E5</td><td>BSD-awk encounters <code>\b</code> in rubric.sh</td><td>contributor introduces new <code>\b</code> in any awk block</td><td><code>--selftest</code> lint pass catches it; exits 1 with <code>[lint] FAIL: \b at scripts/rubric.sh:&lt;line&gt;</code> (FR-07).</td></tr>
+<tr><td>E6</td><td>README has no Skills table</td><td><code>hero-scope-matches-surface</code> [J] check on a single-tool README</td><td>Reviewer returns <code>verdict: pass</code> with rationale "no surface table to compare against"; LLM-judge handles vacuous-true (no [D] short-circuit needed).</td></tr>
+<tr><td>E7</td><td>Pure-audit mode fires AskUserQuestion</td><td>any code path in §1 step 4 emits AskUserQuestion in audit mode</td><td>Integration-test hard-fails via transcript grep (G5, FR-15).</td></tr>
+<tr><td>E8</td><td>Audit close-out missing <code>Suggest: /polish</code></td><td>tracer test against any successful audit run</td><td>Test hard-fails (G4, FR-16); the line must appear exactly once on the final turn.</td></tr>
+<tr><td>E9</td><td>Both <code>READMER_PERSONA_STUB</code> and <code>READMER_REVIEWER_STUB</code> set</td><td>integration-test environment</td><td>Both stubs activate independently; SKILL.md §2 step 1 dispatches via shell to each, in parallel-equivalent semantics (sequential is acceptable in stub mode since stubs return instantly).</td></tr>
+<tr><td>E10</td><td>rubric.yaml missing <code>type</code> field on a row</td><td>contributor adds new check without <code>type:</code></td><td><code>--validate-yaml</code> exits 1 with <code>[validate] FAIL: &lt;row-id&gt; missing type</code> (FR-08); CI fails.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="testing-strategy">
+<h2 id="testing-strategy-heading">10. Testing &amp; Verification Strategy</h2>
+
+<h3 id="ts-unit-validate">10.1 Unit / structural validation</h3>
+<ul>
+<li><strong>FR-08 rubric.yaml shape</strong>: <code>bash scripts/rubric.sh --validate-yaml</code> on the post-edit rubric.yaml. Assert exit 0; 16 [D] + 2 [J] rows. Negative test: temp-copy with a row missing <code>type</code>, assert exit 1 + stderr exact regex.</li>
+<li><strong>FR-07 awk drift lint</strong>: <code>bash scripts/rubric.sh --selftest</code> on a temp-copy of rubric.sh with a planted <code>awk '$0 ~ /\bfoo\b/ { … }'</code> block. Assert exit 1 + stderr <code>[lint] FAIL: \b at scripts/rubric.sh:&lt;line&gt;</code>. Clean run: exit 0 (both lint + fixture-agreement pass).</li>
+</ul>
+
+<h3 id="ts-integration">10.2 Integration tests (<code>tests/integration/</code>)</h3>
+<ul>
+<li><strong>New: <code>simulated_reader_sub40_quote.sh</code></strong> — sets <code>READMER_PERSONA_STUB</code> to a script returning a 24-char quote; runs <code>/readme --audit</code>; asserts exit non-zero + stderr exact <code>simulated-reader returned quote shorter than 40 chars: &lt;quote&gt;</code>. (G6, FR-12.)</li>
+<li><strong>New: <code>reviewer_subagent_contract.sh</code></strong> — sets <code>READMER_REVIEWER_STUB</code> to scripts emitting three variants: (a) valid 2-finding return → assert audit completes + reviewer findings in close-out table; (b) sub-40 quote → assert symmetric hard-fail message; (c) missing check_id → assert set-equality hard-fail message. (FR-11, FR-12, FR-14.)</li>
+<li><strong>New: <code>tracer_audit_polish_suggest.sh</code></strong> — runs <code>/readme --audit</code> on a clean fixture; captures final-turn chat output; asserts the regex <code>^Suggest: /polish .+ — tighten prose without changing meaning\.$</code> matches exactly once. (G4, FR-16.)</li>
+<li><strong>New: <code>reviewer_subagent_jtbd_fixture.sh</code></strong> — sets <code>READMER_REVIEWER_STUB</code> to a script that invokes the live reviewer against <code>tests/fixtures/jtbd-organized-readme.md</code> and writes the return JSON to stdout; assert both [J] checks return <code>verdict: pass</code>. (G2, D6.)</li>
+<li><strong>Extend: <code>audit_clean.sh</code></strong> — (i) transcript grep hard-fail on <code>AskUserQuestion</code> in audit mode (G5, FR-15); (ii) explicit <code>/usr/bin/awk</code> fork to exercise BSD-awk path; assert <code>install-or-quickstart-presence</code> PASS (G3, FR-05/06); (iii) the new <code>cross-cutting-capabilities-surfaced</code> [D] check PASSES against the existing clean fixture (assumed to mention ≥1 of the 8 keywords).</li>
+<li><strong>Extend: <code>simulated_reader_contract.sh</code></strong> — assert 5 Task dispatches (was 3); assert <code>returning-user-navigator</code> appears in dispatch list. (FR-10.)</li>
+</ul>
+
+<h3 id="ts-fixtures">10.3 New fixtures</h3>
+<ul>
+<li><strong><code>tests/fixtures/jtbd-organized-readme.md</code></strong> — synthetic ~40-line README. Hero line scoped to the synthetic project's actual surface. ≥3 top-level <code>##</code> headings starting with imperative verbs or "How to X" pattern (e.g., "How to install", "How to deploy", "How to troubleshoot"). Includes ≥1 of the 8 cross-cutting keywords. License + Contributing sections present (so [D] blockers pass cleanly). (D6, G2.)</li>
+</ul>
+
+<h3 id="ts-skill-eval">10.4 skill-eval re-run (under /verify Phase 7)</h3>
+<p>Per <code>/feature-sdlc</code> FR-50/51: /verify re-runs <code>feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</code> + a fresh reviewer subagent pass against <code>reference/skill-patterns.md §A–§F</code>. Reconciles findings against <code>state.yaml.phases.skill-eval.skill_eval.accepted_residuals[]</code>. Acceptance: zero new failures; previously-accepted residuals (if any) surface in /verify report as KNOWN but non-blocking.</p>
+
+<h3 id="ts-verification-commands">10.5 Exact verification commands</h3>
+<pre><code># Unit-ish
+bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --validate-yaml
+bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest
+
+# Integration (run from repo root)
+bash plugins/pmos-toolkit/skills/readme/tests/integration/audit_clean.sh
+bash plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_contract.sh
+bash plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_sub40_quote.sh
+bash plugins/pmos-toolkit/skills/readme/tests/integration/reviewer_subagent_contract.sh
+bash plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit_polish_suggest.sh
+bash plugins/pmos-toolkit/skills/readme/tests/integration/reviewer_subagent_jtbd_fixture.sh
+
+# /verify Phase 7 re-run (orchestrated by /feature-sdlc)
+bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/
+
+# Negative tracer (sanity: planted-\b lint regression)
+cp plugins/pmos-toolkit/skills/readme/scripts/rubric.sh /tmp/rubric-planted.sh
+# Edit /tmp/rubric-planted.sh to introduce a \b in an awk block, then:
+bash /tmp/rubric-planted.sh --selftest # expect exit 1 + [lint] FAIL stderr
+</code></pre>
+</section>
+
+<section id="release-prerequisites">
+<h2 id="release-prerequisites-heading">11. Release Prerequisites (not in plan waves)</h2>
+<p>Per <code>/feature-sdlc</code> FR-63 skill-feedback scope discipline: the following are <strong>release prerequisites only</strong> and MUST NOT appear as plan waves. <code>/complete-dev</code> is the sole writer.</p>
+<ul>
+<li><strong>Version bump</strong>: patch bump (2.48.0 → 2.48.1) in BOTH <code>plugins/pmos-toolkit/.claude-plugin/plugin.json</code> AND <code>plugins/pmos-toolkit/.codex-plugin/plugin.json</code>, in one commit (pre-push hook enforces sync per repo CLAUDE.md).</li>
+<li><strong>CHANGELOG / changelog</strong>: per <code>/changelog</code> skill — user-facing entry under §2.48.1 describing the 5 fixes.</li>
+<li><strong>README row</strong>: no new row needed (this is an enhancement to existing <code>/readme</code>, not a new skill).</li>
+<li><strong>Manifest version-sync</strong>: enforced by pre-push hook (no extra task).</li>
+<li><strong><code>~/.pmos/learnings.md</code> header bootstrap</strong>: no new header needed (<code>## /readme</code> already exists from prior sessions).</li>
+</ul>
+</section>
+
+<section id="review-log">
+<h2 id="review-log-heading">12. Review Log</h2>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes Made</th></tr></thead>
+<tbody>
+<tr><td>1 (initial draft)</td><td>—</td><td>Drafted from revised 01_requirements.html + Architect+Designer interview answers (4 + 3 questions; all Recommended). Verification plan sketch accepted before write.</td></tr>
+<tr><td>2 (structural + design-critique)</td><td>[Should-fix]: FR-18 missing — <code>tests/run-all.sh</code> registration for the 4 new integration tests. [Nit]: FR-02 hero-block boundary undefined.</td><td>Both Fix-as-proposed: added FR-18; refined FR-02 <code>pass_when</code> wording to "after the first <code>##</code> heading".</td></tr>
+</tbody>
+</table>
+</section>
+</main>
+</body>
+</html>

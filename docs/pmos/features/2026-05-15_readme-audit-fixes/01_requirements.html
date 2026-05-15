@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Requirements — /readme audit fixes</title>
+<link rel="stylesheet" href="assets/style.css?v=2.48.0">
+</head>
+<body>
+<main>
+<header>
+<h1>/readme audit fixes — Requirements</h1>
+<p><strong>Date:</strong> 2026-05-15 · <strong>Last updated:</strong> 2026-05-15 · <strong>Status:</strong> Draft · <strong>Tier:</strong> 2 — Enhancement · <strong>Mode:</strong> skill-feedback · <strong>Target skill:</strong> <code>/readme</code> at <code>plugins/pmos-toolkit/skills/readme/</code></p>
+</header>
+
+<section id="problem">
+<h2 id="problem-heading">Problem</h2>
+<p>A retro on <code>/readme</code> (1 audit + 1 rewrite session) surfaced that the 15-check rubric and 3-persona simulated-reader pass deliver structural wins (license, contributing, install shape, line-length, cross-file checks) but are <strong>blind to value-prop accuracy and information-architecture fit</strong>. The audit reported "clean against rubric" on the most consequential structural question — that the README was organized maintainer-backward (by skill category, not by job-to-be-done) and that the hero line falsely scoped the toolkit to "software delivery". The user surfaced these issues in 5 minutes of reading; the rubric never could.</p>
+<p>Two additional defects compound this: (a) <strong>BSD-awk false-fails</strong> on macOS due to <code>\b</code> usage in awk patterns (every macOS user sees <code>install-or-quickstart-presence</code> FAIL despite valid content); (b) the <code>Suggest: /polish</code> follow-up line documented in §11 (FR-V-2) <strong>does not fire on the audit edge</strong>; (c) the <code>§1 step 4</code> findings contract <strong>conflates audit (read-only) with scaffold/update (writes)</strong>, leading to UX divergence in pure-audit runs; (d) FR-SR-3 sub-40 quote enforcement was <strong>silently relaxed in practice</strong> — the exact "silent recovery" the spec forbids — with no regression test to catch it.</p>
+
+<h3 id="who-experiences-this">Who experiences this?</h3>
+<p>Returning-user developers running <code>/readme --audit</code> against a real plugin/monorepo README — the persona who needs to map intent → skill, not the first-contact reader the existing 3-persona triad optimises for. Also every macOS user of <code>/readme</code> (BSD-awk default).</p>
+
+<h3 id="why-now">Why now?</h3>
+<p>The retro represents real session friction. The audit's verdict "clean against rubric" was true and useless — without these fixes, the next user running <code>/readme --audit</code> on the pmos-toolkit README (or any README organized by maintainer category) will get the same false-pass and the same BSD-awk false-fail.</p>
+</section>
+
+<section id="goals-non-goals">
+<h2 id="goals-non-goals-heading">Goals &amp; Non-Goals</h2>
+<h3 id="goals">Goals</h3>
+<ul>
+<li>The rubric + persona pass <strong>surfaces IA-fit and value-prop issues</strong> on a README organized maintainer-backward — measured by the audit catching the retro's specific IA finding when re-run against the pmos-toolkit README pre-rewrite.</li>
+<li><code>rubric.sh</code> <strong>passes <code>install-or-quickstart-presence</code></strong> on a valid README under BSD awk — measured by macOS CI / selftest on a fixture README that previously false-failed.</li>
+<li>Every successful <code>/readme --audit</code> run <strong>emits the <code>Suggest: /polish</code> line</strong> — measured by tracer test on the audit-only edge.</li>
+<li>Pure-audit runs <strong>do not fire <code>AskUserQuestion</code></strong> — measured by §1 step 4 mode-branched contract + integration test.</li>
+<li>A simulated-reader return with a sub-40 quote <strong>hard-fails and pauses</strong> — measured by new regression fixture.</li>
+</ul>
+<h3 id="non-goals">Non-Goals</h3>
+<ul>
+<li>NOT rewriting the existing 3 personas (<code>evaluator</code>/<code>adopter</code>/<code>contributor</code>) — because the retro proposes <em>adding</em> a 4th lens; existing personas already optimise first-contact bounces correctly for their role.</li>
+<li>NOT changing BSD <code>grep -qE \b</code> usages on lines 213/223 of <code>rubric.sh</code> — because BSD grep supports <code>\b</code>; only awk is broken.</li>
+<li>NOT introducing voice/prose rewriting into <code>/readme</code> — because §11 explicitly delegates that to <code>/polish</code> (Anti-pattern).</li>
+<li>NOT re-architecting the rubric.yaml schema — because the 3 new IA-fit checks fit the existing check-row shape.</li>
+<li>NOT preserving 15/15 pass on existing READMEs — because the 3 new checks are advisory; user disposes per-finding via the §1 step 4 contract (audit-mode table or scaffold/update-mode batched ask). Net rubric size 15 → 18 is a deliberate widening.</li>
+</ul>
+</section>
+
+<section id="solution-direction">
+<h2 id="solution-direction-heading">Solution Direction</h2>
+<p>Five surgical fixes against the existing skill, each preserving the established invariants (3-mode substrate, monorepo-aware discovery, voice→/polish delegation, never auto-commit):</p>
+<ol>
+<li><strong>4th persona: <code>returning-user-navigator</code></strong> — extend <code>reference/simulated-reader.md §1</code> with the new persona prompt ("I know this plugin exists — can I find the skill for my current job?"). Return-shape contract from §2 is reused verbatim — no new JSON schema. Persona dispatch loop in SKILL.md §2 step 1 changes from <code>3 concurrent Task calls</code> to <code>4 concurrent Task calls</code>. Per-persona 120s budget unchanged; theater-check (§3 FR-SR-5) extends to the new persona symmetrically.</li>
+<li><strong>3 new deterministic IA-fit rubric checks in <code>reference/rubric.yaml</code></strong> — (a) <code>hero-scope-matches-surface</code>: hero line claim ≥ surface-area implied by Skills table (regex-extract Skills table rows + hero claim noun phrase; FAIL on superset mismatch); (b) <code>primary-index-by-jtbd</code>: top-level <code>##</code> headings index by job-to-be-done, not by maintainer category (heuristic: ≥3 of N headings match imperative verb / "How to X" / problem-domain pattern); (c) <code>cross-cutting-capabilities-surfaced</code>: at least one section mentions cross-cutting platform capability (HTML/MD, worktrees, auto-tiering, self-eval). Total: 15 → 18 checks. All three are <code>[D]</code> deterministic (regex/awk-based, no LLM-judge).</li>
+<li><strong>BSD-awk fix in <code>scripts/rubric.sh</code></strong> — replace <code>\b</code> with <code>($|[^A-Za-z])</code> at lines 40 and 119; mirror the workaround already at line 60 (<code>check_what_it_does_in_60s</code> with its existing comment "BSD awk lacks \&lt; / \&gt; word boundaries; use a portable boundary class"). Audit every remaining awk <code>\b</code> usage in the script as part of the change.</li>
+<li><strong>§1 step 6 close-out template fix</strong> — emit <code>Suggest: /polish &lt;path-to-README.md&gt; — tighten prose without changing meaning.</code> on the audit close-out path unconditionally (currently only fires after §6 scaffold and §7 update). Cite FR-V-2. Existing §11 wording stays authoritative.</li>
+<li><strong>§1 step 4 mode-branch + §2 step 2 wording tighten + regression fixture</strong> — split §1 step 4 into "audit mode: emit findings table only, no <code>AskUserQuestion</code>" vs "scaffold/update mode: batched 4-option <code>AskUserQuestion</code> (Apply/Modify/Skip/Defer)"; FR-OUT-2 citation branches on mode. Tighten §2 step 2 so a sub-40 quote MUST pause (no silent drop). Add <code>tests/integration/simulated_reader_sub40_quote.sh</code> that mocks a persona return with a 24-char quote via <code>READMER_PERSONA_STUB</code> and expects the parent to hard-fail with the documented FR-SR-3 message.</li>
+</ol>
+</section>
+
+<section id="user-journeys">
+<h2 id="user-journeys-heading">User Journeys</h2>
+<h3 id="primary-journey">Primary Journey — returning-user audit on a maintainer-backward README</h3>
+<ol>
+<li>User on macOS runs <code>/readme --audit README.md</code> on the pmos-toolkit README pre-rewrite.</li>
+<li>Rubric script runs 18 checks; the 3 new IA-fit checks FAIL (hero-scope mismatch; non-JTBD index; cross-cutting capabilities surfaced is borderline). <code>install-or-quickstart-presence</code> PASSES under BSD awk (previously false-failed).</li>
+<li>4 personas dispatched in parallel; the new <code>returning-user-navigator</code> persona returns a friction entry citing the maintainer-backward IA.</li>
+<li>Findings rendered as a table — no <code>AskUserQuestion</code> fires (audit mode read-only contract).</li>
+<li>Close-out emits two lines: <code>rubric: 14 pass / 4 fail</code> and <code>Suggest: /polish README.md — tighten prose without changing meaning.</code></li>
+</ol>
+
+<h3 id="error-edge-cases">Error / Edge Cases</h3>
+<ul>
+<li><strong>Persona returns sub-40 quote</strong> — parent hard-fails with <code>simulated-reader returned quote shorter than 40 chars: &lt;quote&gt;</code>; pauses with failure dialog. Regression fixture exercises this exact case.</li>
+<li><strong>BSD vs GNU awk environment</strong> — selftest in <code>rubric.sh --selftest</code> exercises both boundary semantics; portable class works under both.</li>
+<li><strong>README has no Skills table</strong> (rare, non-monorepo single-tool) — <code>hero-scope-matches-surface</code> check vacuously passes (no surface to compare against).</li>
+<li><strong>Scaffold/update mode</strong> — §1 step 4 still fires AskUserQuestion batched 4-option ask; no change to existing flow.</li>
+</ul>
+</section>
+
+<section id="design-decisions">
+<h2 id="design-decisions-heading">Design Decisions</h2>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>D1</td><td>F1 fix = 4th persona <strong>AND</strong> 3 rubric checks (both, not either)</td><td>(a) persona only; (b) rubric only; (c) both</td><td>Persona catches probabilistic IA framing the user notices in reading; rubric catches the deterministic structural claim (hero-scope vs Skills-table). They are complementary, not redundant — the retro author explicitly listed both as viable fixes; doing both closes the gap from two angles.</td></tr>
+<tr><td>D2</td><td>BSD-awk fix uses <code>($|[^A-Za-z])</code> boundary class</td><td>(a) <code>($|[^A-Za-z])</code> portable class; (b) shell out to GNU awk; (c) PCRE via grep</td><td>(a) matches the existing workaround at line 60 with its inline comment; propagates an established pattern. (b)/(c) introduce new deps; not warranted for a 2-line fix.</td></tr>
+<tr><td>D3</td><td>FR-V-2 emitted unconditionally on audit close, not gated</td><td>(a) unconditional; (b) gated on findings≥1; (c) gated on a new flag</td><td>(a) matches §11 written wording verbatim — "After every successful /readme audit-or-scaffold run". The gate is "successful", not "found defects". Removes a special case.</td></tr>
+<tr><td>D4</td><td>§1 step 4 split into audit vs scaffold/update branches</td><td>(a) split; (b) keep unified with a "skip-ask in audit mode" sub-clause</td><td>(a) the spec is the place to be unambiguous about mode-branched UX contracts; sub-clauses get missed. The split also lets FR-OUT-2 citations branch cleanly.</td></tr>
+<tr><td>D5</td><td>FR-SR-3 fix = tighten + add regression fixture (not relax + warn)</td><td>(a) tighten (pause); (b) relax (drop with warning, continue)</td><td>The retro's lax behaviour was the "silent recovery" the spec forbids. (a) restores the documented contract; (b) would weaken it. A fixture test prevents future drift.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="acceptance-against-skill-patterns">
+<h2 id="acceptance-against-skill-patterns-heading">Acceptance against skill-patterns.md (standing FRs)</h2>
+<p>The revised <code>/readme</code> must conform to <code>plugins/pmos-toolkit/skills/feature-sdlc/reference/skill-patterns.md</code>. Mapped FRs:</p>
+<ul>
+<li><strong>§A frontmatter:</strong> existing frontmatter preserved; <code>description</code> still carries trigger phrases; no changes warranted by this edit. FR-AC-A.</li>
+<li><strong>§B description+triggering:</strong> no new trigger phrases needed; existing 5+ phrases ("audit my README", "scaffold a README", "fix my README", "generate a README", "review my README structure") cover the bug-fix delta. FR-AC-B.</li>
+<li><strong>§C structure / progressive disclosure:</strong> changes confined to §1 step 4/6, §2 step 2, §11 wiring, and <code>reference/*</code> files — no new top-level <code>##</code> sections; SKILL.md stays under skill-eval line cap. FR-AC-C.</li>
+<li><strong>§D body content:</strong> wording tightening + mode-branch split is structural body work; no marketing prose; no implementation details bleeding in. FR-AC-D.</li>
+<li><strong>§E scripts:</strong> <code>scripts/rubric.sh</code> change uses existing patterns (<code>printf</code> TSV row, named function, <code>--selftest</code> via the established <code>_lib.sh</code>); new fixture follows <code>tests/integration/</code> conventions. FR-AC-E.</li>
+<li><strong>§F platform-conditional:</strong> no platform-conditional frontmatter changes warranted. FR-AC-F.</li>
+</ul>
+</section>
+
+<section id="open-questions">
+<h2 id="open-questions-heading">Open Questions</h2>
+<table>
+<thead><tr><th>#</th><th>Question</th></tr></thead>
+<tbody>
+<tr><td>OQ-1</td><td><code>cross-cutting-capabilities-surfaced</code> rubric check — what's the canonical keyword list (HTML/MD, worktrees, auto-tiering, self-eval)? Deferred to <code>/spec</code> — concrete keyword list belongs there, not requirements.</td></tr>
+<tr><td>OQ-2</td><td><code>primary-index-by-jtbd</code> check — what's the imperative-verb heuristic threshold (≥3 of N? ≥50%?)? Deferred to <code>/spec</code>.</td></tr>
+<tr><td>OQ-3</td><td>Theater-check (FR-SR-5) for the new 4th persona — re-dispatch on empty-friction-and-rubric≥3 same rule, or tuned for navigation-finding shape? Deferred to <code>/spec</code> — propose extending FR-SR-5 unchanged unless spec surfaces a reason otherwise.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="review-log">
+<h2 id="review-log-heading">Review Log</h2>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes Made</th></tr></thead>
+<tbody>
+<tr><td>1 (initial draft)</td><td>—</td><td>First draft from triage seed (5 findings → 5 fix workstreams → 5 D-rows).</td></tr>
+<tr><td>2 (gap-analysis)</td><td>Gap 1: BC for existing 15/15 READMEs. Gap 2: F5 fixture test-runner wiring.</td><td>Gap 1: added Non-Goal. Gap 2: deferred to /spec (already implied by Goal #5).</td></tr>
+</tbody>
+</table>
+</section>
+</main>
+</body>
+</html>

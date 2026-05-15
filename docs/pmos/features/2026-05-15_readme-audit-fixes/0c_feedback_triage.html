@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Feedback triage — /readme</title>
+<link rel="stylesheet" href="assets/style.css?v=2.48.0">
+</head>
+<body>
+<main>
+<header>
+<h1>Feedback triage — /readme</h1>
+<p><strong>Mode:</strong> skill-feedback · <strong>Feedback source:</strong> inline retro (1 audit + 1 rewrite session) · <strong>Target skill:</strong> <code>/readme</code></p>
+<p><strong>Status:</strong> all findings approved — Apply (Recommended) selected via single triage gate.</p>
+</header>
+
+<section id="findings-parsed">
+<h2 id="findings-parsed-heading">Findings (parsed)</h2>
+<ol>
+<li id="f1"><strong>[blocker] F1 — Rubric + 3-persona pass blind to value-prop accuracy + IA fit.</strong><br>
+<em>Evidence:</em> "Is it accurate? Are all the skills only about software delivery? There are so many other skills related to creating artifacts, surveys..." — none of the personas surfaced this; rubric reported "clean against rubric" on the most consequential structural questions.<br>
+<em>Proposed fix:</em> add a 4th lens — either a "returning-user navigator" persona, or a rubric pass that checks (a) hero scope ≥ surface-area covered by Skills table, (b) primary index is by job-to-be-done rather than maintainer category, (c) cross-cutting platform capabilities (HTML/MD, worktrees, auto-tiering, self-eval) are surfaced. Same-shape extension to <code>reference/simulated-reader.md §1</code>.</li>
+
+<li id="f2"><strong>[blocker] F2 — BSD-awk false-fail on <code>install-or-quickstart-presence</code>.</strong><br>
+<em>Evidence:</em> <code>scripts/rubric.sh::check_install_or_quickstart_presence</code> line 40, <code>check_code_example_runnable_as_shown</code> line 119 — both use awk <code>\b</code> which BSD awk (macOS default) does not support; <code>check_what_it_does_in_60s</code> at line 60 already has the portable workaround with comment.<br>
+<em>Proposed fix:</em> replace <code>\b</code> with portable boundary class <code>($|[^A-Za-z])</code>; audit every other <code>\b</code> usage in awk patterns (lines 213, 223 are <code>grep -qE</code> which BSD grep supports — leave those).</li>
+
+<li id="f3"><strong>[friction] F3 — FR-V-2 <code>Suggest: /polish</code> didn't fire after audit pass.</strong><br>
+<em>Evidence:</em> §11 says "After every successful /readme audit-or-scaffold run, emit one chat line: Suggest: /polish ...". §1 step 6 close-out emits only "README written to ..." — Suggest line absent on the audit-only edge.<br>
+<em>Proposed fix:</em> add the Suggest line to §1 step 6 close-out template unconditionally on the audit close path.</li>
+
+<li id="f4"><strong>[friction] F4 — Findings-rendering contract ambiguous between audit (read-only) and scaffold/update (writes).</strong><br>
+<em>Evidence:</em> §1 step 4 says findings batched into AskUserQuestion calls of ≤4 with Apply/Modify/Skip/Defer. In a pure audit run with no intent to write, firing AskUserQuestion is wrong — the contract conflates modes.<br>
+<em>Proposed fix:</em> split §1 step 4 into "audit mode: emit findings table, stop after rubric+persona render, no AskUserQuestion" vs. "scaffold/update mode: batch AskUserQuestion with the 4-option choice surface." FR citations branch on mode.</li>
+
+<li id="f5"><strong>[nit] F5 — FR-SR-3 enforcement lax (sub-40 quote silently dropped).</strong><br>
+<em>Evidence:</em> evaluator persona returned a 24-char quote ("## Repository Structure"); spec says parent must hard-fail and pause; instead the under-length quote was silently dropped — the exact "silent recovery" the spec forbids.<br>
+<em>Proposed fix:</em> tighten parent so a sub-40 quote pauses (matches spec as written) + add fixture test exercising a deliberate sub-40 return.</li>
+</ol>
+</section>
+
+<section id="critique">
+<h2 id="critique-heading">Critique (against current SKILL.md + scripts/rubric.sh)</h2>
+<table>
+<thead><tr><th>ID</th><th>already_handled</th><th>classification</th><th>recommendation</th><th>rationale</th><th>scope_hint</th></tr></thead>
+<tbody>
+<tr><td>F1</td><td>no</td><td>new-capability</td><td>apply</td><td>Persona triad in §2/§3 optimises first-contact bounce; no "returning-user navigator" persona, no IA-fit rubric check. Retro fix is a same-shape extension.</td><td>medium</td></tr>
+<tr><td>F2</td><td>no</td><td>bug</td><td>apply</td><td>Two awk patterns use <code>\b</code>; line 60 already has portable workaround with comment — fix propagates an existing pattern.</td><td>small</td></tr>
+<tr><td>F3</td><td>partial</td><td>bug</td><td>apply</td><td>FR-V-2 documented in §11; §1 step 6 close-out template doesn't emit the line on audit edge.</td><td>small</td></tr>
+<tr><td>F4</td><td>no</td><td>ux-friction</td><td>apply</td><td>§1 step 4 was written assuming audit always feeds into write; pure-audit users get contract-divergent UX.</td><td>medium</td></tr>
+<tr><td>F5</td><td>partial</td><td>bug</td><td>apply</td><td>Rule documented in §2 step 2; missing regression test allowed silent-recovery in practice.</td><td>small</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="disposition-log">
+<h2 id="disposition-log-heading">Disposition log</h2>
+<table>
+<thead><tr><th>ID</th><th>Disposition</th><th>Decided by</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td>F1</td><td>Apply</td><td>user (batch triage)</td><td>—</td></tr>
+<tr><td>F2</td><td>Apply</td><td>user (batch triage)</td><td>—</td></tr>
+<tr><td>F3</td><td>Apply</td><td>user (batch triage)</td><td>—</td></tr>
+<tr><td>F4</td><td>Apply</td><td>user (batch triage)</td><td>—</td></tr>
+<tr><td>F5</td><td>Apply</td><td>user (batch triage)</td><td>—</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="approved-changes">
+<h2 id="approved-changes-heading">Approved changes by skill</h2>
+<h3 id="readme-changes">/readme (plugins/pmos-toolkit/skills/readme/)</h3>
+<ul>
+<li><strong>SKILL.md §1 step 4 — split by mode (F4):</strong> introduce "Audit mode: read-only findings table; no AskUserQuestion" branch vs "Scaffold/update mode: batched 4-option ask". Update FR-OUT-2 citation to branch on mode.</li>
+<li><strong>SKILL.md §1 step 6 — close-out template (F3):</strong> emit <code>Suggest: /polish &lt;README&gt; — tighten prose without changing meaning.</code> on audit close path unconditionally; cite FR-V-2.</li>
+<li><strong>SKILL.md §2 step 2 — FR-SR-3 enforcement (F5):</strong> tighten language so a sub-40 quote MUST pause; no silent-drop. (No behavioural change to spec, just unambiguous wording.)</li>
+<li><strong>reference/simulated-reader.md §1 — 4th persona (F1):</strong> add <code>returning-user-navigator</code> persona prompt: "I know this plugin exists — can I find the skill for my current job?" Return-shape contract reused verbatim from §2 (no new schema).</li>
+<li><strong>reference/rubric.yaml — IA-fit rubric (F1, supplementary):</strong> add 3 deterministic checks — (a) hero-scope ≥ Skills-table surface, (b) primary index by job-to-be-done, (c) cross-cutting platform capabilities surfaced. Total checks: 15 → 18.</li>
+<li><strong>scripts/rubric.sh lines 40 & 119 — BSD-awk fix (F2):</strong> replace <code>\b</code> with <code>($|[^A-Za-z])</code>; audit every other awk <code>\b</code>.</li>
+<li><strong>tests/ — FR-SR-3 regression fixture (F5):</strong> new fixture that mocks a persona return with a 24-char quote; expects the parent to hard-fail with the documented message.</li>
+</ul>
+</section>
+
+<section id="per-skill-tier">
+<h2 id="per-skill-tier-heading">Per-skill tier</h2>
+<ul>
+<li><code>/readme</code>: <strong>Tier 2</strong> — 5 findings; 2 medium (F1, F4) + 3 small (F2, F3, F5); touches SKILL.md + rubric.sh + rubric.yaml + reference/simulated-reader.md + tests/. Run tier = max = 2.</li>
+</ul>
+</section>
+</main>
+</body>
+</html>

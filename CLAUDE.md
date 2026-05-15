@@ -43,3 +43,9 @@ The pre-push hook enforces sync. When bumping versions for a release, edit both 
 ## Release entry point
 
 `/complete-dev` is the canonical release skill. It supersedes the legacy `/push`. Skills, docs, and references in this repo should point at `/complete-dev`, not `/push`.
+
+## Bash portability
+
+Repo-wide invariants for any shell script in this repo (most live under `plugins/pmos-toolkit/skills/*/scripts/` and `tests/integration/`):
+
+- **`BASH_SOURCE[0]` is not always populated.** When a script is sourced from a non-canonical path (e.g., via a symlink or under `bash -c "source …"`), `BASH_SOURCE[0]` can be empty or a relative segment that fails `cd "$(dirname …)"`. Always implement a fallback: prefer `${BASH_SOURCE[0]:-$0}`, then fall back to walking up from `$PWD` until a sentinel file is found, then exit with a clear error if neither resolves. Pattern in `plugins/pmos-toolkit/skills/readme/scripts/_reviewer_validate.sh` (2026-05-15).

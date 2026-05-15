@@ -29,6 +29,7 @@ README drops the prefix.
 | Break a spec into TDD tasks | `/plan` | Then `/execute` to implement |
 | Implement an existing plan | `/execute` | `--subagent-driven` for parallel waves with per-task review |
 | Verify and ship work | `/verify` → `/complete-dev` | Lint, test, multi-agent review, then merge + version + push |
+| Generate a changelog entry after merging | `/changelog` | Invoked by `/complete-dev`; user-facing entries describing what the system can now do |
 | Author a new skill (or revise one from feedback) | `/skill-sdlc` | Same pipeline, scored against a binary eval rubric before merge |
 | Draft a PRD / EDD / Discovery Doc | `/artifact` | Section-level eval + writing-style presets |
 | Tighten any prose | `/polish` | 14-check rubric; voice-preserving; optional editorial reduction pass |
@@ -37,6 +38,7 @@ README drops the prefix.
 | Generate a vector diagram | `/diagram` | Brainstorms framings, self-evaluates against a hybrid rubric |
 | Audit a codebase against architectural principles | `/architecture` | L1 universal + L2 stack + L3 per-repo; promotes findings to ADRs |
 | Track personal tasks (LNO, due dates, people) | `/mytasks` | Lives at `~/.pmos/tasks/` |
+| Maintain a shared person / contact directory | `/people` | Handle, name, role, working relationship; consumed by `/mytasks` |
 | Track a lightweight repo backlog | `/backlog` | Hybrid quick-capture + structured tracker |
 | Persist context across sessions and repos | `/product-context` | Workstream / product / feature scope |
 | Capture session learnings | `/session-log` | Decisions, gotchas, patterns |

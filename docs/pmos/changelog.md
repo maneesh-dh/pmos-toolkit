@@ -1,5 +1,47 @@
 # Changelog
 
+## 2026-05-15 — pmos-toolkit 2.49.0: /readme — hardening pass against /retro feedback (rubric portability, reviewer-subagent contract, FR-V-2 polish-hook)
+
+Skill-feedback revision of `/pmos-toolkit:readme` shipped via `/feature-sdlc skill --from-feedback` (skill-feedback mode, Tier 2). Ten surgical changes (T1–T10) against the existing `/readme` substrate to close gaps surfaced by a prior `/retro` against the audit pipeline: rubric script BSD-awk portability, deterministic rubric schema (`type:` field), reviewer-subagent contract with parent-side validation, 4th simulated-reader persona + 5-Task dispatch, audit close-out mode-branch, FR-V-2 `Suggest:/polish` unconditional hook, and four new regression fixtures registered under the run-all harness. Two known structural residuals from Phase 6a (skill name `readme` is a noun — not verb/gerund per `a-name-verb-or-gerund`; SKILL.md body 505 lines in the 501–800 reviewer-judge band per `c-body-size-judge`) accepted as out-of-scope for this audit-fix revision; both surfaced loudly in the `/verify` report. The `/readme` skill at `plugins/pmos-toolkit/skills/readme/SKILL.md` remains the canonical path (no rename, no relocation).
+
+### What's new
+
+- **`scripts/rubric.sh` — BSD-awk portability + selftest drift-guard** (T1, `378064a`). Replaced GNU-awk-only `\b` word-boundary at lines 40 and 119 with the portable boundary class `($|[^A-Za-z])`. Selftest now grep-lints every `awk '...'` block in the script and hard-fails on `\b` regressions; explicit `/usr/bin/awk` fork added to the install-or-quickstart fixture path. macOS users on default `/usr/bin/awk` now get deterministic rubric runs.
+- **`reference/rubric.yaml` — `type:` field + cross-cutting [D] check + `--validate-yaml` flag** (T2, `471d181`). Every rubric row now declares `type: [D]` (deterministic, scored by `scripts/rubric.sh`) or `type: [J]` (judge-only, scored by reviewer subagent). New cross-cutting [D] check asserts every row carries a `type:`; `--validate-yaml` flag prints `missing type` and exits non-zero on omission so CI catches schema drift. Audit-mode behaviour unchanged ([D] rows only).
+- **`reference/reviewer.md` + `[J]` rows + `READMER_REVIEWER_STUB` env path** (T3, `6890ae7`). New 106-line `reference/reviewer.md` carries the [J] rubric rows + the reviewer-subagent dispatch contract (cites `/skill-eval` FR-44 shape). `READMER_REVIEWER_STUB=<path>` env var substitutes a deterministic stub for the live Task-tool dispatch in tests — reusable seam for any pmos skill that dispatches a reviewer.
+- **`scripts/_reviewer_validate.sh` — parent-side validation + 3-variant contract** (T4, `950acaa`, `5a1dc89`). New validator enforces (1) `check_id` set-equality against `reference/reviewer.md`, (2) every `quote` substring-grep ≥40 chars against the source README, (3) hard-fail with exact existing FR-SR-3 message on either miss. 3-variant integration test (`reviewer_subagent_contract.sh`) covers valid / sub-40-quote / missing-check_id paths. `BASH_SOURCE[0]` resolution hardened with `${BASH_SOURCE[0]:-$0}` + cwd-walking fallback (T10).
+- **4th persona `returning-user-navigator` + 5-Task dispatch** (T5, `5b53d64`). Simulated-reader persona inventory expanded to 4 (evaluator, adopter, contributor, returning-user-navigator) with a parallel reviewer (5 total Task dispatches per audit). Theater-check (FR-SR-5) fires symmetrically on all 4 personas. `tests/mocks/simulated_reader_stub.sh` gains the navigator fixture.
+- **SKILL.md §1 mode-branch + close-out + `Suggest:/polish` unconditional** (T6, `309c1c7`). Audit mode emits the findings table only (D2 column shape preserved); scaffold mode unchanged. `Suggest:/polish — readme requires technical voice; /polish refines style without changing meaning.` (FR-V-2) now emits unconditionally on successful audit-or-scaffold close-out — both modes wired.
+- **`simulated_reader_sub40_quote.sh` regression fixture** (T7, `bb1ea01`). New integration test seals FR-SR-3: a sub-40 quote from any persona OR the reviewer MUST hard-fail with the exact existing message. Fixture asserts hard-fail at quote length 18.
+- **JTBD-organized synthetic README fixture + reviewer-subagent test** (T8, `0b57281`). New `tests/fixtures/jtbd-organized-readme.md` and `reviewer_subagent_jtbd_fixture.sh` exercise the [J] check pair against a non-standard but valid README organization; both [J] checks PASS.
+- **Tracer + close-out tightening + 5-dispatch contract** (T9, `cfd852e`). `tracer_audit_polish_suggest.sh` asserts `Suggest:/polish` appears exactly once on every audit-or-scaffold close-out. `audit_clean.sh` tightened to assert the audit-mode contract (16/16 PASS, zero file diff, cross-cutting row present, BSD-awk fork green). `simulated_reader_contract.sh` documents the 5-Task dispatch shape (4 personas + 1 reviewer) and asserts the SKILL.md declares it.
+- **Run-all harness picks up 4 new tests via glob** (`tests/run-all.sh`). The existing alphabetical-glob loop auto-discovers `reviewer_subagent_contract.sh`, `reviewer_subagent_jtbd_fixture.sh`, `simulated_reader_sub40_quote.sh`, `tracer_audit_polish_suggest.sh` — no manual registration needed.
+
+### Known residuals (accepted; carry forward)
+
+- `a-name-verb-or-gerund` (skill-eval [J] check) — skill name `readme` is a noun. Rename would touch plugin manifests, hooks, every existing reference; deferred to a dedicated rename pass.
+- `c-body-size-judge` (skill-eval [J] check) — `SKILL.md` body is 505 lines (down from 511 via T3's extraction of `reference/reviewer.md` at 106 lines). Still in the 501–800 reviewer-judge band; further extraction of §4/§5/§7/§8/§9/§10 deferred to a dedicated restructure pass.
+
+### Pipeline + repo hygiene
+
+- **CLAUDE.md `## Bash portability`** — new section documents the `BASH_SOURCE[0]` fallback pattern (resolved from T10's `_reviewer_validate.sh` hardening). Applies to every shell script under `plugins/pmos-toolkit/skills/*/scripts/` and `tests/integration/`.
+- **`~/.pmos/learnings.md ## /readme`** — captured BSD-awk portability gotcha + the reusable `*_REVIEWER_STUB` env-var test-seam pattern.
+- **README inventory drift fix** — `/changelog` and `/people` rows added to the "What do you want to do?" table (pre-existing drift; not caused by this revision).
+
+### Advisory — pre-existing test failures (out of scope for this release)
+
+Surfaced by `/verify` against the full `tests/run-all.sh`, confirmed pre-existing on `main` (neither file changed in T1–T10). Filed for a follow-up backlog pass:
+
+- `scripts/commit-classifier.sh --selftest` — fixture `tests/fixtures/commits/01_feat-only` lacks `.git`; no `setup.sh` to materialise it. Selftest exits rc=2 with the clear error.
+- `tests/integration/update_hook_dry_run.sh` — exits rc=2 with no diagnostic output. Needs a `set -x` pass to surface the failing line.
+
+### Tests
+
+- `scripts/rubric.sh --selftest`: 16/16 PASS; A2 fixture-agreement 100% on 10 fixtures.
+- `plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/`: [D] 19/19 PASS.
+- `tests/run-all.sh`: 4 substrate-selftests + 13 integration tests — 15 PASS, 2 advisory-fail-pre-existing.
+- All 4 new T1–T10 fixtures green.
+
 ## 2026-05-13 — pmos-toolkit 2.48.0: /architecture — tiered repo audit (L1/L2/L3) with ADR promotion
 
 New skill `/pmos-toolkit:architecture` shipped via `/feature-sdlc skill` (skill-new mode, Tier 3). Audits a repository against 18 architectural rules across three tiers — L1 universal (capped at 15 per spec; 10 shipped: file-size, function-size, arg-count, debug-leak, TODO-rot, path-depth, missing-header, hardcoded-credential, throw-TBD, console.log-in-src), L2 stack-specific (8 rules delegated to `dependency-cruiser` for TypeScript/Vue and `ruff` for Python), and L3 per-repo overrides at `<repo>/.pmos/architecture/principles.yaml` (severity demote/promote + exemption rows with optional `adr:` pointer and `expires:` date). Emits a deterministic JSON report to stdout; promotes ≤5 unexempted block-severity findings to Nygard ADRs at `<repo>/docs/adr/NNNN-<slug>.md` (atomic write, monotonic numbering, `--no-adr` suppression). CLI-only, offline, no network reach.

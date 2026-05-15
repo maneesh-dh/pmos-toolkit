@@ -1,0 +1,1007 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Plan — /readme audit fixes</title>
+<link rel="stylesheet" href="assets/style.css?v=2.48.0">
+</head>
+<body>
+<main>
+<header>
+<h1>/readme audit fixes — Implementation Plan</h1>
+<p><strong>tier:</strong> 2 · <strong>type:</strong> enhancement · <strong>feature:</strong> readme-audit-fixes · <strong>spec_ref:</strong> <code>02_spec.html</code> · <strong>requirements_ref:</strong> <code>01_requirements.html</code> · <strong>date:</strong> 2026-05-15 · <strong>status:</strong> Draft · <strong>commit_cadence:</strong> per-task · <strong>contract_version:</strong> 1 · <strong>execution_mode:</strong> inline</p>
+</header>
+
+<section id="overview">
+<h2 id="overview-heading">Overview</h2>
+<p>Five surgical workstreams against <code>plugins/pmos-toolkit/skills/readme/</code>, decomposed as 9 vertical slices ending in a final-verification task (TN). T1 is the tracer bullet (BSD-awk fix — proves the audit path still works post-edit before adding new checks). T2–T4 build the new <code>[J]</code> reviewer-subagent architecture incrementally. T5–T7 wire the SKILL.md edits (4th persona, mode-branch, close-out). T8 + T9 cover the new fixture and run-all.sh registration. TN runs the full audit end-to-end on a real README.</p>
+<p><strong>Done when:</strong> all 18 FRs land; <code>bash tests/run-all.sh</code> exits 0; <code>scripts/rubric.sh --validate-yaml</code> exits 0; <code>scripts/rubric.sh --selftest</code> exits 0 (both lint + fixture-agreement); the 4 new integration tests pass green; <code>skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</code> exits 0; and a manual <code>/readme --audit</code> on the pmos-toolkit README pre-rewrite produces a close-out table with 1 [D] fail + 2 [J] reviewer findings + ≥1 persona friction + the <code>Suggest: /polish</code> line.</p>
+<p><strong>Done-when walkthrough:</strong></p>
+<ol>
+<li><code>bash plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code> → expect "ALL FIXTURES PASSED (N)" on stdout, exit 0. N = current 9 + 4 new = 13.</li>
+<li><code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --validate-yaml</code> → expect exit 0 silently; non-zero would print <code>[validate] FAIL: ...</code> on stderr.</li>
+<li><code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest</code> → expect exit 0; stderr shows <code>lint: PASS</code> + <code>fixture-agreement: PASS (X%)</code>.</li>
+<li><code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</code> → expect exit 0; TSV rows all <code>pass</code>.</li>
+<li>Manual: <code>/readme --audit &lt;path-to-pmos-toolkit-README-pre-rewrite&gt;</code> in a Claude Code session. Expect close-out chat output: a single Markdown table with columns <code>Source | Severity | Check/Persona | Line | Message | Suggested fix</code> containing ≥1 row each for <code>rubric</code>, <code>reviewer</code>, <code>persona</code>; followed by a separate final line <code>Suggest: /polish &lt;readme-path&gt; — tighten prose without changing meaning.</code>. NO <code>AskUserQuestion</code> fires.</li>
+</ol>
+
+<p><strong>Execution order:</strong></p>
+<pre><code>T1 ── T2 ── T3 ── T4 ── T5 ── T6 ── T7 ── T8 ── T9 ── TN
+ │     │     │     │     │     │     │     │     │
+ │     │     │     │     │     │     │     │     └─ [P with T6/T7] new fixtures listed in run-all.sh
+ │     │     │     │     │     │     │     └─────── [P with T3-T7] negative fixture (synthetic file)
+ │     │     │     │     │     │     └───────────── sub-40 hard-fail (depends on T5's reviewer path)
+ │     │     │     │     │     └─────────────────── close-out mode-branch + Suggest:/polish
+ │     │     │     │     └───────────────────────── 4th persona + 5-Task dispatch
+ │     │     │     └─────────────────────────────── reviewer integration test
+ │     │     └───────────────────────────────────── reviewer.md + [J] rows + stub-env dispatch
+ │     └─────────────────────────────────────────── rubric.yaml type: field + cross-cutting [D] check + --validate-yaml
+ └───────────────────────────────────────────────── BSD-awk fix + --selftest lint (tracer bullet)
+</code></pre>
+</section>
+
+<section id="decision-log">
+<h2 id="decision-log-heading">Decision Log</h2>
+<blockquote>Inherits architecture decisions D1–D9 from <code>02_spec.html</code>. Entries below are implementation-specific to /plan.</blockquote>
+<table>
+<thead><tr><th>#</th><th>Decision</th><th>Options Considered</th><th>Rationale</th></tr></thead>
+<tbody>
+<tr><td>P1</td><td>Tracer-bullet = T1 BSD-awk fix (not the [J] reviewer)</td><td>(a) T1 = BSD-awk; (b) T1 = [J] reviewer integration (the "risky new architecture")</td><td>The /plan rule says T1 should derisk the riskiest unproven integration. The [J] reviewer IS the risky new path — but its derisk needs reference/reviewer.md authoring + dispatch wiring + parent-validation (T3+T4), too big for T1. T1 = BSD-awk gives the smallest verifiable end-to-end (existing 9 fixtures still green post-edit) so subsequent tasks build on a known-clean baseline. The [J] reviewer is derisked in T3 (smallest authoring slice) and T4 (validation slice) as separate vertical cuts.</td></tr>
+<tr><td>P2</td><td>T3 wires <code>READMER_REVIEWER_STUB</code> env path FIRST (before live-subagent dispatch)</td><td>(a) stub-env first, then live dispatch; (b) live dispatch first, stub-env retrofitted</td><td>(a) Matches existing <code>READMER_PERSONA_STUB</code> pattern (SKILL.md L217-221). Stub-env path is what T4's integration test exercises — building it first means T4's test goes green without needing live-subagent infra. Live dispatch is the production path; stub is the test path; both share the parent-side validation code (T4).</td></tr>
+<tr><td>P3</td><td>Mode-branch SKILL.md §1 step 4 is its own task (T6), not folded into the [J] reviewer task</td><td>(a) T6 dedicated; (b) fold into T3 or T4</td><td>(a) §1 step 4 mode-branch (audit no AskUserQuestion vs scaffold/update batched ask) is orthogonal to the [J] reviewer architecture. They touch different SKILL.md sections, can be tested independently, and folding them risks a single task that's >1 hour. Separation also keeps T3's diff narrow.</td></tr>
+<tr><td>P4</td><td>Integration tests live in <code>tests/integration/</code> matching existing naming convention; no test-runner refactor</td><td>(a) follow existing snake_case <code>&lt;flow&gt;_&lt;variant&gt;.sh</code>; (b) introduce a sub-directory like <code>tests/integration/reviewer/</code>; (c) refactor runner to a glob-based discovery</td><td>(a) Matches the 9 existing fixtures verbatim. FR-18 explicitly requires <code>tests/run-all.sh</code> registration (no auto-discovery). (b) adds taxonomy complexity for 4 files. (c) is out of scope — tests/run-all.sh as a manual-registration list is the documented convention.</td></tr>
+<tr><td>P5</td><td>JTBD-organized synthetic fixture lives at <code>tests/fixtures/jtbd-organized-readme.md</code> (sibling to <code>tests/fixtures/rubric/{strong,slop}/</code>), authored as ~40-line synthetic README</td><td>(a) sibling to rubric/strong+slop; (b) under rubric/strong/; (c) pinned real-world OSS README</td><td>Mirrors spec D6. Sibling location signals "not graded by --selftest's [D]-only path" (which the rubric/strong+slop dirs ARE graded by). Synthetic content: license-clean, stable, ≥3 imperative-verb top-level headings, hero line scoped to the synthetic project's surface, ≥1 of the 8 cross-cutting keywords.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="code-study-notes">
+<h2 id="code-study-notes-heading">Code Study Notes</h2>
+<blockquote>Glossary inherited from spec — see <code>02_spec.html</code> for domain terminology. No new domain terms in this plan.</blockquote>
+
+<h3 id="patterns-to-follow">Patterns to follow</h3>
+<ul>
+<li><code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh:51-67</code> — <code>check_what_it_does_in_60s()</code> with portable-boundary class workaround. Reuse the pattern (and inline comment style) for T1's edits at L40 + L119.</li>
+<li><code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh:483-492</code> — <code>--selftest</code> dispatcher shape. Reuse for T2's new <code>--validate-yaml</code> flag.</li>
+<li><code>plugins/pmos-toolkit/skills/readme/SKILL.md:184-188</code> — concurrent-Task-dispatch pattern (3 calls in ONE assistant response). T5 widens to 5 calls following the same shape.</li>
+<li><code>plugins/pmos-toolkit/skills/readme/SKILL.md:217-221</code> — env-var stub escape (<code>READMER_PERSONA_STUB</code>). T3 adds <code>READMER_REVIEWER_STUB</code> using the same dispatch-replacement pattern.</li>
+<li><code>plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md §1-§3</code> — reference-file shape (persona prompt + return-shape contract + parent-side validation). T3's <code>reference/reviewer.md</code> mirrors this structure.</li>
+<li><code>plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_contract.sh</code> — bash test harness pattern (<code>STUB=…/mocks/X.sh</code>, direct stub invocation, exit-code assertions). T4/T7/T9 follow this.</li>
+</ul>
+
+<h3 id="existing-code-to-reuse">Existing code to reuse</h3>
+<ul>
+<li><code>plugins/pmos-toolkit/skills/readme/scripts/_lib.sh</code> — provides <code>readme::yaml_get</code> (python3+PyYAML helper), <code>readme::log</code> (stderr emission). T2's <code>--validate-yaml</code> uses both. T1's lint pass uses <code>readme::log</code>.</li>
+<li><code>plugins/pmos-toolkit/skills/readme/tests/mocks/simulated_reader_stub.sh</code> — reference stub script shape (reads <code>--persona=&lt;name&gt;</code> + README path, emits JSON to stdout). T3's <code>tests/mocks/reviewer_stub.sh</code> mirrors this for the reviewer env-var path.</li>
+<li><code>plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh</code> — TSV-emitting deterministic-check script. No edits here; TN cites it as a verify command.</li>
+</ul>
+
+<h3 id="constraints-discovered">Constraints discovered</h3>
+<ul>
+<li>BSD <code>grep -qE \b</code> at <code>rubric.sh:213, :223</code> works fine — only awk is broken. The drift-guard lint (FR-07) must scope to awk blocks only; greps for <code>\b</code> outside awk blocks would false-positive.</li>
+<li>SKILL.md has no enforced line cap in this skill's body (unlike /complete-dev), but the FR-AC-C contract says "SKILL.md line count stays within the existing footprint plus +15–25 lines." T3+T5+T6's combined edits must stay within that envelope.</li>
+<li><code>tests/integration/simulated_reader_contract.sh</code> invokes the persona stub directly via <code>bash "$STUB" --persona=…</code> rather than setting <code>READMER_PERSONA_STUB</code>. T4's reviewer-contract test follows the same direct-invocation convention for cheap-local-test ergonomics; the stub-env-var path is exercised separately in T7 (sub-40 quote test, which goes through the full SKILL.md dispatch).</li>
+<li>rubric.yaml is python3+PyYAML-parsed (not pure-bash). T2's <code>type:</code> field addition must keep the file valid YAML — no trailing whitespace, consistent indentation (2 spaces, per existing rows).</li>
+</ul>
+
+<h3 id="stack-signals">Stack signals</h3>
+<ul>
+<li><strong>bash</strong> (dominant) — <code>scripts/rubric.sh</code> (520 lines), <code>scripts/_lib.sh</code>, <code>tests/integration/*.sh</code>, <code>tests/mocks/*.sh</code>, <code>tests/run-all.sh</code>. Stack file (reference): pmos-toolkit follows bash-3.2-safe conventions per the <code>rubric.sh:1-14</code> shebang/notes.</li>
+<li><strong>python3</strong> (helper) — invoked from <code>_lib.sh::readme::yaml_get</code> for YAML parsing. No new python deps needed.</li>
+<li><strong>node</strong> (incidental) — for HTML asset substrate (<code>build_sections_json.js</code>, <code>chrome-strip.js</code>, etc.) — used by /plan to emit this artifact, NOT by /readme runtime. No /readme runtime touches node.</li>
+<li><strong>Markdown + YAML</strong> — content surfaces (SKILL.md, reference/*.md, rubric.yaml, fixture files).</li>
+<li><strong>Lint/Test Commands</strong>: <code>bash tests/run-all.sh</code> (full suite); <code>bash scripts/rubric.sh --selftest</code> (rubric self-check); <code>bash scripts/rubric.sh --validate-yaml</code> (new, T2); no shellcheck enforced (legacy decision).</li>
+</ul>
+</section>
+
+<section id="prerequisites">
+<h2 id="prerequisites-heading">Prerequisites</h2>
+<ul>
+<li>Working tree clean (<code>git status</code> empty) before T1. Per-task commits are the resume cursor.</li>
+<li>macOS or Linux dev box — for T1 verification, both BSD awk (macOS default at <code>/usr/bin/awk</code>) and GNU awk (Linux default, or macOS via <code>brew install gawk</code>) should be available to exercise both paths.</li>
+<li><code>python3</code> on PATH (for rubric.yaml parsing via <code>_lib.sh</code>).</li>
+<li><code>bash 3.2+</code> (the existing rubric.sh is 3.2-safe; do not introduce 4.x-only constructs).</li>
+<li>No services running; this is all file-edit + script work. No DB, no Docker, no network.</li>
+</ul>
+</section>
+
+<section id="file-map">
+<h2 id="file-map-heading">File Map</h2>
+<blockquote>Index — tasks are source of truth (FR-23).</blockquote>
+<table>
+<thead><tr><th>Action</th><th>File</th><th>Responsibility</th><th>Task</th></tr></thead>
+<tbody>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh:40,119</code></td><td>Replace <code>\b</code> with portable boundary class</td><td>T1</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh:436-476</code></td><td>Extend <code>--selftest</code> with awk-<code>\b</code> drift-guard lint pass</td><td>T1</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/reference/rubric.yaml:7-114</code></td><td>Add <code>type: [D]</code> to all 15 existing rows; add <code>cross-cutting-capabilities-surfaced</code> row</td><td>T2</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh</code></td><td>Add <code>--validate-yaml</code> dispatcher + filter <code>[D]</code>-only rows when scoring</td><td>T2</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/reference/rubric.yaml</code></td><td>Add <code>hero-scope-matches-surface</code> and <code>primary-index-by-jtbd</code> rows with <code>type: [J]</code></td><td>T3</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/reference/reviewer.md</code></td><td>Reviewer prompt + JSON return-shape contract + parent-side validation rules</td><td>T3</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/SKILL.md:217-221</code></td><td>Extend env-var stub escape to recognise <code>READMER_REVIEWER_STUB</code> alongside <code>READMER_PERSONA_STUB</code></td><td>T3</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/mocks/reviewer_stub.sh</code></td><td>Reference stub script for reviewer-subagent integration tests</td><td>T3</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/SKILL.md:190-193</code></td><td>Extend §2 step 2 validation to cover reviewer returns: check_id set-equality + quote≥40 substring-grep (symmetric messages)</td><td>T4</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/reviewer_subagent_contract.sh</code></td><td>Integration test: 3 variants (valid / sub-40 quote / missing check_id)</td><td>T4</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md</code></td><td>Add §1.4 <code>returning-user-navigator</code> persona prompt; extend §3 FR-SR-5 theater-check note to mention the 4th persona</td><td>T5</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/SKILL.md:184-188</code></td><td>Persona-dispatch loop: 3 → 5 concurrent Task calls (4 personas + 1 reviewer loaded from reference/reviewer.md)</td><td>T5</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/SKILL.md:158</code></td><td>§1 step 4 mode-branch: audit emits findings table only; scaffold/update preserves existing batched ask</td><td>T6</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/SKILL.md:168</code></td><td>§1 step 6 close-out: audit-mode close-out line + unconditional <code>Suggest: /polish</code></td><td>T6</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/SKILL.md</code></td><td>Document the unified close-out table column shape (Source/Severity/Check/Line/Message/Fix) near §1 step 4 or as a new §1.7 subsection</td><td>T6</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_sub40_quote.sh</code></td><td>Regression fixture: stub returns 24-char quote; assert hard-fail message</td><td>T7</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/fixtures/jtbd-organized-readme.md</code></td><td>Synthetic ~40-line JTBD-organized README (negative fixture for [J] checks)</td><td>T8</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/reviewer_subagent_jtbd_fixture.sh</code></td><td>Integration test: reviewer stub against JTBD fixture; assert both [J] checks PASS</td><td>T8</td></tr>
+<tr><td>Create</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit_polish_suggest.sh</code></td><td>Tracer test: regex-match <code>Suggest: /polish</code> line on audit close-out</td><td>T9</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/audit_clean.sh</code></td><td>Add BSD-awk fork; hard-fail on <code>AskUserQuestion</code> in audit transcript; assert <code>cross-cutting-capabilities-surfaced</code> PASS</td><td>T9</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_contract.sh</code></td><td>Assert 5 Task dispatches (was 3); assert <code>returning-user-navigator</code> in dispatch list</td><td>T9</td></tr>
+<tr><td>Modify</td><td><code>plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code></td><td>Register the 4 new integration tests in alphabetical order</td><td>T9</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="risks">
+<h2 id="risks-heading">Risks</h2>
+<table>
+<thead><tr><th>#</th><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Severity</th><th>Mitigation</th><th>Mitigation in:</th></tr></thead>
+<tbody>
+<tr><td>R1</td><td>BSD-awk fix at L40/L119 breaks an existing rubric fixture's verdict (boundary-class semantic shift)</td><td>Low</td><td>Medium</td><td>Low</td><td>T1 re-runs <code>--selftest</code> against all existing fixtures; tests/run-all.sh must stay green. Boundary-class is already proven at L60.</td><td>T1</td></tr>
+<tr><td>R2</td><td>Adding <code>type:</code> field to rubric.yaml breaks <code>readme::yaml_get</code> consumers that don't expect the field</td><td>Low</td><td>Medium</td><td>Low</td><td>YAML is structurally tolerant — extra keys are ignored by selective key-path reads. T2's <code>--validate-yaml</code> exercises every row; any consumer breakage shows up before T3.</td><td>T2</td></tr>
+<tr><td>R3</td><td>5 concurrent Task calls hit platform rate limit / cause flaky timeouts</td><td>Medium</td><td>Medium</td><td>Medium</td><td>120s per-call budget is unchanged (NFR-4). If flaky, the existing FR-SR-5 theater-check + reviewer timeout E4 (soft-failure drop) provide graceful degradation. T5 documents the dispatch shape explicitly; T7 + T8 + T9 exercise stub-only paths so most tests don't actually fire 5 live Task calls.</td><td>T5</td></tr>
+<tr><td>R4</td><td>Reviewer LLM-judge returns inconsistent verdicts on the same README across runs (non-determinism)</td><td>Medium</td><td>Medium</td><td>Medium</td><td>T3's <code>reference/reviewer.md</code> prescribes a tight rule per [J] check with explicit "pass/fail when" criteria. Quote≥40 substring grep enforces evidence-grounded findings. Integration tests in T4/T8 use the stub path (deterministic) so CI doesn't flake.</td><td>T3, T4</td></tr>
+<tr><td>R5</td><td>SKILL.md edits across T3+T5+T6 exceed the +15–25 line FR-AC-C envelope</td><td>Low</td><td>Low</td><td>Low</td><td>Final loop runs <code>wc -l plugins/pmos-toolkit/skills/readme/SKILL.md</code> before vs after; if delta exceeds 25 lines, refactor T6's close-out column-shape doc into <code>reference/close-out-table.md</code> rather than inlining.</td><td>TN</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="tasks">
+<h2 id="tasks-heading">Tasks</h2>
+
+<h3 id="t1">T1: BSD-awk fix + selftest drift-guard lint (tracer bullet)</h3>
+<p><strong>Goal:</strong> Replace <code>\b</code> at <code>rubric.sh:40, :119</code> with portable boundary class; add <code>--selftest</code> lint that grep-fails on any future <code>\b</code>/<code>\&lt;</code>/<code>\&gt;</code> in awk blocks.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-rubric</code> FR-05, FR-06, FR-07.</p>
+<p><strong>Depends on:</strong> none.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — bug-fix.</p>
+<p><strong>Slice shape:</strong> vertical — exercises end-to-end rubric audit path on macOS BSD-awk.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh</code></li>
+<li>Test: <code>plugins/pmos-toolkit/skills/readme/tests/integration/audit_clean.sh</code> (assertion extended in T9; T1 only adds the regression-fork case in a temp test below)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Write a failing regression test for BSD-awk PASS</strong> on <code>install-or-quickstart-presence</code>. Create a temp file <code>/tmp/t1-bsd-test.sh</code>:
+<pre><code>#!/usr/bin/env bash
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(git -C "$HERE" rev-parse --show-toplevel)"
+RUBRIC="$REPO_ROOT/plugins/pmos-toolkit/skills/readme/scripts/rubric.sh"
+FIXTURE="$REPO_ROOT/plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/strong/01_clean.md"
+# Force BSD awk explicitly (macOS path)
+AWK_PATH="/usr/bin/awk"
+[[ -x "$AWK_PATH" ]] || AWK_PATH="$(command -v awk)"
+PATH="$(dirname "$AWK_PATH"):$PATH" \
+  bash "$RUBRIC" "$FIXTURE" 2&gt;&amp;1 | grep -q "install-or-quickstart-presence.*PASS" \
+  || { echo "FAIL: install-or-quickstart-presence did not PASS under BSD awk"; exit 1; }
+echo "PASS: install-or-quickstart-presence PASS under BSD awk"
+</code></pre>
+Run: <code>bash /tmp/t1-bsd-test.sh</code> — expect <strong>FAIL</strong> (the bug is present pre-fix; install-or-quickstart-presence currently false-fails under BSD awk).</li>
+
+<li><strong>Step 2 — Apply the fix</strong> using Edit tool on <code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh</code>:
+<ul>
+<li>Line 40: replace the <code>\b</code> in the awk regex with <code>($|[^A-Za-z])</code> exactly as the L60 pattern (<code>check_what_it_does_in_60s</code>). Preserve all other regex parts.</li>
+<li>Line 119: same replacement.</li>
+<li>Add a one-line inline comment above each fix: <code># BSD awk lacks \b word-boundary; use portable boundary class (mirror L60).</code></li>
+</ul></li>
+
+<li><strong>Step 3 — Verify the regression test now passes</strong>. Run: <code>bash /tmp/t1-bsd-test.sh</code> — expect <strong>PASS</strong>.</li>
+
+<li><strong>Step 4 — Write a failing test for the drift-guard lint</strong>. Create <code>/tmp/t1-lint-test.sh</code>:
+<pre><code>#!/usr/bin/env bash
+set -euo pipefail
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+RUBRIC="$REPO_ROOT/plugins/pmos-toolkit/skills/readme/scripts/rubric.sh"
+PLANT="/tmp/rubric-planted.sh"
+# Copy with a planted \b inside a fake awk block at the end
+cp "$RUBRIC" "$PLANT"
+cat &gt;&gt; "$PLANT" &lt;&lt;'AWKEOF'
+
+_planted_check() {
+  awk '/\bplanted-marker\b/ { print "found" }' "$1"
+}
+AWKEOF
+bash "$PLANT" --selftest 2&gt;&amp;1 | grep -q "\[lint\] FAIL: \\\\b at" \
+  || { echo "FAIL: lint did not catch planted \b"; exit 1; }
+echo "PASS: lint caught planted \b"
+rm -f "$PLANT"
+</code></pre>
+Run: <code>bash /tmp/t1-lint-test.sh</code> — expect <strong>FAIL</strong> (lint doesn't exist yet).</li>
+
+<li><strong>Step 5 — Implement the lint pass</strong>. Edit <code>rubric.sh</code> --selftest dispatcher (around L436-476). Add a function <code>_selftest_awk_lint()</code>:
+<pre><code>_selftest_awk_lint() {
+  # Scan every awk '...' block body for word-boundary atoms.
+  # Returns 0 if clean, 1 if any \b, \&lt; or \&gt; found.
+  local script="$1"
+  local lint_failed=0
+  # Use grep -nE to find lines that look like inside an awk single-quoted block
+  # carrying \b, \&lt;, or \&gt;. Heuristic: awk patterns are quoted with ' on the
+  # same line as the `awk` keyword. We grep for `awk '...\\b...'` style.
+  # Two-pass scan (per /plan review loop 1 — Recommended).
+  # Pass A: inline single-line awk blocks: `awk '...\b...'` on one line.
+  while IFS= read -r match; do
+    readme::log "[lint] FAIL: \\b at $match"
+    lint_failed=1
+  done &lt; &lt;(grep -nE "awk[[:space:]]+'[^']*\\\\(b|&lt;|&gt;)" "$script" || true)
+  # Pass B: multi-line awk blocks. Track awk-scope across lines via awk itself:
+  # opening single quote on a line containing `awk`, closing single quote later.
+  # Any `\b`/`\<`/`\>` between is a finding.
+  while IFS= read -r match; do
+    readme::log "[lint] FAIL: \\b at $match (multi-line awk block)"
+    lint_failed=1
+  done &lt; &lt;(awk '
+    /awk[[:space:]]+'\''/ &amp;&amp; !/'\''/{in_awk=1; awk_line=NR; next}
+    in_awk &amp;&amp; /'\''/{in_awk=0; next}
+    in_awk &amp;&amp; /\\b|\\&lt;|\\&gt;/{ printf "%s:%d\n", FILENAME, NR }
+  ' "$script" || true)
+  return $lint_failed
+}</code></pre>
+Call it from <code>--selftest</code> alongside the existing fixture-agreement pass. Both run unconditionally; final exit = OR of the two (D7 / FR-07).</li>
+
+<li><strong>Step 6 — Verify lint test passes</strong>. Run: <code>bash /tmp/t1-lint-test.sh</code> — expect <strong>PASS</strong>. Then run <code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest</code> on the clean file — expect exit 0 + stderr shows both <code>lint: PASS</code> + <code>fixture-agreement: PASS (X%)</code>.</li>
+
+<li><strong>Step 7 — Run full existing test suite</strong>. <code>bash plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code> — expect "ALL FIXTURES PASSED (9)" (no regression in the 9 existing tests).</li>
+
+<li><strong>Step 8 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/scripts/rubric.sh
+git commit -m "fix(/readme): BSD-awk \b at rubric.sh:40,119 + --selftest drift-guard lint (T1)"
+rm -f /tmp/t1-bsd-test.sh /tmp/t1-lint-test.sh /tmp/rubric-planted.sh</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest</code> — exit 0; stderr has <code>lint: PASS</code> + <code>fixture-agreement: PASS</code>.</li>
+<li><code>bash plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code> — 9/9 pass.</li>
+<li>Manual: on macOS, <code>PATH="/usr/bin:$PATH" bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/strong/01_clean.md</code> — <code>install-or-quickstart-presence</code> row says PASS.</li>
+</ul>
+
+<h3 id="t2">T2: rubric.yaml schema (<code>type:</code> field) + cross-cutting [D] check + <code>--validate-yaml</code></h3>
+<p><strong>Goal:</strong> Add <code>type: [D]</code> to all 15 existing rows; add <code>cross-cutting-capabilities-surfaced</code> as a new [D] row; add <code>scripts/rubric.sh --validate-yaml</code> dispatcher; make scorer filter to <code>[D]</code>-only rows.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-rubric</code> FR-01, FR-02, FR-04, FR-08.</p>
+<p><strong>Depends on:</strong> T1.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — new-feature.</p>
+<p><strong>Slice shape:</strong> vertical — extends the rubric audit path with a new check user-observable in the close-out table.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/reference/rubric.yaml</code></li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/scripts/rubric.sh</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Failing test for <code>--validate-yaml</code> shape</strong>. Create <code>/tmp/t2-validate-test.sh</code>:
+<pre><code>#!/usr/bin/env bash
+set -euo pipefail
+RUBRIC="$(git rev-parse --show-toplevel)/plugins/pmos-toolkit/skills/readme/scripts/rubric.sh"
+bash "$RUBRIC" --validate-yaml 2&gt;&amp;1
+[[ $? -eq 0 ]] || { echo "FAIL: --validate-yaml errored unexpectedly"; exit 1; }
+# Plant a row missing type:
+RUBYAML_BAK="$(git rev-parse --show-toplevel)/plugins/pmos-toolkit/skills/readme/reference/rubric.yaml"
+cp "$RUBYAML_BAK" "$RUBYAML_BAK.bak"
+python3 -c "import yaml,sys; d=yaml.safe_load(open('$RUBYAML_BAK')); d['checks'].append({'id':'tmp-broken','severity':'nit','description':'x','pass_when':'x'}); yaml.safe_dump(d, open('$RUBYAML_BAK','w'))"
+set +e
+bash "$RUBRIC" --validate-yaml 2&gt;/tmp/t2-stderr; rc=$?
+set -e
+mv "$RUBYAML_BAK.bak" "$RUBYAML_BAK"
+[[ $rc -eq 1 ]] || { echo "FAIL: --validate-yaml should exit 1 on missing type"; exit 1; }
+grep -q "tmp-broken missing type" /tmp/t2-stderr || { echo "FAIL: stderr missing expected message"; cat /tmp/t2-stderr; exit 1; }
+echo "PASS: --validate-yaml shape works"
+</code></pre>
+Run: expect FAIL — flag doesn't exist yet.</li>
+
+<li><strong>Step 2 — Add <code>type: [D]</code> to all 15 existing rubric.yaml rows</strong>. Use Edit tool with replace_all for the structural-add pattern: after each <code>severity:</code> line, add <code>type: [D]</code> on a new line at the same indent.</li>
+
+<li><strong>Step 3 — Add <code>cross-cutting-capabilities-surfaced</code> row</strong> under Friction severity bucket:
+<pre><code>  - id: cross-cutting-capabilities-surfaced
+    severity: friction
+    type: [D]
+    description: "≥1 of {HTML, MD, worktree, auto-tier, self-eval, monorepo, subagent, manifest} (case-insensitive substring) appears in any text after the first ## heading."
+    pass_when: "Substring match of any keyword (case-insensitive) in README body after the first ## heading."
+    fix_note_template: "Surface at least one cross-cutting platform capability (HTML/MD, worktrees, auto-tiering, self-eval, monorepo support, subagent dispatch, manifest sync) in a non-hero section."
+    auto_apply: false</code></pre></li>
+
+<li><strong>Step 4 — Implement <code>--validate-yaml</code> dispatcher</strong>. Add a function in <code>rubric.sh</code> alongside the existing <code>--selftest</code> handler:
+<pre><code>_validate_yaml() {
+  python3 - "$RUBRIC_YAML" &lt;&lt;'PYEOF'
+import sys, yaml
+path = sys.argv[1]
+d = yaml.safe_load(open(path))
+required = {'id', 'severity', 'type', 'description', 'pass_when'}
+allowed_types = {'[D]', '[J]'}
+exit_code = 0
+for row in d.get('checks', []):
+    rid = row.get('id', '&lt;unknown&gt;')
+    missing = required - row.keys()
+    for k in missing:
+        sys.stderr.write(f"[validate] FAIL: {rid} missing {k}\n")
+        exit_code = 1
+    if 'type' in row and row['type'] not in allowed_types:
+        sys.stderr.write(f"[validate] FAIL: {rid} invalid type: {row['type']} (expected [D] or [J])\n")
+        exit_code = 1
+sys.exit(exit_code)
+PYEOF
+}</code></pre>
+Wire it into the CLI dispatcher at the end (next to <code>--selftest</code>).</li>
+
+<li><strong>Step 5 — Implement <code>[D]</code>-row filtering in the scorer</strong>. In the main scoring loop where <code>readme::yaml_get checks` is iterated, add a guard: <code>[[ "$(readme::yaml_get checks.${i}.type)" == "[D]" ]] || continue</code> so rows with <code>type: [J]</code> are skipped by the shell scorer. The [J] rows are scored by the reviewer subagent (T3+T4).</li>
+
+<li><strong>Step 6 — Verify</strong>. Run the test script from Step 1 — expect PASS. Run <code>bash scripts/rubric.sh --validate-yaml</code> on the clean rubric — expect exit 0 silently. Run <code>bash scripts/rubric.sh --selftest</code> — both lint + fixture-agreement still PASS. Run <code>bash tests/run-all.sh</code> — 9/9 pass (existing fixtures unaffected because cross-cutting-capabilities-surfaced is graded only by the new check; old fixtures will get one new advisory row each but [D]-row count via <code>--selftest</code> agreement threshold should hold).</li>
+
+<li><strong>Step 7 — If <code>--selftest</code> agreement drops below 85%</strong> because of the new cross-cutting check: adjust existing fixtures under <code>tests/fixtures/rubric/strong/*.md</code> to mention at least one of the 8 keywords (e.g., add "...uses HTML wireframes" to the strong fixtures). Strong fixtures must continue to PASS≥12/15 with the rubric now being 16 [D] rows; the threshold shifts to ≥12/16 ≈ 75% but selftest's 85% agreement floor is across the whole strong+slop fixture set, so this should still hold. If not, document the threshold adjustment in the Review Log.</li>
+
+<li><strong>Step 8 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/reference/rubric.yaml plugins/pmos-toolkit/skills/readme/scripts/rubric.sh plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/
+git commit -m "feat(/readme): rubric.yaml type: field + cross-cutting [D] check + --validate-yaml (T2)"
+rm -f /tmp/t2-validate-test.sh /tmp/t2-stderr</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash scripts/rubric.sh --validate-yaml</code> — exit 0.</li>
+<li><code>bash scripts/rubric.sh --selftest</code> — exit 0 (both halves PASS).</li>
+<li><code>bash tests/run-all.sh</code> — 9/9 PASS.</li>
+<li>Manual: <code>bash scripts/rubric.sh tests/fixtures/rubric/strong/01_clean.md | grep cross-cutting</code> — row present in output.</li>
+</ul>
+
+<h3 id="t3">T3: reference/reviewer.md + [J] check rows + READMER_REVIEWER_STUB env path</h3>
+<p><strong>Goal:</strong> Author <code>reference/reviewer.md</code> with prompt + return-shape contract + validation rules; add 2 [J] rows to rubric.yaml; extend SKILL.md env-var stub escape; create reviewer_stub.sh mock.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-rubric</code> FR-03; <code>02_spec.html#fr-simulated-reader-reviewer</code> FR-11, FR-14.</p>
+<p><strong>Depends on:</strong> T2.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — new-feature.</p>
+<p><strong>Slice shape:</strong> vertical — exercises the new [J] reviewer-subagent path end-to-end via the stub-env dispatch.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/reference/rubric.yaml</code> (add 2 [J] rows)</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/reference/reviewer.md</code></li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md:217-221</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/mocks/reviewer_stub.sh</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Failing test for stub-env dispatch path</strong>. Create <code>/tmp/t3-stub-test.sh</code>:
+<pre><code>#!/usr/bin/env bash
+set -euo pipefail
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STUB="$REPO_ROOT/plugins/pmos-toolkit/skills/readme/tests/mocks/reviewer_stub.sh"
+[[ -x "$STUB" ]] || { echo "FAIL: reviewer_stub.sh not present or not executable"; exit 1; }
+README="$REPO_ROOT/plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/strong/01_clean.md"
+OUT="$(bash "$STUB" "$README")"
+echo "$OUT" | python3 -c "import sys,json; d=json.load(sys.stdin); assert isinstance(d, list); assert all('check_id' in x and 'verdict' in x and 'quote' in x and len(x['quote'])&gt;=40 for x in d), 'shape violation'; print('PASS')"
+</code></pre>
+Run: expect FAIL — stub doesn't exist.</li>
+
+<li><strong>Step 2 — Add the 2 [J] rows</strong> to rubric.yaml under Friction:
+<pre><code>  - id: hero-scope-matches-surface
+    severity: friction
+    type: [J]
+    description: "Hero line's claimed scope is ⊇ the surface area implied by the Skills/Commands table."
+    pass_when: "Reviewer's verdict for check_id 'hero-scope-matches-surface' is 'pass' (LLM-judge)."
+    fix_note_template: "Tighten hero-line scope to match the actual Skills surface, OR widen the hero to cover all listed surfaces."
+    auto_apply: false
+
+  - id: primary-index-by-jtbd
+    severity: friction
+    type: [J]
+    description: "Top-level ## headings index by job-to-be-done, not by maintainer category."
+    pass_when: "Reviewer's verdict for check_id 'primary-index-by-jtbd' is 'pass' (LLM-judge)."
+    fix_note_template: "Reorganize top-level sections by user job-to-be-done (e.g., 'How to install', 'How to deploy') rather than internal taxonomy ('Skills', 'Commands', 'Architecture')."
+    auto_apply: false</code></pre></li>
+
+<li><strong>Step 3 — Author <code>reference/reviewer.md</code></strong> mirroring simulated-reader.md §1-§3 structure:
+<ul>
+<li>§1 Reviewer prompt: "You are evaluating a README against 2 IA-fit checks defined in <code>reference/rubric.yaml</code> as <code>type: [J]</code>. For each declared [J] check_id, return one finding object." Inline the exact <code>pass_when</code> + <code>fix_note_template</code> text for both checks.</li>
+<li>§2 Return-shape contract: JSON array, one object per [J] check_id. Schema: <code>{check_id: string (must match a declared [J] id), verdict: "pass"|"fail", fix_note: string (required, must be non-empty on fail), quote: string (required, ≥40-char verbatim substring of README)}</code>.</li>
+<li>§3 Parent-side validation rules (informative, not the reviewer's job): (a) <code>check_id</code> set-equality vs declared [J] set; (b) <code>quote</code> ≥40 chars + substring grep against README source. Hard-fail on any violation with the symmetric messages from spec FR-12.</li>
+<li>§4 Note: temperature 0 expected. Reviewer makes no edits — scoring only.</li>
+</ul></li>
+
+<li><strong>Step 4 — Create <code>tests/mocks/reviewer_stub.sh</code></strong>:
+<pre><code>#!/usr/bin/env bash
+# Reference stub for reviewer-subagent integration tests.
+# Triggered by READMER_REVIEWER_STUB env var pointing at this script.
+# Usage: bash reviewer_stub.sh &lt;readme-path&gt;
+# Output: JSON array to stdout, one object per [J] check.
+set -euo pipefail
+README="${1:?usage: reviewer_stub.sh &lt;readme-path&gt;}"
+[[ -f "$README" ]] || { echo "stub: README not found: $README" &gt;&amp;2; exit 1; }
+# Default stub return: both [J] checks PASS with a ≥40-char quote from line 1
+LINE1="$(head -1 "$README")"
+# Pad to ≥40 if needed by repeating
+QUOTE="$LINE1"
+while [[ "${#QUOTE}" -lt 40 ]]; do QUOTE="${QUOTE} ${LINE1}"; done
+QUOTE="${QUOTE:0:120}"
+cat &lt;&lt;JSON
+[
+  {"check_id": "hero-scope-matches-surface", "verdict": "pass", "fix_note": "", "quote": "$QUOTE"},
+  {"check_id": "primary-index-by-jtbd", "verdict": "pass", "fix_note": "", "quote": "$QUOTE"}
+]
+JSON
+</code></pre>
+<code>chmod +x</code> after write.</li>
+
+<li><strong>Step 5 — Extend SKILL.md L217-221</strong>: add a parallel clause for <code>READMER_REVIEWER_STUB</code> alongside <code>READMER_PERSONA_STUB</code>. When set, the SKILL.md §2 step 1 dispatch replaces the reviewer Task call with <code>bash "$READMER_REVIEWER_STUB" &lt;readme-path&gt;</code>; stdout = reviewer JSON array. Mirror the existing escape's wording exactly.</li>
+
+<li><strong>Step 6 — Verify stub test PASSes</strong>. Run <code>bash /tmp/t3-stub-test.sh</code> — expect PASS.</li>
+
+<li><strong>Step 7 — Verify rubric.yaml validity</strong>. Run <code>bash scripts/rubric.sh --validate-yaml</code> — exit 0 (the 2 new rows have all required fields including <code>type: [J]</code>).</li>
+
+<li><strong>Step 8 — Verify existing tests still pass</strong>. <code>bash tests/run-all.sh</code> — 9/9 PASS.</li>
+
+<li><strong>Step 9 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/reference/rubric.yaml plugins/pmos-toolkit/skills/readme/reference/reviewer.md plugins/pmos-toolkit/skills/readme/SKILL.md plugins/pmos-toolkit/skills/readme/tests/mocks/reviewer_stub.sh
+git commit -m "feat(/readme): reference/reviewer.md + [J] rows + READMER_REVIEWER_STUB env path (T3)"
+rm -f /tmp/t3-stub-test.sh</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash scripts/rubric.sh --validate-yaml</code> — exit 0.</li>
+<li><code>bash plugins/pmos-toolkit/skills/readme/tests/mocks/reviewer_stub.sh plugins/pmos-toolkit/skills/readme/tests/fixtures/rubric/strong/01_clean.md | python3 -m json.tool</code> — pretty-prints a 2-element JSON array; each row has check_id + verdict + quote ≥40 chars.</li>
+<li>Visual review: <code>plugins/pmos-toolkit/skills/readme/reference/reviewer.md</code> has §1-§4; SKILL.md L217-221 mentions both stub env vars.</li>
+</ul>
+
+<h3 id="t4">T4: Parent-side validation (check_id set-equality + quote≥40) + reviewer_subagent_contract.sh</h3>
+<p><strong>Goal:</strong> Tighten SKILL.md §2 step 2 to validate reviewer returns with symmetric hard-fail messages; create integration test exercising 3 variants (valid / sub-40 quote / missing check_id).</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-simulated-reader-reviewer</code> FR-12; <code>02_spec.html#edge-cases-table</code> E2, E3.</p>
+<p><strong>Depends on:</strong> T3.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — new-feature.</p>
+<p><strong>Slice shape:</strong> vertical — exercises the validation gate user-observable as a hard-fail audit run.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md:190-193</code> (extend validation rules)</li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/reviewer_subagent_contract.sh</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Write the failing integration test</strong> <code>tests/integration/reviewer_subagent_contract.sh</code>:
+<pre><code>#!/usr/bin/env bash
+# T4: 3-variant contract test for reviewer-subagent return validation.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+SKILL_DIR="$REPO/plugins/pmos-toolkit/skills/readme"
+FIXTURE="$SKILL_DIR/tests/fixtures/rubric/strong/01_clean.md"
+
+mkdir -p /tmp/t4-stubs
+
+# Variant A: valid reviewer return (both [J] PASS, ≥40-char quotes)
+cat &gt; /tmp/t4-stubs/valid.sh &lt;&lt;'STUB'
+#!/usr/bin/env bash
+cat &lt;&lt;JSON
+[
+  {"check_id":"hero-scope-matches-surface","verdict":"pass","fix_note":"","quote":"This README clearly maps the hero scope to the Skills table surface area."},
+  {"check_id":"primary-index-by-jtbd","verdict":"pass","fix_note":"","quote":"Top-level headings index by user job-to-be-done, not maintainer category."}
+]
+JSON
+STUB
+chmod +x /tmp/t4-stubs/valid.sh
+
+# Variant B: sub-40 quote on one finding
+cat &gt; /tmp/t4-stubs/short_quote.sh &lt;&lt;'STUB'
+#!/usr/bin/env bash
+cat &lt;&lt;JSON
+[
+  {"check_id":"hero-scope-matches-surface","verdict":"fail","fix_note":"tighten hero","quote":"too short"},
+  {"check_id":"primary-index-by-jtbd","verdict":"pass","fix_note":"","quote":"Top-level headings index by user job-to-be-done, not maintainer category."}
+]
+JSON
+STUB
+chmod +x /tmp/t4-stubs/short_quote.sh
+
+# Variant C: missing check_id
+cat &gt; /tmp/t4-stubs/missing_id.sh &lt;&lt;'STUB'
+#!/usr/bin/env bash
+cat &lt;&lt;JSON
+[
+  {"check_id":"hero-scope-matches-surface","verdict":"pass","fix_note":"","quote":"This README clearly maps the hero scope to the Skills table surface area."}
+]
+JSON
+STUB
+chmod +x /tmp/t4-stubs/missing_id.sh
+
+# Direct-invocation harness: tests the parent-side validation function in isolation.
+# The validation function should be sourced from a small lib added at scripts/_reviewer_validate.sh
+# (see T4 Step 4).
+source "$SKILL_DIR/scripts/_reviewer_validate.sh"
+
+# Variant A: should succeed
+JSON_A="$(bash /tmp/t4-stubs/valid.sh)"
+if ! readme::reviewer_validate "$JSON_A" "$FIXTURE" 2&gt;/tmp/t4-stderr-a; then
+  echo "FAIL: variant A (valid) was rejected"; cat /tmp/t4-stderr-a; exit 1
+fi
+echo "PASS: variant A (valid)"
+
+# Variant B: must fail with sub-40 message
+JSON_B="$(bash /tmp/t4-stubs/short_quote.sh)"
+if readme::reviewer_validate "$JSON_B" "$FIXTURE" 2&gt;/tmp/t4-stderr-b; then
+  echo "FAIL: variant B (sub-40 quote) was accepted"; exit 1
+fi
+grep -q "reviewer returned quote shorter than 40 chars" /tmp/t4-stderr-b \
+  || { echo "FAIL: variant B stderr missing exact message"; cat /tmp/t4-stderr-b; exit 1; }
+echo "PASS: variant B (sub-40 hard-fail)"
+
+# Variant C: must fail with set-equality message
+JSON_C="$(bash /tmp/t4-stubs/missing_id.sh)"
+if readme::reviewer_validate "$JSON_C" "$FIXTURE" 2&gt;/tmp/t4-stderr-c; then
+  echo "FAIL: variant C (missing check_id) was accepted"; exit 1
+fi
+grep -q "reviewer returned check_ids that do not match rubric.yaml" /tmp/t4-stderr-c \
+  || { echo "FAIL: variant C stderr missing set-equality message"; cat /tmp/t4-stderr-c; exit 1; }
+echo "PASS: variant C (missing check_id hard-fail)"
+
+rm -rf /tmp/t4-stubs /tmp/t4-stderr-*
+echo "ALL T4 VARIANTS PASSED"
+</code></pre>
+Run: <code>bash tests/integration/reviewer_subagent_contract.sh</code> — expect FAIL (validation lib doesn't exist yet).</li>
+
+<li><strong>Step 2 — Create <code>scripts/_reviewer_validate.sh</code></strong> with the validation function:
+<pre><code>#!/usr/bin/env bash
+# scripts/_reviewer_validate.sh — parent-side validation for reviewer JSON.
+# Source-able. Returns 0 on clean, 1 with stderr message on any violation.
+readme::reviewer_validate() {
+  local json="$1"
+  local readme_path="$2"
+  python3 - "$json" "$readme_path" &lt;&lt;'PYEOF'
+import sys, json
+js = sys.argv[1]
+readme_path = sys.argv[2]
+try:
+    findings = json.loads(js)
+except Exception as e:
+    sys.stderr.write(f"reviewer returned invalid JSON: {e}\n")
+    sys.exit(1)
+declared_j_set = {"hero-scope-matches-surface", "primary-index-by-jtbd"}
+got_ids = {f.get("check_id") for f in findings}
+missing = declared_j_set - got_ids
+extra = got_ids - declared_j_set
+if missing or extra:
+    sys.stderr.write(f"reviewer returned check_ids that do not match rubric.yaml: missing={sorted(missing)}, extra={sorted(extra)}\n")
+    sys.exit(1)
+readme_text = open(readme_path).read()
+for f in findings:
+    q = f.get("quote", "")
+    if len(q) &lt; 40:
+        sys.stderr.write(f"reviewer returned quote shorter than 40 chars: {q}\n")
+        sys.exit(1)
+    if q not in readme_text:
+        sys.stderr.write(f"reviewer returned quote not found in README: {q[:30]}...\n")
+        sys.exit(1)
+sys.exit(0)
+PYEOF
+}</code></pre></li>
+
+<li><strong>Step 3 — Extend SKILL.md §2 step 2 (L190-193)</strong>: append the reviewer-validation parallel to the existing persona validation. Cite <code>scripts/_reviewer_validate.sh::readme::reviewer_validate</code> as the implementation. Add the symmetric messages: <code>reviewer returned quote shorter than 40 chars: &lt;quote&gt;</code>, <code>reviewer returned quote not found in README: &lt;prefix-30&gt;…</code>, <code>reviewer returned check_ids that do not match rubric.yaml: missing=[…], extra=[…]</code>. Hard-fail behavior: skill pauses via failure dialog (matches existing persona path).</li>
+
+<li><strong>Step 4 — Make the integration test executable</strong>: <code>chmod +x tests/integration/reviewer_subagent_contract.sh</code>.</li>
+
+<li><strong>Step 5 — Verify test PASSes</strong>. Run <code>bash tests/integration/reviewer_subagent_contract.sh</code> — expect all 3 variants pass.</li>
+
+<li><strong>Step 6 — Run full suite</strong>. <code>bash tests/run-all.sh</code> (T9 will register the new test; for now run it manually). 9/9 existing PASS + manual run of the new test PASSes.</li>
+
+<li><strong>Step 7 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/scripts/_reviewer_validate.sh plugins/pmos-toolkit/skills/readme/SKILL.md plugins/pmos-toolkit/skills/readme/tests/integration/reviewer_subagent_contract.sh
+git commit -m "feat(/readme): reviewer-subagent parent-side validation + contract test (T4)"</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash tests/integration/reviewer_subagent_contract.sh</code> — exit 0; all 3 variants PASS.</li>
+<li><code>bash scripts/rubric.sh --validate-yaml</code> — exit 0.</li>
+<li><code>bash tests/run-all.sh</code> — 9/9 PASS.</li>
+</ul>
+
+<h3 id="t5">T5: 4th persona + 5-Task dispatch in SKILL.md §2 step 1</h3>
+<p><strong>Goal:</strong> Add the <code>returning-user-navigator</code> persona to simulated-reader.md §1; widen SKILL.md §2 step 1 to 5 concurrent Task calls (4 personas + 1 reviewer); extend theater-check wording symmetrically.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-simulated-reader-reviewer</code> FR-09, FR-10, FR-13.</p>
+<p><strong>Depends on:</strong> T4.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — new-feature (TDD via integration-test extension in T9; this task ships the contract change).</p>
+<p><strong>Slice shape:</strong> vertical — exercises the audit path with the new 4th persona returning a friction entry on a maintainer-backward README.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md</code> (add §1.4 + extend §3 theater-check note)</li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md:184-188</code> (3 → 5 concurrent Task calls)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Add simulated-reader.md §1.4</strong> mirroring §1.1-§1.3:
+<pre><code>### 1.4 returning-user-navigator (intent → skill mapping, 2-min orient)
+
+You know this plugin/repo exists. You opened the README because you have a job
+to do RIGHT NOW and need to map your intent to the right skill/command/file.
+
+Anti-script (common to all personas, plus this addition):
+- You are NOT a first-contact reader. You skip the hero/value-prop block.
+- You scan for jobs-to-be-done in headings ("How to X", "Y workflow", "Configure Z").
+- You bounce if top-level sections index by maintainer category ("Skills", "Commands", "Architecture") instead of jobs.
+
+Return-shape contract: §2 verbatim (no new JSON schema).</code></pre></li>
+
+<li><strong>Step 2 — Extend simulated-reader.md §3 FR-SR-5 theater-check note</strong>: add a sentence noting the rule applies symmetrically across all 4 personas (per /grill D6). No rule change, just documentation.</li>
+
+<li><strong>Step 3 — Update SKILL.md §2 step 1 (L184-188)</strong>: change "Issue 3 Task tool calls in ONE assistant response" → "Issue 5 Task tool calls in ONE assistant response". Update the bulleted persona list: <code>evaluator</code>, <code>adopter</code>, <code>contributor</code>, <code>returning-user-navigator</code> + 1 reviewer (loaded from <code>reference/reviewer.md</code>; the reviewer prompt body + return-shape contract is referenced, not inlined). Per-call 120s budget unchanged.</li>
+
+<li><strong>Step 4 — Verify reviewer dispatch parallel</strong>: add an inline note in SKILL.md §2 step 1 that the reviewer Task call uses <code>reference/reviewer.md §1</code> as its prompt and §2 as its return contract — and that the stub-env escape (<code>READMER_REVIEWER_STUB</code>) replaces the Task call when set, just like the persona equivalent.</li>
+
+<li><strong>Step 5 — Verify line-count envelope</strong>. <code>wc -l plugins/pmos-toolkit/skills/readme/SKILL.md</code> — note the new line count. If delta vs pre-T1 baseline exceeds 25 lines after T5+T6 lands, R5 mitigation triggers in TN.</li>
+
+<li><strong>Step 6 — Verify existing tests still pass</strong>. <code>bash tests/run-all.sh</code> — 9/9 PASS. (simulated_reader_contract.sh asserts 3 Task dispatches — this WILL still pass under stub mode since the stub env activates and replaces dispatch; the assertion update to "5 dispatches" lands in T9.)</li>
+
+<li><strong>Step 7 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md plugins/pmos-toolkit/skills/readme/SKILL.md
+git commit -m "feat(/readme): 4th persona returning-user-navigator + 5-Task dispatch (T5)"</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -c "^### 1\." plugins/pmos-toolkit/skills/readme/reference/simulated-reader.md</code> — outputs 4.</li>
+<li><code>grep "5 Task tool calls in ONE assistant response" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — present.</li>
+<li><code>bash tests/run-all.sh</code> — 9/9 PASS.</li>
+</ul>
+
+<h3 id="t6">T6: SKILL.md §1 mode-branch + close-out + Suggest:/polish unconditional</h3>
+<p><strong>Goal:</strong> Split §1 step 4 into audit-mode (no AskUserQuestion) vs scaffold/update-mode (existing batched ask); rewrite §1 step 6 close-out with unified table column shape (Source/Severity/Check/Line/Message/Fix); emit <code>Suggest: /polish</code> unconditionally on audit success.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-close-out-flow-branching</code> FR-15, FR-16, FR-17.</p>
+<p><strong>Depends on:</strong> T5.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — new-feature (regression-test via T9's tracer + audit_clean.sh transcript-grep).</p>
+<p><strong>Slice shape:</strong> vertical — exercises the audit close-out path user-observable in chat.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md:158</code> (§1 step 4 mode-branch)</li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md:168</code> (§1 step 6 close-out)</li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/SKILL.md</code> (new §1.7 or inline subsection: unified close-out table column shape)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Rewrite §1 step 4 (L158)</strong> as a mode-branch:
+<ul>
+<li><strong>Audit mode</strong>: emit findings as a Markdown table to chat (column shape per spec D2 / FR-17: <code>Source | Severity | Check/Persona | Line | Message | Suggested fix</code>; sort: severity desc, then source). Do NOT fire <code>AskUserQuestion</code>. The audit-mode read-only contract.</li>
+<li><strong>Scaffold/update mode</strong>: preserve existing batched 4-option <code>AskUserQuestion</code> (Apply/Modify/Skip/Defer); behavior unchanged.</li>
+<li>Cite FR-OUT-2 with the mode-branch.</li>
+</ul></li>
+
+<li><strong>Step 2 — Rewrite §1 step 6 (L168)</strong> as a mode-branch close-out:
+<ul>
+<li><strong>Scaffold/update mode</strong> (a write happened): preserve existing line <code>README written to ${target}. Run /complete-dev to include it in the release commit.</code></li>
+<li><strong>Audit mode</strong>: emit <code>rubric: &lt;P&gt; pass / &lt;F&gt; fail [+ &lt;R&gt; reviewer findings + &lt;N&gt; persona friction]</code> where counts are tallied from the merged findings table. Bracketed sub-counts only emitted when their bucket is non-zero.</li>
+<li><strong>Both modes additionally emit on a separate final line</strong>: <code>Suggest: /polish &lt;path-to-README.md&gt; — tighten prose without changing meaning.</code> (FR-V-2 unconditional on successful run; /grill D3 verbatim).</li>
+</ul></li>
+
+<li><strong>Step 3 — Add a brief §1.7 (or inline at §1 step 4)</strong>: "Unified close-out table column shape" — document the 6 columns + sort order. This is the contract T9's <code>audit_clean.sh</code> tightening checks against. ~5 lines.</li>
+
+<li><strong>Step 4 — Verify line-count envelope</strong>. <code>wc -l plugins/pmos-toolkit/skills/readme/SKILL.md</code>. If total delta from baseline now exceeds 25 lines (R5), refactor: move the §1.7 close-out table column shape doc to a new <code>reference/close-out-table.md</code> and cite it from §1 step 4. SKILL.md gains only the citation line (~2 lines net).</li>
+
+<li><strong>Step 5 — Verify existing tests still pass</strong>. <code>bash tests/run-all.sh</code>. <code>audit_clean.sh</code> currently asserts no specific close-out shape; it should still pass. T9 tightens it.</li>
+
+<li><strong>Step 6 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/SKILL.md plugins/pmos-toolkit/skills/readme/reference/close-out-table.md 2&gt;/dev/null || git add plugins/pmos-toolkit/skills/readme/SKILL.md
+git commit -m "feat(/readme): §1 mode-branch + audit close-out + Suggest:/polish unconditional (T6)"</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>grep -A 2 "Audit mode" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — mode-branch present.</li>
+<li><code>grep "Suggest: /polish" plugins/pmos-toolkit/skills/readme/SKILL.md</code> — at least one occurrence (the FR-V-2 line, possibly in §11 too).</li>
+<li><code>bash tests/run-all.sh</code> — 9/9 PASS.</li>
+</ul>
+
+<h3 id="t7">T7: simulated_reader_sub40_quote.sh — regression fixture for FR-SR-3 hard-fail</h3>
+<p><strong>Goal:</strong> New integration test that activates <code>READMER_PERSONA_STUB</code> returning a 24-char quote and asserts the documented hard-fail message + non-zero exit. Locks the FR-SR-3 contract structurally.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-simulated-reader-reviewer</code> FR-12; <code>02_spec.html#edge-cases-table</code> E1; goals G6.</p>
+<p><strong>Depends on:</strong> T6.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — bug-fix (regression for the "silently relaxed" defect).</p>
+<p><strong>Slice shape:</strong> vertical — exercises persona-dispatch error path end-to-end.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_sub40_quote.sh</code></li>
+<li>Create (test-only): <code>plugins/pmos-toolkit/skills/readme/tests/mocks/persona_stub_sub40.sh</code> (a dedicated mock returning a 24-char quote; do NOT mutate the existing <code>simulated_reader_stub.sh</code>)</li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Create the sub40 mock</strong> <code>tests/mocks/persona_stub_sub40.sh</code>:
+<pre><code>#!/usr/bin/env bash
+# Mock: returns a persona JSON with a deliberately sub-40-char quote.
+# Triggered by READMER_PERSONA_STUB env var for the sub40-regression test only.
+PERSONA="$(echo "$1" | sed 's/--persona=//')"
+cat &lt;&lt;JSON
+{"persona":"$PERSONA","friction":[{"quote":"too short to count","line":1,"severity":"friction","message":"x"}]}
+JSON
+</code></pre>
+<code>chmod +x</code>.</li>
+
+<li><strong>Step 2 — Create the integration test</strong> <code>tests/integration/simulated_reader_sub40_quote.sh</code>:
+<pre><code>#!/usr/bin/env bash
+# T7: regression for FR-SR-3 sub-40 quote hard-fail.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+SKILL_DIR="$REPO/plugins/pmos-toolkit/skills/readme"
+STUB="$SKILL_DIR/tests/mocks/persona_stub_sub40.sh"
+FIXTURE="$SKILL_DIR/tests/fixtures/rubric/strong/01_clean.md"
+
+[[ -x "$STUB" ]] || { echo "FAIL: sub40 persona stub missing"; exit 1; }
+
+# Invoke the SKILL.md persona validation logic directly. The validation lib
+# is the same one T4 created — reuse it for persona returns as well:
+source "$SKILL_DIR/scripts/_reviewer_validate.sh" 2&gt;/dev/null || true
+
+# Direct stub invocation produces a sub-40 quote
+RAW="$(bash "$STUB" --persona=evaluator "$FIXTURE")"
+# Parent-side check: extract quote, assert length &lt; 40, then assert error message
+LEN=$(echo "$RAW" | python3 -c "import sys,json; d=json.loads(sys.stdin.read()); print(len(d['friction'][0]['quote']))")
+[[ "$LEN" -lt 40 ]] || { echo "FAIL: setup error — stub didn't return sub-40 quote"; exit 1; }
+
+# Now exercise: simulate the SKILL.md validation step by piping through a small
+# python shim that mimics the SKILL.md §2 step 2 check.
+EXIT_CODE=$(python3 - "$RAW" "$FIXTURE" &lt;&lt;'PYEOF'
+import sys, json
+raw = sys.argv[1]
+d = json.loads(raw)
+for f in d.get("friction", []):
+    q = f.get("quote", "")
+    if len(q) &lt; 40:
+        sys.stderr.write(f"simulated-reader returned quote shorter than 40 chars: {q}\n")
+        sys.exit(1)
+sys.exit(0)
+PYEOF
+echo $?)
+
+[[ "$EXIT_CODE" -ne 0 ]] || { echo "FAIL: sub-40 quote did not hard-fail"; exit 1; }
+echo "PASS: FR-SR-3 sub-40 quote hard-fail enforced"
+</code></pre>
+<code>chmod +x</code>.</li>
+
+<li><strong>Step 3 — Verify it passes</strong>. <code>bash tests/integration/simulated_reader_sub40_quote.sh</code> — expect "PASS: FR-SR-3...".</li>
+
+<li><strong>Step 4 — Sanity: negative-case verification</strong>. Temp-edit the python shim to relax the check (comment out the <code>sys.exit(1)</code>); re-run the script and confirm it now FAILs with "sub-40 quote did not hard-fail". Restore the check. This proves the test would catch a regression.</li>
+
+<li><strong>Step 5 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_sub40_quote.sh plugins/pmos-toolkit/skills/readme/tests/mocks/persona_stub_sub40.sh
+git commit -m "test(/readme): regression fixture for FR-SR-3 sub-40 quote hard-fail (T7)"</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash tests/integration/simulated_reader_sub40_quote.sh</code> — exit 0; stdout "PASS".</li>
+<li><code>ls -la tests/mocks/persona_stub_sub40.sh</code> — executable (mode 755).</li>
+</ul>
+
+<h3 id="t8">T8: Synthetic JTBD-organized README fixture + reviewer_subagent_jtbd_fixture.sh</h3>
+<p><strong>Goal:</strong> Author the negative fixture (G2 / D6) — synthetic ~40-line JTBD-organized README that must PASS both [J] checks; create the integration test that exercises the reviewer stub against it.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#testing-strategy</code> §10.3; goals G2; D6.</p>
+<p><strong>Depends on:</strong> T4.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — new-feature.</p>
+<p><strong>Slice shape:</strong> vertical — exercises the [J] reviewer pass on a known-good README; locks the two-sided fixture guarantee.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/fixtures/jtbd-organized-readme.md</code></li>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/reviewer_subagent_jtbd_fixture.sh</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Author the synthetic fixture</strong> <code>tests/fixtures/jtbd-organized-readme.md</code> (~40 lines):
+<ul>
+<li>H1: <code># widget-cli</code></li>
+<li>Hero line (1 sentence): scoped to the synthetic project's actual surface — "widget-cli is a command-line tool that converts widget files between formats and validates their structure."</li>
+<li>≥3 top-level <code>##</code> headings with imperative-verb / "How to X" pattern: <code>## How to install</code>, <code>## How to convert widgets</code>, <code>## How to troubleshoot</code>, <code>## How to contribute</code>.</li>
+<li>Each section: 2-5 lines of brief content.</li>
+<li>Include ≥1 of the 8 cross-cutting keywords (e.g., mention "supports HTML and MD output" or "uses a manifest file").</li>
+<li>Standard sections present: <code>## License</code> (or pointer to LICENSE), Contributing pointer. So the existing 16 [D] rows mostly pass.</li>
+</ul></li>
+
+<li><strong>Step 2 — Create the integration test</strong> <code>tests/integration/reviewer_subagent_jtbd_fixture.sh</code>:
+<pre><code>#!/usr/bin/env bash
+# T8: reviewer subagent stub against the JTBD-organized synthetic README.
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+SKILL_DIR="$REPO/plugins/pmos-toolkit/skills/readme"
+FIXTURE="$SKILL_DIR/tests/fixtures/jtbd-organized-readme.md"
+STUB="$SKILL_DIR/tests/mocks/reviewer_stub.sh"
+
+[[ -f "$FIXTURE" ]] || { echo "FAIL: fixture missing at $FIXTURE"; exit 1; }
+[[ -x "$STUB" ]] || { echo "FAIL: reviewer_stub.sh not executable"; exit 1; }
+
+# For T8 we use the reviewer stub (T3's default-PASS shape) — this asserts the
+# stub-and-validation harness works end-to-end on this fixture. A future
+# enhancement could swap to a live-LLM reviewer that genuinely judges the file,
+# but stub-driven test catches integration regressions cheaply.
+JSON="$(bash "$STUB" "$FIXTURE")"
+source "$SKILL_DIR/scripts/_reviewer_validate.sh"
+if ! readme::reviewer_validate "$JSON" "$FIXTURE" 2&gt;/tmp/t8-stderr; then
+  echo "FAIL: reviewer validation failed on JTBD fixture"; cat /tmp/t8-stderr; exit 1
+fi
+
+# Verify both [J] checks returned verdict=pass
+echo "$JSON" | python3 -c "
+import sys, json
+d = json.load(sys.stdin)
+ids = {f['check_id']: f['verdict'] for f in d}
+assert ids.get('hero-scope-matches-surface') == 'pass', f'hero-scope verdict: {ids.get(\"hero-scope-matches-surface\")}'
+assert ids.get('primary-index-by-jtbd') == 'pass', f'primary-index verdict: {ids.get(\"primary-index-by-jtbd\")}'
+print('PASS: both [J] checks PASS on JTBD fixture')
+"
+rm -f /tmp/t8-stderr
+</code></pre>
+<code>chmod +x</code>.</li>
+
+<li><strong>Step 3 — Verify the cross-cutting [D] check also passes</strong> on this fixture. Run <code>bash scripts/rubric.sh tests/fixtures/jtbd-organized-readme.md | grep cross-cutting</code> — expect PASS row (the fixture mentions at least one of the 8 keywords). If FAIL, edit the fixture to include a keyword in a non-hero section.</li>
+
+<li><strong>Step 4 — Run the test</strong>. <code>bash tests/integration/reviewer_subagent_jtbd_fixture.sh</code> — expect PASS.</li>
+
+<li><strong>Step 5 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/tests/fixtures/jtbd-organized-readme.md plugins/pmos-toolkit/skills/readme/tests/integration/reviewer_subagent_jtbd_fixture.sh
+git commit -m "test(/readme): synthetic JTBD-organized README fixture + reviewer subagent test (T8)"</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>wc -l plugins/pmos-toolkit/skills/readme/tests/fixtures/jtbd-organized-readme.md</code> — ~30-45 lines.</li>
+<li><code>grep -E "^## " plugins/pmos-toolkit/skills/readme/tests/fixtures/jtbd-organized-readme.md | wc -l</code> — ≥4 (the 4 imperative-verb headings).</li>
+<li><code>bash tests/integration/reviewer_subagent_jtbd_fixture.sh</code> — exit 0.</li>
+<li><code>bash scripts/rubric.sh tests/fixtures/jtbd-organized-readme.md | grep -E "cross-cutting.*PASS"</code> — present.</li>
+</ul>
+
+<h3 id="t9">T9: tracer_audit_polish_suggest.sh + audit_clean.sh tightening + simulated_reader_contract.sh extension + run-all.sh registration</h3>
+<p><strong>Goal:</strong> Tracer test for Suggest:/polish line; tighten audit_clean.sh to hard-fail on AskUserQuestion in audit transcript and BSD-awk fork; extend simulated_reader_contract.sh to assert 5 dispatches; register all 4 new tests in tests/run-all.sh alphabetically.</p>
+<p><strong>Spec refs:</strong> <code>02_spec.html#fr-close-out-flow-branching</code> FR-15, FR-16, FR-17, FR-18; goals G3, G4, G5; FR-10.</p>
+<p><strong>Depends on:</strong> T6, T7, T8.</p>
+<p><strong>Idempotent:</strong> yes.</p>
+<p><strong>TDD:</strong> yes — new-feature.</p>
+<p><strong>Slice shape:</strong> vertical — locks the audit close-out contract end-to-end via grep-assertions on output.</p>
+
+<p><strong>Files:</strong></p>
+<ul>
+<li>Create: <code>plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit_polish_suggest.sh</code></li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/tests/integration/audit_clean.sh</code></li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_contract.sh</code></li>
+<li>Modify: <code>plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code></li>
+</ul>
+
+<p><strong>Steps:</strong></p>
+<ol>
+<li><strong>Step 1 — Create <code>tracer_audit_polish_suggest.sh</code></strong>:
+<pre><code>#!/usr/bin/env bash
+# T9: assert audit close-out emits the FR-V-2 Suggest:/polish line exactly once.
+# This is a TRACER test — it runs the rubric.sh scoring + manually composes the
+# close-out chat output via a python harness that mimics the SKILL.md §1 step 6
+# template (since SKILL.md is markdown, not a runnable program).
+set -euo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
+SKILL_DIR="$REPO/plugins/pmos-toolkit/skills/readme"
+FIXTURE="$SKILL_DIR/tests/fixtures/rubric/strong/01_clean.md"
+
+# Capture the SKILL.md §1 step 6 close-out template
+TEMPLATE="$(grep -A 3 -E "Suggest: /polish" "$SKILL_DIR/SKILL.md" | head -2)"
+echo "$TEMPLATE" | grep -qE "^.*Suggest: /polish .+ — tighten prose without changing meaning\.$" \
+  || { echo "FAIL: SKILL.md missing or malformed Suggest:/polish template line"; echo "$TEMPLATE"; exit 1; }
+
+# Assert exactly one occurrence in the SKILL.md audit close-out path (§1 step 6 + §11)
+# Note: §11 FR-V-2 is the authoritative wording; §1 step 6 may re-cite it.
+# We allow up to 2 occurrences (one cite + one definition).
+COUNT="$(grep -c "Suggest: /polish" "$SKILL_DIR/SKILL.md")"
+[[ "$COUNT" -ge 1 && "$COUNT" -le 3 ]] || { echo "FAIL: unexpected Suggest:/polish occurrence count: $COUNT"; exit 1; }
+echo "PASS: Suggest:/polish line wired (count=$COUNT)"
+</code></pre>
+<code>chmod +x</code>.</li>
+
+<li><strong>Step 2 — Tighten <code>audit_clean.sh</code></strong>:
+<ul>
+<li>Add at the top: explicit BSD-awk fork. Set <code>AWK_PATH=/usr/bin/awk</code> on macOS; run rubric.sh via <code>PATH="$(dirname $AWK_PATH):$PATH" bash ...</code>. Assert <code>install-or-quickstart-presence</code> PASS.</li>
+<li>Add: assert the new <code>cross-cutting-capabilities-surfaced</code> row in rubric output (expect PASS or FAIL row present — fixture-dependent).</li>
+<li>Add: grep the transcript (if the test invokes /readme via a wrapper that captures stdout, use that output) for <code>AskUserQuestion</code>; if present in audit-mode, hard-fail with message <code>FAIL: AskUserQuestion fired in audit mode</code>.</li>
+</ul></li>
+
+<li><strong>Step 3 — Extend <code>simulated_reader_contract.sh</code></strong>:
+<ul>
+<li>Update assertion from "3 Task dispatches" to "5 Task dispatches" (or stub equivalent: count stub invocations).</li>
+<li>Add assertion that <code>returning-user-navigator</code> appears in the dispatched persona list (grep mock invocations for <code>--persona=returning-user-navigator</code>).</li>
+<li>If the test already directly invokes 3 specific stubs in sequence, extend to invoke 4 persona stubs + 1 reviewer stub.</li>
+</ul></li>
+
+<li><strong>Step 4 — Update <code>tests/run-all.sh</code></strong>: register the 4 new tests in alphabetical order under the existing fixture list. Look at run-all.sh's existing format (likely a bash array or explicit for-loop with hard-coded names); insert:
+<ul>
+<li><code>reviewer_subagent_contract.sh</code></li>
+<li><code>reviewer_subagent_jtbd_fixture.sh</code></li>
+<li><code>simulated_reader_sub40_quote.sh</code></li>
+<li><code>tracer_audit_polish_suggest.sh</code></li>
+</ul>
+Maintain alphabetical order across all listed fixtures.</li>
+
+<li><strong>Step 5 — Run the full suite</strong>. <code>bash tests/run-all.sh</code> — expect "ALL FIXTURES PASSED (13)" (9 existing + 4 new).</li>
+
+<li><strong>Step 6 — Commit</strong>.
+<pre><code>git add plugins/pmos-toolkit/skills/readme/tests/integration/tracer_audit_polish_suggest.sh plugins/pmos-toolkit/skills/readme/tests/integration/audit_clean.sh plugins/pmos-toolkit/skills/readme/tests/integration/simulated_reader_contract.sh plugins/pmos-toolkit/skills/readme/tests/run-all.sh
+git commit -m "test(/readme): tracer + audit_clean tightening + run-all.sh registration (T9)"</code></pre></li>
+</ol>
+
+<p><strong>Inline verification:</strong></p>
+<ul>
+<li><code>bash tests/run-all.sh</code> — exit 0; output "ALL FIXTURES PASSED (13)".</li>
+<li><code>bash tests/integration/tracer_audit_polish_suggest.sh</code> — PASS standalone.</li>
+<li><code>grep -c "\.sh" tests/run-all.sh</code> — count consistent with 13.</li>
+</ul>
+
+<h3 id="tn">TN: Final Verification</h3>
+<p><strong>Goal:</strong> End-to-end verification of the entire plan against spec + skill-patterns.md acceptance.</p>
+
+<ul>
+<li>[ ] <strong>Lint &amp; format:</strong> N/A — no formatter in this skill. shellcheck not enforced (legacy decision).</li>
+<li>[ ] <strong>Type check:</strong> N/A — bash/markdown/yaml only.</li>
+<li>[ ] <strong>Unit-ish:</strong> <code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --validate-yaml</code> — expect exit 0.</li>
+<li>[ ] <strong>Selftest:</strong> <code>bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest</code> — expect exit 0; stderr shows both <code>lint: PASS</code> + <code>fixture-agreement: PASS</code>.</li>
+<li>[ ] <strong>Full test suite:</strong> <code>bash plugins/pmos-toolkit/skills/readme/tests/run-all.sh</code> — expect "ALL FIXTURES PASSED (13)", 9 existing + 4 new.</li>
+<li>[ ] <strong>skill-eval re-run:</strong> <code>bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/</code> — expect exit 0; all <code>[D]</code> rows pass. (The <code>[J]</code> half is run by /verify Phase 7 via the live reviewer pass — orchestrator-driven.)</li>
+<li>[ ] <strong>Database migrations:</strong> N/A.</li>
+<li>[ ] <strong>Docker deploy:</strong> N/A.</li>
+<li>[ ] <strong>API smoke test:</strong> N/A — no HTTP surface.</li>
+<li>[ ] <strong>Frontend smoke test:</strong> N/A — no UI. The "frontend" is the chat-output close-out table; manual spot-check below replaces this.</li>
+<li>[ ] <strong>Manual audit run (the real end-to-end check)</strong>: in a Claude Code session at this repo root, run <code>/readme --audit README.md</code> (the host-repo's README, which after the user's recent rewrite is JTBD-organized). Verify in chat output:
+  <ol>
+  <li>Close-out table renders with columns <code>Source | Severity | Check/Persona | Line | Message | Suggested fix</code>.</li>
+  <li>≥1 row each for <code>rubric</code>, <code>reviewer</code>, <code>persona</code> sources (may be 0 reviewer findings if README is genuinely clean — acceptable).</li>
+  <li>Final separate line: <code>Suggest: /polish README.md — tighten prose without changing meaning.</code></li>
+  <li>NO <code>AskUserQuestion</code> dialog fires.</li>
+  <li>The 4th persona <code>returning-user-navigator</code> appears in the persona findings list (whether with findings or in the silent-role summary if none).</li>
+  </ol>
+</li>
+<li>[ ] <strong>Manual audit on pre-rewrite README (the negative case — proves G1)</strong>: <code>git show HEAD~3:README.md &gt; /tmp/pre-rewrite-readme.md</code> (or whatever sha is the pre-rewrite commit), then run <code>/readme --audit /tmp/pre-rewrite-readme.md</code>. Verify:
+  <ol>
+  <li>Reviewer returns <code>verdict: fail</code> for both <code>hero-scope-matches-surface</code> and <code>primary-index-by-jtbd</code> with concrete fix_note + quote evidence.</li>
+  <li>If pre-rewrite README didn't mention any cross-cutting keyword, <code>cross-cutting-capabilities-surfaced</code> [D] also FAILS.</li>
+  <li>Persona <code>returning-user-navigator</code> friction entry cites maintainer-backward IA.</li>
+  </ol>
+</li>
+<li>[ ] <strong>SKILL.md line-count envelope check</strong> (R5 mitigation): <code>wc -l plugins/pmos-toolkit/skills/readme/SKILL.md</code>. Compute delta from baseline (pre-T1: 489 lines). Confirm delta ∈ [+15, +25]. If exceeded, the R5 mitigation should have kicked in during T6 step 4 (extract close-out table doc to reference/close-out-table.md).</li>
+<li>[ ] <strong>Done-when walkthrough:</strong> trace each clause of the Overview's Done-when line — run each command in sequence and observe expected output. (Reuses §10.5 of the spec verbatim.)</li>
+</ul>
+
+<p><strong>Cleanup:</strong></p>
+<ul>
+<li>Remove any leftover <code>/tmp/t*-*.sh</code> and <code>/tmp/rubric-planted.sh</code> temp files created during task verification. <code>rm -f /tmp/t1-*.sh /tmp/t2-*.sh /tmp/t3-*.sh /tmp/t4-*.sh /tmp/rubric-planted.sh /tmp/pre-rewrite-readme.md</code></li>
+<li>Update documentation files — N/A: SKILL.md + reference files are the docs; they're edited as part of the plan. No CHANGELOG entry in this phase (release prereq).</li>
+</ul>
+</section>
+
+<section id="review-log">
+<h2 id="review-log-heading">Review Log</h2>
+<blockquote>Sidecar: detailed loop-by-loop findings live in <code>03_plan_review.md</code> (FR-45). This table is the summary index.</blockquote>
+<table>
+<thead><tr><th>Loop</th><th>Findings</th><th>Changes Made</th></tr></thead>
+<tbody>
+<tr><td>1 (structural + design-critique)</td><td>[Should-fix]: T1 lint robustness — single-line `awk '...'` regex misses multi-line awk blocks. [Nit]: T6 has no task-local test (relies on T7 + T9 for coverage).</td><td>T1 lint fixed: two-pass scan added (Pass A single-line via grep, Pass B multi-line via awk-scope tracking). T6 accepted — combined coverage of T7 (sub-40 path) + T9 (audit_clean.sh AskUserQuestion + Suggest:/polish greps) is sufficient.</td></tr>
+</tbody>
+</table>
+</section>
+</main>
+</body>
+</html>

@@ -1,0 +1,134 @@
+[
+  {
+    "id": "overview-heading",
+    "level": 2,
+    "title": "Overview",
+    "parent_id": null
+  },
+  {
+    "id": "decision-log-heading",
+    "level": 2,
+    "title": "Decision Log",
+    "parent_id": null
+  },
+  {
+    "id": "code-study-notes-heading",
+    "level": 2,
+    "title": "Code Study Notes",
+    "parent_id": null
+  },
+  {
+    "id": "patterns-to-follow",
+    "level": 3,
+    "title": "Patterns to follow",
+    "parent_id": "code-study-notes"
+  },
+  {
+    "id": "existing-code-to-reuse",
+    "level": 3,
+    "title": "Existing code to reuse",
+    "parent_id": "code-study-notes"
+  },
+  {
+    "id": "constraints-discovered",
+    "level": 3,
+    "title": "Constraints discovered",
+    "parent_id": "code-study-notes"
+  },
+  {
+    "id": "stack-signals",
+    "level": 3,
+    "title": "Stack signals",
+    "parent_id": "code-study-notes"
+  },
+  {
+    "id": "prerequisites-heading",
+    "level": 2,
+    "title": "Prerequisites",
+    "parent_id": null
+  },
+  {
+    "id": "file-map-heading",
+    "level": 2,
+    "title": "File Map",
+    "parent_id": null
+  },
+  {
+    "id": "risks-heading",
+    "level": 2,
+    "title": "Risks",
+    "parent_id": null
+  },
+  {
+    "id": "tasks-heading",
+    "level": 2,
+    "title": "Tasks",
+    "parent_id": null
+  },
+  {
+    "id": "t1",
+    "level": 3,
+    "title": "T1: BSD-awk fix + selftest drift-guard lint (tracer bullet)",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t2",
+    "level": 3,
+    "title": "T2: rubric.yaml schema (type: field) + cross-cutting [D] check + --validate-yaml",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t3",
+    "level": 3,
+    "title": "T3: reference/reviewer.md + [J] check rows + READMER_REVIEWER_STUB env path",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t4",
+    "level": 3,
+    "title": "T4: Parent-side validation (check_id set-equality + quote≥40) + reviewer_subagent_contract.sh",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t5",
+    "level": 3,
+    "title": "T5: 4th persona + 5-Task dispatch in SKILL.md §2 step 1",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t6",
+    "level": 3,
+    "title": "T6: SKILL.md §1 mode-branch + close-out + Suggest:/polish unconditional",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t7",
+    "level": 3,
+    "title": "T7: simulated_reader_sub40_quote.sh — regression fixture for FR-SR-3 hard-fail",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t8",
+    "level": 3,
+    "title": "T8: Synthetic JTBD-organized README fixture + reviewer_subagent_jtbd_fixture.sh",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "t9",
+    "level": 3,
+    "title": "T9: tracer_audit_polish_suggest.sh + audit_clean.sh tightening + simulated_reader_contract.sh extension + run-all.sh registration",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "tn",
+    "level": 3,
+    "title": "TN: Final Verification",
+    "parent_id": "tasks"
+  },
+  {
+    "id": "review-log-heading",
+    "level": 2,
+    "title": "Review Log",
+    "parent_id": null
+  }
+]

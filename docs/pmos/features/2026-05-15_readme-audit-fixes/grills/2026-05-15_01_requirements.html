@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Grill Report — 01_requirements (readme-audit-fixes)</title>
+<link rel="stylesheet" href="../assets/style.css?v=2.48.0">
+</head>
+<body>
+<main>
+<header>
+<h1>Grill Report — 01_requirements.html (readme-audit-fixes)</h1>
+<p><strong>Date:</strong> 2026-05-15 · <strong>Depth:</strong> standard · <strong>Questions asked:</strong> 6 · <strong>Target:</strong> <code>docs/pmos/features/2026-05-15_readme-audit-fixes/01_requirements.html</code></p>
+</header>
+
+<section id="resolved">
+<h2 id="resolved-heading">Resolved</h2>
+<table>
+<thead><tr><th>#</th><th>Branch</th><th>Disposition</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>F1 rubric check type (<code>primary-index-by-jtbd</code>, <code>hero-scope-matches-surface</code>)</td><td><strong>Reclassify both to <code>[J]</code> LLM-judge.</strong> Stop pretending semantic checks are regex-tractable; match the precedent in <code>/skill-eval</code>.</td></tr>
+<tr><td>2</td><td>F5 sub-40 quote severity</td><td><strong>Hard-fail + pause</strong> (matches spec-forbids-silent-recovery; mirrors <code>/feature-sdlc</code> FR-52). User retries by re-running.</td></tr>
+<tr><td>3</td><td>D3 <code>Suggest: /polish</code> gating</td><td><strong>Unconditional on successful audit</strong> (matches §11 verbatim; trust the user to ignore).</td></tr>
+<tr><td>4</td><td>Goodhart / overfit risk on Goal #1</td><td><strong>Add 2nd negative fixture: a JTBD-organized README that must PASS the new checks.</strong> Two-sided fixture pins both catch and false-positive.</td></tr>
+<tr><td>5</td><td>F2 BSD-awk drift prevention</td><td><strong>Add <code>--selftest</code> lint: grep awk blocks for <code>\b</code>/<code>\&lt;</code>/<code>\&gt;</code>, fail if found.</strong> Cheap structural guard, prevents reintroduction.</td></tr>
+<tr><td>6</td><td>OQ-3 theater-check fit for 4th persona</td><td><strong>Extend FR-SR-5 unchanged.</strong> Symmetric with existing 3 personas.</td></tr>
+</tbody>
+</table>
+</section>
+
+<section id="newly-resolved">
+<h2 id="newly-resolved-heading">Newly resolved (was Open Question in requirements)</h2>
+<ul>
+<li><strong>OQ-3</strong> — answered above (extend FR-SR-5 unchanged). No longer deferred.</li>
+<li><strong>[J] orchestration</strong> — <strong>Parallel: 5 concurrent Task calls</strong> (4 personas + 1 reviewer-subagent for the 2 <code>[J]</code> IA-fit checks). New finding-merge contract needed in /spec.</li>
+</ul>
+</section>
+
+<section id="open-deferred">
+<h2 id="open-deferred-heading">Open / Deferred (still for /spec)</h2>
+<ul>
+<li><strong>OQ-1</strong> — canonical keyword list for <code>cross-cutting-capabilities-surfaced</code> (HTML/MD, worktrees, auto-tiering, self-eval). Still <code>[D]</code> per Q1 answer (only the 2 semantic ones moved to <code>[J]</code>).</li>
+<li><strong>OQ-2</strong> — JTBD-heading threshold (≥3 of N? ≥50%?) — <strong>moot</strong> if <code>primary-index-by-jtbd</code> is <code>[J]</code>. /spec should explicitly drop OQ-2 with rationale.</li>
+</ul>
+</section>
+
+<section id="gaps-surfaced">
+<h2 id="gaps-surfaced-heading">Gaps surfaced</h2>
+<ol>
+<li><strong>[J] reviewer findings-table merge contract</strong> — how reviewer findings render alongside rubric <code>[D]</code> + persona findings in the close-out table. Add to /spec.</li>
+<li><strong>Net rubric size text needs revision</strong> — "15 → 18 deterministic" becomes "15 → 16 <code>[D]</code> + 2 <code>[J]</code> reviewer-judged." Update requirements §3 + Goals + Non-Goals wording.</li>
+<li><strong>Persona count change consistency</strong> — F1 says "3 → 4 concurrent Task calls"; updated answer means SKILL.md §2 step 1 actually goes 3 → 5 (4 personas + 1 reviewer). Reconcile in /spec.</li>
+<li><strong>Negative-fixture corpus location</strong> — e.g. <code>tests/fixtures/jtbd-organized-readme.md</code>. /spec specifies path + content shape.</li>
+<li><strong><code>--selftest</code> lint exit-code contract</strong> — does the new awk-<code>\b</code> lint contribute to existing <code>--selftest</code> exit code, or is it a separate check? /spec decides.</li>
+</ol>
+</section>
+
+<section id="recommended-next-step">
+<h2 id="recommended-next-step-heading">Recommended next step</h2>
+<ul>
+<li>Revise <code>01_requirements.html</code>: update F1 ("3 new deterministic" → "1 [D] + 2 [J] reviewer-judged"), §3 net-rubric text (18 → 16 [D] + 2 [J]), Goals/Non-Goals net-count language, primary journey (14 pass / 4 fail counts), and resolve OQ-3 inline (with FR-SR-5 unchanged).</li>
+<li>Mark OQ-2 dropped in the next /requirements revision (heuristic threshold moot now).</li>
+<li>Then proceed to /spec with the 5 gaps above seeded as design tasks.</li>
+</ul>
+</section>
+</main>
+</body>
+</html>

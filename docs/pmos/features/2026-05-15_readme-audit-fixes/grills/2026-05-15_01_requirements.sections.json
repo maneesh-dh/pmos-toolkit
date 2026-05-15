@@ -1,0 +1,32 @@
+[
+  {
+    "id": "resolved-heading",
+    "level": 2,
+    "title": "Resolved",
+    "parent_id": null
+  },
+  {
+    "id": "newly-resolved-heading",
+    "level": 2,
+    "title": "Newly resolved (was Open Question in requirements)",
+    "parent_id": null
+  },
+  {
+    "id": "open-deferred-heading",
+    "level": 2,
+    "title": "Open / Deferred (still for /spec)",
+    "parent_id": null
+  },
+  {
+    "id": "gaps-surfaced-heading",
+    "level": 2,
+    "title": "Gaps surfaced",
+    "parent_id": null
+  },
+  {
+    "id": "recommended-next-step-heading",
+    "level": 2,
+    "title": "Recommended next step",
+    "parent_id": null
+  }
+]

@@ -1,0 +1,86 @@
+[
+  {
+    "id": "problem-heading",
+    "level": 2,
+    "title": "Problem",
+    "parent_id": null
+  },
+  {
+    "id": "who-experiences-this",
+    "level": 3,
+    "title": "Who experiences this?",
+    "parent_id": "problem"
+  },
+  {
+    "id": "why-now",
+    "level": 3,
+    "title": "Why now?",
+    "parent_id": "problem"
+  },
+  {
+    "id": "goals-non-goals-heading",
+    "level": 2,
+    "title": "Goals & Non-Goals",
+    "parent_id": null
+  },
+  {
+    "id": "goals",
+    "level": 3,
+    "title": "Goals",
+    "parent_id": "goals-non-goals"
+  },
+  {
+    "id": "non-goals",
+    "level": 3,
+    "title": "Non-Goals",
+    "parent_id": "goals-non-goals"
+  },
+  {
+    "id": "solution-direction-heading",
+    "level": 2,
+    "title": "Solution Direction",
+    "parent_id": null
+  },
+  {
+    "id": "user-journeys-heading",
+    "level": 2,
+    "title": "User Journeys",
+    "parent_id": null
+  },
+  {
+    "id": "primary-journey",
+    "level": 3,
+    "title": "Primary Journey — returning-user audit on a maintainer-backward README",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "error-edge-cases",
+    "level": 3,
+    "title": "Error / Edge Cases",
+    "parent_id": "user-journeys"
+  },
+  {
+    "id": "design-decisions-heading",
+    "level": 2,
+    "title": "Design Decisions",
+    "parent_id": null
+  },
+  {
+    "id": "acceptance-against-skill-patterns-heading",
+    "level": 2,
+    "title": "Acceptance against skill-patterns.md (standing FRs)",
+    "parent_id": null
+  },
+  {
+    "id": "open-questions-heading",
+    "level": 2,
+    "title": "Open Questions",
+    "parent_id": null
+  },
+  {
+    "id": "review-log-heading",
+    "level": 2,
+    "title": "Review Log",
+    "parent_id": null
+  }
+]

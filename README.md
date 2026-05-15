@@ -1,119 +1,133 @@
 # PMOS Toolkit
 
-A plugin marketplace for Claude Code and Codex CLI that provides a structured software delivery pipeline — from requirements through to verification — plus supporting utilities for backlog tracking, personal tasks, prose polishing, and more.
+A Claude Code and Codex plugin for product builders. Turn fuzzy ideas into
+shipped features, run user research, draft PRDs and design docs, critique UIs,
+and track personal work — without leaving your terminal.
 
-**Plugin name:** `pmos-toolkit`
-**Namespace:** Skills are invoked as `/pmos-toolkit:<skill-name>`
+**What makes it different:** every workflow has built-in adversarial and
+user-perspective checks, so the output survives contact with reality:
 
-## Repository Structure
+- `/grill` interviews you on shaky assumptions before you commit to a direction.
+- `/msf-req` and `/msf-wf` simulate user friction against requirements and wireframes.
+- `/simulate-spec` pressure-tests a technical design before any code is written.
+- `/creativity` surfaces non-obvious alternatives you'd otherwise miss.
+- `/ideate` runs premortem + inversion + assumption-mapping on a half-formed idea.
+
+Skills are namespaced `/pmos-toolkit:<name>` — for brevity the rest of this
+README drops the prefix.
+
+## What do you want to do?
+
+| I want to… | Use | Notes |
+|---|---|---|
+| Take an idea all the way to shipped code | `/feature-sdlc <idea>` | Drives the full pipeline: requirements → grill → spec → plan → execute → verify → ship |
+| Pressure-test a half-formed idea before writing it up | `/ideate` | Frame → expand → premortem + inversion; outputs a one-page brief |
+| Shape just requirements (no code yet) | `/requirements` | Stress-test with `/grill` or `/msf-req` after |
+| Mock up the UI before specifying it | `/wireframes` → `/prototype` | Static HTML wireframes, then a clickable React prototype |
+| Critique an existing UI, wireframes, or prototype | `/design-crit` | Nielsen + WCAG 2.2 + Gestalt + PSYCH/MSF rubric |
+| Write a technical design doc | `/spec`, or `/artifact` for a standalone EDD/PRD | `/simulate-spec` to pressure-test |
+| Break a spec into TDD tasks | `/plan` | Then `/execute` to implement |
+| Implement an existing plan | `/execute` | `--subagent-driven` for parallel waves with per-task review |
+| Verify and ship work | `/verify` → `/complete-dev` | Lint, test, multi-agent review, then merge + version + push |
+| Author a new skill (or revise one from feedback) | `/skill-sdlc` | Same pipeline, scored against a binary eval rubric before merge |
+| Draft a PRD / EDD / Discovery Doc | `/artifact` | Section-level eval + writing-style presets |
+| Tighten any prose | `/polish` | 14-check rubric; voice-preserving; optional editorial reduction pass |
+| Audit, scaffold, or update a README | `/readme` | Rubric + 3-persona simulated reader |
+| Design and field a survey | `/survey-design` | Then `/survey-analyse` on the responses |
+| Generate a vector diagram | `/diagram` | Brainstorms framings, self-evaluates against a hybrid rubric |
+| Audit a codebase against architectural principles | `/architecture` | L1 universal + L2 stack + L3 per-repo; promotes findings to ADRs |
+| Track personal tasks (LNO, due dates, people) | `/mytasks` | Lives at `~/.pmos/tasks/` |
+| Track a lightweight repo backlog | `/backlog` | Hybrid quick-capture + structured tracker |
+| Persist context across sessions and repos | `/product-context` | Workstream / product / feature scope |
+| Capture session learnings | `/session-log` | Decisions, gotchas, patterns |
+| Send feedback to skill authors | `/retro` | Severity-tagged, per-skill, from the session transcript |
+| Diagnose a slow / hot Mac | `/mac-health` | Background processes, extension leaks, sleep blockers |
+
+## How it works
+
+Five cross-cutting capabilities the whole toolkit is built on:
+
+- **HTML-primary artifacts with Markdown sidecar.** Pipeline skills emit HTML
+  by default (better for review and stakeholder sharing) with a Markdown
+  sidecar for diffing. Controlled by `output_format` in `.pmos/settings.yaml`
+  — set once per repo.
+- **Resumable worktree pipelines.** `/feature-sdlc` runs each feature in its
+  own git worktree with state persisted to `.pmos/feature-sdlc/state.yaml`.
+  Crash, close the session, switch machines — `cd` back in and resume from the
+  last checkpoint. `/feature-sdlc list` shows everything in flight across all
+  `feat/*` worktrees.
+- **Auto-tiering by scope.** Every pipeline skill detects whether you're doing
+  a bug fix, an enhancement, or a feature, and adjusts depth automatically
+  (Tier 1 = lightweight, Tier 3 = full ceremony). You don't pick the tier;
+  the skill does.
+- **Adversarial self-evaluation loops.** `/wireframes`, `/prototype`,
+  `/diagram`, `/survey-design`, `/artifact`, `/readme` all dispatch a reviewer
+  subagent against the draft, apply approved fixes, and loop up to two
+  iterations before showing you anything. Built-in, not opt-in.
+- **Persistent workstream context.** `~/.pmos/workstreams/` stores product /
+  area / feature scope across repos and sessions. Pipeline skills read it as
+  a context preamble so you stop re-explaining what you're building. Set via
+  `/product-context`.
+
+<details>
+<summary>More platform features</summary>
+
+- **Per-developer run defaults.** `/complete-dev` remembers your last release
+  answers (`.pmos/complete-dev.lastrun.yaml`) and short-circuits the confirm
+  prompts on subsequent runs. Destructive prompts still fire.
+- **Parallel subagent execution.** `/execute --subagent-driven` runs
+  independent tasks in parallel waves with two-stage review (spec compliance
+  + code quality). `/readme`'s simulated-reader dispatches three reader
+  personas concurrently. `/wireframes` and `/prototype` parallelise per-device
+  generation.
+- **User-extensible templates.** `/artifact` reads custom templates from
+  `~/.pmos/artifacts/`; `/polish` reads custom checks from
+  `~/.pmos/polish/custom-checks.yaml`. Bring your own writing-style preset or
+  rubric.
+- **Per-skill learnings capture.** Every skill appends session lessons to
+  `~/.pmos/learnings.md` under `## /<skill-name>`, then reads them on next
+  invocation. The toolkit gets smarter about your workflow over time.
+- **Cross-platform, non-interactive ready.** The same skill bodies run under
+  Claude Code and Codex CLI. A canonical `--non-interactive` mode auto-picks
+  recommended answers and defers ambiguous or destructive choices to an
+  open-questions log, so the pipeline runs unattended in headless CI agents.
+
+</details>
+
+## The build-a-feature pipeline
+
+For the end-to-end "idea → shipped" flow, the skills compose like this:
 
 ```
-pmos-toolkit/
-├── .claude-plugin/
-│   └── marketplace.json       Marketplace manifest (this repo IS the marketplace)
-├── .claude/
-│   └── commands/              Project-scoped slash commands (e.g., /push)
-├── .codex/
-│   └── INSTALL.md             Codex installation instructions
-├── plugins/
-│   └── pmos-toolkit/
-│       ├── .claude-plugin/
-│       │   └── plugin.json    Claude Code plugin manifest
-│       ├── .codex-plugin/
-│       │   └── plugin.json    Codex plugin manifest
-│       ├── skills/            Plugin skills
-│       └── agents/            Shared agent definitions
-├── docs/
-│   ├── specs/                 Skill specs
-│   └── plans/                 Implementation plans
-└── skills/                    (Reserved for non-plugin skills; plugin loads from plugins/pmos-toolkit/skills/)
+/ideate? → /requirements → [/wireframes → /prototype] → /spec → /plan → /execute → /verify → /complete-dev
+                              optional (UI work)
+
+Adversarial passes are available at every stage:
+  /grill          — interview on shaky assumptions
+  /msf-req        — user-friction analysis on requirements
+  /msf-wf         — user-friction analysis on wireframes
+  /creativity     — non-obvious alternatives
+  /simulate-spec  — pressure-test the design before code
 ```
 
-## Skills
+`/feature-sdlc` runs this whole chain for you, auto-tiering each stage by
+scope (bug fix vs. enhancement vs. feature) and persisting resumable state in
+a worktree.
 
-### Pipeline (requirements → spec → plan → execute → verify → complete-dev)
-
-| Skill | Description |
-|-------|-------------|
-| `/pmos-toolkit:requirements` | Brainstorm and shape a requirements document — first pipeline stage |
-| `/pmos-toolkit:wireframes` | Generate static HTML wireframes (Tailwind, mid-fi, multi-device) for user-facing features — optional bridge between /requirements and /spec |
-| `/pmos-toolkit:prototype` | High-fidelity interactive prototype (React via CDN + JSX, mock API) stitching wireframe screens into walkable journeys — optional bridge between /wireframes and /spec |
-| `/pmos-toolkit:spec` | Technical specification from requirements — second pipeline stage |
-| `/pmos-toolkit:simulate-spec` | Pressure-test a spec via scenario trace, fitness critique, interface cross-reference, targeted pseudocode — optional validator between /spec and /plan |
-| `/pmos-toolkit:plan` | Execution plan from a spec — third pipeline stage |
-| `/pmos-toolkit:execute` | Implement a plan end-to-end with TDD and verification — `--subagent-driven` runs a fresh implementer subagent per task, fans independent tasks out across parallel waves, and puts each task through a two-stage (spec + code-quality) review; default is inline single-agent execution. `/plan` asks which mode at close |
-| `/pmos-toolkit:verify` | Post-implementation verification gate — lint, test, multi-agent code review, interactive QA |
-| `/pmos-toolkit:complete-dev` | End-of-dev orchestrator — confirm run defaults (Phase 0.5: one consolidated prompt seeded from per-repo `.pmos/complete-dev.lastrun.yaml`), merge, deploy per repo norms, capture learnings, /changelog, version bump, commit, tag, push to all remotes, then remove the worktree (Phase 16.5 — after push tag succeeds, preserving /feature-sdlc resume contract). Supersedes legacy /push (which remains available this release; will be removed next release) |
-
-### Pipeline orchestrators
-
-| Skill | Description |
-|-------|-------------|
-| `/pmos-toolkit:feature-sdlc` | End-to-end SDLC orchestrator — turns an initial idea into a shipped feature by sequentially driving requirements → grill → optional gates → spec → simulate-spec → plan → execute → verify → complete-dev. Auto-tiers, creates worktree + branch via `EnterWorktree` (with `cd <worktree> && claude --resume` handoff if the harness can't enter inline), persists resumable state inside the worktree, surfaces compact checkpoints before heavy phases. `/feature-sdlc list` shows in-flight features across all `feat/*` worktrees. `/feature-sdlc skill <description>` / `/feature-sdlc skill --from-feedback <…>` drive the same pipeline to author a new skill or apply feedback to existing skill(s), scoring each against a binary eval rubric before merge |
-| `/pmos-toolkit:skill-sdlc` | Thin alias for `/feature-sdlc skill …` — create a new skill or apply retro/feedback to existing skill(s) via the full SDLC pipeline |
-| `/pmos-toolkit:update-skills` | _Archived in 2.38.0 — superseded by `/feature-sdlc skill --from-feedback`; see `archive/skills/README.md`_ |
-
-### Pipeline enhancers (optional)
-
-| Skill | Description |
-|-------|-------------|
-| `/pmos-toolkit:msf-req` | Motivation/Satisfaction/Friction analysis on a requirements doc — recommendations-only |
-| `/pmos-toolkit:msf-wf` | Grounded MSF + PSYCH analysis on a wireframes folder; `--apply-edits` to apply HTML edits inline (typically invoked from /wireframes Phase 6) |
-| `/pmos-toolkit:creativity` | Structured creativity techniques for non-obvious improvements |
-| `/pmos-toolkit:grill` | Adversarially interview a plan, spec, or design to surface unresolved decisions and shaky assumptions |
-
-### Artifacts & docs
-
-| Skill | Description |
-|-------|-------------|
-| `/pmos-toolkit:artifact` | Generate, refine, and update PRDs, EDDs, Engineering Design Docs, Discovery Docs with section-level eval criteria + writing-style presets. Custom templates at `~/.pmos/artifacts/` |
-| `/pmos-toolkit:polish` | Critique and refactor any markdown doc for clarity, concision, voice, and de-AI-slop — 14-check binary rubric with auto-apply + per-finding approval |
-| `/pmos-toolkit:changelog` | Generate user-facing changelog entries after merging to main |
-| `/pmos-toolkit:session-log` | Capture learnings, decisions, and patterns from a session |
-| `/pmos-toolkit:retro` | Paste-back retrospective for every pmos-toolkit skill invoked in the session — severity-tagged feedback for skill authors |
-
-### Tracking & context
-
-| Skill | Description |
-|-------|-------------|
-| `/pmos-toolkit:product-context` | Persistent workstream context (product / area / feature) that enriches all pipeline skills across repos and sessions. Stored at `~/.pmos/workstreams/` |
-| `/pmos-toolkit:backlog` | Lightweight, AI-readable backlog of features, bugs, tech-debt, and ideas inside the repo. Hybrid quick-capture + structured tracker; integrates with the pipeline via `--backlog <id>` |
-| `/pmos-toolkit:mytasks` | Persistent personal task tracker (LNO importance, due dates, people, workstream). Lives at `~/.pmos/tasks/` |
-| `/pmos-toolkit:people` | Shared person/contact directory consumed by /mytasks. Stored at `~/.pmos/people/` |
-
-### Utilities
-
-| Skill | Description |
-|-------|-------------|
-| `/pmos-toolkit:create-skill` | _Archived in 2.38.0 — superseded by `/feature-sdlc skill <description>` (or the `/skill-sdlc` alias); see `archive/skills/README.md`_ |
-| `/pmos-toolkit:diagram` | Generate a single SVG vector diagram from a free-form description — brainstorms 2–3 framings, drafts, and self-evaluates against a hybrid SVG-metrics + vision rubric |
-| `/pmos-toolkit:ideate` | Turn a fuzzy idea into a structured, pressure-tested one-page brief — 3-phase loop (Frame → Expand → Pressure-test) with always-on premortem + Munger inversion + assumption-mapping against the chosen finalist, saved to `{docs_path}/ideate/{YYYY-MM-DD}_<slug>.html` |
-| `/pmos-toolkit:readme` | Audit, scaffold, or update a repository's README against a binary 15-check rubric + 3-persona simulated reader. Three modes (`--audit`, `--scaffold`, `--update <commit-range>`); monorepo-aware (8 workspace manifests + multi-stack); voice work delegated to `/polish`; never auto-commits |
-| `/pmos-toolkit:architecture` | Audit a repo against tiered architectural principles (L1 universal ≤15 rules, L2 stack-specific via dependency-cruiser/ruff, L3 per-repo overrides at `<repo>/.pmos/architecture/principles.yaml`); emit JSON report with rule citations; promote ≤5 block findings to Nygard ADRs at `<repo>/docs/adr/NNNN-<slug>.md`. CLI-only, offline, deterministic |
-| `/pmos-toolkit:survey-design` | Design a methodologically sound survey from a rough intent (or refine an existing one) — generates a sectioned `survey.json`, runs a reviewer-critique pass + a simulated-respondent friction walk, renders a fillable `preview.html`, and emits import files for Typeform / SurveyMonkey / Google Forms |
-| `/pmos-toolkit:survey-analyse` | Analyse fielded survey responses (CSV / TSV / XLSX / XLS / PDF) and produce a defensible HTML report — bundled per-question-type Python helpers compute deterministic stats, the LLM authors a per-run `analysis.py`, open-end coding via subagent-per-question (Braun & Clarke), cross-tabs with Holm correction by default. Sister to `/survey-design` |
-| `/pmos-toolkit:design-crit` | Critique an application URL, wireframes, or prototype on overall UX — captures flow screenshots via packaged Playwright script, evaluates against a Nielsen + WCAG 2.2 + visual + Gestalt + journey-friction rubric, runs a PSYCH/MSF pass, and synthesises prioritized recommendations |
-| `/pmos-toolkit:mac-health` | Diagnose battery drain, orphaned processes, browser extension leaks, and cleanup opportunities |
-
-**Pipeline flow:**
-
-```
-/requirements  →  [/wireframes  →  /prototype]  →  [/msf-req, /creativity, /grill]  →  /spec  →  [/simulate-spec]  →  /plan  →  /execute  →  /verify
-                   optional bridges (UI features)    optional enhancers                  optional validator
-```
-
-`/polish`, `/artifact`, `/backlog`, `/mytasks`, `/people`, `/product-context`, `/changelog`, `/session-log`, `/retro`, `/feature-sdlc`, `/skill-sdlc`, `/diagram`, `/survey-design`, `/survey-analyse`, `/design-crit`, `/ideate`, `/readme`, `/architecture`, `/mac-health` are standalone — invoke them at any point.
+Every other skill is standalone — invoke at any point.
 
 ## Install
 
-### Claude Code
-
 ```bash
+# Claude Code
 /plugin marketplace add maneesh-dhabria/pmos-toolkit
 /plugin install pmos-toolkit
 ```
 
-### Codex
+Smoke test: run `/pmos-toolkit:mytasks` or `/pmos-toolkit:backlog` — both work
+on a fresh install with no prior artifacts.
+
+### Codex (recommended)
 
 Tell Codex:
 
@@ -121,7 +135,10 @@ Tell Codex:
 Fetch and follow instructions from https://raw.githubusercontent.com/maneesh-dhabria/pmos-toolkit/refs/heads/main/.codex/INSTALL.md
 ```
 
-Or manually:
+Then restart Codex.
+
+<details>
+<summary>Codex — manual install</summary>
 
 ```bash
 git clone https://github.com/maneesh-dhabria/pmos-toolkit.git ~/.codex/pmos-toolkit
@@ -129,57 +146,55 @@ mkdir -p ~/.agents/skills
 ln -s ~/.codex/pmos-toolkit/plugins/pmos-toolkit/skills ~/.agents/skills/pmos-toolkit
 ```
 
-Then restart Codex.
+</details>
 
-### Verify
-
-Open a new session and run `/pmos-toolkit:spec` or `/pmos-toolkit:plan` to confirm the plugin is loaded.
-
-## Local Development
-
-For developing skills locally:
+## Local development
 
 ```bash
-# Clone the repo
 git clone https://github.com/maneesh-dhabria/pmos-toolkit.git
-
-# Load directly (per-session)
 claude --plugin-dir /path/to/pmos-toolkit
 ```
 
-Changes to skill files take effect after restarting your session or running `/reload-plugins`. Plugin caching is keyed by `version` in `plugin.json` — bump the version on any skill content change, otherwise updates won't be picked up. Both `.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` versions must match (enforced by `.githooks/pre-push`).
+Changes take effect after restarting the session or running `/reload-plugins`.
+Plugin caching is keyed by `version` in `plugin.json` — bump the version on
+any skill content change. Both `.claude-plugin/plugin.json` and
+`.codex-plugin/plugin.json` versions must match (enforced by
+`.githooks/pre-push`).
 
-For pushing changes, use the project-scoped `/push` slash command. It walks pre-flight checks, version bump prompts, manifest sync verification, JSON schema validation, feature-branch reconciliation, commit-message review, stale branch cleanup, and sequential push to all 3 remotes.
+Skills live under `plugins/pmos-toolkit/skills/<skill-name>/SKILL.md` — that
+path is the only one the loader reads.
 
-## Adding New Skills
-
-Use `/pmos-toolkit:feature-sdlc skill <description>` (or the `/skill-sdlc` alias) inside a session, or manually:
-
-1. Create `plugins/pmos-toolkit/skills/<skill-name>/SKILL.md` with the required frontmatter:
-
-```yaml
----
-name: my-skill
-description: What it does. When to use it. Natural trigger phrases.
-user-invocable: true
-argument-hint: "<what to pass>"
----
-```
-
-2. Bump `version` in BOTH `plugins/pmos-toolkit/.claude-plugin/plugin.json` and `plugins/pmos-toolkit/.codex-plugin/plugin.json` (must match).
-3. Add a row to the Skills table in this README.
-4. Restart your session or run `/reload-plugins`.
-
-The `/push` command automates steps 2 and 3.
+To add or revise a skill, use `/skill-sdlc <description>` (or
+`/skill-sdlc --from-feedback <text|path>` to apply retro feedback).
 
 ## Updating
 
+Claude Code updates automatically via the marketplace. For Codex:
+
 ```bash
-# Claude Code updates automatically via the marketplace.
-# For Codex:
 cd ~/.codex/pmos-toolkit && git pull
 ```
 
 ## Requirements
 
 - Claude Code or Codex CLI
+
+## Contributing
+
+This is a solo-maintained project. To keep the surface area honest:
+
+- **Feedback is welcome** — open a GitHub issue, or run `/pmos-toolkit:retro`
+  at the end of a session and paste the output. `/retro` produces
+  severity-tagged, per-skill feedback that's the easiest signal for me to act
+  on.
+- **Bug reports are welcome** — issues with a reproducer get priority.
+- **Unsolicited PRs are not accepted.** If you'd like to propose a skill
+  change, run `/pmos-toolkit:skill-sdlc --from-feedback <description>` on your
+  end, share the proposed diff in an issue, and we'll discuss before any code
+  lands.
+- **Forks are fine.** MIT means you can take the toolkit in any direction you
+  want under your own name.
+
+## License
+
+[MIT](LICENSE) — use it however you want, please keep the copyright notice.

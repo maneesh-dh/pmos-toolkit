@@ -59,14 +59,39 @@ if ! diff -u "$tmp/README.snapshot.md" "$tmp/README.md" >/dev/null; then
   exit 1
 fi
 
-# 3. Strong-fixture sanity: ≥12/15 checks PASS (matches rubric.sh selftest
-#    threshold for "strong-agreement").
+# 3. Strong-fixture sanity: ≥12/16 checks PASS (rubric.sh selftest threshold).
+#    Rubric now has 16 [D] rows after T2's cross-cutting addition.
 pass_count=$(grep -c $'\tPASS\t' "$tmp/out1.tsv" || true)
 if [ "${pass_count:-0}" -lt 12 ]; then
-  echo "FAIL: strong fixture scored ${pass_count}/15 < 12 (rubric.sh selftest gate)"
+  echo "FAIL: strong fixture scored ${pass_count}/16 < 12 (rubric.sh selftest gate)"
   cat "$tmp/out1.tsv"
   exit 1
 fi
 
-echo "PASS: audit_clean — deterministic eval (${pass_count}/15 PASS), zero file diff (NFR-2 holds)"
+# 4. Cross-cutting [D] check (T2 / FR-08): row must be present in output.
+if ! grep -qE '^cross-cutting-capabilities-surfaced\t' "$tmp/out1.tsv"; then
+  echo "FAIL: cross-cutting-capabilities-surfaced row missing from audit output"
+  exit 1
+fi
+
+# 5. BSD-awk fork (T1 / FR-05/FR-06): explicitly force the BSD awk path
+#    (macOS /usr/bin/awk) and assert install-or-quickstart-presence PASSes.
+if [ -x /usr/bin/awk ]; then
+  PATH="/usr/bin:$PATH" bash "$SCRIPTS/rubric.sh" "$tmp/README.md" \
+    >"$tmp/out-bsd.tsv" 2>&1 || true
+  if ! grep -qE '^install-or-quickstart-presence\tPASS\t' "$tmp/out-bsd.tsv"; then
+    echo "FAIL: install-or-quickstart-presence regressed under BSD awk"
+    grep '^install-or-quickstart-presence' "$tmp/out-bsd.tsv" || true
+    exit 1
+  fi
+fi
+
+# 6. Audit-mode contract (T6 / FR-15): SKILL.md must declare that audit-mode
+#    does NOT fire AskUserQuestion. Grep the spec text for the contract line.
+if ! grep -qF 'Do NOT fire `AskUserQuestion`' "$HERE/../../SKILL.md"; then
+  echo "FAIL: SKILL.md audit-mode contract missing the 'Do NOT fire AskUserQuestion' clause"
+  exit 1
+fi
+
+echo "PASS: audit_clean — deterministic eval (${pass_count}/16 PASS), zero file diff (NFR-2 holds), cross-cutting row present, BSD-awk fork green, audit-mode contract preserved"
 exit 0

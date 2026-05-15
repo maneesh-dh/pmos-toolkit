@@ -2,7 +2,7 @@
 # simulated_reader_stub.sh — canned persona output for FR-SR-3 contract tests.
 # Triggered by READMER_PERSONA_STUB env var pointing at this script.
 #
-# Args: --persona=<evaluator|adopter|contributor> <readme-path>
+# Args: --persona=<evaluator|adopter|contributor|returning-user-navigator> <readme-path>
 # Stdout: per-persona JSON matching reference/simulated-reader.md §2 schema.
 set -euo pipefail
 
@@ -33,6 +33,12 @@ JSON
     # Altered: "Ripgrep is a line-oriented search tool…" (capital R)
     cat <<'JSON'
 {"persona":"contributor","friction":[{"quote":"Ripgrep is a line-oriented search tool for recursively searching the current directory for a regex pattern.","line":3,"severity":"friction","message":"contributing section missing"}]}
+JSON
+    ;;
+  returning-user-navigator)
+    # VALID: quote is a verbatim ≥40-char substring of the fixture README.
+    cat <<'JSON'
+{"persona":"returning-user-navigator","friction":[{"quote":"ripgrep is a line-oriented search tool for recursively searching the current directory for a regex pattern.","line":3,"severity":"friction","message":"top-level headings index by maintainer category; cannot map 'how do I exclude a path' to a section quickly"}]}
 JSON
     ;;
   *)

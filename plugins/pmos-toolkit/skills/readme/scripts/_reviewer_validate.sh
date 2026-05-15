@@ -8,9 +8,17 @@
 #   2. check_id set-equality vs declared [J] set in rubric.yaml.
 #   3. Each finding's quote is ≥40 chars AND a verbatim substring of the README.
 
-# Resolve rubric.yaml relative to this script.
-_REVIEWER_VALIDATE_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-: "${READMER_RUBRIC_YAML:=$_REVIEWER_VALIDATE_HERE/../reference/rubric.yaml}"
+# Resolve rubric.yaml relative to this script. BASH_SOURCE[0] is set when
+# sourced from inside a script (the production path) and possibly unset in
+# some harness sub-shells; fall back to a git-rev-parse lookup so the
+# function stays callable in both contexts.
+if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
+  _REVIEWER_VALIDATE_HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  : "${READMER_RUBRIC_YAML:=$_REVIEWER_VALIDATE_HERE/../reference/rubric.yaml}"
+else
+  _REVIEWER_VALIDATE_REPO="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  : "${READMER_RUBRIC_YAML:=$_REVIEWER_VALIDATE_REPO/plugins/pmos-toolkit/skills/readme/reference/rubric.yaml}"
+fi
 
 readme::reviewer_validate() {
   local json="$1"

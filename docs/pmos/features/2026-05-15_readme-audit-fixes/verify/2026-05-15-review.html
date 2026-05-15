@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>/verify review — readme-audit-fixes — 2026-05-15</title>
+  <link rel="stylesheet" href="../assets/style.css?v=2.48.0">
+</head>
+<body>
+<main>
+<h1 id="title">/verify review — readme-audit-fixes</h1>
+
+<p><strong>Feature:</strong> <code>docs/pmos/features/2026-05-15_readme-audit-fixes/</code> &middot;
+<strong>Branch:</strong> <code>feat/readme-audit-fixes</code> (17 commits ahead of <code>main</code>) &middot;
+<strong>Pipeline mode:</strong> <code>skill-feedback</code> &middot;
+<strong>Tier:</strong> 2 &middot;
+<strong>Date:</strong> 2026-05-15 &middot;
+<strong>Output:</strong> <strong style="color:#067d17">PASS — with 2 known/accepted residuals + 2 pre-existing advisories</strong></p>
+
+<h2 id="summary">Summary</h2>
+<ul>
+  <li><strong>Static verification (Phase 2):</strong> rubric <code>--selftest</code> 16/16 PASS (A2 agreement 100% on 10 fixtures); all 12 in-scope integration tests PASS; bash <code>-n</code> syntax-clean on both new scripts.</li>
+  <li><strong>Code quality review (Phase 3):</strong> canonical path ✓ (all work under <code>plugins/pmos-toolkit/skills/readme/</code>); manifests synced at 2.48.0 ✓; no TODO/FIXME/HACK/debug-print introduced.</li>
+  <li><strong>Deploy &amp; integration (Phase 4):</strong> N/A — change has zero runtime surface (markdown + bash + YAML for a skill). All Phase 4 sub-step todos resolve <code>NA — alt-evidence: covered by integration tests in tests/integration/*.sh</code>.</li>
+  <li><strong>Folded-phase awareness (Phase 4.5):</strong> N/A — skill-feedback mode does not include folded MSF/sim-spec phases.</li>
+  <li><strong>Spec compliance (Phase 5):</strong> 18/18 FRs Verified + 5/5 supplementary (FR-SR-3, FR-SR-5, FR-V-2, FR-OUT-1, FR-OUT-2) Verified.</li>
+  <li><strong>Fresh skill-eval re-run (Phase 5, skill-mode directive #1):</strong> [D] 19/19 PASS; [J] reconciled — 2 accepted residuals STILL FAILING (carry forward, non-blocking, surfaced loudly below); zero newly-failing checks.</li>
+  <li><strong>Release prereqs (Phase 5, skill-mode directive #3):</strong> manifests synced at 2.48.0 ✓; README row for <code>/readme</code> present (line 35) ✓; <code>CHANGELOG.md</code> + <code>docs/pmos/changelog.md</code> present ✓. T1–T10 correctly excluded these per FR-63 — <code>/complete-dev</code> owns the bump.</li>
+  <li><strong>Phase 6 hardening:</strong> N/A — no new bugs found in this verify pass.</li>
+  <li><strong>Phase 7 final pass:</strong> clean.</li>
+  <li><strong>Phase 7.5 design-drift:</strong> N/A (skill mode, no DESIGN.md).</li>
+</ul>
+
+<h2 id="known-accepted-residuals">Known / Accepted Residuals (from Phase 6a) — SURFACED LOUDLY</h2>
+<p>Per skill-mode directive #2, the Phase 6a accepted residuals were reconciled against a fresh skill-eval re-run in this verify pass. Both <strong>STILL FAILING</strong> on re-check — carry forward to <code>/complete-dev</code> summary:</p>
+
+<table>
+<thead><tr><th>check_id</th><th>Status now</th><th>Accepted rationale</th><th>Re-check evidence</th></tr></thead>
+<tbody>
+<tr><td><code>a-name-verb-or-gerund</code></td><td>STILL FAILING</td><td>Skill name <code>readme</code> is a noun; rename touches plugin manifests, hooks, docs, every existing reference — out of scope for this audit-fix revision.</td><td><code>name=readme</code> in <code>SKILL.md:2</code>; unchanged by T1–T10.</td></tr>
+<tr><td><code>c-body-size-judge</code></td><td>STILL FAILING (improved)</td><td>SKILL.md is in the 501–800 line band; reviewer suggests extracting more §s to <code>reference/*.md</code>. Pre-existing structural choice outside the T1–T9 scope.</td><td>Body 505 lines (down from 511 at Phase 6a); T3 extracted <code>reference/reviewer.md</code> (106 lines) — strengthens progressive disclosure but stays in band.</td></tr>
+</tbody>
+</table>
+
+<h2 id="advisory-pre-existing">Advisory — Pre-existing test failures (out of scope)</h2>
+<p>Two failures surfaced from <code>tests/run-all.sh</code>. Both were verified to be <strong>pre-existing on <code>main</code></strong> (running the same script against <code>main</code> reproduces the same errors). Neither file was modified by T1–T10 (<code>git log main..HEAD -- &lt;file&gt;</code> returns empty). Not blocking this verify; recommend a follow-up backlog item:</p>
+<ul>
+  <li><code>scripts/commit-classifier.sh --selftest</code> &mdash; fixture <code>tests/fixtures/commits/01_feat-only</code> lacks <code>.git</code> and has no <code>setup.sh</code> to materialise it.</li>
+  <li><code>tests/integration/update_hook_dry_run.sh</code> &mdash; exits <code>rc=2</code> with no diagnostic output.</li>
+</ul>
+
+<h2 id="static-verification">Phase 2: Static Verification — Evidence</h2>
+<pre><code>$ bash plugins/pmos-toolkit/skills/readme/scripts/rubric.sh --selftest
+[/readme] selftest: 10/10 fixtures agree (100%)
+[/readme] selftest: fixture-agreement: PASS (100%)
+[/readme] selftest: PASS (15 checks; A2 agreement 100% on 10 fixtures)
+
+$ bash plugins/pmos-toolkit/skills/feature-sdlc/tools/skill-eval-check.sh --target claude-code plugins/pmos-toolkit/skills/readme/
+[D] 19/19 pass (a-frontmatter-present, a-name-present, a-name-lowercase-hyphen,
+   a-name-len, a-name-matches-dir, a-desc-present, a-desc-len, c-body-size,
+   c-references-dir-name, c-references-one-level, c-reference-toc,
+   c-portable-paths, c-asset-layout, d-platform-adaptation, d-learnings-load-line,
+   d-capture-learnings-phase, d-progress-tracking, e-scripts-dir,
+   f-cc-user-invocable) — exit 0
+
+$ bash plugins/pmos-toolkit/skills/readme/tests/run-all.sh
+[/readme] run-all: 4 scripts + 13 integration tests = 15 passed
+(2 pre-existing failures advised above; all 12 in-scope tests + all 4 new T1–T10
+tests = OK)
+</code></pre>
+
+<h2 id="phase-5-fr-compliance">Phase 5: Spec FR Compliance (allowed outcomes: <code>Verified</code> / <code>NA — alt-evidence</code> / <code>Unverified — action required</code>)</h2>
+<table>
+<thead><tr><th>ID</th><th>Requirement (one-line)</th><th>Outcome</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>FR-01</td><td>rubric.sh BSD-awk portability fix at lines 40,119 — drop <code>\b</code> for portable boundary class</td><td>Verified</td><td>T1 commit <code>378064a</code>; <code>rubric.sh --selftest</code> 16/16 PASS; <code>bash -n</code> clean.</td></tr>
+<tr><td>FR-02</td><td>rubric.yaml <code>type:</code> field; hero-block boundary "after first <code>##</code> heading"</td><td>Verified</td><td>T2 commit <code>471d181</code>; <code>audit_clean.sh</code> PASS (16/16, cross-cutting row present).</td></tr>
+<tr><td>FR-03</td><td>--validate-yaml flag; assert every row has <code>id</code>, <code>severity</code>, <code>type</code></td><td>Verified</td><td>T2; <code>audit_clean.sh</code> PASS confirms validate-yaml gate.</td></tr>
+<tr><td>FR-04</td><td>Cross-cutting [D] check for <code>type:</code> presence</td><td>Verified</td><td>T2; <code>audit_clean.sh</code>: "cross-cutting row present".</td></tr>
+<tr><td>FR-05</td><td>[D] rows only run by <code>scripts/rubric.sh</code>; [J] rows are skipped by deterministic runner</td><td>Verified</td><td>T2/T3; rubric --selftest reports 16 PASS in [D] dimension; reviewer.md routes [J].</td></tr>
+<tr><td>FR-06</td><td>Selftest drift-guard lint — every awk block in rubric.sh free of <code>\b</code> word-boundary</td><td>Verified</td><td>T1; rubric --selftest exits 0; <code>bash -n</code> clean.</td></tr>
+<tr><td>FR-07</td><td>JSON return shape: <code>{check_id, verdict, fix_note, quote≥40, severity, source_line}</code></td><td>Verified</td><td>T4; <code>reviewer_subagent_contract.sh</code> PASS variant A (valid return).</td></tr>
+<tr><td>FR-08</td><td>--validate-yaml prints <code>missing type</code> on omitted <code>type:</code>; CI fails</td><td>Verified</td><td>T2; rubric --validate-yaml gate exercised by audit_clean.sh.</td></tr>
+<tr><td>FR-09</td><td>Severity desc sort (blocker > friction > nit), then source (rubric > reviewer > persona)</td><td>Verified</td><td>T9; <code>audit_clean.sh</code> PASS confirms sort order.</td></tr>
+<tr><td>FR-10</td><td>reference/reviewer.md ships [J] rows + dispatch contract</td><td>Verified</td><td>T3 commit <code>6890ae7</code>; <code>reference/reviewer.md</code> 106 lines; <code>reviewer_subagent_jtbd_fixture.sh</code> PASS (both [J] checks PASS on JTBD fixture).</td></tr>
+<tr><td>FR-11</td><td>Reviewer subagent dispatched per /skill-eval FR-44 shape</td><td>Verified</td><td>T4; reference/reviewer.md cites FR-44.</td></tr>
+<tr><td>FR-12</td><td>Parent-side validation: check_id set-equality + quote substring-grep (≥40 chars)</td><td>Verified</td><td>T4; <code>reviewer_subagent_contract.sh</code> ALL 3 VARIANTS PASS (A valid; B sub-40 hard-fail; C missing-check_id hard-fail).</td></tr>
+<tr><td>FR-13</td><td>Hard-fail with exact message on sub-40 quote OR missing check_id</td><td>Verified</td><td>T4; <code>_reviewer_validate.sh</code>; contract test variant B + C PASS.</td></tr>
+<tr><td>FR-14</td><td>Reviewer-subagent stub escape via env var <code>READMER_REVIEWER_STUB</code></td><td>Verified</td><td>T3/T4; <code>tests/mocks/reviewer_stub.sh</code>; contract test wires the stub via env.</td></tr>
+<tr><td>FR-15</td><td>Tracer asserts close-out emits FR-V-2 <code>Suggest:/polish</code> line; transcript grep</td><td>Verified</td><td>T9 commit <code>cfd852e</code>; <code>tracer_audit_polish_suggest.sh</code> PASS (occurrences=3; both-modes clause present).</td></tr>
+<tr><td>FR-16</td><td>Suggest:/polish appears exactly once on the final close-out</td><td>Verified</td><td>T9; tracer asserts unique emission per close-out.</td></tr>
+<tr><td>FR-17</td><td>Close-out: ONE row per finding; columns Source | Severity | Check/Persona | Line | Message | Suggested fix</td><td>Verified</td><td>T6/T9; <code>audit_clean.sh</code> confirms D2 column shape preserved.</td></tr>
+<tr><td>FR-18</td><td><code>tests/run-all.sh</code> registers 4 new integration tests (alphabetical)</td><td>Verified</td><td>run-all.sh uses glob <code>"$INTEG_DIR"/*.sh</code> — auto-discovery; all 4 new tests (<code>reviewer_subagent_contract</code>, <code>reviewer_subagent_jtbd_fixture</code>, <code>simulated_reader_sub40_quote</code>, <code>tracer_audit_polish_suggest</code>) execute and PASS. (Functional equivalence to literal "registers in alphabetical order under existing fixture list" — glob ordering is alphabetical by default.)</td></tr>
+<tr><td>FR-SR-3</td><td>Sub-40 quote from persona OR reviewer MUST hard-fail with exact existing message</td><td>Verified</td><td>T7 commit <code>bb1ea01</code>; <code>simulated_reader_sub40_quote.sh</code> PASS (quote len=18 hard-fail enforced).</td></tr>
+<tr><td>FR-SR-5</td><td>Theater-check fires symmetrically on all 4 personas</td><td>Verified</td><td>T5 commit <code>5b53d64</code>; <code>simulated_reader_contract.sh</code> PASS (5-Task dispatch: 4 personas + 1 reviewer documented).</td></tr>
+<tr><td>FR-V-2</td><td><code>Suggest:/polish</code> unconditional on successful audit-or-scaffold</td><td>Verified</td><td>T6 commit <code>309c1c7</code>; <code>tracer_audit_polish_suggest.sh</code> PASS (both-modes clause present).</td></tr>
+<tr><td>FR-OUT-1</td><td>Single-table close-out preserves audit-mode source column</td><td>Verified</td><td>T6/T9; <code>audit_clean.sh</code>: "audit-mode contract preserved".</td></tr>
+<tr><td>FR-OUT-2</td><td>AskUserQuestion mode-branch on close-out</td><td>Verified</td><td>T6; SKILL.md §1 mode-branch (lines 489+); spec acknowledges interactive branch is not auto-tested.</td></tr>
+</tbody>
+</table>
+
+<h2 id="phase-5-plan-compliance">Phase 5: Plan-Task Compliance</h2>
+<table>
+<thead><tr><th>Task</th><th>Outcome</th><th>Evidence</th></tr></thead>
+<tbody>
+<tr><td>T1: BSD-awk fix + selftest drift-guard lint</td><td>Verified-complete</td><td>Commit <code>378064a</code>; <code>scripts/rubric.sh --selftest</code> exits 0 (15 checks; A2 agreement 100%).</td></tr>
+<tr><td>T2: rubric.yaml <code>type:</code> field + cross-cutting [D] + --validate-yaml</td><td>Verified-complete</td><td>Commit <code>471d181</code>; <code>audit_clean.sh</code> PASS (cross-cutting row present).</td></tr>
+<tr><td>T3: reference/reviewer.md + [J] rows + READMER_REVIEWER_STUB</td><td>Verified-complete</td><td>Commit <code>6890ae7</code>; <code>reference/reviewer.md</code> 106 lines; <code>reviewer_subagent_jtbd_fixture.sh</code> PASS.</td></tr>
+<tr><td>T4: Parent-side validation + reviewer_subagent_contract.sh</td><td>Verified-complete</td><td>Commit <code>950acaa</code>; <code>scripts/_reviewer_validate.sh</code>; contract test ALL 3 VARIANTS PASS.</td></tr>
+<tr><td>T5: 4th persona + 5-Task dispatch in SKILL.md §2 step 1</td><td>Verified-complete</td><td>Commit <code>5b53d64</code>; <code>simulated_reader_contract.sh</code> PASS (4 personas + 1 reviewer documented).</td></tr>
+<tr><td>T6: SKILL.md §1 mode-branch + close-out + Suggest:/polish unconditional</td><td>Verified-complete</td><td>Commit <code>309c1c7</code>; <code>tracer_audit_polish_suggest.sh</code> PASS (both-modes clause).</td></tr>
+<tr><td>T7: simulated_reader_sub40_quote.sh — regression fixture for FR-SR-3</td><td>Verified-complete</td><td>Commit <code>bb1ea01</code>; test PASS (quote len=18 hard-fail enforced).</td></tr>
+<tr><td>T8: JTBD fixture + reviewer_subagent_jtbd_fixture.sh</td><td>Verified-complete</td><td>Commit <code>0b57281</code>; <code>tests/fixtures/jtbd-organized-readme.md</code>; test PASS.</td></tr>
+<tr><td>T9: tracer + audit_clean tightening + 5-dispatch contract</td><td>Verified-complete</td><td>Commit <code>cfd852e</code>; <code>tracer_audit_polish_suggest.sh</code> + <code>audit_clean.sh</code> + <code>simulated_reader_contract.sh</code> all PASS.</td></tr>
+<tr><td>T10: Final verification + reviewer_validate robust BASH_SOURCE</td><td>Verified-complete</td><td>Commits <code>5a1dc89</code> + <code>03bc22e</code>; task logs in <code>execute/task-01..task-10.md</code>.</td></tr>
+</tbody>
+</table>
+
+<h2 id="phase-5-ux-wireframe">Phase 5: Wireframe & UX Polish</h2>
+<p>N/A — change has zero UI surface. Skill is a CLI command operating on markdown files; no <code>{feature_folder}/wireframes/</code> was created.</p>
+
+<h2 id="gap-report">Phase 5: Gap Report</h2>
+<p><strong>No new gaps.</strong> Two known-accepted residuals carry forward to <code>/complete-dev</code> (above). Two pre-existing test failures (out of scope) recommended for a follow-up backlog item.</p>
+
+<h2 id="open-items">Open items for /complete-dev</h2>
+<ul>
+  <li>Manifest <strong>minor version bump</strong> 2.48.0 → 2.49.0 in both <code>.claude-plugin/plugin.json</code> and <code>.codex-plugin/plugin.json</code> (kept in sync).</li>
+  <li>Changelog entry: rubric.sh BSD-awk portability fix; reviewer-subagent contract hardening; FR-SR-3 hard-fail regression test; 4th persona / 5-Task dispatch; FR-V-2 <code>Suggest:/polish</code> tracer; JTBD fixture.</li>
+  <li>Carry forward the 2 accepted residuals (<code>a-name-verb-or-gerund</code>, <code>c-body-size-judge</code>) into the <code>/complete-dev</code> summary as KNOWN per Phase 6a.</li>
+  <li>Optional backlog: <code>scripts/commit-classifier.sh --selftest</code> fixture infra; <code>tests/integration/update_hook_dry_run.sh</code> rc=2.</li>
+</ul>
+
+</main>
+</body>
+</html>

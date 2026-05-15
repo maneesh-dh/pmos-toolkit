@@ -36,8 +36,9 @@ check_install_or_quickstart_presence() {
   local path="$1"
   # Find a heading matching Install/Quickstart/Getting Started/Download, then a fenced
   # code block within 10 lines.
+  # BSD awk lacks \b word-boundary; use portable boundary class (mirror L60).
   awk '
-    /^##[[:space:]]+(Install|Quickstart|Getting Started|Download)\b/ {found_h=NR; next}
+    /^##[[:space:]]+(Install|Quickstart|Getting Started|Download)($|[^A-Za-z])/ {found_h=NR; next}
     found_h && NR <= found_h+10 && /^```/ {found_c=1; exit}
     END {exit (found_c?0:1)}
   ' "$path" && {
@@ -115,8 +116,9 @@ check_code_example_runnable_as_shown() {
   # First fenced code block under an Install/Quickstart heading should not contain
   # '...', '<TODO>', '<placeholder>'.
   local block
+  # BSD awk lacks \b word-boundary; use portable boundary class (mirror L60).
   block=$(awk '
-    /^##[[:space:]]+(Install|Quickstart|Getting Started|Download)\b/ {h=1; next}
+    /^##[[:space:]]+(Install|Quickstart|Getting Started|Download)($|[^A-Za-z])/ {h=1; next}
     h && /^```/ {if (incode) {exit} else {incode=1; next}}
     h && incode {print}
   ' "$path")
@@ -433,7 +435,70 @@ EOF
   printf '%d %d\n' "$pass" "$fail"
 }
 
+_selftest_awk_lint() {
+  # Drift-guard: scan rubric.sh for word-boundary atoms (\b, \<, \>) inside
+  # awk '...' blocks. BSD awk lacks these; we use a portable boundary class.
+  # Two-pass scan — Pass A: single-line `awk '...\b...'`. Pass B: multi-line
+  # awk blocks, tracked across lines by counting unmatched single quotes.
+  local script="$1"
+  local lint_failed=0
+  # Pass A: single-line awk-quoted regex containing \b, \<, or \>.
+  # Skip shell-comment lines (leading whitespace + #) — they may legitimately
+  # reference these tokens in lint-self-description text.
+  local hits_a
+  hits_a=$(grep -nE "awk[[:space:]]+'[^']*\\\\(b|<|>)" "$script" \
+    | grep -vE '^[0-9]+:[[:space:]]*#' || true)
+  if [ -n "$hits_a" ]; then
+    while IFS= read -r line; do
+      readme::log "[lint] FAIL: \\b at $line"
+      lint_failed=1
+    done <<EOF
+$hits_a
+EOF
+  fi
+  # Pass B: multi-line awk blocks. Track state via awk itself.
+  local hits_b
+  hits_b=$(awk '
+    {
+      line=$0
+      if (!in_awk) {
+        # Enter awk block: line has `awk ` followed by single-quote and no closing quote yet.
+        if (match(line, /awk[[:space:]]+'\''/)) {
+          rest = substr(line, RSTART + RLENGTH)
+          if (index(rest, "'\''") == 0) { in_awk=1; awk_start=NR }
+        }
+      } else {
+        # Inside awk block; closes when a single quote appears.
+        if (index(line, "'\''") > 0) { in_awk=0; next }
+        # Skip shell-comment lines (defensive; awk-quoted regex never starts with #).
+        if (line ~ /^[[:space:]]*#/) next
+        if (line ~ /\\b|\\<|\\>/) {
+          printf "%s:%d\n", FILENAME, NR
+        }
+      }
+    }
+  ' "$script" || true)
+  if [ -n "$hits_b" ]; then
+    while IFS= read -r line; do
+      readme::log "[lint] FAIL: \\b at $line (multi-line awk block)"
+      lint_failed=1
+    done <<EOF
+$hits_b
+EOF
+  fi
+  if [ "$lint_failed" -eq 0 ]; then
+    readme::log "selftest: lint: PASS"
+  else
+    readme::log "selftest: lint: FAIL"
+  fi
+  return $lint_failed
+}
+
 selftest() {
+  local script_path="$HERE/rubric.sh"
+  local lint_rc=0
+  _selftest_awk_lint "$script_path" || lint_rc=1
+
   local strong_dir="$HERE/../tests/fixtures/rubric/strong"
   local slop_dir="$HERE/../tests/fixtures/rubric/slop"
   local agreement=0 total=0 f counts pass
@@ -467,11 +532,17 @@ selftest() {
   local pct
   pct=$(awk -v a="$agreement" -v t="$total" 'BEGIN {if (t==0) print 0; else printf "%d", (a*100)/t}')
   readme::log "selftest: $agreement/$total fixtures agree (${pct}%)"
+  local agree_rc=0
   if [ "$pct" -ge 85 ]; then
+    readme::log "selftest: fixture-agreement: PASS (${pct}%)"
+  else
+    readme::log "selftest: fixture-agreement: FAIL (${pct}% < 85%)"
+    agree_rc=1
+  fi
+  if [ "$lint_rc" -eq 0 ] && [ "$agree_rc" -eq 0 ]; then
     readme::log "selftest: PASS (15 checks; A2 agreement ${pct}% on $total fixtures)"
     exit 0
   fi
-  readme::log "selftest: FAIL (A2 agreement ${pct}% < 85%)"
   exit 1
 }
 
